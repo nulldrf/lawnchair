@@ -75,6 +75,18 @@
     <string name="wallpapers">Wallpapers</string>
     <string name="caddy_beta">Caddy (Beta)</string>
     <string name="caddy">Caddy</string>
+    <string name="app_drawer_folder">App drawer folder</string>
+    <string name="app_drawer_folder_settings">Drawer folder</string>
+    <string name="add_folder">Add folder</string>
+    <string name="edit_folder">Edit folder</string>
+    <string name="add_label">Add</string>
+    <string name="edit_label">Edit</string>
+    <string name="apply_label">درخواست دیں</string>
+    <string name="delete_label">حزف کریں</string>
+    <string name="folder_list_note">Swipe left to edit, swipe right to delete, or tap to update items</string>
+    <string name="apps_in_folder_label">Hide folder apps</string>
+    <string name="apps_in_folder_description">Apps assigned to folders are excluded from app lists</string>
+    <string name="my_folder_label">My folder</string>
     <!-- A11y description -->
     <string name="accessibility_service_description">اشارہ کرتے وقت اپنے فون کو لاک کرنے کے لیے، اور اشاروں کے ذریعے حالیہ کھولنے کے لیے، Lawnchair کو قابل رسائی رسائی درکار ہوتی ہے۔\n\nLawnchair صارف کی کسی کارروائی کو نہیں دیکھتا، حالانکہ ایسا کرنے کا استحقاق تمام قابل رسائی خدمات کے لیے درکار ہے۔ Lawnchair سسٹم کی طرف سے بھیجے گئے کسی بھی ایونٹ کو رد کر دیتا ہے۔\n\nآپ کے فون کو لاک کرنے، یا Recents کھولنے کے لیے، Lawnchair پرفارم گلوبل ایکشن ایکسیسبیلٹی سروس استعمال کرتا ہے۔.</string>
     <string name="x_by_y">%1$d x %2$d</string>
@@ -116,6 +128,12 @@
     <string name="always_reload_icons_description">آئیکن پیک سے کیشڈ آئیکنز استعمال کرنے سے گریز کریں۔</string>
     <string name="recents_lock_unlock">لاک/انلاک</string>
     <string name="recents_lock_unlock_description">\"سب کو صاف کریں\" دبانے پر منتخب ایپ کو بند ہونے سے روکیں</string>
+    <!--Overlay-->
+    <string name="overlay_fade_in">Fade In</string>
+    <string name="overlay_suck_in">Suck In</string>
+    <string name="app_closing_animation">App closing animation</string>
+    <string name="overlay_label">Overlay</string>
+    <string name="overlay_none">None</string>
     <!--
 
     Notifications
@@ -352,6 +370,7 @@
     <string name="gesture_handler_open_app_drawer">Open app drawer</string>
     <string name="gesture_handler_open_app_search">Open app search</string>
     <string name="gesture_handler_open_search">Open search</string>
+    <string name="gesture_handler_open_assistant">Open assistant</string>
     <string name="pick_app_for_gesture">Pick app</string>
     <string name="dt2s_admin_hint_title">Admin permissions required</string>
     <string name="dt2s_admin_hint">To use Double-Tap to Sleep, set Lawnchair as a device admin app. Tap \"Open settings\", then tap \"Activate this device admin app.\"</string>
@@ -385,6 +404,9 @@
     <string name="wallpaper_blur">Blur wallpaper (experimental)</string>
     <string name="wallpaper_background_blur">Blur intensity</string>
     <string name="wallpaper_background_blur_factor">Factor threshold</string>
+    <string name="home_lawn_deck_label">Deck</string>
+    <string name="home_lawn_deck_label_beta">Deck (Beta)</string>
+    <string name="home_lawn_deck_description">Effortlessly access your applications with Deck, the ultimate drawerless experience designed for simplicity and seamless organization</string>
     <string name="auto_add_shortcuts_label">Add new apps to home screen</string>
     <string name="minus_one_enable">Show feed</string>
     <string name="minus_one_unavailable">No feed apps installed</string>

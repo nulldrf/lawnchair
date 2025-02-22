@@ -75,6 +75,18 @@
     <string name="wallpapers">Wallpapers</string>
     <string name="caddy_beta">Caddy (Beta)</string>
     <string name="caddy">Caddy</string>
+    <string name="app_drawer_folder">App drawer folder</string>
+    <string name="app_drawer_folder_settings">Drawer folder</string>
+    <string name="add_folder">Add folder</string>
+    <string name="edit_folder">Edit folder</string>
+    <string name="add_label">Add</string>
+    <string name="edit_label">Edit</string>
+    <string name="apply_label">Použiť</string>
+    <string name="delete_label">Vymazať</string>
+    <string name="folder_list_note">Swipe left to edit, swipe right to delete, or tap to update items</string>
+    <string name="apps_in_folder_label">Hide folder apps</string>
+    <string name="apps_in_folder_description">Apps assigned to folders are excluded from app lists</string>
+    <string name="my_folder_label">My folder</string>
     <!-- A11y description -->
     <string name="accessibility_service_description">Na uzamknutie telefónu pri vykonávaní gesta vyžaduje aplikácia Lawnchair prístup k funkciám prístupnosti.\n\nLawnchair nesleduje žiadnu činnosť používateľa, hoci oprávnenie na to sa vyžaduje pre všetky služby prístupnosti. Služba Lawnchair zahodí akúkoľvek udalosť odoslanú systémom.\n\nNa uzamknutie telefónu používa služba sprístupnenia performGlobalAction.</string>
     <string name="x_by_y">%1$d × %2$d</string>
@@ -116,6 +128,12 @@
     <string name="always_reload_icons_description">Zamedzí používaniu ikon, ktoré boli uložené vo vyrovnávacej pamäti</string>
     <string name="recents_lock_unlock">Zamknúť/odomknúť</string>
     <string name="recents_lock_unlock_description">Zabrániť ukončeniu vybranej aplikácie po kliknutím tlačidla „Vyčistiť všetko“</string>
+    <!--Overlay-->
+    <string name="overlay_fade_in">Fade In</string>
+    <string name="overlay_suck_in">Suck In</string>
+    <string name="app_closing_animation">App closing animation</string>
+    <string name="overlay_label">Overlay</string>
+    <string name="overlay_none">None</string>
     <!--
 
     Notifications
@@ -352,6 +370,7 @@
     <string name="gesture_handler_open_app_drawer">Otvoriť ponuku aplikácií</string>
     <string name="gesture_handler_open_app_search">Otvoriť vyhľadávanie aplikácií</string>
     <string name="gesture_handler_open_search">Otvoriť vyhľadávanie</string>
+    <string name="gesture_handler_open_assistant">Open assistant</string>
     <string name="pick_app_for_gesture">Vybrať aplikáciu</string>
     <string name="dt2s_admin_hint_title">Nutné povolenia správcu</string>
     <string name="dt2s_admin_hint">Pre používanie dvojitého kliknutia pre uspanie, nastavte Lawnchair ako správcu aplikácie. Kliknite na Nastavenia a potom na \"Aktivujte túto aplikáciu ako správca.\"</string>
@@ -385,6 +404,9 @@
     <string name="wallpaper_blur">Rozmazať pozadie (experimentálne)</string>
     <string name="wallpaper_background_blur">Intenzita rozmazania</string>
     <string name="wallpaper_background_blur_factor">Factor threshold</string>
+    <string name="home_lawn_deck_label">Deck</string>
+    <string name="home_lawn_deck_label_beta">Deck (Beta)</string>
+    <string name="home_lawn_deck_description">Effortlessly access your applications with Deck, the ultimate drawerless experience designed for simplicity and seamless organization</string>
     <string name="auto_add_shortcuts_label">Pridať nové aplikácie na domovskú obrazovku</string>
     <string name="minus_one_enable">Ukázať feed</string>
     <string name="minus_one_unavailable">Feed nie je nainštalovaný</string>

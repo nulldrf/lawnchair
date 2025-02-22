@@ -21,13 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.lawnchair.data.Converters
 import app.lawnchair.font.FontCache
 import app.lawnchair.gestures.config.GestureHandlerConfig
+import app.lawnchair.gestures.type.GestureType
 import app.lawnchair.hotseat.HotseatMode
 import app.lawnchair.icons.CustomAdaptiveIconDrawable
 import app.lawnchair.icons.shape.IconShape
@@ -45,11 +48,13 @@ import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.ui.popup.LauncherOptionsPopup
 import app.lawnchair.ui.preferences.components.HiddenAppsInSearch
 import app.lawnchair.util.kotlinxJson
+import app.lawnchair.views.overlay.FullScreenOverlayMode
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.InvariantDeviceProfile.INDEX_DEFAULT
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
 import com.android.launcher3.graphics.IconShape as L3IconShape
+import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.DynamicResource
 import com.android.launcher3.util.MainThreadInitializedObject
 import com.android.launcher3.util.SafeCloseable
@@ -57,9 +62,11 @@ import com.patrykmichalik.opto.core.PreferenceManager
 import com.patrykmichalik.opto.core.firstBlocking
 import com.patrykmichalik.opto.core.setBlocking
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 class PreferenceManager2 private constructor(private val context: Context) :
@@ -374,19 +381,19 @@ class PreferenceManager2 private constructor(private val context: Context) :
     val homeIconSizeFactor = preference(
         key = floatPreferencesKey(name = "home_icon_size_factor"),
         defaultValue = resourceProvider.getFloat(R.dimen.config_default_home_icon_size_factor),
-        onSet = { reloadHelper.reloadIcons() },
+        onSet = { reloadHelper.reloadGrid() },
     )
 
     val folderPreviewBackgroundOpacity = preference(
         key = floatPreferencesKey(name = "folder_preview_background_opacity"),
         defaultValue = resourceProvider.getFloat(R.dimen.config_default_folder_preview_background_opacity),
-        onSet = { reloadHelper.reloadIcons() },
+        onSet = { reloadHelper.reloadGrid() },
     )
 
     val folderBackgroundOpacity = preference(
         key = floatPreferencesKey(name = "folder_background_opacity"),
         defaultValue = resourceProvider.getFloat(R.dimen.config_default_folder_background_opacity),
-        onSet = { reloadHelper.reloadIcons() },
+        onSet = { reloadHelper.reloadGrid() },
     )
 
     val showIconLabelsOnHomeScreen = preference(
@@ -404,7 +411,7 @@ class PreferenceManager2 private constructor(private val context: Context) :
     val drawerIconSizeFactor = preference(
         key = floatPreferencesKey(name = "drawer_icon_size_factor"),
         defaultValue = resourceProvider.getFloat(R.dimen.config_default_drawer_icon_size_factor),
-        onSet = { reloadHelper.reloadIcons() },
+        onSet = { reloadHelper.reloadGrid() },
     )
 
     val showIconLabelsInDrawer = preference(
@@ -458,6 +465,14 @@ class PreferenceManager2 private constructor(private val context: Context) :
     val enableFuzzySearch = preference(
         key = booleanPreferencesKey(name = "enable_fuzzy_search"),
         defaultValue = context.resources.getBoolean(R.bool.config_default_enable_fuzzy_search),
+    )
+
+    val closingAppOverlay = preference(
+        key = stringPreferencesKey(name = "closing_app_overlay"),
+        defaultValue = FullScreenOverlayMode.fromValue(context.resources.getString(R.string.config_default_overlay)),
+        parse = { FullScreenOverlayMode.fromValue(it) },
+        save = { it.value },
+        onSet = { reloadHelper.reloadGrid() },
     )
 
     val matchHotseatQsbStyle = preference(
@@ -629,6 +644,18 @@ class PreferenceManager2 private constructor(private val context: Context) :
         onSet = { reloadHelper.recreate() },
     )
 
+    val deckLayout = preference(
+        key = booleanPreferencesKey(name = "enable_lawn_deck"),
+        defaultValue = false,
+        onSet = { reloadHelper.reloadIcons() },
+    )
+
+    val enableLabelInDock = preference(
+        key = booleanPreferencesKey(name = "enable_label_dock"),
+        defaultValue = false,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
     val doubleTapGestureHandler = serializablePreference<GestureHandlerConfig>(
         key = stringPreferencesKey("double_tap_gesture_handler"),
         defaultValue = GestureHandlerConfig.Sleep,
@@ -677,6 +704,25 @@ class PreferenceManager2 private constructor(private val context: Context) :
                 LauncherAppState.getInstance(context).reloadIcons()
             }
             .launchIn(scope)
+    }
+
+    suspend fun setGestureForApp(key: ComponentKey, gestureType: GestureType, gesture: GestureHandlerConfig) {
+        val cmp = Converters().fromComponentKey(key)
+        val key = stringPreferencesKey("$cmp:${gestureType.name}")
+        preferencesDataStore.edit { prefs ->
+            prefs[key] = kotlinxJson.encodeToString(gesture)
+        }
+    }
+
+    fun getGestureForApp(key: ComponentKey, gestureType: GestureType): Flow<GestureHandlerConfig> {
+        val cmp = Converters().fromComponentKey(key)
+        val key = stringPreferencesKey("$cmp:${gestureType.name}")
+        return preferencesDataStore.data.map { prefs ->
+            prefs[key]?.let {
+                runCatching { kotlinxJson.decodeFromString<GestureHandlerConfig>(it) }
+                    .getOrDefault(GestureHandlerConfig.NoOp)
+            } ?: GestureHandlerConfig.NoOp
+        }
     }
 
     private fun initializeIconShape(shape: IconShape) {

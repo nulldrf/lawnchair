@@ -126,7 +126,7 @@ object ColorTokens {
 
     @JvmField val QsbIconTintPrimary = DayNightColorToken(Accent1_600, Accent1_200)
 
-    @JvmField val QsbIconTintSecondary = DayNightColorToken(Accent2_300, Accent1_10)
+    @JvmField val QsbIconTintSecondary = DayNightColorToken(Accent2_300, Accent2_300)
 
     @JvmField val QsbIconTintTertiary = DayNightColorToken(Accent1_500, Accent1_400)
 

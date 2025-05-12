@@ -44,6 +44,7 @@ import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.ui.popup.LauncherOptionsPopup
+import app.lawnchair.ui.popup.toOptionOrderString
 import app.lawnchair.ui.preferences.components.HiddenAppsInSearch
 import app.lawnchair.ui.preferences.data.liveinfo.LiveInformationManager
 import app.lawnchair.util.kotlinxJson
@@ -288,11 +289,6 @@ class PreferenceManager2 private constructor(private val context: Context) :
     val lockHomeScreen = preference(
         key = booleanPreferencesKey(name = "lock_home_screen"),
         defaultValue = context.resources.getBoolean(R.bool.config_default_lock_home_screen),
-        onSet = {
-            if (it) {
-                LauncherOptionsPopup.disableUnavailableItems(context)
-            }
-        },
     )
 
     val legacyPopupOptionsMigrated = preference(
@@ -302,7 +298,7 @@ class PreferenceManager2 private constructor(private val context: Context) :
 
     val launcherPopupOrder = preference(
         key = stringPreferencesKey(name = "launcher_popup_order"),
-        defaultValue = LauncherOptionsPopup.DEFAULT_ORDER,
+        defaultValue = LauncherOptionsPopup.DEFAULT_ORDER.toOptionOrderString(),
         onSet = { reloadHelper.reloadGrid() },
     )
 

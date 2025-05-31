@@ -6,16 +6,21 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Text
-import androidx.compose.material.TextFieldDefaults
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -80,6 +85,24 @@ fun CustomizeDialog(
                 contentDescription = null,
                 modifier = Modifier.size(54.dp),
             )
+            if (launchSelectIcon != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(12.dp),
+                    )
+                }
+            }
         }
         OutlinedTextField(
             value = title,
@@ -96,9 +119,9 @@ fun CustomizeDialog(
                 }
             },
             singleLine = true,
-            colors = TextFieldDefaults.outlinedTextFieldColors(
-                unfocusedBorderColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12F),
-                textColor = MaterialTheme.colors.onSurface,
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
             ),
             shape = MaterialTheme.shapes.large,
             label = { Text(text = stringResource(id = R.string.label)) },
@@ -172,7 +195,7 @@ fun CustomizeAppDialog(
             )
         }
 
-        if (context.launcher.stateManager.state != LauncherState.ALL_APPS) {
+        if (preferenceManager2.iconSwipeGestures.asState().value && context.launcher.stateManager.state != LauncherState.ALL_APPS) {
             PreferenceGroup(heading = stringResource(R.string.gestures_label)) {
                 listOf(
                     GestureType.SWIPE_LEFT,

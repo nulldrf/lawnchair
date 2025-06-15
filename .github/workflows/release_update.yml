@@ -23,6 +23,9 @@ on:
 jobs:
   build-release-apk:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,11 +34,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 21
-      - uses: gradle/gradle-build-action@v2
-        with:
-          gradle-home-cache-cleanup: true
-      - name: Build release APK
-        run: ./gradlew assembleLawnWithQuickstepRelease
+      - uses: gradle/actions/setup-gradle@v4
       - name: Write sign info
         id: sign-release-apk
         if: github.repository_owner == 'LawnchairLauncher'
@@ -47,9 +46,14 @@ jobs:
             echo storeFile='${{ github.workspace }}/key.jks' >> keystore.properties
             echo ${{ secrets.KEYSTORE }} | base64 --decode > ${{ github.workspace }}/key.jks
           fi
+      - name: Build release APK
+        run: ./gradlew assembleLawnWithQuickstepGithubRelease
       - name: Rename artifact
-        continue-on-error: true
-        run: mv "${{ steps.sign-release-apk.outputs.signedReleaseFile }}" "${{ github.event.inputs.artifactName }}"
+        run: mv build/outputs/apk/**/**/*.apk "${{ github.event.inputs.artifactName }}"
+      - name: Attest
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ github.event.inputs.artifactName }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -72,7 +76,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tagName }}
-          prerelease: ${{ github.events.inputs.prerelease }}
+          prerelease: ${{ github.event.inputs.prerelease }}
           draft: true
           body_path: ${{ github.workspace }}/GITHUB_CHANGELOG.md
           files: artifacts/release-apk/${{ github.event.inputs.artifactName }}

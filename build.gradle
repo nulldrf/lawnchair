@@ -365,7 +365,7 @@ dependencies {
     implementation 'com.github.ChickenHook:RestrictionBypass:2.2'
     implementation 'dev.rikka.tools.refine:runtime:4.4.0'
 
-    implementation platform("androidx.compose:compose-bom:2025.05.01")
+    implementation platform("androidx.compose:compose-bom:2025.06.00")
     implementation "androidx.compose.ui:ui"
     implementation "androidx.compose.ui:ui-util"
     debugImplementation "androidx.compose.ui:ui-tooling"
@@ -378,7 +378,7 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material3:material3-window-size-class'
     implementation "androidx.activity:activity-compose:1.10.1"
-    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1"
     implementation "androidx.navigation:navigation-compose:2.9.0"
     implementation "androidx.constraintlayout:constraintlayout:2.2.1"
     implementation "androidx.palette:palette-ktx:1.0.0"
@@ -411,10 +411,10 @@ dependencies {
     // Persian Date
     implementation 'com.github.samanzamani:PersianDate:1.7.1'
 
-    implementation 'com.airbnb.android:lottie:6.6.6'
+    implementation 'com.airbnb.android:lottie:6.6.7'
 
     // Compose drag and drop library
-    implementation 'sh.calvin.reorderable:reorderable:2.4.3'
+    implementation 'sh.calvin.reorderable:reorderable:2.5.1'
 
     // Smartspacer
     implementation('com.kieronquinn.smartspacer:sdk-client:1.1.2') {

@@ -17,7 +17,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
 import app.lawnchair.preferences.PreferenceManager
-import app.lawnchair.ui.util.isPlayStoreFlavor
 import app.lawnchair.util.checkAndRequestFilesPermission
 import app.lawnchair.util.filesAndStorageGranted
 import app.lawnchair.util.scaleDownToDisplaySize
@@ -51,7 +50,7 @@ fun wallpaperDrawable(): Drawable? {
     val permissionState = rememberPermissionState(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             android.Manifest.permission.READ_MEDIA_IMAGES
-        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !isPlayStoreFlavor()) {
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             android.Manifest.permission.MANAGE_EXTERNAL_STORAGE
         } else {
             android.Manifest.permission.READ_EXTERNAL_STORAGE

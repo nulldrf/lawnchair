@@ -51,6 +51,7 @@ import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.navigation.AboutLicenses
 import app.lawnchair.util.checkAndRequestFilesPermission
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
@@ -305,7 +306,7 @@ fun About(
         PreferenceGroup {
             NavigationActionPreference(
                 label = stringResource(id = R.string.acknowledgements),
-                destination = AboutRoutes.LICENSES,
+                destination = AboutLicenses,
             )
             ClickablePreference(
                 label = stringResource(id = R.string.translate),

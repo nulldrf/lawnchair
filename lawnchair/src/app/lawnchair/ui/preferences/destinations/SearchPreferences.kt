@@ -1,5 +1,6 @@
 package app.lawnchair.ui.preferences.destinations
 
+import androidx.annotation.Keep
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -15,9 +16,10 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.TwoTabPreferenceLayout
 import app.lawnchair.ui.preferences.components.search.DockSearchPreference
 import app.lawnchair.ui.preferences.components.search.DrawerSearchPreference
-import app.lawnchair.ui.preferences.navigation.Routes
+import app.lawnchair.ui.preferences.navigation.Search
 import com.android.launcher3.R
 
+@Keep // This is refed by a Kotlin serializer, we must keep it's fully qualified name.
 enum class SearchRoute {
     DOCK_SEARCH,
     DRAWER_SEARCH,
@@ -36,7 +38,7 @@ fun SearchBarPreference(
                 label = stringResource(R.string.search_bar_settings),
                 modifier = modifier,
             ) {
-                navController.navigate(route = "${Routes.SEARCH}/${id.ordinal}")
+                navController.navigate(route = Search(id))
             }
         }
     }
@@ -55,12 +57,12 @@ fun SearchBarPreference(
 @Composable
 fun SearchPreferences(
     modifier: Modifier = Modifier,
-    currentTab: Int = 0,
+    currentTab: SearchRoute = SearchRoute.DOCK_SEARCH,
 ) {
     TwoTabPreferenceLayout(
         label = stringResource(id = R.string.search_bar_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
-        defaultPage = currentTab,
+        defaultPage = currentTab.ordinal,
         firstPageLabel = stringResource(id = R.string.dock_label),
         firstPageContent = {
             DockSearchPreference()

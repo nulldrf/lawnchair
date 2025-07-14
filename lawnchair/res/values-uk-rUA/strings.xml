@@ -43,7 +43,7 @@
     <string name="inverse_selection">Inverse selection</string>
     <string name="loading">Завантаження…</string>
     <string name="download_update">Download update</string>
-    <string name="install_update">Скачать обновлення</string>
+    <string name="install_update">Встановіть оновлення</string>
     <string name="pro_updated">You\'re up-to-date!</string>
     <string name="managed_by_lawnchair">Керується Lawnchair</string>
     <!-- When mentioning settings UI -->
@@ -100,7 +100,7 @@
     <string name="accessibility_service_description">To perform certain actions (such as locking your phone) when performing a gesture, Lawnchair requires accessibility access.\n\nLawnchair doesn\'t watch any user action, though the privilege to do so is required for all accessibility services. Lawnchair discards any event sent by the system.\n\nIn order to lock your phone, or to open the Recents screen, Lawnchair uses the performGlobalAction Accessibility service.</string>
     <string name="x_with_y_count">%1$s (%2$d)</string>
     <string name="x_by_y">%1$d на %2$d</string>
-    <string name="x_and_y">%1$s і %2$s</string>
+    <string name="x_and_y">%1$s &amp; %2$s</string>
     <string name="advanced">Advanced</string>
     <!--
 
@@ -139,6 +139,8 @@
     <string name="always_reload_icons_description">Уникати використання кешованих значків з наборів значків</string>
     <string name="icon_swipe_gestures">Icon swipe gestures</string>
     <string name="icon_swipe_gestures_description">Perform actions when swiping left or right on icons instead of moving the home screen</string>
+    <string name="show_deck_layout">Deck layout</string>
+    <string name="show_deck_layout_description">Show a layout option to hide the app drawer and automatically add new apps to the home screen</string>
     <string name="recents_lock_unlock">Заблокувати/Розблокувати</string>
     <string name="recents_lock_unlock_description">Не закривати обрані додатки при натисканні \"Закрити всі\"</string>
     <!--Overlay-->
@@ -611,4 +613,5 @@
     <string name="warn_contact_permission_content">Щоб шукати контакти, надайте Lawnchair доступ до списку контактів та дзвінків</string>
     <string name="warn_files_permission_content">Щоб шукати файли, надайте Lawnchair доступ до сховища</string>
     <string name="grant_requested_permissions">Надати дозвіл</string>
+    <string name="custom_search_label">Custom search engine name</string>
 </resources>

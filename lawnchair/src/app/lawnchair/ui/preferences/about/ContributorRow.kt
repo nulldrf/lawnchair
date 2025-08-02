@@ -17,7 +17,6 @@
 package app.lawnchair.ui.preferences.about
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -27,87 +26,81 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import app.lawnchair.ui.placeholder.PlaceholderHighlight
 import app.lawnchair.ui.placeholder.fade
 import app.lawnchair.ui.placeholder.placeholder
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
-import app.lawnchair.util.kotlinxJson
 import coil.compose.SubcomposeAsyncImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
-import okhttp3.MediaType.Companion.toMediaType
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import retrofit2.http.GET
-import retrofit2.http.Path
+import com.android.launcher3.R
 
-suspend fun checkUserContribution(userName: String): String {
-    val retrofit = Retrofit.Builder()
-        .baseUrl("https://api.github.com/")
-        .addConverterFactory(kotlinxJson.asConverterFactory("application/json".toMediaType()))
-        .build()
-
-    val api = retrofit.create(GitHubApi::class.java)
-
-    return withContext(Dispatchers.IO) {
-        try {
-            val events = api.getRepositoryEvents("LawnchairLauncher", "lawnchair")
-            val isActive = events.any {
-                it.actor.login == userName
-            }
-            if (isActive) "Active" else "Idle"
-        } catch (e: Exception) {
-            e.printStackTrace()
-            ""
-        }
+/**
+ * Displays a row with contributor information.
+ *
+ * @param member The [TeamMember] data for the contributor.
+ * @param modifier Optional [Modifier] for customization.
+ */
+@Composable
+fun ContributorRow(
+    member: TeamMember,
+    modifier: Modifier = Modifier,
+) {
+    val statusText = when (member.status) {
+        ContributorStatus.Active -> stringResource(R.string.contributor_status_active)
+        ContributorStatus.Idle -> ""
     }
+
+    val context = LocalContext.current
+    val description = "${
+        stringResource(member.role.descriptionResId)
+    } ${if (member.status == ContributorStatus.Active && statusText.isNotBlank()) "• $statusText" else ""}"
+
+    ContributorRow(
+        name = member.name,
+        description = description,
+        photoUrl = member.photoUrl,
+        onClick = {
+            val webpage = member.socialUrl.toUri()
+            val intent = Intent(Intent.ACTION_VIEW, webpage)
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+            }
+        },
+        modifier = modifier,
+    )
 }
 
+/**
+ * Displays a row with contributor information.
+ *
+ * @param name The name of the contributor.
+ * @param description The role and status of the contributor.
+ * @param photoUrl The URL of the contributor's photo.
+ * @param onClick The action to perform when the row is clicked.
+ * @param modifier Optional [Modifier] for customization.
+ */
 @Composable
 fun ContributorRow(
     name: String,
     description: String,
     photoUrl: String,
-    url: String,
-    githubUsername: String?,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-
-    val coroutineScope = rememberCoroutineScope()
-    var contributionStatus by remember { mutableStateOf("") }
-
-    if (githubUsername != null) {
-        LaunchedEffect(githubUsername) {
-            coroutineScope.launch {
-                contributionStatus = checkUserContribution(githubUsername)
-            }
-        }
-    }
-
     PreferenceTemplate(
         title = { Text(text = name) },
         modifier = modifier
-            .clickable {
-                val webpage = Uri.parse(url)
-                val intent = Intent(Intent.ACTION_VIEW, webpage)
-                if (intent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(intent)
-                }
-            },
-        description = { Text(text = "$description ${if (!contributionStatus.isBlank() or !contributionStatus.isEmpty()) "•" else ""} $contributionStatus") },
+            .clickable(onClick = onClick),
+        description = {
+            Text(
+                text = description,
+            )
+        },
         startWidget = {
             SubcomposeAsyncImage(
                 model = photoUrl,
@@ -130,23 +123,3 @@ fun ContributorRow(
         },
     )
 }
-
-interface GitHubApi {
-    @GET("repos/{owner}/{repo}/events")
-    suspend fun getRepositoryEvents(
-        @Path("owner") owner: String,
-        @Path("repo") repo: String,
-    ): List<GitHubEvent>
-}
-
-@Serializable
-data class GitHubEvent(
-    val type: String,
-    val actor: Actor,
-    val created_at: String,
-)
-
-@Serializable
-data class Actor(
-    val login: String,
-)

@@ -45,7 +45,22 @@
     <string name="dismiss">Miễn nhiệm</string>
     <string name="download_update">Tải xuống bản cập nhật</string>
     <string name="install_update">Cài đặt bản cập nhật</string>
+    <string name="view_changes">Xem các thay đổi</string>
     <string name="pro_updated">Bạn đã cập nhật rồi!</string>
+    <!-- Changes dialog strings -->
+    <string name="changes_dialog_title">Cập nhật</string>
+    <string name="changes_dialog_error">Không tải được thay đổi</string>
+    <string name="changes_dialog_no_changes">Không tìm thấy thay đổi nào</string>
+    <string name="changes_dialog_build_format">Bản dựng #%1$d -> #%2$d</string>
+    <string name="changes_dialog_commit_info">từ %1$s • %2$s • %3$s</string>
+    <!-- Time ago strings -->
+    <string name="time_just_now">chỉ bây giờ</string>
+    <string name="time_minutes_ago">%dph</string>
+    <string name="time_hours_ago">%dg</string>
+    <string name="time_days_ago">%dng</string>
+    <string name="time_weeks_ago">%dt</string>
+    <string name="time_months_ago">%dth</string>
+    <string name="time_years_ago">%dn</string>
     <string name="managed_by_lawnchair">Quản lí bởi Lawnchair</string>
     <!-- When mentioning settings UI -->
     <string name="smartspace_preferences">Tùy chỉnh</string>
@@ -207,9 +222,9 @@
     <string name="icon_shape_squircle">Vuông tròn</string>
     <string name="icon_shape_teardrop">Giọt nước</string>
     <!-- Icon shape (Material 3 Expressive) -->
-    <string name="icon_shape_four_sided_cookie">Four-sided cookie</string>
-    <string name="icon_shape_seven_sided_cookie">Seven-sided cookie</string>
-    <string name="icon_shape_arch">Arch</string>
+    <string name="icon_shape_four_sided_cookie">Cookie bốn mặt</string>
+    <string name="icon_shape_seven_sided_cookie">Cookie bảy mặt</string>
+    <string name="icon_shape_arch">Cổng vòm</string>
     <!-- Custom icon shapes -->
     <string name="custom_icon_shape">Tùy chỉnh hình dạng biểu tượng</string>
     <string name="custom_icon_shape_create">Tạo hình dạng biểu tượng tùy chỉnh</string>
@@ -343,19 +358,23 @@
     About the app
 
     -->
-    <string name="news">Tin tức</string>
     <string name="support">Hỗ trợ</string>
+    <string name="translate">Dịch</string>
+    <string name="donate">Đóng góp</string>
     <string name="product">Sản phẩm từ</string>
     <string name="design_and_development">Thiết kế và phát triển</string>
     <string name="development">Nhà phát triển</string>
     <string name="quickswitch_maintenance">Bảo trì QuickSwitch</string>
     <string name="devops">Tuỳ chọn của lập trình viên</string>
     <string name="support_and_pr">Hỗ trợ và PR</string>
+    <string name="community">Cộng đồng</string>
+    <string name="telegram">Telegram</string>
+    <string name="news">Tin tức</string>
+    <string name="legal">Hợp pháp</string>
     <string name="acknowledgements">Ghi nhận</string>
-    <string name="translate">Dịch</string>
-    <string name="donate">Đóng góp</string>
-    <string name="contributor_status_active">Active</string>
-    <string name="update_check_failed">Failed to check for updates</string>
+    <string name="privacy_policy">Chính sách bảo mật</string>
+    <string name="contributor_status_active">Kích hoạt</string>
+    <string name="update_check_failed">Không kiểm tra được bản cập nhật</string>
     <!--
 
     Backup and restore

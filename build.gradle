@@ -14,9 +14,9 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.serialization' version "2.1.10"
     id "com.google.devtools.ksp" version "2.1.10-1.0.31"
     id 'com.google.protobuf' version "0.9.5"
-    id 'app.cash.licensee' version "1.13.0"
+    id 'app.cash.licensee' version "1.14.1"
     id 'dev.rikka.tools.refine' version "4.4.0"
-    id 'com.diffplug.spotless' version '7.2.1'
+    id 'com.diffplug.spotless' version '8.0.0'
 }
 
 
@@ -49,7 +49,7 @@ allprojects {
     }
 
     plugins.withId('com.google.protobuf') {
-        def protocVersion = '4.32.1'
+        def protocVersion = '4.33.0'
         protobuf {
             // Configure the protoc executable
             protoc {
@@ -397,7 +397,7 @@ dependencies {
     implementation 'com.github.ChickenHook:RestrictionBypass:2.2'
     implementation 'dev.rikka.tools.refine:runtime:4.4.0'
 
-    implementation platform("androidx.compose:compose-bom:2025.09.00")
+    implementation platform("androidx.compose:compose-bom:2025.10.00")
     implementation "androidx.compose.ui:ui"
     implementation "androidx.compose.ui:ui-util"
     debugImplementation "androidx.compose.ui:ui-tooling"
@@ -410,8 +410,8 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material3:material3-window-size-class'
     implementation "androidx.activity:activity-compose:1.11.0"
-    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.3"
-    implementation "androidx.navigation:navigation-compose:2.9.4"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4"
+    implementation "androidx.navigation:navigation-compose:2.9.5"
     implementation "androidx.constraintlayout:constraintlayout:2.2.1"
     implementation "androidx.palette:palette-ktx:1.0.0"
     implementation "androidx.slice:slice-core:1.1.0-alpha02"
@@ -432,7 +432,7 @@ dependencies {
     def retrofitVersion = "3.0.0"
     implementation "com.squareup.retrofit2:retrofit:$retrofitVersion"
     implementation "com.squareup.retrofit2:converter-kotlinx-serialization:$retrofitVersion"
-    implementation "com.squareup.okhttp3:okhttp:5.1.0"
+    implementation "com.squareup.okhttp3:okhttp:5.2.1"
 
     def roomVersion = '2.7.2'
     implementation "androidx.room:room-runtime:$roomVersion"
@@ -444,7 +444,7 @@ dependencies {
     // Persian Date
     implementation 'com.github.samanzamani:PersianDate:1.7.1'
 
-    implementation 'com.airbnb.android:lottie:6.6.7'
+    implementation 'com.airbnb.android:lottie:6.6.10'
 
     // Compose drag and drop library
     implementation 'sh.calvin.reorderable:reorderable:2.5.1'
@@ -456,7 +456,7 @@ dependencies {
 
     implementation 'io.github.hokofly:hoko-blur:1.5.5'
 
-    implementation "androidx.window:window:1.4.0"
+    implementation "androidx.window:window:1.5.0"
 }
 
 ksp {
@@ -495,4 +495,5 @@ licensee {
     allowUrl("https://opensource.org/licenses/mit-license.php")
 
     bundleAndroidAsset = true
+    androidAssetReportPath = 'licenses.json'
 }

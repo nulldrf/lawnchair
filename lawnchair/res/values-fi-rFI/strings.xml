@@ -91,6 +91,7 @@
     <string name="wallpaper">Taustakuva</string>
     <string name="style">Tyyli</string>
     <string name="background_opacity">Taustan läpinäkymättömyys</string>
+    <string name="pref_all_apps_search_bar_background">Separated Search bar background</string>
     <!-- Toast text and tips -->
     <string name="copied_toast">Kopioitu leikepöydälle</string>
     <string name="calculator_search_result_copied_toast">Tulos kopioitu leikepöydälle</string>
@@ -534,9 +535,9 @@
     <string name="pref_all_apps_remember_position_title">Muista sijainti</string>
     <string name="pref_all_apps_remember_position_description">Muista sovellusvalikon sijainti siitä poistumisen jälkeen</string>
     <string name="pref_all_apps_show_scrollbar_title">Näytä vierityspalkki</string>
-    <string name="app_drawer_columns">App drawer columns</string>
-    <string name="row_height_label">Row height</string>
-    <string name="app_drawer_indent_label">Horizontal padding</string>
+    <string name="app_drawer_columns">Sovellusvalikon pylväät</string>
+    <string name="row_height_label">Rivin korkeus</string>
+    <string name="app_drawer_indent_label">Vaakareunus</string>
     <string name="app_drawer_bg_color_label">Background color</string>
     <!-- HiddenAppsPreferences -->
     <string name="hide_from_drawer">Hide from app drawer</string>
@@ -608,7 +609,7 @@
     <string name="search_algorithm_global_search_via_asi">Globaali haku (ASI:n kautta)</string>
     <string name="custom_search_label">Hakukoneen nimi</string>
     <string name="custom_search_url">Hakukoneen URL</string>
-    <string name="custom_search_suggestions_url">Hakuehdotusten URL-osoite</string>
+    <string name="custom_search_suggestions_url">Search suggestions URL</string>
     <string name="custom_search_input_hint">&#37;s tullaan korvaamaan haun kyselyllä</string>
     <string name="custom_search_suggestions_hint">&#37;s korvataan haun kyselyllä ja tulosten on oltava JSON OpenSearch -muodossa.</string>
     <!-- Labels of each search result types -->

@@ -109,7 +109,7 @@
     <string name="edit_label">Изменить</string>
     <string name="apply_label">Применить</string>
     <string name="delete_label">Удалить</string>
-    <string name="folder_list_note">Смахните влево для редактирования, Смахните вправо для удаления или Коснитесь для обновления элементов</string>
+    <string name="folder_list_note">Смахните влево для редактирования, Смахните вправо для удаления или коснитесь для обновления элементов</string>
     <string name="apps_in_folder_label">Скрыть приложения в папках</string>
     <string name="apps_in_folder_description">Скрывать приложения в папках из общего списка приложений</string>
     <string name="folders_filter_duplicates">Показывать только неповторяющиеся приложения</string>

@@ -624,7 +624,7 @@
     <string name="search_pref_result_files_title">Soubory</string>
     <string name="search_pref_result_visual_media_title">Photos and videos</string>
     <string name="search_pref_result_audio_media_title">Audio files</string>
-    <string name="search_pref_result_all_files_title">All files</string>
+    <string name="search_pref_result_all_files_title">Všechny soubory</string>
     <string name="search_pref_result_web_title">Návrhy webu</string>
     <string name="search_pref_result_history_title">Search history</string>
     <string name="all_apps_search_result_calculator">Kalkulačka</string>

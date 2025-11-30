@@ -1,5 +1,6 @@
 import app.cash.licensee.SpdxId
 import com.android.build.gradle.api.AndroidBasePlugin
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -39,8 +40,8 @@ allprojects {
                 checkReleaseBuilds false
             }
             compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
+                sourceCompatibility = libs.versions.jdkRelease.get()
+                targetCompatibility = libs.versions.jdkRelease.get()
             }
         }
         dependencies {
@@ -72,17 +73,24 @@ allprojects {
 
     plugins.withType(JavaBasePlugin).configureEach {
         java {
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
+            sourceCompatibility = libs.versions.jdkRelease.get()
+            targetCompatibility = libs.versions.jdkRelease.get()
         }
     }
 
     tasks.withType(KotlinCompile).configureEach {
         compilerOptions {
-            freeCompilerArgs.add(
-                "-Xjvm-default=all",
-            )
-            jvmTarget = JvmTarget.JVM_17
+            jvmDefault = JvmDefaultMode.ENABLE
+            jvmTarget = JvmTarget.fromTarget(libs.versions.jdkRelease.get())
+        }
+    }
+
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            // Fix duplicate class kotlinx.android.parcel.* found in these 2 dependencies.
+            if (requested.module == libs.kotlin.androidExtensionRuntime.get().module) {
+                useTarget(libs.kotlin.parcelizeRuntime)
+            }
         }
     }
 
@@ -96,10 +104,12 @@ allprojects {
             }
             gradle.projectsEvaluated {
                 tasks.withType(JavaCompile).configureEach {
+                    // Make sure the frameworkJar is always first in the classpath.
                     classpath = files(frameworkJar, classpath)
                 }
                 tasks.withType(KotlinCompile).configureEach {
-                    libraries.from(files(frameworkJar))
+                    // Make sure the frameworkJar is always first in the classpath.
+                    libraries.setFrom files(frameworkJar, libraries)
                 }
             }
             dependencies {
@@ -448,8 +458,6 @@ dependencies {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
-    arg("room.generateKotlin", "true")
-    arg("room.incremental", "true")
 }
 
 
@@ -461,8 +469,8 @@ spotless {
     }
     kotlin {
         target("lawnchair/src/**/*.kt")
-        ktlint().customRuleSets([
-            "io.nlopez.compose.rules:ktlint:0.4.27",
+        ktlint("1.8.0").customRuleSets([
+            "io.nlopez.compose.rules:ktlint:0.4.28",
         ]).editorConfigOverride([
             "ktlint_compose_compositionlocal-allowlist": "disabled",
             "ktlint_compose_lambda-param-event-trailing": "disabled",

@@ -53,7 +53,7 @@ allprojects {
         protobuf {
             // Configure the protoc executable
             protoc {
-                artifact = libs.protobuf.protoc.get().toString()
+                artifact = "com.google.protobuf:protoc:${libs.versions.protocVersion.get()}"
             }
             generateProtoTasks {
                 all().configureEach { task ->
@@ -411,6 +411,7 @@ dependencies {
     implementation libs.compose.ui.google.fonts
     implementation libs.compose.foundation
     implementation libs.compose.material.icons
+    implementation libs.compose.material
     implementation libs.compose.runtime.livedata
     implementation libs.compose.material3
     implementation libs.compose.material3.windowSizeClass
@@ -469,7 +470,7 @@ spotless {
     kotlin {
         target("lawnchair/src/**/*.kt")
         ktlint("1.8.0").customRuleSets([
-            libs.composeRules.get().toString()
+            "io.nlopez.compose.rules:ktlint:0.5.2",
         ]).editorConfigOverride([
             "ktlint_compose_compositionlocal-allowlist": "disabled",
             "ktlint_compose_lambda-param-event-trailing": "disabled",

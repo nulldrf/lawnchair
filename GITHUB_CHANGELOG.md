@@ -1,35 +1,18 @@
-Lawnchair 14 Beta 3 is here! This release works with QuickSwitch from Android 10 to Android 14 QPR3.
+Lawnchair 15 Beta 2 is now available. This is a stability-focused release that addresses numerous bugs from Beta 1, while adding a few quality of life improvements.
 
-This release contains numerous improvements:
-* UI improvements
-  * UI text refresh: all text is now Sentence case to match Material You guidelines (#4209)
-  * Proper tablet support: the launcher and settings UI now adjust accordingly to the larger width
-  * Color scheme improvements: Lawnchair now matches the Android 14 and Pixel Launcher colors
-  * Added support for predictive back when navigating in Settings
-  * Added support for Android 14's per-app language feature
-  * Added new fonts in font picker
-* Search improvements 
-  * Improved permission handling for contacts and files search settings
-  * Improved performance of search results
-  * Added the ability to switch search algorithms
-  * Added new web search providers: Google & DuckDuckGo
-  * Added new dock search bar providers: Yandex
-  * Added additional dock search bar customizations 
-  * Added an option to use dock search provider actions for app drawer
-* Recents screen improvements:
-  * Added the ability to reorganize the quick actions in Overview
-  * Added the ability to change transparency of the recents background
-* Bug fixes
-  * Fixed crashes on One UI, ColorOS, and other Android OEMs
-  * Fixed crash when accessing settings with a wallpaper preview on Android 15
-  * Fixed Smartspacer left padding not working
-  * Fixed Lawnfeed not working
-* Other repository improvments:
-  * Improved docs and README of Lawnchair (#4370)
-  * Added nightly releases (#4264); do note that these are built differently from normal builds, and can be buggy and less optimized.
+### New features
+* Redesigned the search UI and backend architecture for a more stable and extensible foundation. 
+* Improved the "About" screen to support new links
+* Added an option in Settings to clear all items from the home screen. 
+* Added support for infinite home screen scrolling. 
+* Added the ability to reorder apps within app drawer folders.
 
-Alongside that, this release contains the usual performance improvements, miscellaneous bug fixes, and new bugs & translations.
+### Bug fixes and improvements  
+* Fixed an issue that caused the search widget to fail to launch the Google app on Android 14 and above. 
+* Addressed multiple crashes on older Android versions. 
+* Resolved a race condition that could cause a crash when customizing an app that was being uninstalled. 
+* Fixed an issue where the search state would not clear correctly when the app drawer was closed. 
+* Corrected various visual bugs, including the page indicator being partially displayed and incorrect icon scaling in the app drawer. 
+* Established a public roadmap and a new, simplified triage system for our issue tracker.
 
-Thanks to our new contributors: @osm0sis, @t895, @berkekbgz, @JovannMC, @Susexe, @HarmfulBreeze, @sandstranger, @hotmule, and @nivlafx
-
-Want to support Lawnchair's development? Visit [our Open Collective page](https://opencollective.com/lawnchair), or set your search engine to Startpage. Alongside that, if you're a developer and want to work on Lawnchair, we're investigating how we want to do payouts for development work and bugfixes. If you have any ideas or want to contribute, please get in contact at our discussion forums!
+Thanks to 

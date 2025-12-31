@@ -125,6 +125,8 @@
     <string name="caddy">Caddy</string>
 
     <string name="app_drawer_folder">App drawer folders</string>
+    <string name="selected_apps">Selected apps</string>
+    <string name="add_apps">Add apps</string>
     <string name="app_drawer_folder_settings">Drawer folder</string>
     <string name="add_folder">Create folder</string>
     <string name="edit_folder">Edit folder</string>
@@ -151,6 +153,13 @@
     <string name="x_and_y">%1$s &amp; %2$s</string>
 
     <string name="advanced">Advanced</string>
+
+    <!-- Draggable -->
+    <string name="reorderable_active_items">Active items</string>
+    <string name="reorderable_disabled_items">Other items</string>
+    <string name="reorderable_disabled_hint">Disabled items will appear here. Drag an item here or tap the remove button to make an item active.</string>
+    <string name="reorderable_add_hint_items">Active items will appear here. Drag an item here or tap the add button to make an item active.</string>
+
     <!--
 
     Preference Dashboard
@@ -163,6 +172,8 @@
 
     <string name="home_screen_label">Home screen</string>
     <string name="home_screen_description">Feed, grid, icons</string>
+
+    <string name="home_screen_actions">Home screen actions</string>
 
     <string name="dock_label">Dock</string>
     <string name="dock_description">Search bar, icon count</string>
@@ -259,6 +270,9 @@
 
     <string name="reset_custom_icons">Reset custom icons</string>
     <string name="reset_custom_icons_confirmation">All custom icons will be reset. Do you want to continue?</string>
+
+    <string name="remove_all_views_from_home_screen">Clear home screen</string>
+    <string name="remove_all_views_from_home_screen_desc">Home screen will be cleared. Do you want to continue?</string>
 
     <!-- Icon picker -->
     <string name="icon_picker_default_category">Icons</string>
@@ -586,6 +600,9 @@
     <string name="wallpaper_depth_effect_description">Zoom in and out of the wallpaper when transitioning between areas of the launcher</string>
     <string name="show_sys_ui_scrim">Top shadow</string>
 
+    <string name="infinite_scrolling_label">Infinite scrolling</string>
+    <string name="infinite_scrolling_description">Swipe to loop between the first and last pages</string>
+
     <string name="home_screen_grid">Home screen grid</string>
     <string name="home_screen_lock">Lock home screen</string>
     <string name="home_screen_unlock">Unlock home screen</string>
@@ -755,7 +772,7 @@
 
     -->
     <!-- Launcher strings used -->
-    <string name="all_apps_device_search_hint">Search apps, web, and more</string>
+    <string name="all_apps_device_search_hint">Search web and more</string>
     <string name="all_apps_search_bar_hint">Search apps</string>
     <string name="all_apps_no_search_results">No apps found matching \"<xliff:g example="Android" id="query">%1$s</xliff:g>\"</string>
 
@@ -887,4 +904,6 @@
     <string name="grant_requested_permissions">Grant permissions</string>
     <string name="permissions_needed">Permissions needed</string>
     <string name="grant_requested_permissions_tap">Tap to grant permissions</string>
+    <!-- Message shown when all home screen views are removed -->
+    <string name="home_screen_all_views_removed_msg">Home screen cleared</string>
 </resources>

@@ -7,9 +7,9 @@ androidx-room = "2.8.4"
 androidx-lifecycle = "2.10.0"
 accompanist = "0.37.3"
 opto = "1.0.18"
-protobuf = "4.33.2"
+protobuf = "4.33.4"
 retrofit = "3.0.0"
-dagger = "2.57.2"
+dagger = "2.59"
 libsu = "6.0.0"
 refine = "4.4.0"
 
@@ -27,7 +27,7 @@ google-ksp = "com.google.devtools.ksp:2.3.4"
 google-protobuf = "com.google.protobuf:0.9.6"
 cash-licensee = "app.cash.licensee:1.14.1"
 rikka-refine = { id = "dev.rikka.tools.refine", version.ref = "refine" }
-diffplug-spotless = "com.diffplug.spotless:8.1.0"
+diffplug-spotless = "com.diffplug.spotless:8.2.0"
 
 [libraries]
 # AndroidX
@@ -53,7 +53,7 @@ androidx-uiautomator = "androidx.test.uiautomator:uiautomator:2.3.0"
 androidx-window = "androidx.window:window:1.5.1"
 
 # Compose
-compose-bom = "androidx.compose:compose-bom:2025.12.01"
+compose-bom = "androidx.compose:compose-bom:2026.01.00"
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
 compose-material-icons = "androidx.compose.material:material-icons-extended:1.7.8"
 compose-material3 = { module = "androidx.compose.material3:material3" }
@@ -94,7 +94,7 @@ kotlin-androidExtensionRuntime = { module = "org.jetbrains.kotlin:kotlin-android
 kotlin-parcelizeRuntime = { module = "org.jetbrains.kotlin:kotlin-parcelize-runtime", version.ref = "kotlin" }
 # KotlinX
 kotlinx-coroutines-android = "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
-kotlinx-serialization-json = "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
+kotlinx-serialization-json = "org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0"
 
 protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
 protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf" }
@@ -117,7 +117,7 @@ rikka-annotation-processor = { module = "dev.rikka.tools.refine:annotation-proce
 rikka-refine-runtime = { group = "dev.rikka.tools.refine", name = "runtime", version.ref = "refine" }
 smartspacer-sdk = "com.kieronquinn.smartspacer:sdk-client:1.1.2"
 xdrop-fuzzywuzzy = "me.xdrop:fuzzywuzzy:1.4.0"
-errorprone-annotations = "com.google.errorprone:error_prone_annotations:2.45.0"
+errorprone-annotations = "com.google.errorprone:error_prone_annotations:2.46.0"
 composeRules = "io.nlopez.compose.rules:ktlint:0.5.3"
 
 [bundles]

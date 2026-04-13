@@ -155,13 +155,13 @@ object ColorTokens {
 
     @JvmField val PopupArrow = PopupShadeFirst
 	
-    @JvmField val QsbIconTintPrimary = DayNightColorToken(Accent1_600, Accent3_100)
+    @JvmField val QsbIconTintPrimary = DayNightColorToken(Accent3_400, Accent3_100)
 
-    @JvmField val QsbIconTintSecondary = DayNightColorToken(Accent2_300, Accent1_400)
+    @JvmField val QsbIconTintSecondary = DayNightColorToken(Accent1_500, Accent1_400)
 
-    @JvmField val QsbIconTintTertiary = DayNightColorToken(Accent1_500, Accent1_10)
+    @JvmField val QsbIconTintTertiary = DayNightColorToken(Accent2_300, Accent2_10)
 
-    @JvmField val QsbIconTintQuaternary = DayNightColorToken(Accent3_400, Accent1_200)
+    @JvmField val QsbIconTintQuaternary = DayNightColorToken(Accent1_600, Accent1_200)
 
     @JvmField val WallpaperPopupScrim = Neutral1_900
 

@@ -155,7 +155,7 @@ object ColorTokens {
 
     @JvmField val PopupArrow = PopupShadeFirst
 	
-	@JvmField val QsbIconTintPrimary = DayNightColorToken(Accent1_600, Accent3_100)
+    @JvmField val QsbIconTintPrimary = DayNightColorToken(Accent1_600, Accent3_100)
 
     @JvmField val QsbIconTintSecondary = DayNightColorToken(Accent2_300, Accent1_400)
 

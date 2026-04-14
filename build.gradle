@@ -137,7 +137,7 @@ final def devReleaseName = ciBuild ? "Dev.(#${ciRunNumber})" : "Dev.(${buildComm
 
 final def version = "16"
 final def releaseName = "Development 5.1"
-final def versionDisplayName = "${version}.${isReleaseBuild ? releaseName : devReleaseName}"
+final def versionDisplayName = "${version} ${releaseName}"
 final def majorVersion = versionDisplayName.split("\\.")[0]
 
 final def quickstepMinSdk = "29"

@@ -30,6 +30,7 @@ import app.lawnchair.qsb.providers.GoogleGo
 import app.lawnchair.qsb.providers.PixelSearch
 import app.lawnchair.qsb.providers.QsbSearchProvider
 import app.lawnchair.theme.color.ColorOption
+import app.lawnchair.theme.color.tokens.ColorTokens
 import app.lawnchair.util.pendingIntent
 import app.lawnchair.util.repeatOnAttached
 import app.lawnchair.util.viewAttachedScope
@@ -198,7 +199,7 @@ class LawnQsbLayout(context: Context, attrs: AttributeSet?) : FrameLayout(contex
     private fun setUpBackground(themed: Boolean = false) {
         val transparency = preferenceManager.hotseatQsbAlpha.get()
         val cornerRadius = getCornerRadius(context, preferenceManager)
-        val baseColor = if (themed) Themes.getColorBackgroundFloating(context) else Themes.getAttrColor(context, R.attr.qsbFillColor)
+        val baseColor = ColorTokens.QsbFillColor.resolveColor(context)
         val alphaValue = (transparency * 255) / 100
         val color = Color.argb(alphaValue, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
         val strokeColor = strokeColor

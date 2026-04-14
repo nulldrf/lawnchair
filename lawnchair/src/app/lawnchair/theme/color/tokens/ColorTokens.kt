@@ -165,6 +165,8 @@ object ColorTokens {
 
     @JvmField val QsbIconTintMonochrome = DayNightColorToken(Accent1_700, Accent1_100)
 
+    @JvmField val QsbFillColor = DayNightColorToken(Accent2_50, Accent2_800)
+
     @JvmField val WallpaperPopupScrim = Neutral1_900
 
     @JvmField val WidgetsPickerScrim = Scrim.setAlpha(.32f)

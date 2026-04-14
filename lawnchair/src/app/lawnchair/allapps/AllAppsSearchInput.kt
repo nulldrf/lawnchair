@@ -49,7 +49,6 @@ import com.android.launcher3.Utilities
 import com.android.launcher3.allapps.ActivityAllAppsContainerView
 import com.android.launcher3.allapps.AllAppsStore
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem
-import com.android.launcher3.allapps.BaseAllAppsAdapter.Companion.VIEW_TYPE_APP
 import com.android.launcher3.allapps.SearchUiManager
 import com.android.launcher3.allapps.search.AllAppsSearchBarController
 import com.android.launcher3.search.SearchCallback
@@ -196,8 +195,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     searchAlgorithm?.doZeroStateSearch(this)
                 }
 
-                // Keep background visible when focused
-                setBackgroundVisibility(true, 1f)
+                setBackgroundVisibility(false, 0f)
                 animateHintVisibility(true)
                 animatePadding(currentPaddingLeft / 2, currentPaddingRight / 2)
 
@@ -377,26 +375,9 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
     override fun onSearchResult(query: String, items: ArrayList<AdapterItem>?) {
         if (items != null) {
-            val uniformItems = ArrayList<AdapterItem>()
-            for (item in items) {
-                // Create a new AdapterItem with VIEW_TYPE_APP to ensure uniform sizing
-                val uniformItem = AdapterItem(
-                    viewType = VIEW_TYPE_APP,
-                    title = item.title,
-                    icon = item.icon,
-                    contentDescription = item.contentDescription,
-                    // Preserve the original item info for proper handling
-                    itemInfo = item.itemInfo,
-                    // Copy any other relevant fields
-                    rowIndex = item.rowIndex,
-                    iconVisible = item.iconVisible,
-                    indentCount = item.indentCount
-                )
-                uniformItems.add(uniformItem)
-            }
-            apps.setSearchResults(uniformItems)
+            apps.setSearchResults(items)
             notifyResultChanged()
-            appsView.setSearchResults(uniformItems)
+            appsView.setSearchResults(items)
         }
     }
 

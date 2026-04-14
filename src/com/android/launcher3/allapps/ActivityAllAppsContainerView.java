@@ -854,13 +854,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
 
-        boolean bgVisible = mSearchUiManager.getBackgroundVisibility();
-        if (scrolledOffset == 0 && !isSearching()) {
-            bgVisible = true;
-        } else if (scrolledOffset > mHeaderThreshold) {
-            bgVisible = false;
-        }
-        mSearchUiManager.setBackgroundVisibility(bgVisible, 1 - prog);
+        mSearchUiManager.setBackgroundVisibility(true, 1f);
     }
 
     protected int getHeaderColor(float blendRatio) {

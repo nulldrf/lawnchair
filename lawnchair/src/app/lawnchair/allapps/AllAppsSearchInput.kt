@@ -48,7 +48,8 @@ import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.allapps.ActivityAllAppsContainerView
 import com.android.launcher3.allapps.AllAppsStore
-import com.android.launcher3.allapps.BaseAllAppsAdapter
+import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem
+import com.android.launcher3.allapps.BaseAllAppsAdapter.Companion.VIEW_TYPE_APP
 import com.android.launcher3.allapps.SearchUiManager
 import com.android.launcher3.allapps.search.AllAppsSearchBarController
 import com.android.launcher3.search.SearchCallback
@@ -376,12 +377,26 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
     override fun onSearchResult(query: String, items: ArrayList<AdapterItem>?) {
         if (items != null) {
+            val uniformItems = ArrayList<AdapterItem>()
             for (item in items) {
-                item.viewType = BaseAllAppsAdapter.VIEW_TYPE_APP
+                // Create a new AdapterItem with VIEW_TYPE_APP to ensure uniform sizing
+                val uniformItem = AdapterItem(
+                    viewType = VIEW_TYPE_APP,
+                    title = item.title,
+                    icon = item.icon,
+                    contentDescription = item.contentDescription,
+                    // Preserve the original item info for proper handling
+                    itemInfo = item.itemInfo,
+                    // Copy any other relevant fields
+                    rowIndex = item.rowIndex,
+                    iconVisible = item.iconVisible,
+                    indentCount = item.indentCount
+                )
+                uniformItems.add(uniformItem)
             }
-            apps.setSearchResults(items)
+            apps.setSearchResults(uniformItems)
             notifyResultChanged()
-            appsView.setSearchResults(items)
+            appsView.setSearchResults(uniformItems)
         }
     }
 

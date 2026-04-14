@@ -195,7 +195,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     searchAlgorithm?.doZeroStateSearch(this)
                 }
 
-                setBackgroundVisibility(false, 0f)
+                setBackgroundVisibility(true, 1f)
                 animateHintVisibility(true)
                 animatePadding(currentPaddingLeft / 2, currentPaddingRight / 2)
 

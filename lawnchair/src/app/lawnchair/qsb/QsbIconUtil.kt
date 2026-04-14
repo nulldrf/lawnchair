@@ -33,7 +33,7 @@ fun ImageView.setThemedIconResource(
             if (resId == R.drawable.ic_mic_color || resId == R.drawable.ic_lens_color) {
                 // Mic and lens always use a single uniform color across all layers,
                 // matching Google's latest update where these icons are monochrome.
-                val accent = ColorTokens.QsbIconTintPrimary.resolveColor(context)
+                val accent = ColorTokens.QsbIconTintMonochrome.resolveColor(context)
                 for (i in 0 until drawable.numberOfLayers) {
                     drawable.getDrawable(i).setTint(accent)
                 }
@@ -127,7 +127,7 @@ fun ImageView.setThemedIconResource(
             // Mic and lens: uniform single color even when unthemed
             val drawable = ResourcesCompat.getDrawable(resources, resId, null)!!
             if (drawable is LayerDrawable) {
-                val accent = ColorTokens.QsbIconTintPrimary.resolveColor(context)
+                val accent = ColorTokens.QsbIconTintMonochrome.resolveColor(context)
                 for (i in 0 until drawable.numberOfLayers) {
                     drawable.getDrawable(i).setTint(accent)
                 }

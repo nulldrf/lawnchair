@@ -50,6 +50,7 @@
 
     <style name="HomeSettings.PreferenceStyle" parent="@style/Preference.Material">
         <item name="iconSpaceReserved">@bool/home_settings_icon_space_reserved</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
     </style>
 
     <style name="HomeSettings.PreferenceScreenStyle"
@@ -60,6 +61,7 @@
     <style name="HomeSettings.SwitchPreferenceStyle"
             parent="@style/Preference.SwitchPreference.Material">
         <item name="iconSpaceReserved">@bool/home_settings_icon_space_reserved</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
     </style>
 
     <style name="HomeSettings.PreferenceTitle"

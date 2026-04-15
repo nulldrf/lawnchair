@@ -1,21 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Copyright (C) 2021 The Android Open Source Project
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
+  MD3-style track.
+  Uses a selector so the OFF state has a visible outline (like MD3)
+  and the ON state is filled. Color tokens come from the existing
+  home_settings_switch_track_color.xml selector via android:tint
+  set in SwitchStyle.
 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Disabled -->
     <item android:state_enabled="false">
         <shape
             android:shape="rectangle"
@@ -25,8 +18,9 @@
             <corners android:radius="35dp" />
         </shape>
     </item>
-	
-	<item android:state_checked="false">
+
+    <!-- OFF: outlined track (MD3 style) -->
+    <item android:state_checked="false">
         <shape
             android:shape="rectangle"
             android:width="52dp"

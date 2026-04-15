@@ -97,12 +97,12 @@
         <item name="android:switchStyle">@style/SwitchStyle</item>
     </style>
 
-    <style name="SwitchStyle"
-        parent="@android:style/Widget.Material.CompoundButton.Switch">
+    <style name="SwitchStyle" parent="@style/Widget.MaterialComponents.CompoundButton.Switch">
         <item name="android:switchMinWidth">52dp</item>
-        <item name="android:thumb">@drawable/home_settings_switch_thumb</item>
-        <item name="android:track">@drawable/home_settings_switch_track</item>
-    </style>
+        <item name="android:thumbTintList">@color/home_settings_switch_thumb_color</item>
+        <item name="android:trackTintList">@color/home_settings_switch_track_color</item>
+        <item name="thumbIcon">@drawable/home_settings_switch_thumb_icon</item>
+	</style>
 
     <style name="LauncherTheme.DarkMainColor" parent="@style/LauncherTheme" />
 

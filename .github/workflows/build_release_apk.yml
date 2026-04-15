@@ -29,8 +29,8 @@ jobs:
         run: ./gradlew assembleLawnWithQuickstepGithubRelease
       - name: Upload artifact
         uses: actions/upload-artifact@v7
-        archive: false
         with:
           name: Release APK
           path: build/outputs/apk/lawnWithQuickstepGithub/release/*.apk
+          archive: false
           

@@ -15,6 +15,7 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.preferenceManager2
+import app.lawnchair.settings.ui.LawnchairSettingsActivity
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
@@ -26,7 +27,6 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.data.liveinfo.model.LiveInformation
 import app.lawnchair.ui.preferences.navigation.FeatureFlags
-import com.android.launcher3.settings.SettingsActivity
 import com.android.launcher3.settings.SettingsActivity.DEVELOPER_OPTIONS_KEY
 import com.android.launcher3.settings.SettingsActivity.EXTRA_FRAGMENT_HIGHLIGHT_KEY
 import com.android.systemui.shared.system.BlurUtils
@@ -63,7 +63,7 @@ fun DebugMenuPreferences(
                         label = "Feature flags (Views)",
                         onClick = {
                             try {
-                                Intent(context, SettingsActivity::class.java)
+                                Intent(context, LawnchairSettingsActivity::class.java)
                                     .putExtra(
                                         EXTRA_FRAGMENT_HIGHLIGHT_KEY,
                                         DEVELOPER_OPTIONS_KEY,

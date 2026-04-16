@@ -45,6 +45,18 @@
         android:largeHeap="@bool/config_largeHeap"
         android:restoreAnyVersion="true"
         android:supportsRtl="true" >
+		
+		<!-- Remove upstream SettingsActivity -->
+        <activity
+            android:name="com.android.launcher3.settings.SettingsActivity"
+            tools:node="remove" />
+
+        <!-- Register Lawnchair's settings activity -->
+        <activity
+            android:name="app.lawnchair.settings.ui.LawnchairSettingsActivity"
+            android:exported="true"
+            android:label="@string/settings_title"
+            android:theme="@style/HomeSettings.Theme" />
 
         <!--
         Main launcher activity. When extending only change the name, and keep all the

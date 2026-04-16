@@ -11,10 +11,11 @@ class LawnchairSettingsActivity : SettingsActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Hide the ActionBar's own title — CollapsingToolbarLayout shows it
+        // Disable the native ActionBar title and home button entirely
         actionBar?.setDisplayShowTitleEnabled(false)
+        actionBar?.setDisplayHomeAsUpEnabled(false)
+        actionBar?.setHomeButtonEnabled(false)
 
-        // Wire navigation icon directly on the toolbar view
         val toolbar = findViewById<MaterialToolbar>(R.id.action_bar)
         val collapsingToolbar = findViewById<CollapsingToolbarLayout>(R.id.collapsing_toolbar)
 

@@ -24,7 +24,10 @@
     -->
     <string name="preview_label">Preview</string>
 
-    <string name="action_create">Create</string>
+    <!-- Settings fragment override -->
+    <string name="settings_fragment_name" translatable="false">app.lawnchair.settings.ui.LawnchairSettingsFragment</string>
+    
+	<string name="action_create">Create</string>
     <string name="action_backup">Backup</string>
     <string name="action_restore">Restore</string>
     <string name="action_delete">Delete</string>

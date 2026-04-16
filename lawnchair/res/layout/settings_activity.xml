@@ -35,9 +35,7 @@
                 android:elevation="0dp"
                 android:paddingStart="4dp"
                 android:paddingEnd="8dp"
-                app:layout_collapseMode="pin"
-                app:navigationIcon="@drawable/ic_arrow_back"
-                app:navigationIconTint="?colorOnSurface" />
+                app:layout_collapseMode="pin" />
 
         </com.google.android.material.appbar.CollapsingToolbarLayout>
 

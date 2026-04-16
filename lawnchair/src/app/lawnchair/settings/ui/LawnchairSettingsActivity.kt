@@ -4,17 +4,32 @@ import android.os.Bundle
 import com.android.launcher3.R
 import com.android.launcher3.settings.SettingsActivity
 import com.google.android.material.appbar.CollapsingToolbarLayout
+import com.google.android.material.appbar.MaterialToolbar
 
 class LawnchairSettingsActivity : SettingsActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState) // super handles setContentView + setActionBar
+        super.onCreate(savedInstanceState)
 
-        // Just hide the native ActionBar's own title — CollapsingToolbarLayout shows it instead
-        getActionBar()?.setDisplayShowTitleEnabled(false)
+        // Hide the ActionBar's own title — CollapsingToolbarLayout shows it
+        actionBar?.setDisplayShowTitleEnabled(false)
 
-        // Sync initial title to the collapsing toolbar
-        findViewById<CollapsingToolbarLayout>(R.id.collapsing_toolbar)?.title = title
+        // Wire navigation icon directly on the toolbar view
+        val toolbar = findViewById<MaterialToolbar>(R.id.action_bar)
+        val collapsingToolbar = findViewById<CollapsingToolbarLayout>(R.id.collapsing_toolbar)
+
+        val showBack = intent.hasExtra(EXTRA_FRAGMENT_ROOT_KEY)
+            || intent.hasExtra(EXTRA_FRAGMENT_ARGS)
+            || intent.hasExtra(EXTRA_FRAGMENT_HIGHLIGHT_KEY)
+
+        if (showBack) {
+            toolbar.setNavigationIcon(R.drawable.ic_back)
+            toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        } else {
+            toolbar.navigationIcon = null
+        }
+
+        collapsingToolbar.title = title
     }
 
     override fun setTitle(title: CharSequence?) {

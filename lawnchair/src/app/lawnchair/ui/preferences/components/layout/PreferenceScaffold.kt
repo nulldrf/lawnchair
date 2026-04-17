@@ -44,7 +44,7 @@ fun PreferenceScaffold(
     } else {
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
             snapAnimationSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
-            flingAnimationSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
+            flingAnimationSpec = null,  // Use default decay behavior
         )
     }
     Scaffold(

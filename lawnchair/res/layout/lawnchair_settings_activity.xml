@@ -34,6 +34,7 @@
                 app:layout_collapseMode="pin"
                 app:navigationIcon="@drawable/ic_back"
                 app:navigationIconTint="?colorOnSurface">
+            </com.google.android.material.appbar.MaterialToolbar>
 
         </com.google.android.material.appbar.CollapsingToolbarLayout>
 

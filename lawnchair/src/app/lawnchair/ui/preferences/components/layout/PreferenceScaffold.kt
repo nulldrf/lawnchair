@@ -17,6 +17,8 @@
 
 package app.lawnchair.ui.preferences.components.layout
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +39,14 @@ fun PreferenceScaffold(
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val scrollBehavior = if (isExpandedScreen) TopAppBarDefaults.pinnedScrollBehavior() else TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior = if (isExpandedScreen) {
+        TopAppBarDefaults.pinnedScrollBehavior()
+    } else {
+        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+            snapAnimationSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
+            flingAnimationSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
+        )
+    }
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {

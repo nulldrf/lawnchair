@@ -56,7 +56,7 @@
             android:name="app.lawnchair.settings.ui.LawnchairSettingsActivity"
             android:exported="true"
             android:label="@string/settings_title"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+            android:theme="@style/HomeSettings.Theme" />
 
         <!--
         Main launcher activity. When extending only change the name, and keep all the

@@ -31,23 +31,21 @@ fun PreferenceColumn(
     scrollState: ScrollState? = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    NestedScrollStretch(
-        modifier = modifier,
-    ) {
-        Column(
-            verticalArrangement = verticalArrangement,
-            horizontalAlignment = horizontalAlignment,
-            modifier = Modifier
-                .fillMaxHeight()
-                .addIf(scrollState != null) {
-                    this
-                        .verticalScroll(scrollState!!)
-                }
-                .padding(contentPadding)
-                .padding(top = 8.dp, bottom = 16.dp),
-            content = content,
-        )
-    }
+    // NestedScrollStretch removed — it was consuming scroll events before they
+    // could reach LargeTopAppBar's exitUntilCollapsedScrollBehavior, preventing
+    // the collapsing toolbar from working.
+    Column(
+        verticalArrangement = verticalArrangement,
+        horizontalAlignment = horizontalAlignment,
+        modifier = modifier
+            .fillMaxHeight()
+            .addIf(scrollState != null) {
+                this.verticalScroll(scrollState!!)
+            }
+            .padding(contentPadding)
+            .padding(top = 8.dp, bottom = 16.dp),
+        content = content,
+    )
 }
 
 @Composable

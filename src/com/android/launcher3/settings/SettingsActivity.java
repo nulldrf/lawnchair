@@ -36,7 +36,6 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toolbar;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -91,12 +90,10 @@ public class SettingsActivity extends FragmentActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
 
+        // Removed setActionBar() — LawnchairSettingsActivity manages the toolbar directly.
+        // Calling setActionBar() + setDisplayHomeAsUpEnabled() was injecting a native back
+        // button on top of the CollapsingToolbarLayout.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-
-        // Do NOT call setActionBar() — let subclasses (LawnchairSettingsActivity)
-        // manage the toolbar via findViewById directly.
-        // This prevents the native ActionBar from injecting its own back button
-        // on top of the CollapsingToolbarLayout.
 
         Intent intent = getIntent();
 
@@ -124,19 +121,8 @@ public class SettingsActivity extends FragmentActivity
         }
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
     private boolean startPreference(String fragment, Bundle args, String key) {
         if (getSupportFragmentManager().isStateSaved()) {
-            // Sometimes onClick can come after onPause because of being posted on the handler.
-            // Skip starting new preferences in that case.
             return false;
         }
         final FragmentManager fm = getSupportFragmentManager();
@@ -162,6 +148,15 @@ public class SettingsActivity extends FragmentActivity
         Bundle args = new Bundle();
         args.putString(ARG_PREFERENCE_ROOT, pref.getKey());
         return startPreference(getString(R.string.settings_fragment_name), args, pref.getKey());
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     /**
@@ -265,7 +260,6 @@ public class SettingsActivity extends FragmentActivity
                 return insets.consumeSystemWindowInsets();
             });
 
-            // Overriding Text Direction in the Androidx preference library to support RTL
             view.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         }
 
@@ -275,10 +269,6 @@ public class SettingsActivity extends FragmentActivity
             outState.putBoolean(SAVE_HIGHLIGHTED_KEY, mPreferenceHighlighted);
         }
 
-        /**
-         * Initializes a preference. This is called for every preference. Returning false here
-         * will remove that preference from the list.
-         */
         protected boolean initPreference(Preference preference) {
             DisplayController.Info info = DisplayController.INSTANCE.get(getContext()).getInfo();
             switch (preference.getKey()) {

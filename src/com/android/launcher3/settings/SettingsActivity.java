@@ -36,6 +36,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toolbar;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -90,14 +91,14 @@ public class SettingsActivity extends FragmentActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
 
-        setActionBar(findViewById(R.id.action_bar));
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
+        // Do NOT call setActionBar() — let subclasses (LawnchairSettingsActivity)
+        // manage the toolbar via findViewById directly.
+        // This prevents the native ActionBar from injecting its own back button
+        // on top of the CollapsingToolbarLayout.
+
         Intent intent = getIntent();
-        if (intent.hasExtra(EXTRA_FRAGMENT_ROOT_KEY) || intent.hasExtra(EXTRA_FRAGMENT_ARGS)
-                || intent.hasExtra(EXTRA_FRAGMENT_HIGHLIGHT_KEY)) {
-            getActionBar().setDisplayHomeAsUpEnabled(true);
-        }
 
         if (savedInstanceState == null) {
             Bundle args = intent.getBundleExtra(EXTRA_FRAGMENT_ARGS);
@@ -121,6 +122,15 @@ public class SettingsActivity extends FragmentActivity
             // Display the fragment as the main content.
             fm.beginTransaction().replace(R.id.content_frame, f).commit();
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private boolean startPreference(String fragment, Bundle args, String key) {
@@ -154,15 +164,6 @@ public class SettingsActivity extends FragmentActivity
         return startPreference(getString(R.string.settings_fragment_name), args, pref.getKey());
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
     /**
      * This fragment shows the launcher preferences.
      */
@@ -192,13 +193,11 @@ public class SettingsActivity extends FragmentActivity
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             final Bundle args = getArguments();
             mHighLightKey = args == null ? null : args.getString(EXTRA_FRAGMENT_HIGHLIGHT_KEY);
-
-            if (savedInstanceState != null) {
-                mPreferenceHighlighted = savedInstanceState.getBoolean(SAVE_HIGHLIGHTED_KEY);
+            if (rootKey != null) {
+                setPreferencesFromResource(R.xml.launcher_preferences, rootKey);
+            } else {
+                setPreferencesFromResource(R.xml.launcher_preferences, null);
             }
-
-            getPreferenceManager().setSharedPreferencesName(LauncherFiles.SHARED_PREFERENCES_KEY);
-            setPreferencesFromResource(R.xml.launcher_preferences, rootKey);
 
             PreferenceScreen screen = getPreferenceScreen();
             for (int i = screen.getPreferenceCount() - 1; i >= 0; i--) {
@@ -208,12 +207,8 @@ public class SettingsActivity extends FragmentActivity
                 }
             }
 
-            // If the target preference is not in the current preference screen, find the parent
-            // preference screen that contains the target preference and set it as the preference
-            // screen.
-            if (mHighLightKey != null
-                    && !isKeyInPreferenceGroup(mHighLightKey, screen)) {
-                final PreferenceScreen parentPreferenceScreen =
+            if (getActivity() != null && !TextUtils.isEmpty(mHighLightKey)) {
+                PreferenceScreen parentPreferenceScreen =
                         findParentPreference(screen, mHighLightKey);
                 if (parentPreferenceScreen != null && getActivity() != null) {
                     if (!TextUtils.isEmpty(parentPreferenceScreen.getTitle())) {
@@ -239,13 +234,6 @@ public class SettingsActivity extends FragmentActivity
             return false;
         }
 
-        /**
-         * Finds the parent preference screen for the given target key.
-         *
-         * @param parent    the parent preference screen
-         * @param targetKey the key of the preference to find
-         * @return the parent preference screen that contains the target preference
-         */
         @Nullable
         private PreferenceScreen findParentPreference(PreferenceScreen parent, String targetKey) {
             for (int i = 0; i < parent.getPreferenceCount(); i++) {
@@ -301,10 +289,8 @@ public class SettingsActivity extends FragmentActivity
                         return false;
                     }
                     if (info.isTablet(info.realBounds)) {
-                        // Launcher supports rotation by default. No need to show this setting.
                         return false;
                     }
-                    // Initialize the UI once
                     preference.setDefaultValue(RotationHelper.getAllowRotationDefaultValue(info));
                     return true;
                 case DEVELOPER_OPTIONS_KEY:
@@ -314,15 +300,12 @@ public class SettingsActivity extends FragmentActivity
                     return mDeveloperOptionsEnabled;
                 case FIXED_LANDSCAPE_MODE:
                     if (!Flags.oneGridSpecs()
-                            // adding this condition until fixing b/378972567
                             || InvariantDeviceProfile.INSTANCE.get(getContext()).deviceType
                             == TYPE_MULTI_DISPLAY
                             || InvariantDeviceProfile.INSTANCE.get(getContext()).deviceType
                             == TYPE_TABLET) {
                         return false;
                     }
-                    // When the setting changes rotate the screen accordingly to showcase the result
-                    // of the setting
                     preference.setOnPreferenceChangeListener(
                             (pref, newValue) -> {
                                 getActivity().setRequestedOrientation(
@@ -357,7 +340,6 @@ public class SettingsActivity extends FragmentActivity
 
         @Override
         public void onSettingsChanged(boolean isEnabled) {
-            // Developer options changed, try recreate
             tryRecreateActivity();
         }
 
@@ -370,9 +352,6 @@ public class SettingsActivity extends FragmentActivity
             }
         }
 
-        /**
-         * Tries to recreate the preference
-         */
         protected void tryRecreateActivity() {
             if (isResumed()) {
                 recreateActivityNow();

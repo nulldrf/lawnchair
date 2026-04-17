@@ -21,7 +21,8 @@
             app:expandedTitleMarginStart="24dp"
             app:expandedTitleTextAppearance="?textAppearanceHeadlineLarge"
             app:expandedTitleTextColor="?attr/colorOnSurface"
-            app:layout_scrollFlags="scroll|exitUntilCollapsed|snap">
+            app:layout_scrollFlags="scroll|exitUntilCollapsed|snap"
+            app:titleCollapseMode="scale">
 
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/topAppBar"
@@ -32,7 +33,7 @@
                 android:paddingEnd="8dp"
                 app:layout_collapseMode="pin"
                 app:navigationIcon="@drawable/ic_back"
-                app:navigationIconTint="?colorOnSurface" />
+                app:navigationIconTint="?colorOnSurface">
 
         </com.google.android.material.appbar.CollapsingToolbarLayout>
 

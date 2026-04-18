@@ -16,29 +16,14 @@
 
 package app.lawnchair.ui.preferences.components.layout
 
-import android.view.ContextThemeWrapper
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.widget.FrameLayout
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
-import com.android.launcher3.R
-import com.google.android.material.R as MaterialR
-import com.google.android.material.appbar.AppBarLayout
-import com.google.android.material.appbar.CollapsingToolbarLayout
-import com.google.android.material.appbar.MaterialToolbar
 
 @Composable
 fun PreferenceScaffold(
@@ -50,99 +35,23 @@ fun PreferenceScaffold(
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val toolbar = LocalCollapsingToolbar.current
 
-    val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
-    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
+    // LaunchedEffect(key) runs every time the key changes — guaranteed to fire
+    // on every navigation even if the composable doesn't fully recompose.
+    // SideEffect was unreliable for cross-screen navigation.
+    LaunchedEffect(label) {
+        toolbar?.setTitle(label)
+    }
+    LaunchedEffect(backArrowVisible) {
+        toolbar?.setBackArrowVisible(backArrowVisible)
+    }
+    // actions is a lambda — use Unit as key so it always updates on composition
+    LaunchedEffect(Unit) {
+        toolbar?.setActions { Row { actions() } }
+    }
 
-    AndroidView(
-        modifier = modifier.fillMaxSize(),
-        factory = { ctx ->
-            val themedCtx = ContextThemeWrapper(
-                ctx,
-                MaterialR.style.Theme_Material3_DayNight_NoActionBar,
-            )
-
-            val root = LayoutInflater.from(themedCtx)
-                .inflate(R.layout.lawnchair_preference_scaffold, null, false)
-
-            val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
-            val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
-            val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
-            val contentFrame = root.findViewById<FrameLayout>(R.id.preference_content)
-            val actionsFrame = root.findViewById<FrameLayout>(R.id.preference_toolbar_actions)
-            val scrollView = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
-
-            // Bottom inset for nav bar
-            ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
-                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.updatePadding(bottom = systemBars.bottom)
-                insets
-            }
-
-            // Apply Lawnchair dynamic colors
-            appBarLayout.setBackgroundColor(surfaceColor)
-            collapsingToolbar.setContentScrimColor(surfaceContainerColor)
-            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
-            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
-            toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            collapsingToolbar.title = label
-
-            // Back button
-            if (backArrowVisible) {
-                toolbar.setNavigationIcon(R.drawable.ic_back)
-                toolbar.navigationIcon?.setTint(onSurfaceColor)
-                toolbar.setNavigationOnClickListener {
-                    backDispatcher?.onBackPressed()
-                }
-            } else {
-                toolbar.navigationIcon = null
-            }
-
-            // Toolbar actions
-            val actionsComposeView = ComposeView(ctx).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    Gravity.END or Gravity.CENTER_VERTICAL,
-                )
-                setContent {
-                    MaterialTheme(
-                        colorScheme = MaterialTheme.colorScheme,
-                        typography = MaterialTheme.typography,
-                    ) {
-                        Row { actions() }
-                    }
-                }
-            }
-            actionsFrame.addView(actionsComposeView)
-
-            // Main content
-            val composeView = ComposeView(ctx).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                )
-                setContent {
-                    content(PaddingValues())
-                }
-            }
-            contentFrame.addView(composeView)
-
-            root
-        },
-        update = { root ->
-            val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
-            val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
-            val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
-
-            appBarLayout.setBackgroundColor(surfaceColor)
-            collapsingToolbar.setContentScrimColor(surfaceContainerColor)
-            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
-            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
-            collapsingToolbar.title = label
-            toolbar.navigationIcon?.setTint(onSurfaceColor)
-        },
-    )
+    Box(modifier = modifier.fillMaxSize()) {
+        content(PaddingValues())
+    }
 }

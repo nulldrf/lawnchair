@@ -17,10 +17,12 @@
 package app.lawnchair.ui.preferences.components.layout
 
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.widget.FrameLayout
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +52,10 @@ fun PreferenceScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+
+    // Read Lawnchair's dynamic colors from Compose MaterialTheme
     val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
+    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
 
     AndroidView(
@@ -68,9 +73,10 @@ fun PreferenceScaffold(
             val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
             val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
             val contentFrame = root.findViewById<FrameLayout>(R.id.preference_content)
+            val actionsFrame = root.findViewById<FrameLayout>(R.id.preference_toolbar_actions)
             val scrollView = root.findViewById<NestedScrollView>(R.id.preference_scroll_view)
 
-            // Apply bottom inset to scroll view so content isn't hidden behind nav bar
+            // Bottom inset for nav bar
             ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
                 val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                 view.updatePadding(bottom = systemBars.bottom)
@@ -79,12 +85,13 @@ fun PreferenceScaffold(
 
             // Apply Lawnchair dynamic colors
             appBarLayout.setBackgroundColor(surfaceColor)
-            collapsingToolbar.setContentScrimColor(surfaceColor)
+            collapsingToolbar.setContentScrimColor(surfaceContainerColor)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
             collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
-            toolbar.setBackgroundColor(surfaceColor)
+            toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             collapsingToolbar.title = label
 
+            // Back button
             if (backArrowVisible) {
                 toolbar.setNavigationIcon(R.drawable.ic_back)
                 toolbar.navigationIcon?.setTint(onSurfaceColor)
@@ -95,8 +102,25 @@ fun PreferenceScaffold(
                 toolbar.navigationIcon = null
             }
 
-            // WRAP_CONTENT is critical — prevents ComposeView from getting infinite
-            // height from NestedScrollView, which causes fillMaxHeight crashes
+            // Toolbar actions via ComposeView
+            val actionsComposeView = ComposeView(ctx).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.END or Gravity.CENTER_VERTICAL,
+                )
+                setContent {
+                    MaterialTheme(
+                        colorScheme = MaterialTheme.colorScheme,
+                        typography = MaterialTheme.typography,
+                    ) {
+                        Row { actions() }
+                    }
+                }
+            }
+            actionsFrame.addView(actionsComposeView)
+
+            // Main content
             val composeView = ComposeView(ctx).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -116,10 +140,9 @@ fun PreferenceScaffold(
             val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
 
             appBarLayout.setBackgroundColor(surfaceColor)
-            collapsingToolbar.setContentScrimColor(surfaceColor)
+            collapsingToolbar.setContentScrimColor(surfaceContainerColor)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
             collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
-            toolbar.setBackgroundColor(surfaceColor)
             collapsingToolbar.title = label
             toolbar.navigationIcon?.setTint(onSurfaceColor)
         },

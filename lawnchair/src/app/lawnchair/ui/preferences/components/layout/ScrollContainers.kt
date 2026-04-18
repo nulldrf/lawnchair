@@ -1,28 +1,26 @@
 package app.lawnchair.ui.preferences.components.layout
 
-import androidx.compose.foundation.MutatePriority
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import app.lawnchair.ui.util.addIf
-import kotlinx.coroutines.awaitCancellation
 
 @Composable
 fun PreferenceColumn(
@@ -55,8 +53,7 @@ fun PreferenceLazyColumn(
     content: LazyListScope.() -> Unit,
 ) {
     // LazyColumn is incompatible with NestedScrollView (infinite height constraints crash).
-    // We render all items eagerly in a Column instead. This trades lazy loading for
-    // compatibility. Most preference screens have few enough items this is fine.
+    // Render all items eagerly in a Column instead.
     val scope = remember { EagerLazyListScope() }
     scope.reset()
     scope.content()
@@ -73,9 +70,6 @@ fun PreferenceLazyColumn(
     }
 }
 
-/**
- * A fake LazyListScope that collects items eagerly for rendering in a Column.
- */
 private class EagerLazyListScope : LazyListScope {
     val items = mutableListOf<@Composable () -> Unit>()
 
@@ -110,10 +104,13 @@ private class EagerLazyListScope : LazyListScope {
 }
 
 private object FakeLazyItemScope : LazyItemScope {
-    @Composable
     override fun Modifier.animateItem(
-        fadeInSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float>?,
-        placementSpec: androidx.compose.animation.core.FiniteAnimationSpec<androidx.compose.ui.unit.IntOffset>?,
-        fadeOutSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float>?,
-    ) = this
+        fadeInSpec: FiniteAnimationSpec<Float>?,
+        placementSpec: FiniteAnimationSpec<IntOffset>?,
+        fadeOutSpec: FiniteAnimationSpec<Float>?,
+    ): Modifier = this
+
+    override fun Modifier.fillParentMaxSize(fraction: Float): Modifier = this
+    override fun Modifier.fillParentMaxWidth(fraction: Float): Modifier = this
+    override fun Modifier.fillParentMaxHeight(fraction: Float): Modifier = this
 }

@@ -143,7 +143,7 @@ fun ImageView.setThemedIconResource(
                 val yellow = 0xFFFBBC05.toInt()
                 val red    = 0xFFEA4335.toInt()
 
-                val d = 0.03f
+                val d = 0.05f
                 val sweepColors = intArrayOf(
                     blue, blue, green, green, yellow, yellow, red, red, blue, blue,
                 )

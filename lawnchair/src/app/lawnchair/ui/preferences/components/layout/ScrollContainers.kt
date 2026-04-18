@@ -6,8 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -30,17 +31,16 @@ fun PreferenceColumn(
     scrollState: ScrollState? = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // NestedScrollStretch and verticalScroll removed — the View-based NestedScrollView
-    // in lawnchair_preference_scaffold.xml handles scrolling and communicates with
-    // CollapsingToolbarLayout via AppBarLayout$ScrollingViewBehavior.
-    // Bottom padding removed — NestedScrollView inset listener handles nav bar spacing.
+    // fillMaxHeight and verticalScroll removed — NestedScrollView in the View-based
+    // scaffold handles scrolling. wrapContentHeight allows content to size naturally.
     Column(
         verticalArrangement = verticalArrangement,
         horizontalAlignment = horizontalAlignment,
         modifier = modifier
-            .fillMaxHeight()
+            .fillMaxWidth()
+            .wrapContentHeight()
             .padding(contentPadding)
-            .padding(top = 8.dp),
+            .padding(top = 8.dp, bottom = 16.dp),
         content = content,
     )
 }
@@ -61,13 +61,15 @@ fun PreferenceLazyColumn(
             }
         }
     }
+    // LazyColumn inside NestedScrollView needs wrapContentHeight to avoid
+    // infinite height constraints crash
     LazyColumn(
         modifier = modifier
-            .addIf(!isChild) {
-                fillMaxHeight()
-            },
+            .fillMaxWidth()
+            .wrapContentHeight(),
         contentPadding = contentPadding,
         state = state,
+        userScrollEnabled = false, // NestedScrollView handles scrolling
         content = content,
     )
 }

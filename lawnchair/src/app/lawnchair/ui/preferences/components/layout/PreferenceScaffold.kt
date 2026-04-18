@@ -16,15 +16,17 @@
 
 package app.lawnchair.ui.preferences.components.layout
 
-import android.graphics.Color
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.widget.FrameLayout
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.ViewCompat
@@ -33,6 +35,7 @@ import androidx.core.view.updatePadding
 import androidx.core.widget.NestedScrollView
 import com.android.launcher3.R
 import com.google.android.material.R as MaterialR
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
 
@@ -48,9 +51,15 @@ fun PreferenceScaffold(
 ) {
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
+    // Read colors from Compose MaterialTheme — these are Lawnchair's dynamic colors
+    val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
+
     AndroidView(
-        modifier = modifier,
+        modifier = modifier.fillMaxSize(),
         factory = { ctx ->
+            // Only use ContextThemeWrapper for inflation — so Material3 attrs resolve
+            // We override the actual colors below using Compose MaterialTheme values
             val themedCtx = ContextThemeWrapper(
                 ctx,
                 MaterialR.style.Theme_Material3_DayNight_NoActionBar,
@@ -59,27 +68,30 @@ fun PreferenceScaffold(
             val root = LayoutInflater.from(themedCtx)
                 .inflate(R.layout.lawnchair_preference_scaffold, null, false)
 
+            val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
             val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
             val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
             val contentFrame = root.findViewById<FrameLayout>(R.id.preference_content)
             val scrollView = root.findViewById<NestedScrollView>(R.id.preference_scroll_view)
 
-            // Apply bottom inset to scroll view so content isn't hidden behind nav bar
+            // Apply bottom inset
             ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
                 val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                 view.updatePadding(bottom = systemBars.bottom)
                 insets
             }
 
+            // Apply Lawnchair's dynamic colors to View components
+            appBarLayout.setBackgroundColor(surfaceColor)
+            collapsingToolbar.setContentScrimColor(surfaceColor)
+            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
+            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
+            toolbar.setBackgroundColor(surfaceColor)
+
             // Title
             collapsingToolbar.title = label
 
-            // Resolve colorOnSurface from themedCtx
-            val typedArray = themedCtx.obtainStyledAttributes(intArrayOf(MaterialR.attr.colorOnSurface))
-            val onSurfaceColor = typedArray.getColor(0, Color.BLACK)
-            typedArray.recycle()
-
-            // Back button
+            // Back button with dynamic color
             if (backArrowVisible) {
                 toolbar.setNavigationIcon(R.drawable.ic_back)
                 toolbar.navigationIcon?.setTint(onSurfaceColor)
@@ -90,7 +102,7 @@ fun PreferenceScaffold(
                 toolbar.navigationIcon = null
             }
 
-            // Embed Compose content using original ctx so Lawnchair theme/colors apply inside
+            // Embed Compose content using original ctx so all Lawnchair theme/colors apply
             val composeView = ComposeView(ctx).apply {
                 setContent {
                     content(PaddingValues())
@@ -101,8 +113,19 @@ fun PreferenceScaffold(
             root
         },
         update = { root ->
-            root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
-                .title = label
+            val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
+            val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
+            val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
+
+            // Re-apply dynamic colors on recomposition (e.g. theme change)
+            appBarLayout.setBackgroundColor(surfaceColor)
+            collapsingToolbar.setContentScrimColor(surfaceColor)
+            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
+            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
+            toolbar.setBackgroundColor(surfaceColor)
+            collapsingToolbar.title = label
+
+            toolbar.navigationIcon?.setTint(onSurfaceColor)
         },
     )
 }

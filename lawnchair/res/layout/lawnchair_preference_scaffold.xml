@@ -37,7 +37,6 @@
                 app:layout_collapseMode="pin"
                 app:navigationIconTint="?colorOnSurface">
 
-                <!-- Actions slot — ComposeView is added here programmatically -->
                 <FrameLayout
                     android:id="@+id/preference_toolbar_actions"
                     android:layout_width="wrap_content"
@@ -50,11 +49,12 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <androidx.core.widget.NestedScrollView
+    <app.lawnchair.ui.preferences.components.layout.StretchNestedScrollView
         android:id="@+id/preference_scroll_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
+        android:overScrollMode="always"
         app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
 
         <FrameLayout
@@ -62,6 +62,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-    </androidx.core.widget.NestedScrollView>
+    </app.lawnchair.ui.preferences.components.layout.StretchNestedScrollView>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -34,7 +34,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
-import androidx.core.widget.NestedScrollView
 import com.android.launcher3.R
 import com.google.android.material.R as MaterialR
 import com.google.android.material.appbar.AppBarLayout
@@ -53,7 +52,6 @@ fun PreferenceScaffold(
 ) {
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
-    // Read Lawnchair's dynamic colors from Compose MaterialTheme
     val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
     val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
@@ -74,7 +72,7 @@ fun PreferenceScaffold(
             val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
             val contentFrame = root.findViewById<FrameLayout>(R.id.preference_content)
             val actionsFrame = root.findViewById<FrameLayout>(R.id.preference_toolbar_actions)
-            val scrollView = root.findViewById<NestedScrollView>(R.id.preference_scroll_view)
+            val scrollView = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
 
             // Bottom inset for nav bar
             ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
@@ -102,7 +100,7 @@ fun PreferenceScaffold(
                 toolbar.navigationIcon = null
             }
 
-            // Toolbar actions via ComposeView
+            // Toolbar actions
             val actionsComposeView = ComposeView(ctx).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,

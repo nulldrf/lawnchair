@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2022, Lawnchair
  *
@@ -17,18 +16,26 @@
 
 package app.lawnchair.ui.preferences.components.layout
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import android.graphics.Color
+import android.view.ContextThemeWrapper
+import android.view.LayoutInflater
+import android.widget.FrameLayout
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.core.widget.NestedScrollView
+import com.android.launcher3.R
+import com.google.android.material.R as MaterialR
+import com.google.android.material.appbar.CollapsingToolbarLayout
+import com.google.android.material.appbar.MaterialToolbar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreferenceScaffold(
     label: String,
@@ -39,27 +46,63 @@ fun PreferenceScaffold(
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val scrollBehavior = if (isExpandedScreen) {
-        TopAppBarDefaults.pinnedScrollBehavior()
-    } else {
-        TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
-            snapAnimationSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
-            flingAnimationSpec = null,  // Use default decay behavior
-        )
-    }
-    Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopBar(
-                backArrowVisible = backArrowVisible,
-                label = label,
-                isExpandedScreen = isExpandedScreen,
-                actions = actions,
-                scrollBehavior = scrollBehavior,
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            val themedCtx = ContextThemeWrapper(
+                ctx,
+                MaterialR.style.Theme_Material3_DayNight_NoActionBar,
             )
+
+            val root = LayoutInflater.from(themedCtx)
+                .inflate(R.layout.lawnchair_preference_scaffold, null, false)
+
+            val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
+            val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
+            val contentFrame = root.findViewById<FrameLayout>(R.id.preference_content)
+            val scrollView = root.findViewById<NestedScrollView>(R.id.preference_scroll_view)
+
+            // Apply bottom inset to scroll view so content isn't hidden behind nav bar
+            ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
+                val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                view.updatePadding(bottom = systemBars.bottom)
+                insets
+            }
+
+            // Title
+            collapsingToolbar.title = label
+
+            // Resolve colorOnSurface from themedCtx
+            val typedArray = themedCtx.obtainStyledAttributes(intArrayOf(MaterialR.attr.colorOnSurface))
+            val onSurfaceColor = typedArray.getColor(0, Color.BLACK)
+            typedArray.recycle()
+
+            // Back button
+            if (backArrowVisible) {
+                toolbar.setNavigationIcon(R.drawable.ic_back)
+                toolbar.navigationIcon?.setTint(onSurfaceColor)
+                toolbar.setNavigationOnClickListener {
+                    backDispatcher?.onBackPressed()
+                }
+            } else {
+                toolbar.navigationIcon = null
+            }
+
+            // Embed Compose content using original ctx so Lawnchair theme/colors apply inside
+            val composeView = ComposeView(ctx).apply {
+                setContent {
+                    content(PaddingValues())
+                }
+            }
+            contentFrame.addView(composeView)
+
+            root
         },
-        bottomBar = bottomBar,
-    ) {
-        content(it)
-    }
+        update = { root ->
+            root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
+                .title = label
+        },
+    )
 }

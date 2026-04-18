@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -31,19 +30,17 @@ fun PreferenceColumn(
     scrollState: ScrollState? = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // NestedScrollStretch removed — it was consuming scroll events before they
-    // could reach LargeTopAppBar's exitUntilCollapsedScrollBehavior, preventing
-    // the collapsing toolbar from working.
+    // NestedScrollStretch and verticalScroll removed — the View-based NestedScrollView
+    // in lawnchair_preference_scaffold.xml handles scrolling and communicates with
+    // CollapsingToolbarLayout via AppBarLayout$ScrollingViewBehavior.
+    // Bottom padding removed — NestedScrollView inset listener handles nav bar spacing.
     Column(
         verticalArrangement = verticalArrangement,
         horizontalAlignment = horizontalAlignment,
         modifier = modifier
             .fillMaxHeight()
-            .addIf(scrollState != null) {
-                this.verticalScroll(scrollState!!)
-            }
             .padding(contentPadding)
-            .padding(top = 8.dp, bottom = 16.dp),
+            .padding(top = 8.dp),
         content = content,
     )
 }
@@ -64,17 +61,13 @@ fun PreferenceLazyColumn(
             }
         }
     }
-    NestedScrollStretch(
-        modifier = modifier,
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .addIf(!isChild) {
-                    fillMaxHeight()
-                },
-            contentPadding = contentPadding,
-            state = state,
-            content = content,
-        )
-    }
+    LazyColumn(
+        modifier = modifier
+            .addIf(!isChild) {
+                fillMaxHeight()
+            },
+        contentPadding = contentPadding,
+        state = state,
+        content = content,
+    )
 }

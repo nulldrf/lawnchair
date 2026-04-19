@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -100,8 +101,12 @@ fun PreferenceScaffold(
                 toolbar.navigationIcon = null
             }
 
-            // Toolbar actions
+            // Toolbar actions — ViewCompositionStrategy ensures lifecycle sync
+            // with parent composition so toolbar icons animate correctly
             val actionsComposeView = ComposeView(ctx).apply {
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -118,8 +123,12 @@ fun PreferenceScaffold(
             }
             actionsFrame.addView(actionsComposeView)
 
-            // Main content
+            // Main content — ViewCompositionStrategy syncs frame timing with
+            // parent Compose composition so navigation animations don't skip frames
             val composeView = ComposeView(ctx).apply {
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,

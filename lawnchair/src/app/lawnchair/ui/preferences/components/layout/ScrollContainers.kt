@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -30,12 +29,15 @@ fun PreferenceColumn(
     scrollState: ScrollState? = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // No wrapContentHeight — let content size naturally so NestedScrollView
+    // can scroll all the way to the bottom without cutting off items.
+    // No verticalScroll — NestedScrollView handles scrolling.
+    // No NestedScrollStretch — StretchNestedScrollView handles overscroll.
     Column(
         verticalArrangement = verticalArrangement,
         horizontalAlignment = horizontalAlignment,
         modifier = modifier
             .fillMaxWidth()
-            .wrapContentHeight()
             .padding(contentPadding)
             .padding(top = 8.dp, bottom = 16.dp),
         content = content,
@@ -51,8 +53,9 @@ fun PreferenceLazyColumn(
     state: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
-    // LazyColumn is incompatible with NestedScrollView (infinite height constraints crash).
-    // Render all items eagerly in a Column instead.
+    // LazyColumn crashes inside NestedScrollView (infinite height constraints).
+    // Render all items eagerly in a Column instead — this fixes the font list
+    // crash and About screen crash while keeping NestedScrollView scrolling.
     val scope = remember { EagerLazyListScope() }
     scope.reset()
     scope.content()
@@ -60,7 +63,6 @@ fun PreferenceLazyColumn(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .wrapContentHeight()
             .padding(contentPadding),
     ) {
         scope.items.forEach { item ->

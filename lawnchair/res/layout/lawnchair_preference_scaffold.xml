@@ -49,20 +49,19 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!--
-        FrameLayout with MATCH_PARENT on both dimensions.
-        This gives ComposeView a fully bounded measurement context —
-        no infinite height constraints. Each preference screen manages
-        its own scrolling internally via Compose's verticalScroll/LazyColumn.
-
-        The CollapsingToolbarLayout scroll is driven by the Compose
-        nestedScroll connection in PreferenceScaffold talking to the
-        AppBarLayout via its OnOffsetChangedListener.
-    -->
-    <FrameLayout
-        android:id="@+id/preference_content_frame"
+    <app.lawnchair.ui.preferences.components.layout.StretchNestedScrollView
+        android:id="@+id/preference_scroll_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior" />
+        android:clipToPadding="false"
+        android:overScrollMode="always"
+        app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
+
+        <FrameLayout
+            android:id="@+id/preference_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+    </app.lawnchair.ui.preferences.components.layout.StretchNestedScrollView>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -10,7 +10,7 @@
         android:scaleX="1.2"
         android:scaleY="1.2"
         android:translateX="2.4"
-        android:translateY="2.4">
+        android:translateY="3.2">
         
         <path
             android:fillAlpha="0.4"

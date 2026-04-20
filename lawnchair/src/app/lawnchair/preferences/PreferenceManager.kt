@@ -59,6 +59,8 @@ class PreferenceManager @Inject constructor(
     val wrapAdaptiveIcons = BoolPref("prefs_wrapAdaptive", true, recreate)
     val transparentIconBackground = BoolPref("prefs_transparentIconBackground", false, recreate)
     val shadowBGIcons = BoolPref("pref_shadowBGIcons", true, recreate)
+	val colorizedBackgrounds = BoolPref("pref_colorizedLegacyTreatment", false, recreate)
+    val treatWhiteAdaptiveIcons = BoolPref("pref_enableWhiteOnlyTreatment", false, recreate)
     val addIconToHome = BoolPref("pref_add_icon_to_home", true)
     val hotseatColumns = IntPref("pref_hotseatColumns", 4, reloadGrid)
     val workspaceColumns = IntPref("pref_workspaceColumns", 4)

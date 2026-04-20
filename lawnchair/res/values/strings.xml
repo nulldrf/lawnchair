@@ -298,6 +298,11 @@
 
     <string name="remove_all_views_from_home_screen">Clear home screen</string>
     <string name="remove_all_views_from_home_screen_desc">Home screen will be cleared. Do you want to continue?</string>
+	
+	<string name="colorized_backgrounds_label">Smart icon backgrounds</string>
+    <string name="colorized_backgrounds_description">Analyze icon pixels for accurate background colors and scaling</string>
+    <string name="treat_white_adaptive_icons_label">Recolor white adaptive icon backgrounds</string>
+    <string name="treat_white_adaptive_icons_description">Replace plain white backgrounds on adaptive icons with a color from the icon</string>
 
     <!-- Icon picker -->
     <string name="icon_picker_default_category">Icons</string>

@@ -145,6 +145,7 @@ fun GeneralPreferences() {
             }
         }
         val wrapAdaptiveIcons = prefs.wrapAdaptiveIcons.getAdapter()
+        val colorizedBackgrounds = prefs.colorizedBackgrounds.getAdapter()
 
         PreferenceGroup(
             heading = stringResource(id = R.string.icons),
@@ -201,6 +202,29 @@ fun GeneralPreferences() {
                     valueRange = 0F..1F,
                     step = 0.1f,
                     showAsPercentage = true,
+                )
+            }
+            // Smart background color analysis — only visible when auto-adaptive icons is on
+            Item(
+                "colorized_backgrounds",
+                wrapAdaptiveIcons.state.value,
+            ) {
+                SwitchPreference(
+                    adapter = colorizedBackgrounds,
+                    label = stringResource(id = R.string.colorized_backgrounds_label),
+                    description = stringResource(id = R.string.colorized_backgrounds_description),
+                )
+            }
+            // Recolor white adaptive icon backgrounds — only visible when both
+            // auto-adaptive icons AND colorized backgrounds are on
+            Item(
+                "treat_white_adaptive_icons",
+                wrapAdaptiveIcons.state.value && colorizedBackgrounds.state.value,
+            ) {
+                SwitchPreference(
+                    adapter = prefs.treatWhiteAdaptiveIcons.getAdapter(),
+                    label = stringResource(id = R.string.treat_white_adaptive_icons_label),
+                    description = stringResource(id = R.string.treat_white_adaptive_icons_description),
                 )
             }
         }

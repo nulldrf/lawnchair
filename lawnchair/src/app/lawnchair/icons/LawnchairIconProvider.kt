@@ -32,6 +32,7 @@ import app.lawnchair.icons.picker.IconType
 import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
+import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
@@ -40,6 +41,7 @@ import com.android.launcher3.icons.ClockDrawableWrapper
 import com.android.launcher3.icons.LauncherIconProvider
 import com.android.launcher3.icons.mono.ThemedIconDrawable
 import com.android.launcher3.util.ComponentKey
+import com.android.launcher3.util.Executors
 import com.android.launcher3.util.SafeCloseable
 import javax.inject.Inject
 import org.xmlpull.v1.XmlPullParser
@@ -88,6 +90,72 @@ class LawnchairIconProvider @Inject constructor(
         }
 
     val systemIconState = themeManager.iconState
+
+    // -----------------------------------------------------------------------
+    // Adaptive icon pref subscriptions
+    //
+    // When "Smart icon backgrounds" (pref_colorizedLegacyTreatment) or
+    // "Recolor white adaptive icon backgrounds" (pref_enableWhiteOnlyTreatment) change,
+    // we need a full icon cache flush so the new processing logic takes effect immediately.
+    //
+    // The flush must happen in this order — all on MODEL_EXECUTOR:
+    //   1. updateSystemState()        — refreshes mSystemState with the new pref values.
+    //                                    Without this, getStateForApp() returns the same
+    //                                    freshnessId as before, the disk cache thinks every
+    //                                    icon is still fresh, and old bitmaps are re-served.
+    //   2. iconCache.clearMemoryCache() — drops all in-memory FastBitmapDrawable bitmaps.
+    //                                    Without this, the drag layer (and the initial
+    //                                    redraw after recreate()) reads the old shaped bitmaps
+    //                                    from memory and shows them in the drag view.
+    //   3. model.reloadIfActive()     — triggers full icon regeneration on MODEL_EXECUTOR.
+    //                                    As each icon is regenerated it is posted to the
+    //                                    main thread to update the visible icon slots.
+    //
+    // Using recreate() alone (the old behavior of these prefs) only triggered a visual
+    // redraw from the in-memory cache, which still held the old bitmaps. The icons looked
+    // unchanged until a force-stop or shape change invalidated the cache another way.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Performs a full icon cache flush and triggers icon regeneration.
+     *
+     * Called whenever a pref that affects icon rendering changes. Must run on MODEL_EXECUTOR
+     * because clearMemoryCache() and reloadIfActive() both assert the worker thread.
+     */
+    private fun flushIconCacheAndReload() {
+        Executors.MODEL_EXECUTOR.execute {
+            // Step 1: update mSystemState so getStateForApp() returns new freshnessIds.
+            // This causes the disk cache to treat every app's icon as stale.
+            updateSystemState()
+
+            val appState = LauncherAppState.getInstance(context)
+
+            // Step 2: drop all in-memory cached bitmaps.
+            // This ensures the drag layer and initial redraw don't use old shaped bitmaps.
+            appState.iconCache.clearMemoryCache()
+
+            // Step 3: trigger full regeneration.
+            appState.model.reloadIfActive()
+        }
+    }
+
+    init {
+        // Subscribe to both adaptive icon prefs so any change triggers a full flush.
+        // We use the SharedPreferences change listener directly because these prefs live
+        // in the same "com.android.launcher3.prefs" store that both PreferenceManager
+        // and IconPreferences.kt read from.
+        //
+        // We cannot use PreferenceManager's BoolPref callback for this because that
+        // callback fires synchronously on the main thread — we need to run on MODEL_EXECUTOR
+        // and we also need to call updateSystemState() BEFORE the model reload, not after.
+        // A SharedPreferences listener is the simplest way to hook into both pref writes
+        // regardless of which code path (UI toggle, migration, etc.) made the change.
+        context.prefs.registerOnSharedPreferenceChangeListener { _, key ->
+            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment") {
+                flushIconCacheAndReload()
+            }
+        }
+    }
 
     private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {
         val componentKey = ComponentKey(componentName, user)

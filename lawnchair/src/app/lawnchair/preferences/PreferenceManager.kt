@@ -45,7 +45,13 @@ class PreferenceManager @Inject constructor(
     private val idp get() = InvariantDeviceProfile.INSTANCE.get(context)
     private val mRecentsModel get() = RecentsModel.INSTANCE.get(context)
     private val themeManager = ThemeManager.INSTANCE.get(context)
+
+    // reloadIcons: calls RecentsModel.onThemeChanged() which clears the recents/overview
+    // thumbnail + icon cache on MODEL_EXECUTOR and triggers a full model reload.
+    // This is stronger than recreate() which only redraws from the existing in-memory cache.
+    // All icon-appearance prefs use this so toggling them immediately regenerates icons.
     private val reloadIcons: () -> Unit = { mRecentsModel.onThemeChanged() }
+
     private val reloadGrid: () -> Unit = { idp.onPreferencesChanged(context) }
 
     private val recreate = {
@@ -56,11 +62,13 @@ class PreferenceManager @Inject constructor(
     val iconPackPackage = StringPref("pref_iconPackPackage", "", reloadIcons)
     val themedIconPackPackage = StringPref("pref_themedIconPackPackage", "", recreate)
     val allowRotation = BoolPref("pref_allowRotation", false)
+
+    // Icon wrapping and appearance prefs — use reloadIcons so the icon cache is actually
+    // regenerated when these change, not just visually redrawn from stale cached bitmaps.
     val wrapAdaptiveIcons = BoolPref("prefs_wrapAdaptive", true, reloadIcons)
     val transparentIconBackground = BoolPref("prefs_transparentIconBackground", false, reloadIcons)
     val shadowBGIcons = BoolPref("pref_shadowBGIcons", true, reloadIcons)
-    val colorizedBackgrounds = BoolPref("pref_colorizedLegacyTreatment", false, reloadIcons)
-    val treatWhiteAdaptiveIcons = BoolPref("pref_enableWhiteOnlyTreatment", false, reloadIcons)
+
     val addIconToHome = BoolPref("pref_add_icon_to_home", true)
     val hotseatColumns = IntPref("pref_hotseatColumns", 4, reloadGrid)
     val workspaceColumns = IntPref("pref_workspaceColumns", 4)
@@ -69,7 +77,11 @@ class PreferenceManager @Inject constructor(
     val folderRows = IdpIntPref("pref_folderRows", { numFolderRows[INDEX_DEFAULT] }, reloadGrid)
 
     val drawerOpacity = FloatPref("pref_drawerOpacity", .4f, recreate)
-    val coloredBackgroundLightness = FloatPref("pref_coloredBackgroundLightness", 1F, recreate)
+
+    // coloredBackgroundLightness affects how the Palette-based background color is adjusted.
+    // Use reloadIcons here too so the change takes effect in the cached bitmaps.
+    val coloredBackgroundLightness = FloatPref("pref_coloredBackgroundLightness", 1F, reloadIcons)
+
     val feedProvider = StringPref("pref_feedProvider", "")
     val ignoreFeedWhitelist = BoolPref("pref_ignoreFeedWhitelist", false)
     val launcherTheme = StringPref("pref_launcherTheme", "system")
@@ -154,6 +166,29 @@ class PreferenceManager @Inject constructor(
     )
 
     val forceIconMonochrome = BoolPref("pref_forceIconMonochrome", false, recreate)
+
+    // -----------------------------------------------------------------------
+    // Adaptive icon color analysis prefs
+    //
+    // These prefs use a null callback intentionally.
+    //
+    // When either pref changes, the real work (updateSystemState + clearMemoryCache +
+    // model.reloadIfActive) is performed by LawnchairIconProvider which registers its
+    // own SharedPreferences change listener for these two keys in its init block.
+    //
+    // Using reloadIcons() here would cause a DOUBLE reload: one from this callback and
+    // one from LawnchairIconProvider's listener, with the LawnchairIconProvider one being
+    // the only correct one (it calls updateSystemState first so the disk cache is actually
+    // invalidated). We suppress the PreferenceManager callback entirely to avoid the
+    // redundant reload and the race condition it would create.
+    //
+    // The PreferenceAdapter in GeneralPreferences.kt still works correctly because it
+    // reads/writes via get()/set() directly on the BoolPref, which goes to SharedPreferences
+    // regardless of whether a callback is registered.
+    // -----------------------------------------------------------------------
+
+    val colorizedBackgrounds = BoolPref("pref_colorizedLegacyTreatment", false)
+    val treatWhiteAdaptiveIcons = BoolPref("pref_enableWhiteOnlyTreatment", false)
 
     override fun close() {
         TODO("Not yet implemented")

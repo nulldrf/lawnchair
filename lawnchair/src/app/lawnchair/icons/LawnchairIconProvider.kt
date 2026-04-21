@@ -24,7 +24,6 @@ import android.util.ArrayMap
 import android.util.Log
 import androidx.core.content.getSystemService
 import androidx.core.graphics.drawable.toDrawable
-import app.lawnchair.LawnchairLauncher
 import app.lawnchair.data.iconoverride.IconOverrideRepository
 import app.lawnchair.icons.iconpack.IconPack
 import app.lawnchair.icons.iconpack.IconPackProvider
@@ -102,40 +101,49 @@ class LawnchairIconProvider @Inject constructor(
     // -----------------------------------------------------------------------
 
     /**
-     * Performs a full icon cache flush and triggers icon regeneration.
+     * Reloads icons when a pref that affects icon appearance changes, using the same
+     * two-phase strategy that makes icon shape changes feel instant.
      *
-     * Called whenever a pref that affects icon rendering changes.
+     * PHASE 1 — immediate visual response (matches shape-change behavior):
+     *   On MODEL_EXECUTOR, call clearMemoryCache() then reloadIfActive().
+     *   clearMemoryCache() drops all in-memory bitmaps. reloadIfActive() queues a
+     *   LoaderTask that re-loads every icon. Since the disk cache is still valid at
+     *   this point (mSystemState hasn't changed yet), the LoaderTask reads old bitmaps
+     *   from disk and posts them to the main thread immediately. The user sees icons
+     *   appear right away — exactly like shape change.
      *
-     * Strategy:
-     *   1. Immediately call recreate() on the main thread so the user sees an instant
-     *      visual response. The Activity re-reads from the in-memory icon cache, so
-     *      existing icons stay visible — there's no blank/placeholder period.
+     * PHASE 2 — background regeneration with new settings:
+     *   After phase 1 completes on MODEL_EXECUTOR, call updateSystemState() to update
+     *   mSystemState with the new pref values. This changes the freshnessId returned
+     *   by getStateForApp() for every app. Then call reloadIfActive() again. This time
+     *   the LoaderTask sees disk cache misses (freshnessId mismatch), falls through to
+     *   BaseIconFactory, regenerates bitmaps with the new settings, and posts them to
+     *   the main thread. Icons update progressively from their old appearance to the new.
      *
-     *   2. On MODEL_EXECUTOR: call updateSystemState() so mSystemState reflects the new
-     *      pref values. This makes getStateForApp() return a new freshnessId for every app,
-     *      which causes the disk cache to treat all entries as stale.
-     *      Then call model.reloadIfActive() to regenerate all icons in the background.
-     *      As each icon regenerates it posts to the main thread to update its slot.
+     * The net result: icons appear on screen INSTANTLY from disk (phase 1 feels like
+     * a normal icon-pack change), then each icon refreshes as its new bitmap is ready
+     * (phase 2). This is the same UX as changing the icon shape.
      *
-     * We deliberately do NOT call clearMemoryCache() before the reload. Clearing the
-     * memory cache would cause every icon to show a placeholder/blank while waiting for
-     * the background regeneration. By keeping the old bitmaps in memory, the homescreen
-     * stays fully populated (showing slightly-stale icons) while the new bitmaps are
-     * regenerated one by one and swap in progressively.
+     * We do NOT call recreate() here because it is redundant — the model reload already
+     * posts UI updates for each icon individually on the main thread.
      */
     private fun flushIconCacheAndReload() {
-        // Step 1: immediate visual refresh on main thread.
-        // This uses the existing in-memory cache, so icons stay visible.
-        LawnchairLauncher.instance?.recreateIfNotScheduled()
+        val appState = LauncherAppState.getInstance(context)
 
-        // Step 2: background work — invalidate disk cache + trigger regeneration.
+        // Phase 1: clear memory + reload from disk (fast — serves old bitmaps immediately).
         Executors.MODEL_EXECUTOR.execute {
-            // updateSystemState() must run BEFORE model.reloadIfActive() so that
-            // getStateForApp() returns the new freshnessId. If we skip this, the disk
-            // cache considers every icon still valid and reloadIfActive() re-serves
-            // the old bitmaps from disk, making the toggle appear to do nothing.
+            appState.iconCache.clearMemoryCache()
+            appState.model.reloadIfActive()
+        }
+
+        // Phase 2: invalidate disk cache + reload from factory (regenerates with new settings).
+        // Runs after phase 1 because MODEL_EXECUTOR is a serial executor — tasks are
+        // processed in submission order. By the time this task runs, phase 1's LoaderTask
+        // has already been queued and will display old icons. Phase 2's LoaderTask will
+        // then replace them one-by-one with correctly processed icons.
+        Executors.MODEL_EXECUTOR.execute {
             updateSystemState()
-            LauncherAppState.getInstance(context).model.reloadIfActive()
+            appState.model.reloadIfActive()
         }
     }
 

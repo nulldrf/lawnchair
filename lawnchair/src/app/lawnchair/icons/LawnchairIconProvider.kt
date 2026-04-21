@@ -101,48 +101,31 @@ class LawnchairIconProvider @Inject constructor(
     // -----------------------------------------------------------------------
 
     /**
-     * Reloads icons when a pref that affects icon appearance changes, using the same
-     * two-phase strategy that makes icon shape changes feel instant.
+     * Flushes the icon cache and triggers regeneration with the new settings.
      *
-     * PHASE 1 — immediate visual response (matches shape-change behavior):
-     *   On MODEL_EXECUTOR, call clearMemoryCache() then reloadIfActive().
-     *   clearMemoryCache() drops all in-memory bitmaps. reloadIfActive() queues a
-     *   LoaderTask that re-loads every icon. Since the disk cache is still valid at
-     *   this point (mSystemState hasn't changed yet), the LoaderTask reads old bitmaps
-     *   from disk and posts them to the main thread immediately. The user sees icons
-     *   appear right away — exactly like shape change.
+     * This runs a single reload pass on MODEL_EXECUTOR:
+     *   1. updateSystemState() — update mSystemState so getStateForApp() returns new
+     *      freshnessIds. This makes every disk cache entry stale.
+     *   2. clearMemoryCache() — drop in-memory bitmaps.
+     *   3. model.reloadIfActive() — regenerate all icons. Each icon is posted to the
+     *      main thread as it completes, so icons appear progressively (~3-5 seconds).
      *
-     * PHASE 2 — background regeneration with new settings:
-     *   After phase 1 completes on MODEL_EXECUTOR, call updateSystemState() to update
-     *   mSystemState with the new pref values. This changes the freshnessId returned
-     *   by getStateForApp() for every app. Then call reloadIfActive() again. This time
-     *   the LoaderTask sees disk cache misses (freshnessId mismatch), falls through to
-     *   BaseIconFactory, regenerates bitmaps with the new settings, and posts them to
-     *   the main thread. Icons update progressively from their old appearance to the new.
+     * This is the same speed as a launcher restart (which is what the user noticed
+     * as "fast"). The previous two-phase approach ran TWO full model reloads (one
+     * from disk, then one from factory), doubling the time to 10+ seconds.
      *
-     * The net result: icons appear on screen INSTANTLY from disk (phase 1 feels like
-     * a normal icon-pack change), then each icon refreshes as its new bitmap is ready
-     * (phase 2). This is the same UX as changing the icon shape.
-     *
-     * We do NOT call recreate() here because it is redundant — the model reload already
-     * posts UI updates for each icon individually on the main thread.
+     * We do NOT attempt to replicate the "instant" feel of shape changes. Shape changes
+     * are instant because they update a static mask path (CustomAdaptiveIconDrawable.sMask)
+     * that affects all live drawable instances immediately at draw time — no bitmap
+     * regeneration needed. Background color is baked into the bitmap, so it cannot be
+     * changed without regenerating. The progressive appearance of new icons (3-5 seconds)
+     * is the best achievable UX without an architectural rewrite of BitmapInfo.
      */
     private fun flushIconCacheAndReload() {
         val appState = LauncherAppState.getInstance(context)
-
-        // Phase 1: clear memory + reload from disk (fast — serves old bitmaps immediately).
-        Executors.MODEL_EXECUTOR.execute {
-            appState.iconCache.clearMemoryCache()
-            appState.model.reloadIfActive()
-        }
-
-        // Phase 2: invalidate disk cache + reload from factory (regenerates with new settings).
-        // Runs after phase 1 because MODEL_EXECUTOR is a serial executor — tasks are
-        // processed in submission order. By the time this task runs, phase 1's LoaderTask
-        // has already been queued and will display old icons. Phase 2's LoaderTask will
-        // then replace them one-by-one with correctly processed icons.
         Executors.MODEL_EXECUTOR.execute {
             updateSystemState()
+            appState.iconCache.clearMemoryCache()
             appState.model.reloadIfActive()
         }
     }

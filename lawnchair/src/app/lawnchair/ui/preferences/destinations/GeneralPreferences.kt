@@ -215,8 +215,9 @@ fun GeneralPreferences() {
                     description = stringResource(id = R.string.colorized_backgrounds_description),
                 )
             }
-            // Recolor white adaptive icon backgrounds — only visible when both
-            // auto-adaptive icons AND colorized backgrounds are on
+            // Recolor adaptive icon backgrounds — only visible when both
+            // auto-adaptive icons AND colorized backgrounds are on.
+            // Now handles white, very dark, and desaturated gray backgrounds (not just white).
             Item(
                 "treat_white_adaptive_icons",
                 wrapAdaptiveIcons.state.value && colorizedBackgrounds.state.value,

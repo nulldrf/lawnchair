@@ -8,6 +8,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
+import app.lawnchair.qsb.SweepGradientDrawable
 import android.os.UserHandle
 import android.util.AttributeSet
 import android.view.View
@@ -262,9 +264,14 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
     /**
      * Creates a circle-shaped [Bitmap] by drawing [drawable] centered inside a circle.
      *
-     * The circle background uses the theme's [android.R.attr.colorBackground] so it blends
-     * naturally with both light and dark themes. The icon is drawn with 20% padding on each
-     * side so it sits comfortably inside the circle without touching the edges.
+     * If [drawable] is a [LayerDrawable] (i.e. a multi-color provider icon such as the
+     * Google G), it is wrapped in a [SweepGradientDrawable] using Google's brand colors
+     * before being drawn — matching the exact same treatment applied to the QSB icon in
+     * [app.lawnchair.qsb.setThemedIconResource]. The [SweepGradientDrawable] uses
+     * [android.graphics.PorterDuff.Mode.SRC_IN] inside its own [android.graphics.Canvas.saveLayer],
+     * so it composites cleanly on top of the circle without leaking into the background.
+     *
+     * Simple vector icons (search glass, history, settings, calculator) are drawn as-is.
      *
      * This is called on a background thread, so it must not access the view hierarchy.
      */
@@ -278,12 +285,49 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
         paint.color = ColorTokens.ColorPrimary.resolveColor(context)
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
 
+        // For multi-layer provider icons (e.g. Google G), apply the same sweep gradient
+        // used in the QSB so the icon looks identical in both surfaces.
+        val finalDrawable: Drawable = if (drawable is LayerDrawable) {
+            buildGoogleSweepDrawable(drawable)
+        } else {
+            drawable
+        }
+
         // Draw the icon centered with 20% padding on each side.
         val padding = (size * 0.20f).toInt()
-        drawable.setBounds(padding, padding, size - padding, size - padding)
-        drawable.draw(canvas)
+        finalDrawable.setBounds(padding, padding, size - padding, size - padding)
+        finalDrawable.draw(canvas)
 
         return bitmap
+    }
+
+    /**
+     * Wraps [layerDrawable] in a [SweepGradientDrawable] using Google's original brand
+     * colors and the same junction angles and bar-exclusion rectangle defined in
+     * [app.lawnchair.qsb.setThemedIconResource] (unthemed path).
+     */
+    private fun buildGoogleSweepDrawable(layerDrawable: LayerDrawable): SweepGradientDrawable {
+        val blue   = 0xFF4285F4.toInt()
+        val green  = 0xFF34A853.toInt()
+        val yellow = 0xFFFBBC05.toInt()
+        val red    = 0xFFEA4335.toInt()
+        val d = 0.05f
+        return SweepGradientDrawable(
+            layerDrawable,
+            intArrayOf(blue, blue, green, green, yellow, yellow, red, red, blue, blue),
+            floatArrayOf(
+                0.000f,
+                0.1358f - d, 0.1358f + d,
+                0.4259f - d, 0.4259f + d,
+                0.5741f - d, 0.5741f + d,
+                0.9000f - d, 0.9000f + d,
+                1.000f,
+            ),
+            barExcludeLeft   = 0.500f,
+            barExcludeTop    = 0.417f,
+            barExcludeRight  = 1.000f,
+            barExcludeBottom = 0.605f,
+        )
     }
 
     private fun getPackageIcon(packageName: String, user: UserHandle): BitmapInfo {

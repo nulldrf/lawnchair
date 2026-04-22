@@ -185,7 +185,7 @@ class SearchTargetFactory(
         val actionBuilder = SearchActionCompat.Builder(id, SettingsTarget.formatSettingTitle(info.name))
             .setIcon(
                 Icon.createWithResource(context, R.drawable.ic_setting)
-                    .setTint(ColorTokens.Accent1_600.resolveColor(context)),
+                    .setTint(ColorTokens.TextColorSecondary.resolveColor(context)),
             )
             .setIntent(intent)
             .build()

@@ -12,6 +12,8 @@ import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.theme.color.AndroidColor
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
+import app.lawnchair.theme.color.KdragMonetColorScheme
+import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.SystemColorScheme
 import app.lawnchair.ui.theme.getSystemAccent
@@ -44,7 +46,13 @@ class ThemeProvider @Inject constructor(
     private var accentColor: ColorOption = preferenceManager2.accentColor.firstBlocking()
     private var colorStyle: ColorStyle = preferenceManager2.colorStyle.firstBlocking()
 
+    // Cache for Android-system Monet schemes — keyed by (seedColor, Style).
     private val colorSchemeMap = HashMap<Pair<Int, Style>, ColorScheme>()
+
+    // Separate cache for the kdrag0n ZCAM engine — keyed by seedColor alone,
+    // since LegacyKdrag has no Style variant.
+    private val kdragColorSchemeMap = HashMap<Int, ColorScheme>()
+
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
     init {
@@ -93,30 +101,40 @@ class ThemeProvider @Inject constructor(
 
         is ColorOption.WallpaperPrimary -> {
             val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
-            getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle.style)
+            getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle)
         }
 
-        is ColorOption.CustomColor -> getColorScheme(accentColor.color, colorStyle.style)
+        is ColorOption.CustomColor -> getColorScheme(accentColor.color, colorStyle)
 
-        else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle.style)
+        else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle)
     }
 
     private val systemColorScheme get() = when {
-        Utilities.ATLEAST_S -> getColorScheme(0, colorStyle.style)
-        else -> getColorScheme(context.getSystemAccent(darkTheme = false), colorStyle.style)
+        Utilities.ATLEAST_S -> getColorScheme(0, colorStyle)
+        else -> getColorScheme(context.getSystemAccent(darkTheme = false), colorStyle)
     }
 
+    /**
+     * Returns a [ColorScheme] for [colorInt] using the requested [colorStyle].
+     *
+     * When [colorStyle] is [LegacyKdrag] the kdrag0n ZCAM engine is used and the
+     * result is stored in [kdragColorSchemeMap].  For every other style the Android
+     * system engine ([MonetColorSchemeCompat]) is used and cached in [colorSchemeMap].
+     */
     private fun getColorScheme(
         colorInt: Int,
-        colorStyle: Style,
+        colorStyle: ColorStyle,
     ): ColorScheme {
-        val key = Pair(colorInt, colorStyle)
-        var colorScheme = colorSchemeMap[key]
-        if (colorScheme == null) {
-            colorScheme = MonetColorSchemeCompat(colorInt, colorStyle)
-            colorSchemeMap[key] = colorScheme
+        return if (colorStyle is LegacyKdrag) {
+            kdragColorSchemeMap.getOrPut(colorInt) {
+                KdragMonetColorScheme(colorInt)
+            }
+        } else {
+            val key = Pair(colorInt, colorStyle.style)
+            colorSchemeMap.getOrPut(key) {
+                MonetColorSchemeCompat(colorInt, colorStyle.style)
+            }
         }
-        return colorScheme
     }
 
     fun addListener(listener: ColorSchemeChangeListener) {

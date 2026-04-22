@@ -30,6 +30,7 @@ import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
+import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
@@ -231,8 +232,12 @@ fun GeneralPreferences() {
         }
 
         val accentColorAdapter = prefs2.accentColor.getAdapter()
-        val showColorStyle = !(Utilities.ATLEAST_S && accentColorAdapter.state.value == ColorOption.SystemAccent) ||
+        val accentColorValue = accentColorAdapter.state.value
+        val showColorStyle = !(Utilities.ATLEAST_S && accentColorValue == ColorOption.SystemAccent) ||
             !Utilities.ATLEAST_S
+
+        // LegacyKdrag is only meaningful for wallpaper-derived seed colors.
+        val isWallpaperAccent = accentColorValue is ColorOption.WallpaperPrimary
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
             Item { ThemePreference() }
@@ -240,7 +245,12 @@ fun GeneralPreferences() {
             Item(
                 "color_style",
                 showColorStyle,
-            ) { ColorStylePreference(prefs2.colorStyle.getAdapter()) }
+            ) {
+                ColorStylePreference(
+                    adapter = prefs2.colorStyle.getAdapter(),
+                    showLegacyKdrag = isWallpaperAccent,
+                )
+            }
         }
 
         val notificationEnabled by remember { notificationDotsEnabled(context) }.collectAsStateWithLifecycle(initialValue = false)
@@ -287,14 +297,18 @@ fun GeneralPreferences() {
 private fun ColorStylePreference(
     adapter: PreferenceAdapter<ColorStyle>,
     modifier: Modifier = Modifier,
+    // When false the legacy kdrag0n engine option is hidden from the list.
+    showLegacyKdrag: Boolean = false,
 ) {
-    val entries = remember {
-        ColorStyle.values().map { mode ->
-            ListPreferenceEntry(
-                value = mode,
-                label = { stringResource(id = mode.nameResourceId) },
-            )
-        }
+    val entries = remember(showLegacyKdrag) {
+        ColorStyle.values()
+            .filter { style -> style !is LegacyKdrag || showLegacyKdrag }
+            .map { mode ->
+                ListPreferenceEntry(
+                    value = mode,
+                    label = { stringResource(id = mode.nameResourceId) },
+                )
+            }
     }
 
     ListPreference(

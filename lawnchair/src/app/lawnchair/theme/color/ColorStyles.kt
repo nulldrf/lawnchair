@@ -4,6 +4,13 @@ import androidx.annotation.StringRes
 import com.android.launcher3.R
 import com.android.systemui.monet.Style
 
+/**
+ * Represents a Monet color-generation style.
+ *
+ * [style] is the Android-system [Style] enum used by [MonetColorSchemeCompat].
+ * For [LegacyKdrag] this field is a no-op placeholder; [ThemeProvider] detects
+ * the subtype and routes to [KdragMonetColorScheme] instead.
+ */
 sealed class ColorStyle(
     val style: Style,
     @StringRes val nameResourceId: Int,
@@ -17,6 +24,7 @@ sealed class ColorStyle(
             "fruit_salad" -> FruitSalad
             "content" -> Content
             "monochromatic" -> Monochromatic
+            "legacy_kdrag" -> LegacyKdrag
             else -> TonalSpot // TonalSpot is the default scheme
         }
 
@@ -32,6 +40,7 @@ sealed class ColorStyle(
             FruitSalad,
             Content,
             Monochromatic,
+            LegacyKdrag,
         )
     }
 }
@@ -59,4 +68,16 @@ object Content : ColorStyle(Style.CONTENT, R.string.color_style_content) {
 }
 object Monochromatic : ColorStyle(Style.MONOCHROMATIC, R.string.color_style_monochromatic) {
     override fun toString() = "monochromatic"
+}
+
+/**
+ * Uses the kdrag0n ZCAM-based Monet engine ([KdragMonetColorScheme]) instead of the
+ * Android system engine.  Only meaningful when the accent source is a wallpaper color
+ * (i.e. [ColorOption.WallpaperPrimary]); the UI hides it for other accent sources.
+ *
+ * [Style.TONAL_SPOT] is a harmless placeholder — [ThemeProvider] never reads [style]
+ * when this subtype is active.
+ */
+object LegacyKdrag : ColorStyle(Style.TONAL_SPOT, R.string.color_style_legacy_kdrag) {
+    override fun toString() = "legacy_kdrag"
 }

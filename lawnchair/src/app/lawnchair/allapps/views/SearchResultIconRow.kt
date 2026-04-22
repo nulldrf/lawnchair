@@ -82,6 +82,12 @@ class SearchResultIconRow(context: Context, attrs: AttributeSet?) :
         boundId = target.id
         flags = getFlags(target.extras)
 
+        // Any target driven by a SearchAction (suggestions, web search, settings, recent,
+        // calculator…) must not inherit the icon pack shape. App and shortcut targets are
+        // unaffected because forceCircleIcon is only read inside populateSearchActionItemInfo,
+        // which is only reached when searchAction != null.
+        icon.forceCircleIcon = target.searchAction != null
+
         icon.bind(target) {
             title.text = it.title
             tag = it

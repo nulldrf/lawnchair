@@ -4,6 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.Drawable
 import android.os.UserHandle
 import android.util.AttributeSet
 import android.view.View
@@ -30,6 +34,7 @@ import com.android.launcher3.touch.ItemClickHandler
 import com.android.launcher3.touch.ItemLongClickListener
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.Executors
+import app.lawnchair.theme.color.tokens.ColorTokens
 
 class SearchResultIcon(context: Context, attrs: AttributeSet?) :
     BubbleTextView(context, attrs),
@@ -44,6 +49,14 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
     private var callback: ((info: ItemInfoWithIcon) -> Unit)? = null
 
     private val searchResultMargin = resources.getDimensionPixelSize(R.dimen.search_result_margin)
+
+    /**
+     * When true, the icon for this result will be rendered as a circle, bypassing the
+     * icon pack shape. This should be set to true for non-app targets such as web
+     * suggestions and web search actions before [bind] is called.
+     */
+    @Volatile
+    var forceCircleIcon = false
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -213,7 +226,19 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
 
                 icon == null -> packageIcon
 
-                else -> icon.loadDrawable(context)?.let { li.createBadgedIconBitmap(it, BaseIconFactory.IconOptions().setUser(info.user)) } ?: packageIcon
+                else -> icon.loadDrawable(context)?.let { drawable ->
+                    if (forceCircleIcon) {
+                        // Render the icon as a circle, independent of the icon pack shape.
+                        // iconSize is a BubbleTextView property and is safe to read here.
+                        val size = iconSize
+                        BitmapInfo.of(createCircleBitmap(drawable, size), 0)
+                    } else {
+                        li.createBadgedIconBitmap(
+                            drawable,
+                            BaseIconFactory.IconOptions().setUser(info.user),
+                        )
+                    }
+                } ?: packageIcon
             }
             if (info.hasFlags(SearchActionItemInfo.FLAG_BADGE_WITH_COMPONENT_NAME) && target.extras.containsKey("class")) {
                 try {
@@ -232,6 +257,33 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
 //                info.bitmap = li.badgeBitmap(info.bitmap.icon, packageIcon)
             }
         }
+    }
+
+    /**
+     * Creates a circle-shaped [Bitmap] by drawing [drawable] centered inside a circle.
+     *
+     * The circle background uses the theme's [android.R.attr.colorBackground] so it blends
+     * naturally with both light and dark themes. The icon is drawn with 20% padding on each
+     * side so it sits comfortably inside the circle without touching the edges.
+     *
+     * This is called on a background thread, so it must not access the view hierarchy.
+     */
+    private fun createCircleBitmap(drawable: Drawable, size: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Use ColorPrimary so the circle is Neutral1_50 in light theme and Neutral1_900
+        // in dark theme, giving a strong but theme-appropriate background for the icon.
+        paint.color = ColorTokens.ColorPrimary.resolveColor(context)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+
+        // Draw the icon centered with 20% padding on each side.
+        val padding = (size * 0.20f).toInt()
+        drawable.setBounds(padding, padding, size - padding, size - padding)
+        drawable.draw(canvas)
+
+        return bitmap
     }
 
     private fun getPackageIcon(packageName: String, user: UserHandle): BitmapInfo {

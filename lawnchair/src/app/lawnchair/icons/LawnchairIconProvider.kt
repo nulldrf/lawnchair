@@ -33,6 +33,7 @@ import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
 import com.android.launcher3.LauncherAppState
+import com.android.launcher3.icons.LauncherIcons
 import com.android.launcher3.R
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
@@ -92,70 +93,35 @@ class LawnchairIconProvider @Inject constructor(
     val systemIconState = themeManager.iconState
 
     // -----------------------------------------------------------------------
-    // Adaptive icon pref subscriptions
+    // Icon cache flush on adaptive icon pref changes.
     //
-    // When "Smart icon backgrounds" (pref_colorizedLegacyTreatment) or
-    // "Recolor white adaptive icon backgrounds" (pref_enableWhiteOnlyTreatment) change,
-    // we need to flush the disk icon cache and trigger regeneration so the new
-    // processing logic takes effect. See flushIconCacheAndReload() for the full strategy.
+    // When "Smart icon backgrounds" or "Recolor white adaptive backgrounds"
+    // change, LawnchairThemeManager.verifyIconState() detects the state change
+    // (because the colorize suffix is baked into the iconMask key) and fires
+    // onThemeChanged(). We hook into that event here to:
+    //   1. Call updateSystemState() so mSystemState changes → disk cache stale.
+    //   2. Clear the memory bitmap cache.
+    //   3. Clear the LauncherIcons factory pool so the next factory obtained
+    //      reads the new pref values instead of using cached factory state.
     //
-    // IMPORTANT — listener must be stored as a strong reference.
-    // SharedPreferences stores listeners in a WeakHashMap. An anonymous lambda passed
-    // directly to registerOnSharedPreferenceChangeListener has no other strong reference,
-    // so the GC can collect it at any time (often after the first GC cycle). This caused
-    // pref toggles to silently do nothing: the listener fired once (if at all) and was
-    // then gone, leaving all cached bitmaps stale. The drag-shows-new-color /
-    // release-shows-old-color symptom was the tell-tale sign of this exact bug.
+    // The launcher's own onThemeChanged() downstream handler then refreshes all
+    // visible icon views, which re-load from memory cache (now empty), fall
+    // through to disk cache (now stale), and regenerate bitmaps with the new
+    // background logic. This is the same fast path used by shape changes.
+    //
+    // We do NOT call model.reloadIfActive() — that method is confirmed broken
+    // (see ReloadHelper.kt: "This doesn't work") and takes 30+ seconds.
     // -----------------------------------------------------------------------
 
-    /**
-     * Strong reference to the adaptive icon pref change listener.
-     * Must NOT be anonymous — see the comment above.
-     */
-    private val adaptiveIconPrefListener =
-        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment") {
-                flushIconCacheAndReload()
+    init {
+        themeManager.addChangeListener {
+            Executors.MODEL_EXECUTOR.execute {
+                updateSystemState()
+                val appState = LauncherAppState.getInstance(context)
+                appState.iconCache.clearMemoryCache()
+                LauncherIcons.clearPool(context)
             }
         }
-
-    /**
-     * Flushes the icon cache and triggers regeneration with the new settings.
-     *
-     * This runs a single reload pass on MODEL_EXECUTOR:
-     *   1. updateSystemState() — update mSystemState so getStateForApp() returns new
-     *      freshnessIds. This makes every disk cache entry stale.
-     *   2. clearMemoryCache() — drop in-memory bitmaps.
-     *   3. model.reloadIfActive() — regenerate all icons. Each icon is posted to the
-     *      main thread as it completes, so icons appear progressively (~3-5 seconds).
-     *
-     * This is the same speed as a launcher restart (which is what the user noticed
-     * as "fast"). The previous two-phase approach ran TWO full model reloads (one
-     * from disk, then one from factory), doubling the time to 10+ seconds.
-     *
-     * We do NOT attempt to replicate the "instant" feel of shape changes. Shape changes
-     * are instant because they update a static mask path (CustomAdaptiveIconDrawable.sMask)
-     * that affects all live drawable instances immediately at draw time — no bitmap
-     * regeneration needed. Background color is baked into the bitmap, so it cannot be
-     * changed without regenerating. The progressive appearance of new icons (3-5 seconds)
-     * is the best achievable UX without an architectural rewrite of BitmapInfo.
-     */
-    private fun flushIconCacheAndReload() {
-        val appState = LauncherAppState.getInstance(context)
-        Executors.MODEL_EXECUTOR.execute {
-            updateSystemState()
-            appState.iconCache.clearMemoryCache()
-            appState.model.reloadIfActive()
-        }
-    }
-
-    init {
-        // Register the strongly-referenced listener so it is never GC'd.
-        // Using the stored property (adaptiveIconPrefListener) instead of an anonymous
-        // lambda ensures the WeakHashMap inside SharedPreferences always holds a reachable
-        // reference and the listener survives across GC cycles for the lifetime of this
-        // singleton.
-        context.prefs.registerOnSharedPreferenceChangeListener(adaptiveIconPrefListener)
     }
 
     private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {

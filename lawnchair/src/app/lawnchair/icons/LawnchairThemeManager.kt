@@ -2,6 +2,9 @@ package app.lawnchair.icons
 
 import android.content.Context
 import android.util.Log
+import app.lawnchair.icons.prefs
+import app.lawnchair.icons.shouldColorizeBackground
+import app.lawnchair.icons.shouldTreatWhiteAdaptive
 import app.lawnchair.icons.shape.IconShape
 import app.lawnchair.icons.shape.PathShapeDelegate
 import app.lawnchair.preferences2.PreferenceManager2
@@ -42,6 +45,23 @@ constructor(
 ) {
     override var iconState = parseIconStateV2(null)
 
+    // -----------------------------------------------------------------------
+    // Strongly-referenced listener for "Smart icon backgrounds" and
+    // "Recolor white adaptive backgrounds" prefs.
+    //
+    // These prefs live in the old SharedPreferences store and are not tracked
+    // by LauncherPrefs, so we register a separate listener here.
+    //
+    // IMPORTANT: stored as a property (not anonymous lambda) so the
+    // WeakHashMap inside SharedPreferences never GC-collects it.
+    // -----------------------------------------------------------------------
+    private val colorizePrefsListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment") {
+                verifyIconState()
+            }
+        }
+
     init {
         val scope = MainScope()
         merge(
@@ -62,8 +82,11 @@ constructor(
         }
         prefs.addListener(prefListener, *keysArray)
 
+        context.prefs.registerOnSharedPreferenceChangeListener(colorizePrefsListener)
+
         lifecycle.addCloseable {
             prefs.removeListener(prefListener, *keysArray)
+            context.prefs.unregisterOnSharedPreferenceChangeListener(colorizePrefsListener)
             scope.cancel()
         }
     }
@@ -91,7 +114,15 @@ constructor(
             IconShape.Circle
         }
 
-        val appShapeKey = currentAppShape.getHashString()
+        // Include colorize pref values in the shape key so that toggling
+        // "Smart icon backgrounds" or "Recolor white adaptive backgrounds" produces a
+        // different IconState → verifyIconState() fires onThemeChanged() → the launcher
+        // refreshes icons through the same fast path used by shape changes.
+        val colorize   = context.shouldColorizeBackground()
+        val treatWhite = context.shouldTreatWhiteAdaptive()
+        val colorizeSuffix = "|c${if (colorize) 1 else 0}t${if (treatWhite) 1 else 0}"
+
+        val appShapeKey    = currentAppShape.getHashString() + colorizeSuffix
         val folderShapeKey = currentFolderShape.getHashString()
 
         val appShape =

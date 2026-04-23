@@ -84,12 +84,13 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
             avatar.visibility = GONE
             preview.visibility = VISIBLE
         }
-        // Contact rows are single-line so the compact height is enough.
-        // File rows allow 2-line titles so they need the taller row height.
+        // Contact rows: fixed compact height (single line, no wrapping).
+        // File rows: wrap content so the card sizes to the 2-line title
+        // rather than leaving dead space from the old large-icon height.
         val heightRes = if (isSmall) {
             resources.getDimensionPixelSize(R.dimen.search_result_small_row_height)
         } else {
-            resources.getDimensionPixelSize(R.dimen.search_result_row_height)
+            LayoutParams.WRAP_CONTENT
         }
         val layoutParams = LayoutParams(
             LayoutParams.MATCH_PARENT,

@@ -65,7 +65,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.icons.FastBitmapDrawable;
-import com.android.launcher3.icons.IconNormalizer;
+// import com.android.launcher3.icons.IconNormalizer; // unused after Lawnchair drag-size fix
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.views.ActivityContext;
@@ -270,7 +270,31 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                 // be scaled down due to icon normalization.
                 mBadge = fullDrawable.second;
                 FastBitmapDrawable.setBadgeBounds(mBadge, bounds);
-                Utilities.scaleRectAboutCenter(bounds, IconNormalizer.ICON_VISIBLE_AREA_FACTOR);
+
+                // LAWNCHAIR: Do NOT apply ICON_VISIBLE_AREA_FACTOR here.
+                //
+                // AOSP uses ICON_VISIBLE_AREA_FACTOR (≈ 0.707) to shrink the shape mask to
+                // ~69% of the drag view area. This was designed for stock adaptive icons whose
+                // foreground art occupies only 66% of the 108dp adaptive canvas (the 18dp outer
+                // ring is reserved for parallax). Applying this factor makes the drag preview
+                // icon match stock AOSP.
+                //
+                // In Lawnchair, however, all icons (legacy, partial-adaptive, full-adaptive) are
+                // rendered as FastBitmapDrawable on the homescreen, where the bitmap content fills
+                // the entire icon cell (mIconSize). Using ICON_VISIBLE_AREA_FACTOR in the drag
+                // preview shrinks the shape mask to 69% of the drag view, making every dragged
+                // icon appear ~30% smaller than it looks on the homescreen — visible as a small
+                // icon inside a large circle/squircle outline. Using 1.0f lets the shape mask fill
+                // the full drag view (minus the tiny 0.98 shrink below for AA edge clearance),
+                // matching the homescreen visual size.
+                //
+                // For real adaptive icons (Case 1), the foreground art now fills the shape mask
+                // fully, which is actually MORE correct than AOSP: the 18dp outer parallax zone
+                // is still provided by the extra-inset expansion below (bg/fg get extraInsetFraction
+                // added back), so parallax effects still work. The only difference is that the
+                // outer parallax content is now visible inside the mask during drag — which is a
+                // minor and intentional difference from AOSP behavior.
+                // Utilities.scaleRectAboutCenter(bounds, IconNormalizer.ICON_VISIBLE_AREA_FACTOR);
 
                 // Shrink very tiny bit so that the clip path is smaller than the original bitmap
                 // that has anti aliased edges and shadows.

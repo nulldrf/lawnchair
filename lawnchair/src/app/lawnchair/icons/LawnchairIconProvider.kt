@@ -98,7 +98,26 @@ class LawnchairIconProvider @Inject constructor(
     // "Recolor white adaptive icon backgrounds" (pref_enableWhiteOnlyTreatment) change,
     // we need to flush the disk icon cache and trigger regeneration so the new
     // processing logic takes effect. See flushIconCacheAndReload() for the full strategy.
+    //
+    // IMPORTANT — listener must be stored as a strong reference.
+    // SharedPreferences stores listeners in a WeakHashMap. An anonymous lambda passed
+    // directly to registerOnSharedPreferenceChangeListener has no other strong reference,
+    // so the GC can collect it at any time (often after the first GC cycle). This caused
+    // pref toggles to silently do nothing: the listener fired once (if at all) and was
+    // then gone, leaving all cached bitmaps stale. The drag-shows-new-color /
+    // release-shows-old-color symptom was the tell-tale sign of this exact bug.
     // -----------------------------------------------------------------------
+
+    /**
+     * Strong reference to the adaptive icon pref change listener.
+     * Must NOT be anonymous — see the comment above.
+     */
+    private val adaptiveIconPrefListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment") {
+                flushIconCacheAndReload()
+            }
+        }
 
     /**
      * Flushes the icon cache and triggers regeneration with the new settings.
@@ -131,21 +150,12 @@ class LawnchairIconProvider @Inject constructor(
     }
 
     init {
-        // Subscribe to both adaptive icon prefs so any change triggers a full flush.
-        // We use the SharedPreferences change listener directly because these prefs live
-        // in the same "com.android.launcher3.prefs" store that both PreferenceManager
-        // and IconPreferences.kt read from.
-        //
-        // We cannot use PreferenceManager's BoolPref callback for this because that
-        // callback fires synchronously on the main thread — we need to run on MODEL_EXECUTOR
-        // and we also need to call updateSystemState() BEFORE the model reload, not after.
-        // A SharedPreferences listener is the simplest way to hook into both pref writes
-        // regardless of which code path (UI toggle, migration, etc.) made the change.
-        context.prefs.registerOnSharedPreferenceChangeListener { _, key ->
-            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment") {
-                flushIconCacheAndReload()
-            }
-        }
+        // Register the strongly-referenced listener so it is never GC'd.
+        // Using the stored property (adaptiveIconPrefListener) instead of an anonymous
+        // lambda ensures the WeakHashMap inside SharedPreferences always holds a reachable
+        // reference and the listener survives across GC cycles for the lifetime of this
+        // singleton.
+        context.prefs.registerOnSharedPreferenceChangeListener(adaptiveIconPrefListener)
     }
 
     private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {

@@ -7,11 +7,18 @@
     android:orientation="horizontal"
     android:paddingStart="8dp">
 
+    <!--
+        files_preview: use the same standard icon size as every other search row.
+        The old search_row_files_preview_width/height were oversized, causing the
+        thumbnail to dominate the row and push text off-screen.
+    -->
     <app.lawnchair.util.ImageViewWrapper
         android:id="@+id/files_preview"
         style="@style/BaseIcon"
-        android:layout_width="@dimen/search_row_files_preview_width"
-        android:layout_height="@dimen/search_row_files_preview_height"
+        android:layout_width="@dimen/search_row_icon_size"
+        android:layout_height="@dimen/search_row_icon_size"
+        android:layout_gravity="center_vertical"
+        android:layout_margin="@dimen/search_result_padding"
         android:drawableTint="?android:textColorPrimary"
         android:ellipsize="end"
         launcher:iconDisplay="search_result_small"
@@ -29,6 +36,12 @@
         launcher:layoutHorizontal="true"
         launcher:matchTextInsetWithQuery="true" />
 
+    <!--
+        text_rows: orientation and singleLine behaviour are now controlled entirely
+        in SearchResultRightLeftIcon.kt depending on whether this row is a file
+        (vertical, 2-line) or a contact (horizontal, 1-line). The XML sets the
+        neutral defaults; the view overrides them on bind.
+    -->
     <LinearLayout
         android:id="@+id/text_rows"
         style="@style/AllAppsSearchResult"
@@ -40,8 +53,7 @@
         android:paddingStart="@dimen/dynamic_grid_edge_margin"
         android:paddingTop="@dimen/dynamic_grid_edge_margin"
         android:paddingEnd="@dimen/dynamic_grid_edge_margin"
-        android:paddingBottom="@dimen/dynamic_grid_edge_margin"
-        android:singleLine="true">
+        android:paddingBottom="@dimen/dynamic_grid_edge_margin">
 
         <TextView
             android:id="@+id/title"
@@ -50,9 +62,8 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:gravity="start|center"
-            android:maxLines="1"
+            android:maxLines="2"
             android:paddingEnd="4dp"
-            android:singleLine="true"
             android:textAlignment="viewStart"
             android:textColor="?android:textColorPrimary"
             android:textSize="@dimen/search_result_hero_title_size" />
@@ -84,40 +95,39 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="end"
+        android:orientation="horizontal"
         android:paddingTop="@dimen/dynamic_grid_edge_margin"
         android:paddingEnd="@dimen/dynamic_grid_edge_margin"
-        android:paddingBottom="@dimen/dynamic_grid_edge_margin"
-        android:orientation="horizontal"
-        android:singleLine="true">
+        android:paddingBottom="@dimen/dynamic_grid_edge_margin">
 
         <ImageView
             android:id="@+id/icon1"
             style="@style/BaseIcon"
-            android:background="@drawable/pill_ripple"
             android:layout_width="@dimen/search_row_medium_icon_size"
             android:layout_height="@dimen/search_row_medium_icon_size"
+            android:background="@drawable/pill_ripple"
+            android:clickable="true"
+            android:contentDescription="@string/custom"
             android:drawableTint="?android:textColorPrimary"
             android:ellipsize="end"
-            android:clickable="true"
             launcher:iconDisplay="search_result_small"
             launcher:layoutHorizontal="true"
-            launcher:matchTextInsetWithQuery="true"
-            android:contentDescription="@string/custom"/>
+            launcher:matchTextInsetWithQuery="true" />
 
         <ImageView
             android:id="@+id/icon2"
             style="@style/BaseIcon"
-            android:background="@drawable/pill_ripple"
-            android:layout_marginLeft="@dimen/search_result_padding_medium"
             android:layout_width="@dimen/search_row_medium_icon_size"
             android:layout_height="@dimen/search_row_medium_icon_size"
+            android:layout_marginLeft="@dimen/search_result_padding_medium"
+            android:background="@drawable/pill_ripple"
+            android:clickable="true"
+            android:contentDescription="@string/custom"
             android:drawableTint="?android:textColorPrimary"
             android:ellipsize="end"
-            android:clickable="true"
             launcher:iconDisplay="search_result_small"
             launcher:layoutHorizontal="true"
-            launcher:matchTextInsetWithQuery="true"
-            android:contentDescription="@string/custom" />
+            launcher:matchTextInsetWithQuery="true" />
 
     </LinearLayout>
 </app.lawnchair.allapps.views.SearchResultRightLeftIcon>

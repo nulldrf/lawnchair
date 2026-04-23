@@ -30,6 +30,7 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
     private lateinit var call: ImageView
     private lateinit var message: ImageView
     private lateinit var preview: ImageViewWrapper
+    private lateinit var textRows: LinearLayout
     private val appInfoHelper = AppInfoHelper(context)
     private var defPhoneAppInfo: AppInfo? = null
     private var defSmsAppInfo: AppInfo? = null
@@ -44,6 +45,7 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         defSmsAppInfo = appInfoHelper.getDefaultMessageAppInfo()
         onFocusChangeListener = launcher.focusHandler
         title = ViewCompat.requireViewById(this, R.id.title)
+        textRows = ViewCompat.requireViewById(this, R.id.text_rows)
         avatar = ViewCompat.requireViewById(this, R.id.avatar)
         call = ViewCompat.requireViewById(this, R.id.icon2)
         message = ViewCompat.requireViewById(this, R.id.icon1)
@@ -69,9 +71,7 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         val heightRes = if (isSmall) {
             resources.getDimensionPixelSize(R.dimen.search_result_small_row_height)
         } else {
-            resources.getDimensionPixelSize(
-                R.dimen.search_result_files_row_height,
-            )
+            resources.getDimensionPixelSize(R.dimen.search_result_row_height)
         }
         val layoutParams = LayoutParams(
             LayoutParams.MATCH_PARENT,
@@ -121,13 +121,22 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         }
 
         if (!isFile) {
+            // Contact row: compact single-line horizontal layout.
             isSmall = true
+            textRows.orientation = HORIZONTAL
+            title.maxLines = 1
+            title.isSingleLine = true
             setUpdateResources()
         }
 
         if (isFile) {
+            // File row: stack the filename vertically so long names can wrap to a
+            // second line instead of clipping. The icon is already sized to
+            // search_row_icon_size in XML so it no longer dominates the row.
             preview.setImageIcon(target.searchAction?.icon)
+            textRows.orientation = VERTICAL
             title.isSingleLine = false
+            title.maxLines = 2
         }
 
         if (shouldHandleClick(target)) {

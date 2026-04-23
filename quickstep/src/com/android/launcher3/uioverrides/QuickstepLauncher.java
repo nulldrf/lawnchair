@@ -45,6 +45,7 @@ import static com.android.launcher3.Utilities.ATLEAST_BAKLAVA;
 import static com.android.launcher3.Utilities.ATLEAST_S;
 import static com.android.launcher3.Utilities.ATLEAST_S_V2;
 import static com.android.launcher3.Utilities.ATLEAST_T;
+import static com.android.launcher3.Utilities.ATLEAST_V;
 import static com.android.launcher3.Utilities.isRtl;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
@@ -1612,12 +1613,16 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         switch (name) {
             case "TextClock", "android.widget.TextClock" -> {
                 TextClock tc = new TextClock(context, attrs);
-                tc.setClockEventDelegate(AsyncClockEventDelegate.INSTANCE.get(this));
+                if (Utilities.ATLEAST_V) {
+                    tc.setClockEventDelegate(AsyncClockEventDelegate.INSTANCE.get(this));
+                }
                 return tc;
             }
             case "AnalogClock", "android.widget.AnalogClock" -> {
                 AnalogClock ac = new AnalogClock(context, attrs);
-                ac.setClockEventDelegate(AsyncClockEventDelegate.INSTANCE.get(this));
+                if (Utilities.ATLEAST_V) {
+                    ac.setClockEventDelegate(AsyncClockEventDelegate.INSTANCE.get(this));
+                }
                 return ac;
             }
         }

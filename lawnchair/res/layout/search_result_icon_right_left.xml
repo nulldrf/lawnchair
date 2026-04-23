@@ -8,19 +8,18 @@
     android:paddingStart="8dp">
 
     <!--
-        files_preview: use the same standard icon size as every other search row.
-        The old search_row_files_preview_width/height were oversized, causing the
-        thumbnail to dominate the row and push text off-screen.
+        files_preview: width, height, and marginStart are set programmatically in
+        onFinishInflate to match SearchResultIcon's own sizing so photo thumbnails
+        and vector file icons have identical visual footprint. XML dimensions are
+        left as wrap_content as a safe fallback only.
     -->
     <app.lawnchair.util.ImageViewWrapper
         android:id="@+id/files_preview"
         style="@style/BaseIcon"
-        android:layout_width="@dimen/search_row_icon_size"
-        android:layout_height="@dimen/search_row_icon_size"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
-        android:layout_margin="@dimen/search_result_padding"
         android:drawableTint="?android:textColorPrimary"
-        android:ellipsize="end"
         launcher:iconDisplay="search_result_small"
         launcher:layoutHorizontal="true"
         launcher:matchTextInsetWithQuery="true" />

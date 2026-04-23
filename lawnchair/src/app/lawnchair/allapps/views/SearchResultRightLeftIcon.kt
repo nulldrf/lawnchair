@@ -6,6 +6,7 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.util.AttributeSet
 import android.util.Log
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -52,6 +53,20 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         message = ViewCompat.requireViewById(this, R.id.icon1)
         preview = ViewCompat.requireViewById(this, R.id.files_preview)
         FontManager.INSTANCE.get(context).setCustomFont(title, R.id.font_body)
+
+        // SearchResultIcon.bind() overrides its own width/height to
+        // (iconSize + compoundDrawablePadding) and sets marginStart to
+        // search_result_margin. Mirror those same values on files_preview
+        // so both a vector icon and a photo thumbnail have identical
+        // visual footprint and left alignment regardless of XML dimensions.
+        val iconSizeWithPadding = avatar.iconSize + avatar.compoundDrawablePadding
+        val iconMargin = resources.getDimensionPixelSize(R.dimen.search_result_margin)
+        (preview.layoutParams as ViewGroup.MarginLayoutParams).apply {
+            width = iconSizeWithPadding
+            height = iconSizeWithPadding
+            marginStart = iconMargin
+        }
+
         setUpdateResources()
     }
 

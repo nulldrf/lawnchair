@@ -171,6 +171,10 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
             textRows.orientation = VERTICAL
             title.isSingleLine = false
             title.maxLines = 2
+
+            // Remove top/bottom padding from text_rows so layout_gravity="center_vertical"
+            // centers the actual text lines rather than a padded-out wrap_content box.
+            textRows.setPadding(textRows.paddingLeft, 0, textRows.paddingRight, 0)
         }
 
         if (shouldHandleClick(target)) {

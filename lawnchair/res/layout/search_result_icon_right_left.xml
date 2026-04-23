@@ -27,13 +27,11 @@
     <app.lawnchair.allapps.views.SearchResultIcon
         android:id="@+id/avatar"
         style="@style/BaseIcon"
-        android:layout_width="@dimen/search_row_medium_icon_size"
-        android:layout_height="@dimen/search_row_medium_icon_size"
+        android:layout_width="@dimen/search_row_icon_size"
+        android:layout_height="wrap_content"
         android:drawableTint="?android:textColorPrimary"
-        android:ellipsize="end"
-        launcher:iconDisplay="search_result_small"
-        launcher:layoutHorizontal="true"
-        launcher:matchTextInsetWithQuery="true" />
+        launcher:iconDisplay="search_result_tall"
+        launcher:layoutHorizontal="true" />
 
     <!--
         text_rows: orientation and singleLine behaviour are now controlled entirely

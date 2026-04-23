@@ -2,6 +2,7 @@ package app.lawnchair.allapps.views
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.util.AttributeSet
 import android.util.Log
@@ -129,10 +130,26 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         }
 
         if (isFile) {
-            // File row: stack the filename vertically so long names can wrap to a
-            // second line instead of clipping. The icon is already sized to
-            // search_row_icon_size in XML so it no longer dominates the row.
-            preview.setImageIcon(target.searchAction?.icon)
+            val icon = target.searchAction?.icon
+            val isPhotoBitmap = icon != null &&
+                (icon.type == Icon.TYPE_BITMAP || icon.type == Icon.TYPE_ADAPTIVE_BITMAP)
+
+            if (isPhotoBitmap) {
+                // Actual photo/image thumbnail — ImageViewWrapper's CENTER_CROP +
+                // rounded-rect clip looks great here, keep it.
+                preview.visibility = VISIBLE
+                avatar.visibility = GONE
+                preview.setImageIcon(icon)
+            } else {
+                // Generic vector file icon (torrent, zip, folder, unknown…).
+                // Route through SearchResultIcon so it gets the same circle
+                // treatment as web suggestion and settings icons.
+                preview.visibility = GONE
+                avatar.visibility = VISIBLE
+                avatar.forceCircleIcon = true
+                avatar.bind(target) { title.text = it.title }
+            }
+
             textRows.orientation = VERTICAL
             title.isSingleLine = false
             title.maxLines = 2

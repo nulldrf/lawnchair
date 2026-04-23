@@ -68,11 +68,10 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
             avatar.visibility = GONE
             preview.visibility = VISIBLE
         }
-        val heightRes = if (isSmall) {
-            resources.getDimensionPixelSize(R.dimen.search_result_small_row_height)
-        } else {
-            resources.getDimensionPixelSize(R.dimen.search_result_row_height)
-        }
+        // Both file and contact rows now use the compact small row height.
+        // File rows no longer need extra height since the preview icon is standard-sized
+        // and the title wraps to at most 2 lines within this same compact space.
+        val heightRes = resources.getDimensionPixelSize(R.dimen.search_result_small_row_height)
         val layoutParams = LayoutParams(
             LayoutParams.MATCH_PARENT,
             heightRes,

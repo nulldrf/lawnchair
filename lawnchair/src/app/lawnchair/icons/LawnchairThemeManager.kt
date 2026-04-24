@@ -2,6 +2,7 @@ package app.lawnchair.icons
 
 import android.content.Context
 import android.util.Log
+import app.lawnchair.LawnchairLauncher
 import app.lawnchair.icons.prefs
 import app.lawnchair.icons.shouldColorizeBackground
 import app.lawnchair.icons.shouldTreatWhiteAdaptive
@@ -17,6 +18,7 @@ import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.util.DaggerSingletonTracker
+import com.android.launcher3.util.Executors
 import com.android.launcher3.util.LooperExecutor
 import com.patrykmichalik.opto.core.firstBlocking
 import javax.inject.Inject
@@ -57,8 +59,17 @@ constructor(
     // -----------------------------------------------------------------------
     private val colorizePrefsListener =
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment") {
+            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment"
+                    || key == "pref_coloredBackgroundLightness") {
+                // verifyIconState() updates the iconState (colorizeSuffix changes) and fires
+                // onThemeChanged() so LawnchairIconProvider clears the caches.
                 verifyIconState()
+                // Recreate the launcher for instant visual feedback.
+                // This is done here (not in the generic ThemeChangeListener) so that shape
+                // changes don't trigger an extra recreate on top of their own reload path.
+                Executors.MAIN_EXECUTOR.execute {
+                    LawnchairLauncher.instance?.recreateIfNotScheduled()
+                }
             }
         }
 
@@ -120,7 +131,10 @@ constructor(
         // refreshes icons through the same fast path used by shape changes.
         val colorize   = context.shouldColorizeBackground()
         val treatWhite = context.shouldTreatWhiteAdaptive()
-        val colorizeSuffix = "|c${if (colorize) 1 else 0}t${if (treatWhite) 1 else 0}"
+        val lightness  = context.prefs.getFloat("pref_coloredBackgroundLightness", 1f)
+        // Round to 2 decimal places so tiny float noise doesn't create new cache keys.
+        val lightnessKey = (lightness * 100).toInt()
+        val colorizeSuffix = "|c${if (colorize) 1 else 0}t${if (treatWhite) 1 else 0}l$lightnessKey"
 
         val appShapeKey    = currentAppShape.getHashString() + colorizeSuffix
         val folderShapeKey = currentFolderShape.getHashString()

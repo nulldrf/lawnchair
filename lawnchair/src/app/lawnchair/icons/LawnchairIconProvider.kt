@@ -32,7 +32,6 @@ import app.lawnchair.icons.picker.IconType
 import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
-import app.lawnchair.LawnchairLauncher
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.LauncherIcons
 import com.android.launcher3.R
@@ -115,19 +114,18 @@ class LawnchairIconProvider @Inject constructor(
     // -----------------------------------------------------------------------
 
     init {
+        // Clear caches on any theme change (shape, themed icons, colorize prefs).
+        // updateSystemState() makes disk cache stale; clearMemoryCache() + clearPool()
+        // force new bitmaps to be generated with current settings.
+        // Recreate is NOT triggered here — shape changes handle their own recreate via
+        // LawnchairThemeManager, and colorize changes trigger recreate directly from
+        // LawnchairThemeManager.colorizePrefsListener to avoid double-recreates.
         themeManager.addChangeListener {
             Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
-                // Recreate the launcher so all visible icon views are immediately
-                // rebuilt from scratch with the new background settings.
-                // This is the same path used by shape changes and is the fastest
-                // way to make pref changes visible without a manual restart.
-                Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.instance?.recreateIfNotScheduled()
-                }
             }
         }
     }

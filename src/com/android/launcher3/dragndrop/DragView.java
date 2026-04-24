@@ -264,37 +264,28 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                 int blurMargin = (int) mActivity.getResources()
                         .getDimension(R.dimen.blur_size_medium_outline) / 2;
 
-                Rect bounds = new Rect(0, 0, w, h);
-                bounds.inset(blurMargin, blurMargin);
-                // Badge is applied after icon normalization so the bounds for badge should not
-                // be scaled down due to icon normalization.
+                // LAWNCHAIR: Use FULL view bounds for the icon mask — no blurMargin inset,
+                // no ICON_VISIBLE_AREA_FACTOR.
+                //
+                // AOSP insets by blurMargin to reserve space for a live drop-shadow rendered
+                // outside the mask during drag. Lawnchair bakes shadows into the icon bitmap
+                // via ShadowGenerator, so there is no live shadow — the space is wasted and
+                // just makes the drag icon visibly smaller than the homescreen icon.
+                //
+                // AOSP also applies ICON_VISIBLE_AREA_FACTOR (≈0.707) to match the stock
+                // adaptive icon spec where the foreground art occupies only the inner 66dp
+                // of the 108dp canvas. Lawnchair icons (legacy, partial-adaptive) are all
+                // pre-rendered into a bitmap that fills the full icon cell, so this factor
+                // shrinks the drag preview ~30% relative to homescreen.
+                //
+                // The badge still uses blurMargin-inset bounds so it stays inset from the edge.
+                Rect badgeBounds = new Rect(0, 0, w, h);
+                badgeBounds.inset(blurMargin, blurMargin);
                 mBadge = fullDrawable.second;
-                FastBitmapDrawable.setBadgeBounds(mBadge, bounds);
+                FastBitmapDrawable.setBadgeBounds(mBadge, badgeBounds);
 
-                // LAWNCHAIR: Do NOT apply ICON_VISIBLE_AREA_FACTOR here.
-                //
-                // AOSP uses ICON_VISIBLE_AREA_FACTOR (≈ 0.707) to shrink the shape mask to
-                // ~69% of the drag view area. This was designed for stock adaptive icons whose
-                // foreground art occupies only 66% of the 108dp adaptive canvas (the 18dp outer
-                // ring is reserved for parallax). Applying this factor makes the drag preview
-                // icon match stock AOSP.
-                //
-                // In Lawnchair, however, all icons (legacy, partial-adaptive, full-adaptive) are
-                // rendered as FastBitmapDrawable on the homescreen, where the bitmap content fills
-                // the entire icon cell (mIconSize). Using ICON_VISIBLE_AREA_FACTOR in the drag
-                // preview shrinks the shape mask to 69% of the drag view, making every dragged
-                // icon appear ~30% smaller than it looks on the homescreen — visible as a small
-                // icon inside a large circle/squircle outline. Using 1.0f lets the shape mask fill
-                // the full drag view (minus the tiny 0.98 shrink below for AA edge clearance),
-                // matching the homescreen visual size.
-                //
-                // For real adaptive icons (Case 1), the foreground art now fills the shape mask
-                // fully, which is actually MORE correct than AOSP: the 18dp outer parallax zone
-                // is still provided by the extra-inset expansion below (bg/fg get extraInsetFraction
-                // added back), so parallax effects still work. The only difference is that the
-                // outer parallax content is now visible inside the mask during drag — which is a
-                // minor and intentional difference from AOSP behavior.
-                // Utilities.scaleRectAboutCenter(bounds, IconNormalizer.ICON_VISIBLE_AREA_FACTOR);
+                // Icon mask: full view bounds, no inset.
+                Rect bounds = new Rect(0, 0, w, h);
 
                 // Shrink very tiny bit so that the clip path is smaller than the original bitmap
                 // that has anti aliased edges and shadows.

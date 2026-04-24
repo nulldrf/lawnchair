@@ -10,26 +10,17 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
-import androidx.compose.material.icons.rounded.Build
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TipsAndUpdates
-import androidx.compose.material3.DropdownMenuGroup
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -46,12 +37,10 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.observeAsState
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
-import app.lawnchair.ui.OverflowMenuGrouped
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.AnnouncementPreference
 import app.lawnchair.ui.preferences.components.controls.PreferenceCategory
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
-import app.lawnchair.ui.preferences.components.layout.ClickableIcon
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
@@ -60,9 +49,9 @@ import app.lawnchair.ui.preferences.navigation.About
 import app.lawnchair.ui.preferences.navigation.AppDrawer
 import app.lawnchair.ui.preferences.navigation.BackupAndRestore
 import app.lawnchair.ui.preferences.navigation.CreateBackup
-import app.lawnchair.ui.preferences.navigation.DebugMenu
 import app.lawnchair.ui.preferences.navigation.Dock
 import app.lawnchair.ui.preferences.navigation.ExperimentalFeatures
+import app.lawnchair.ui.preferences.navigation.Extras
 import app.lawnchair.ui.preferences.navigation.Folders
 import app.lawnchair.ui.preferences.navigation.General
 import app.lawnchair.ui.preferences.navigation.Gestures
@@ -71,9 +60,7 @@ import app.lawnchair.ui.preferences.navigation.PreferenceRootRoute
 import app.lawnchair.ui.preferences.navigation.Quickstep
 import app.lawnchair.ui.preferences.navigation.Search
 import app.lawnchair.ui.preferences.navigation.Smartspace
-import app.lawnchair.ui.util.addIf
 import app.lawnchair.util.isDefaultLauncher
-import app.lawnchair.util.restartLauncher
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.patrykmichalik.opto.core.firstBlocking
@@ -100,7 +87,6 @@ fun PreferencesDashboard(
         modifier = modifier,
         verticalArrangement = Arrangement.Top,
         backArrowVisible = false,
-        actions = { PreferencesOverflowMenu(currentRoute = currentRoute, onNavigate = onNavigate) },
     ) {
         AnnouncementPreference()
 
@@ -244,6 +230,18 @@ fun PreferencesDashboard(
 
             Item {
                 PreferenceCategory(
+                    label = stringResource(R.string.extras_label),
+                    description = stringResource(R.string.extras_description),
+                    iconResource = R.drawable.ic_extras,
+                    onNavigate = { onNavigate(Extras) },
+                    isSelected = currentRoute is Extras,
+                    isFirst = it.isFirst,
+                    isLast = it.isLast,
+                )
+            }
+
+            Item {
+                PreferenceCategory(
                     label = stringResource(R.string.about_label),
                     description = aboutDescrption,
                     iconResource = R.drawable.ic_about,
@@ -254,98 +252,6 @@ fun PreferencesDashboard(
                 )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun RowScope.PreferencesOverflowMenu(
-    currentRoute: PreferenceRootRoute,
-    onNavigate: (PreferenceRootRoute) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val enableDebug by preferenceManager().enableDebugMenu.observeAsState()
-    val highlightColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp)
-    val highlightShape = MaterialTheme.shapes.large
-
-    if (enableDebug) {
-        ClickableIcon(
-            imageVector = Icons.Rounded.Build,
-            onClick = { onNavigate(DebugMenu) },
-            modifier = Modifier.addIf(currentRoute == DebugMenu) {
-                Modifier
-                    .clip(highlightShape)
-                    .background(highlightColor)
-            },
-        )
-    }
-    val context = LocalContext.current
-
-    OverflowMenuGrouped(
-        modifier = modifier.addIf(
-            listOf(ExperimentalFeatures).any {
-                currentRoute == it
-            },
-        ) {
-            Modifier
-                .clip(highlightShape)
-                .background(highlightColor)
-        },
-    ) {
-        DropdownMenuGroup(
-            shapes = MenuDefaults.groupShape(0, 1),
-        ) {
-            DropdownMenuItem(
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_about),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                onClick = {
-                    openAppInfo(context)
-                    hideMenu()
-                },
-                text = {
-                    Text(text = stringResource(id = R.string.app_info_drop_target_label))
-                },
-            )
-            DropdownMenuItem(
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                onClick = {
-                    restartLauncher(context)
-                    hideMenu()
-                },
-                text = {
-                    Text(text = stringResource(id = R.string.debug_restart_launcher))
-                },
-            )
-            DropdownMenuItem(
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Science,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                onClick = {
-                    onNavigate(ExperimentalFeatures)
-                    hideMenu()
-                },
-                text = {
-                    Text(text = stringResource(id = R.string.experimental_features_label))
-                },
-            )
-        }
-
-        Spacer(Modifier.height(MenuDefaults.GroupSpacing))
     }
 }
 

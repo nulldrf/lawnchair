@@ -32,6 +32,7 @@ import app.lawnchair.icons.picker.IconType
 import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
+import app.lawnchair.LawnchairLauncher
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.LauncherIcons
 import com.android.launcher3.R
@@ -120,6 +121,13 @@ class LawnchairIconProvider @Inject constructor(
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
+                // Recreate the launcher so all visible icon views are immediately
+                // rebuilt from scratch with the new background settings.
+                // This is the same path used by shape changes and is the fastest
+                // way to make pref changes visible without a manual restart.
+                Executors.MAIN_EXECUTOR.execute {
+                    LawnchairLauncher.instance?.recreateIfNotScheduled()
+                }
             }
         }
     }

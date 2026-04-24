@@ -205,6 +205,10 @@
     <string name="debug_restart_launcher">Restart Lawnchair</string>
     <string name="experimental_features_label">Experimental features</string>
 
+    <string name="extras_label">Extras</string>
+    <string name="extras_description">Experimental, debug &amp; more</string>
+    <string name="debug_menu_label">Debug menu</string>
+
     <!-- Experimental features -->
     <string name="workspace_label">Workspace</string>
     <string name="smartspace_label">Smartspace</string>

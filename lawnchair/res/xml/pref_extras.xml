@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory>
+
+        <Preference
+            android:key="experimental_features"
+            android:title="@string/experimental_features_label" />
+
+        <Preference
+            android:key="debug_menu"
+            android:title="@string/debug_menu_label" />
+
+        <Preference
+            android:key="restart_launcher"
+            android:title="@string/debug_restart_launcher" />
+
+        <Preference
+            android:key="app_info"
+            android:title="@string/app_info_drop_target_label" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory>
+
+        <Preference
+            android:key="create_backup"
+            android:title="@string/create_backup"
+            android:summary="@string/create_backup_description" />
+
+        <Preference
+            android:key="restore_backup"
+            android:title="@string/restore_backup"
+            android:summary="@string/restore_backup_description" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

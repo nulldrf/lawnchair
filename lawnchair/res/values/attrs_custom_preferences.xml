@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="FloatSeekBarPreference">
+        <attr name="minValue" format="float" />
+        <attr name="maxValue" format="float" />
+        <attr name="stepSize" format="float" />
+        <attr name="showAsPercentage" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="IntSeekBarPreference">
+        <attr name="android:min" />
+        <attr name="android:max" />
+    </declare-styleable>
+
+</resources>

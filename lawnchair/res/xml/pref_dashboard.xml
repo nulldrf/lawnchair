@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        android:key="pref_general"
+        android:title="@string/general_label"
+        android:summary="@string/general_description"
+        android:icon="@drawable/ic_general" />
+
+    <Preference
+        android:key="pref_home_screen"
+        android:title="@string/home_screen_label"
+        android:summary="@string/home_screen_description"
+        android:icon="@drawable/ic_home_screen" />
+
+    <Preference
+        android:key="pref_smartspace"
+        android:title="@string/smartspace_widget"
+        android:summary="@string/smartspace_widget_description"
+        android:icon="@drawable/ic_smartspace" />
+
+    <Preference
+        android:key="pref_dock"
+        android:title="@string/dock_label"
+        android:summary="@string/dock_description"
+        android:icon="@drawable/ic_dock" />
+
+    <Preference
+        android:key="pref_app_drawer"
+        android:title="@string/app_drawer_label"
+        android:summary="@string/app_drawer_description"
+        android:icon="@drawable/ic_apps" />
+
+    <Preference
+        android:key="pref_search"
+        android:title="@string/search_bar_label"
+        android:summary="@string/drawer_search_description"
+        android:icon="@drawable/ic_search" />
+
+    <Preference
+        android:key="pref_folders"
+        android:title="@string/folders_label"
+        android:summary="@string/folders_description"
+        android:icon="@drawable/ic_folder" />
+
+    <Preference
+        android:key="pref_gestures"
+        android:title="@string/gestures_label"
+        android:summary="@string/gestures_description"
+        android:icon="@drawable/ic_gestures" />
+
+    <Preference
+        android:key="pref_quickstep"
+        android:title="@string/quickstep_label"
+        android:summary="@string/quickstep_description"
+        android:icon="@drawable/ic_quickstep" />
+
+    <Preference
+        android:key="pref_backup_restore"
+        android:title="@string/backup_and_restore_label"
+        android:summary="@string/backup_and_restore_description"
+        android:icon="@drawable/backup_restore" />
+
+    <Preference
+        android:key="pref_extras"
+        android:title="@string/extras_label"
+        android:summary="@string/extras_description"
+        android:icon="@drawable/ic_extras" />
+
+    <Preference
+        android:key="pref_about"
+        android:title="@string/about_label"
+        android:icon="@drawable/ic_about" />
+
+</PreferenceScreen>

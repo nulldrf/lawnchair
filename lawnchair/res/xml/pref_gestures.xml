@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/gestures_label">
+
+        <Preference
+            android:key="double_tap"
+            android:title="@string/gesture_double_tap" />
+
+        <Preference
+            android:key="swipe_up"
+            android:title="@string/gesture_swipe_up" />
+
+        <Preference
+            android:key="swipe_down"
+            android:title="@string/gesture_swipe_down" />
+
+        <Preference
+            android:key="two_finger_swipe_up"
+            android:title="@string/gesture_two_finger_swipe_up" />
+
+        <Preference
+            android:key="two_finger_swipe_down"
+            android:title="@string/gesture_two_finger_swipe_down" />
+
+        <Preference
+            android:key="home_press"
+            android:title="@string/gesture_home_tap" />
+
+        <Preference
+            android:key="back_press"
+            android:title="@string/gesture_back_tap" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/sleep_mode_label">
+
+        <ListPreference
+            android:key="sleep_mode"
+            android:title="@string/sleep_mode_label" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

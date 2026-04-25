@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <SwitchPreferenceCompat
+        android:key="show_hotseat"
+        android:title="@string/show_hotseat_title" />
+
+    <PreferenceCategory android:title="@string/search_bar_label">
+
+        <Preference
+            android:key="hotseat_mode"
+            android:title="@string/hotseat_mode_label" />
+
+        <Preference
+            android:key="search_bar_settings_dock"
+            android:title="@string/search_bar_settings" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/style">
+
+        <SwitchPreferenceCompat
+            android:key="hotseat_background"
+            android:title="@string/hotseat_background" />
+
+        <Preference
+            android:key="hotseat_bg_settings"
+            android:title="@string/style" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_dock_grid"
+        android:title="@string/grid">
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="dock_icons"
+            android:title="@string/dock_icons"
+            android:defaultValue="5" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="hotseat_bottom_space"
+            android:title="@string/hotseat_bottom_space_label"
+            android:defaultValue="1.0" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="page_indicator_height"
+            android:title="@string/page_indicator_height"
+            android:defaultValue="1.0" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_icons_dock"
+        android:title="@string/icons">
+
+        <SwitchPreferenceCompat
+            android:key="show_labels_dock"
+            android:title="@string/show_labels" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/general_label">
+        <SwitchPreferenceCompat
+            android:key="allow_rotation"
+            android:title="@string/home_screen_rotation_label"
+            android:summary="@string/home_screen_rotation_description" />
+
+        <SwitchPreferenceCompat
+            android:key="auto_updater_nightly"
+            android:title="@string/auto_updater_label"
+            android:summary="@string/auto_updater_description" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_fonts"
+        android:title="@string/font_label">
+
+        <Preference
+            android:key="font_workspace"
+            android:title="@string/fontWorkspace" />
+
+        <Preference
+            android:key="font_heading"
+            android:title="@string/fontHeading" />
+
+        <Preference
+            android:key="font_heading_medium"
+            android:title="@string/fontHeadingMedium" />
+
+        <Preference
+            android:key="font_body"
+            android:title="@string/fontBody" />
+
+        <Preference
+            android:key="font_body_medium"
+            android:title="@string/fontBodyMedium" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/icons">
+
+        <Preference
+            android:key="icon_style"
+            android:title="@string/icon_style_label" />
+
+        <SwitchPreferenceCompat
+            android:key="transparent_icon_background"
+            android:title="@string/transparent_background_icons_label"
+            android:summary="@string/transparent_background_icons_description" />
+
+        <Preference
+            android:key="icon_shape"
+            android:title="@string/icon_shape_label" />
+
+        <SwitchPreferenceCompat
+            android:key="auto_adaptive_icons"
+            android:title="@string/auto_adaptive_icons_label"
+            android:summary="@string/auto_adaptive_icons_description" />
+
+        <SwitchPreferenceCompat
+            android:key="shadow_bg_icons"
+            android:title="@string/shadow_bg_icons_label" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="bg_lightness"
+            android:title="@string/background_lightness_label"
+            android:defaultValue="1.0" />
+
+        <SwitchPreferenceCompat
+            android:key="colorized_backgrounds"
+            android:title="@string/colorized_backgrounds_label"
+            android:summary="@string/colorized_backgrounds_description" />
+
+        <SwitchPreferenceCompat
+            android:key="treat_white_adaptive_icons"
+            android:title="@string/treat_white_adaptive_icons_label"
+            android:summary="@string/treat_white_adaptive_icons_description" />
+
+        <PreferenceCategory
+            android:key="pref_category_adaptive_desc"
+            android:title="@string/adaptive_icon_background_description" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/colors">
+
+        <ListPreference
+            android:key="theme"
+            android:title="@string/theme_label"
+            android:defaultValue="system" />
+
+        <Preference
+            android:key="accent_color"
+            android:title="@string/accent_color" />
+
+        <ListPreference
+            android:key="color_style"
+            android:title="@string/color_style_label" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/notification_dots">
+
+        <Preference
+            android:key="notification_dots"
+            android:title="@string/notification_dots" />
+
+        <Preference
+            android:key="notification_dot_color"
+            android:title="@string/notification_dots_color" />
+
+        <SwitchPreferenceCompat
+            android:key="show_notification_count"
+            android:title="@string/show_notification_count" />
+
+        <Preference
+            android:key="notification_dot_text_color"
+            android:title="@string/notification_dots_text_color" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

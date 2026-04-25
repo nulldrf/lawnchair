@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/derived_app_name">
+
+        <Preference
+            android:key="version_info"
+            android:title="@string/about_label" />
+
+        <Preference
+            android:key="check_for_updates"
+            android:title="@string/updater" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/community">
+
+        <Preference
+            android:key="link_news"
+            android:title="@string/news"
+            android:icon="@drawable/ic_new_releases" />
+
+        <Preference
+            android:key="link_support"
+            android:title="@string/support"
+            android:icon="@drawable/ic_help" />
+
+        <Preference
+            android:key="link_github"
+            android:title="@string/github"
+            android:icon="@drawable/ic_github" />
+
+        <Preference
+            android:key="link_translate"
+            android:title="@string/translate"
+            android:icon="@drawable/ic_translate" />
+
+        <Preference
+            android:key="link_donate"
+            android:title="@string/donate"
+            android:icon="@drawable/ic_open_collective" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/community">
+
+        <Preference
+            android:key="link_telegram"
+            android:title="@string/telegram"
+            android:icon="@drawable/ic_telegram" />
+
+        <Preference
+            android:key="link_discord"
+            android:title="@string/discord"
+            android:icon="@drawable/ic_discord" />
+
+        <Preference
+            android:key="link_twitter"
+            android:title="@string/x_twitter"
+            android:icon="@drawable/ic_x_twitter" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/legal">
+
+        <Preference
+            android:key="acknowledgements"
+            android:title="@string/acknowledgements" />
+
+        <Preference
+            android:key="privacy_policy"
+            android:title="@string/privacy_policy" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

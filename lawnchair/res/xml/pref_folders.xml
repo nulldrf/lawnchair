@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/general_label">
+
+        <Preference
+            android:key="folder_color"
+            android:title="@string/folder_preview_bg_color_label" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="folder_preview_bg_opacity"
+            android:title="@string/folder_preview_bg_opacity_label"
+            android:defaultValue="1.0" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="folder_bg_opacity"
+            android:title="@string/folder_bg_opacity_label"
+            android:defaultValue="1.0" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/grid">
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_folder_columns"
+            android:title="@string/max_folder_columns"
+            android:defaultValue="4" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_folder_rows"
+            android:title="@string/max_folder_rows"
+            android:defaultValue="4" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/icons">
+
+        <SwitchPreferenceCompat
+            android:key="show_labels_folder"
+            android:title="@string/show_labels" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="folder_icon_label_size_factor"
+            android:title="@string/label_size"
+            android:defaultValue="1.0" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

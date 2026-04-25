@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/workspace_label">
+
+        <SwitchPreferenceCompat
+            android:key="enable_folder_icon_shape"
+            android:title="@string/experimental_folder_shape_modify_label" />
+
+        <Preference
+            android:key="folder_shape_picker"
+            android:title="@string/folder_shape_label" />
+
+        <SwitchPreferenceCompat
+            android:key="enable_font_selection"
+            android:title="@string/font_picker_label"
+            android:summary="@string/font_picker_description" />
+
+        <SwitchPreferenceCompat
+            android:key="workspace_increase_max_grid_size"
+            android:title="@string/workspace_increase_max_grid_size_label"
+            android:summary="@string/workspace_increase_max_grid_size_description" />
+
+        <SwitchPreferenceCompat
+            android:key="icon_swipe_gestures"
+            android:title="@string/icon_swipe_gestures"
+            android:summary="@string/icon_swipe_gestures_description" />
+
+        <SwitchPreferenceCompat
+            android:key="show_deck_layout"
+            android:title="@string/show_deck_layout"
+            android:summary="@string/show_deck_layout_description" />
+
+        <SwitchPreferenceCompat
+            android:key="enable_wallpaper_blur"
+            android:title="@string/wallpaper_blur" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="wallpaper_blur_amount"
+            android:title="@string/wallpaper_background_blur"
+            android:defaultValue="0" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="wallpaper_blur_factor"
+            android:title="@string/wallpaper_background_blur_factor"
+            android:defaultValue="0.0" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/internal_label"
+        android:summary="@string/internal_description">
+
+        <SwitchPreferenceCompat
+            android:key="always_reload_icons"
+            android:title="@string/always_reload_icons_label"
+            android:summary="@string/always_reload_icons_description" />
+
+        <Preference
+            android:key="always_reload_icons_warning"
+            android:title="@string/always_reload_icons_warning"
+            android:selectable="false" />
+
+        <SwitchPreferenceCompat
+            android:key="enable_gnc"
+            android:title="@string/gesturenavcontract_label"
+            android:summary="@string/gesturenavcontract_description" />
+
+        <Preference
+            android:key="gnc_warning"
+            android:title="@string/gesturenavcontract_warning_incompatibility"
+            android:selectable="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <SwitchPreferenceCompat
+        android:key="show_app_search_bar"
+        android:title="@string/show_app_search_bar" />
+
+    <PreferenceCategory android:title="@string/general_label">
+
+        <SwitchPreferenceCompat
+            android:key="auto_show_keyboard"
+            android:title="@string/pref_search_auto_show_keyboard" />
+
+        <ListPreference
+            android:key="search_algorithm"
+            android:title="@string/app_search_algorithm" />
+
+        <SwitchPreferenceCompat
+            android:key="match_hotseat_qsb_style"
+            android:title="@string/allapps_match_qsb_style_label"
+            android:summary="@string/allapps_match_qsb_style_description" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_search_results"
+        android:title="@string/show_search_result_types">
+
+        <SwitchPreferenceCompat
+            android:key="search_result_apps"
+            android:title="@string/search_pref_result_apps_and_shortcuts_title" />
+
+        <SwitchPreferenceCompat
+            android:key="search_result_shortcuts"
+            android:title="@string/search_pref_result_shortcuts_title" />
+
+        <SwitchPreferenceCompat
+            android:key="search_result_people"
+            android:title="@string/search_pref_result_people_title" />
+
+        <SwitchPreferenceCompat
+            android:key="search_result_settings"
+            android:title="@string/search_pref_result_settings_title" />
+
+        <SwitchPreferenceCompat
+            android:key="search_result_calculator"
+            android:title="@string/all_apps_search_result_calculator" />
+
+        <Preference
+            android:key="search_result_files"
+            android:title="@string/search_pref_result_files_title" />
+
+        <SwitchPreferenceCompat
+            android:key="search_result_web"
+            android:title="@string/search_pref_result_web_title" />
+
+        <SwitchPreferenceCompat
+            android:key="search_result_history"
+            android:title="@string/search_pref_result_history_title" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_result_counts"
+        android:title="@string/general_label">
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_app_count"
+            android:title="@string/max_apps_result_count_title"
+            android:defaultValue="5" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_people_count"
+            android:title="@string/max_people_result_count_title"
+            android:defaultValue="10" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_file_count"
+            android:title="@string/max_file_result_count_title"
+            android:defaultValue="3" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_settings_count"
+            android:title="@string/max_settings_entry_result_count_title"
+            android:defaultValue="5" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="max_history_count"
+            android:title="@string/max_recent_result_count_title"
+            android:defaultValue="2" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

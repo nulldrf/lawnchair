@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        android:key="quickswitch_warning"
+        android:title="@string/quickswitch_ignored_warning"
+        android:selectable="false" />
+
+    <PreferenceCategory android:title="@string/general_label">
+
+        <SwitchPreferenceCompat
+            android:key="translucent_background"
+            android:title="@string/translucent_background" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="translucent_bg_alpha"
+            android:title="@string/translucent_background_alpha"
+            android:defaultValue="0.0" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/recents_actions_label">
+
+        <Preference
+            android:key="quick_actions"
+            android:title="@string/recents_actions_label" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/window_corner_radius_label">
+
+        <SwitchPreferenceCompat
+            android:key="override_window_corner_radius"
+            android:title="@string/override_window_corner_radius_label" />
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="window_corner_radius"
+            android:title="@string/window_corner_radius_label"
+            android:defaultValue="100" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/taskbar_label">
+
+        <SwitchPreferenceCompat
+            android:key="enable_taskbar"
+            android:title="@string/enable_taskbar_experimental" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

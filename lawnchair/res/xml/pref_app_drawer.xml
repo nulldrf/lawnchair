@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/layout">
+
+        <SwitchPreferenceCompat
+            android:key="drawer_list"
+            android:title="@string/layout" />
+
+        <Preference
+            android:key="app_drawer_folder"
+            android:title="@string/app_drawer_folder" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/general_label">
+
+        <Preference
+            android:key="hidden_apps"
+            android:title="@string/hidden_apps_label" />
+
+        <Preference
+            android:key="drawer_search_settings"
+            android:title="@string/search_bar_settings" />
+
+        <Preference
+            android:key="suggestions"
+            android:title="@string/suggestion_pref_screen_title" />
+
+        <SwitchPreferenceCompat
+            android:key="app_drawer_haptic_feedback"
+            android:title="@string/app_drawer_haptic_feedback_label" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/style">
+
+        <Preference
+            android:key="app_drawer_bg_color"
+            android:title="@string/app_drawer_bg_color_label" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="drawer_opacity"
+            android:title="@string/background_opacity"
+            android:defaultValue="1.0" />
+
+        <Preference
+            android:key="work_profile_tab_bg_color"
+            android:title="@string/work_profile_tab_background_label" />
+
+        <SwitchPreferenceCompat
+            android:key="work_profile_tab_container_bg"
+            android:title="@string/work_profile_tab_container_background_label" />
+
+        <SwitchPreferenceCompat
+            android:key="app_drawer_search_bar_bg"
+            android:title="@string/pref_all_apps_search_bar_background" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/grid">
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="drawer_columns"
+            android:title="@string/app_drawer_columns"
+            android:defaultValue="5" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="drawer_cell_height_factor"
+            android:title="@string/row_height_label"
+            android:defaultValue="1.0" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="drawer_left_right_margin_factor"
+            android:title="@string/app_drawer_indent_label"
+            android:defaultValue="0.1" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/icons">
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="drawer_icon_size_factor"
+            android:title="@string/icon_sizes"
+            android:defaultValue="1.0" />
+
+        <SwitchPreferenceCompat
+            android:key="show_icon_labels_drawer"
+            android:title="@string/show_labels" />
+
+        <app.lawnchair.settings.ui.preference.FloatSeekBarPreference
+            android:key="drawer_icon_label_size_factor"
+            android:title="@string/label_size"
+            android:defaultValue="1.0" />
+
+        <SwitchPreferenceCompat
+            android:key="two_line_all_apps"
+            android:title="@string/twoline_label" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/advanced">
+
+        <SwitchPreferenceCompat
+            android:key="remember_position"
+            android:title="@string/pref_all_apps_remember_position_title"
+            android:summary="@string/pref_all_apps_remember_position_description" />
+
+        <SwitchPreferenceCompat
+            android:key="show_scrollbar"
+            android:title="@string/pref_all_apps_show_scrollbar_title" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

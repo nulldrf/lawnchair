@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <SwitchPreferenceCompat
+        android:key="enable_smartspace"
+        android:title="@string/smartspace_widget_toggle_label"
+        android:summary="@string/smartspace_widget_toggle_description" />
+
+    <PreferenceCategory android:title="@string/smartspace_mode_label">
+
+        <ListPreference
+            android:key="smartspace_mode"
+            android:title="@string/smartspace_mode_label" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_what_to_show"
+        android:title="@string/what_to_show">
+        <!-- Data sources added programmatically -->
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_date_time"
+        android:title="@string/smartspace_date_and_time">
+
+        <SwitchPreferenceCompat
+            android:key="smartspace_show_date"
+            android:title="@string/smartspace_date" />
+
+        <ListPreference
+            android:key="smartspace_calendar"
+            android:title="@string/smartspace_calendar" />
+
+        <SwitchPreferenceCompat
+            android:key="smartspace_show_time"
+            android:title="@string/smartspace_time" />
+
+        <ListPreference
+            android:key="smartspace_time_format"
+            android:title="@string/smartspace_time_format" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="pref_category_smartspacer"
+        android:title="@string/smartspacer_settings">
+
+        <app.lawnchair.settings.ui.preference.IntSeekBarPreference
+            android:key="smartspacer_max_count"
+            android:title="@string/maximum_number_of_targets"
+            android:defaultValue="5" />
+
+        <Preference
+            android:key="open_smartspacer_settings"
+            android:title="@string/open_smartspacer_settings" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

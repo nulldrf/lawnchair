@@ -51,11 +51,23 @@
             android:name="com.android.launcher3.settings.SettingsActivity"
             tools:node="remove" />
 
-        <!-- Register Lawnchair's settings activity -->
+        <!-- Lawnchair View-based settings activity — primary entry point -->
         <activity
             android:name="app.lawnchair.settings.ui.LawnchairSettingsActivity"
             android:exported="true"
-            android:label="@string/settings_title"
+            android:label="@string/settings_button_text"
+            android:theme="@style/HomeSettings.Theme"
+            android:autoRemoveFromRecents="true">
+            <intent-filter android:priority="-1">
+                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Keep this for internal Feature Flags / legacy path only -->
+        <activity
+            android:name="app.lawnchair.settings.ui.LawnchairSettingsActivity"
+            android:exported="false"
             android:theme="@style/HomeSettings.Theme" />
 
         <!--

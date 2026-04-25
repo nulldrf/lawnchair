@@ -307,8 +307,27 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                         (int) (-bounds.height() * AdaptiveIconDrawable.getExtraInsetFraction())
                 );
                 mBgSpringDrawable = adaptiveIcon.getBackground();
-                if (mBgSpringDrawable == null) {
-                    mBgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
+                // LAWNCHAIR: Replace missing or non-real backgrounds with white.
+                //
+                // Case 2 (partial adaptive, transparent bg): getBackground() returns null or a
+                // transparent ColorDrawable. The homescreen shows these with a white (or tinted)
+                // background via normalizeAndWrapToAdaptiveIcon. Without this fix, the drag view
+                // shows a transparent background — the shape outline appears empty and the icon
+                // content "floats", making it look visually smaller than the homescreen icon.
+                //
+                // Case 3 (legacy wrapped): createShapedAdaptiveIcon uses ColorDrawable(BLACK) as
+                // its background. A black-filled shape behind the icon looks wrong. Replace with
+                // white to match the homescreen rendering which always uses a white (or lightness-
+                // adjusted) background for legacy icons.
+                //
+                // Case 1 (full adaptive, real background): hasRealBackground = true → untouched.
+                final boolean hasRealBackground = mBgSpringDrawable != null
+                        && !(mBgSpringDrawable instanceof ColorDrawable
+                             && Color.alpha(((ColorDrawable) mBgSpringDrawable).getColor()) == 0)
+                        && !(mBgSpringDrawable instanceof ColorDrawable
+                             && ((ColorDrawable) mBgSpringDrawable).getColor() == Color.BLACK);
+                if (!hasRealBackground) {
+                    mBgSpringDrawable = new ColorDrawable(Color.WHITE);
                 }
                 mBgSpringDrawable.setBounds(bounds);
                 mFgSpringDrawable = adaptiveIcon.getForeground();

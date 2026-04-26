@@ -67,6 +67,7 @@ import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.icons.FastBitmapDrawable;
 // import com.android.launcher3.icons.IconNormalizer; // unused after Lawnchair drag-size fix
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
@@ -264,28 +265,20 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                 int blurMargin = (int) mActivity.getResources()
                         .getDimension(R.dimen.blur_size_medium_outline) / 2;
 
-                // LAWNCHAIR: Use FULL view bounds for the icon mask — no blurMargin inset,
-                // no ICON_VISIBLE_AREA_FACTOR.
-                //
-                // AOSP insets by blurMargin to reserve space for a live drop-shadow rendered
-                // outside the mask during drag. Lawnchair bakes shadows into the icon bitmap
-                // via ShadowGenerator, so there is no live shadow — the space is wasted and
-                // just makes the drag icon visibly smaller than the homescreen icon.
-                //
-                // AOSP also applies ICON_VISIBLE_AREA_FACTOR (≈0.707) to match the stock
-                // adaptive icon spec where the foreground art occupies only the inner 66dp
-                // of the 108dp canvas. Lawnchair icons (legacy, partial-adaptive) are all
-                // pre-rendered into a bitmap that fills the full icon cell, so this factor
-                // shrinks the drag preview ~30% relative to homescreen.
-                //
-                // The badge still uses blurMargin-inset bounds so it stays inset from the edge.
-                Rect badgeBounds = new Rect(0, 0, w, h);
-                badgeBounds.inset(blurMargin, blurMargin);
-                mBadge = fullDrawable.second;
-                FastBitmapDrawable.setBadgeBounds(mBadge, badgeBounds);
-
-                // Icon mask: full view bounds, no inset.
+                // bounds = icon area (inside the shadow margin).
+                // We keep the blurMargin inset so the background drawable stays inside the
+                // shadow ring and doesn't paint over it as a large colored square.
+                // What we do NOT do is apply ICON_VISIBLE_AREA_FACTOR (≈0.707) on top —
+                // that was the real shrink culprit, designed for stock AOSP adaptive icons
+                // whose foreground art only occupies the inner 66dp of the 108dp canvas.
+                // Lawnchair pre-renders all icons into a bitmap filling the full icon cell,
+                // so applying that factor made the drag preview ~30% smaller than homescreen.
                 Rect bounds = new Rect(0, 0, w, h);
+                bounds.inset(blurMargin, blurMargin);
+                // Badge stays at the same inset bounds as the icon.
+                mBadge = fullDrawable.second;
+                FastBitmapDrawable.setBadgeBounds(mBadge, bounds);
+                // REMOVED: Utilities.scaleRectAboutCenter(bounds, IconNormalizer.ICON_VISIBLE_AREA_FACTOR);
 
                 // Shrink very tiny bit so that the clip path is smaller than the original bitmap
                 // that has anti aliased edges and shadows.
@@ -307,33 +300,51 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                         (int) (-bounds.height() * AdaptiveIconDrawable.getExtraInsetFraction())
                 );
                 mBgSpringDrawable = adaptiveIcon.getBackground();
-                // LAWNCHAIR: Replace missing or non-real backgrounds with white.
-                //
-                // Case 2 (partial adaptive, transparent bg): getBackground() returns null or a
-                // transparent ColorDrawable. The homescreen shows these with a white (or tinted)
-                // background via normalizeAndWrapToAdaptiveIcon. Without this fix, the drag view
-                // shows a transparent background — the shape outline appears empty and the icon
-                // content "floats", making it look visually smaller than the homescreen icon.
-                //
-                // Case 3 (legacy wrapped): createShapedAdaptiveIcon uses ColorDrawable(BLACK) as
-                // its background. A black-filled shape behind the icon looks wrong. Replace with
-                // white to match the homescreen rendering which always uses a white (or lightness-
-                // adjusted) background for legacy icons.
-                //
-                // Case 1 (full adaptive, real background): hasRealBackground = true → untouched.
-                final boolean hasRealBackground = mBgSpringDrawable != null
-                        && !(mBgSpringDrawable instanceof ColorDrawable
-                             && Color.alpha(((ColorDrawable) mBgSpringDrawable).getColor()) == 0)
-                        && !(mBgSpringDrawable instanceof ColorDrawable
-                             && ((ColorDrawable) mBgSpringDrawable).getColor() == Color.BLACK);
-                if (!hasRealBackground) {
-                    mBgSpringDrawable = new ColorDrawable(Color.WHITE);
-                }
-                mBgSpringDrawable.setBounds(bounds);
                 mFgSpringDrawable = adaptiveIcon.getForeground();
+
+                // -----------------------------------------------------------------------
+                // LAWNCHAIR: Use cached bitmap for Case 2 and Case 3 icons.
+                //
+                // getFullDrawable() rebuilds the icon from the raw app drawable, completely
+                // bypassing normalizeAndWrapToAdaptiveIcon. This means:
+                //   - Case 3 (legacy): createShapedAdaptiveIcon wraps the cached bitmap in
+                //     InsetDrawable(1/6 inset) → icon appears at 2/3 size (shrunk).
+                //     Background is ColorDrawable(BLACK) — wrong color entirely.
+                //   - Case 2 (partial adaptive): background is transparent/null → hollow shape.
+                //     Colorized background set by normalizeAndWrapToAdaptiveIcon is lost.
+                //
+                // The correct fix: for Case 2 and 3, skip the getFullDrawable layers entirely
+                // and use the ItemInfoWithIcon.bitmap (already-processed BitmapInfo) directly.
+                // That bitmap has the correct background color (colorized/grey/white), correct
+                // scale, and correct shadows — it IS what the homescreen shows.
+                //
+                // Case 1 (full adaptive, real colored background): leave untouched.
+                // -----------------------------------------------------------------------
+                final boolean isRealAdaptiveBg = mBgSpringDrawable != null
+                        && !(mBgSpringDrawable instanceof ColorDrawable cd1
+                             && Color.alpha(cd1.getColor()) == 0)
+                        && !(mBgSpringDrawable instanceof ColorDrawable cd2
+                             && cd2.getColor() == Color.BLACK);
+
+                if (!isRealAdaptiveBg && info instanceof ItemInfoWithIcon itemInfoWithIcon
+                        && itemInfoWithIcon.bitmap != null
+                        && itemInfoWithIcon.bitmap.icon != null) {
+                    // Use the already-processed cached bitmap as a full-bounds BitmapDrawable.
+                    // No InsetDrawable, no ICON_VISIBLE_AREA_FACTOR — bitmap fills the shape.
+                    // Transparent bg so the bitmap's own baked-in background shows correctly
+                    // (white, grey at 50% lightness, or colorized when recolor is enabled).
+                    mBgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
+                    mFgSpringDrawable = new android.graphics.drawable.BitmapDrawable(
+                            mActivity.getResources(), itemInfoWithIcon.bitmap.icon);
+                }
+
+                if (mBgSpringDrawable == null) {
+                    mBgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
+                }
                 if (mFgSpringDrawable == null) {
                     mFgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
                 }
+                mBgSpringDrawable.setBounds(bounds);
                 mFgSpringDrawable.setBounds(bounds);
 
                 new Handler(Looper.getMainLooper()).post(() -> mOnDragStartCallback.add(() -> {

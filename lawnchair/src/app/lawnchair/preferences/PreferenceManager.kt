@@ -26,6 +26,7 @@ import app.lawnchair.util.isGestureNavContractCompatible
 import app.lawnchair.util.isOnePlusStock
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.InvariantDeviceProfile.INDEX_DEFAULT
+import com.android.launcher3.LauncherAppState
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
@@ -33,6 +34,7 @@ import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.model.DeviceGridState
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.DaggerSingletonObject
+import com.android.launcher3.util.Executors
 import com.android.launcher3.util.SafeCloseable
 import com.android.quickstep.RecentsModel
 import javax.inject.Inject
@@ -44,13 +46,16 @@ class PreferenceManager @Inject constructor(
     SafeCloseable {
     private val idp get() = InvariantDeviceProfile.INSTANCE.get(context)
     private val mRecentsModel get() = RecentsModel.INSTANCE.get(context)
-    private val themeManager = ThemeManager.INSTANCE.get(context)
 
-    // reloadIcons: calls RecentsModel.onThemeChanged() which clears the recents/overview
-    // thumbnail + icon cache on MODEL_EXECUTOR and triggers a full model reload.
-    // This is stronger than recreate() which only redraws from the existing in-memory cache.
-    // All icon-appearance prefs use this so toggling them immediately regenerates icons.
-    private val reloadIcons: () -> Unit = { mRecentsModel.onThemeChanged() }
+    // reloadIcons: clears the recents thumbnail + icon cache, then triggers a full model
+    // reload. Stronger than recreate() which only redraws from the existing in-memory cache.
+    private val reloadIcons: () -> Unit = {
+        mRecentsModel.onThemeChanged()
+        Executors.MODEL_EXECUTOR.execute {
+            LauncherAppState.INSTANCE.get(context).iconCache.clearMemoryCache()
+            LauncherAppState.INSTANCE.get(context).model.reloadIfActive()
+        }
+    }
 
     private val reloadGrid: () -> Unit = { idp.onPreferencesChanged(context) }
 
@@ -60,14 +65,15 @@ class PreferenceManager @Inject constructor(
     }
 
     val iconPackPackage = StringPref("pref_iconPackPackage", "", reloadIcons)
-    val themedIconPackPackage = StringPref("pref_themedIconPackPackage", "", recreate)
+    val themedIconPackPackage = StringPref("pref_themedIconPackPackage", "", reloadIcons)
     val allowRotation = BoolPref("pref_allowRotation", false)
 
-    // Icon wrapping and appearance prefs — use reloadIcons so the icon cache is actually
-    // regenerated when these change, not just visually redrawn from stale cached bitmaps.
-    val wrapAdaptiveIcons = BoolPref("prefs_wrapAdaptive", true, reloadIcons)
-    val transparentIconBackground = BoolPref("prefs_transparentIconBackground", false, reloadIcons)
-    val shadowBGIcons = BoolPref("pref_shadowBGIcons", true, reloadIcons)
+    // These prefs have no direct callback because LawnchairThemeManager tracks them via
+    // statePrefs1 and fires verifyIconState() → onThemeChanged() when they change,
+    // which already triggers the correct icon reload path.
+    val wrapAdaptiveIcons = BoolPref("prefs_wrapAdaptive", true)
+    val transparentIconBackground = BoolPref("prefs_transparentIconBackground", false)
+    val shadowBGIcons = BoolPref("pref_shadowBGIcons", true)
 
     val addIconToHome = BoolPref("pref_add_icon_to_home", true)
     val hotseatColumns = IntPref("pref_hotseatColumns", 4, reloadGrid)
@@ -78,9 +84,8 @@ class PreferenceManager @Inject constructor(
 
     val drawerOpacity = FloatPref("pref_drawerOpacity", .4f, recreate)
 
-    // coloredBackgroundLightness affects how the Palette-based background color is adjusted.
-    // Use reloadIcons here too so the change takes effect in the cached bitmaps.
-    val coloredBackgroundLightness = FloatPref("pref_coloredBackgroundLightness", 1F, reloadIcons)
+    // No callback — tracked by LawnchairThemeManager via statePrefs1.
+    val coloredBackgroundLightness = FloatPref("pref_coloredBackgroundLightness", 1F)
 
     val feedProvider = StringPref("pref_feedProvider", "")
     val ignoreFeedWhitelist = BoolPref("pref_ignoreFeedWhitelist", false)
@@ -124,9 +129,9 @@ class PreferenceManager @Inject constructor(
     val searchResultSettingsEntry = BoolPref("pref_searchResultSettingsEntry", false, recreate)
     val searchResulRecentSuggestion = BoolPref("pref_searchResultRecentSuggestion", false, recreate)
 
-    val themedIcons = BoolPref("themed_icons", false, recreate)
-    val drawerThemedIcons = BoolPref("drawer_themed_icons", false, recreate)
-    val tintIconPackBackgrounds = BoolPref("tint_icon_pack_backgrounds", false, recreate)
+    val themedIcons = BoolPref("themed_icons", false, reloadIcons)
+    val drawerThemedIcons = BoolPref("drawer_themed_icons", false, reloadIcons)
+    val tintIconPackBackgrounds = BoolPref("tint_icon_pack_backgrounds", false, reloadIcons)
 
     val hotseatQsbCornerRadius = FloatPref("pref_hotseatQsbCornerRadius", 1F, recreate)
     val hotseatQsbAlpha = IntPref("pref_searchHotseatTranparency", 100, recreate)
@@ -165,28 +170,17 @@ class PreferenceManager @Inject constructor(
         context.getApkVersionComparison().first[0],
     )
 
-    val forceIconMonochrome = BoolPref("pref_forceIconMonochrome", false, recreate)
+    // No callback — tracked by LawnchairThemeManager via statePrefs1.
+    val forceIconMonochrome = BoolPref("pref_forceIconMonochrome", false)
 
     // -----------------------------------------------------------------------
-    // Adaptive icon color analysis prefs
+    // Adaptive icon color analysis prefs (mod additions)
     //
-    // These prefs use a null callback intentionally.
-    //
-    // When either pref changes, the real work (updateSystemState + clearMemoryCache +
-    // model.reloadIfActive) is performed by LawnchairIconProvider which registers its
-    // own SharedPreferences change listener for these two keys in its init block.
-    //
-    // Using reloadIcons() here would cause a DOUBLE reload: one from this callback and
-    // one from LawnchairIconProvider's listener, with the LawnchairIconProvider one being
-    // the only correct one (it calls updateSystemState first so the disk cache is actually
-    // invalidated). We suppress the PreferenceManager callback entirely to avoid the
-    // redundant reload and the race condition it would create.
-    //
-    // The PreferenceAdapter in GeneralPreferences.kt still works correctly because it
-    // reads/writes via get()/set() directly on the BoolPref, which goes to SharedPreferences
-    // regardless of whether a callback is registered.
+    // No callback here — LawnchairThemeManager adds both prefs to statePrefs1
+    // and listens via PreferenceChangeListener, which calls verifyIconState()
+    // → onThemeChanged() → full icon reload on any change. A separate callback
+    // here would cause a redundant double reload.
     // -----------------------------------------------------------------------
-
     val colorizedBackgrounds = BoolPref("pref_colorizedLegacyTreatment", false)
     val treatWhiteAdaptiveIcons = BoolPref("pref_enableWhiteOnlyTreatment", false)
 

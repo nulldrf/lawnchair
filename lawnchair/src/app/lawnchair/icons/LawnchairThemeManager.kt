@@ -2,31 +2,27 @@ package app.lawnchair.icons
 
 import android.content.Context
 import android.util.Log
-import app.lawnchair.LawnchairLauncher
-import app.lawnchair.icons.prefs
-import app.lawnchair.icons.shouldColorizeBackground
-import app.lawnchair.icons.shouldTreatWhiteAdaptive
 import app.lawnchair.icons.shape.IconShape
 import app.lawnchair.icons.shape.PathShapeDelegate
+import app.lawnchair.preferences.PreferenceChangeListener
+import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
-import com.android.launcher3.EncryptionType
-import com.android.launcher3.LauncherPrefChangeListener
 import com.android.launcher3.LauncherPrefs
-import com.android.launcher3.LauncherPrefs.Companion.backedUpItem
 import com.android.launcher3.concurrent.annotations.Ui
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.util.DaggerSingletonTracker
-import com.android.launcher3.util.Executors
 import com.android.launcher3.util.LooperExecutor
 import com.patrykmichalik.opto.core.firstBlocking
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.plus
 
 @LauncherAppSingleton
 class LawnchairThemeManager
@@ -38,6 +34,7 @@ constructor(
     private val iconControllerFactory: IconControllerFactory,
     private val lifecycle: DaggerSingletonTracker,
     private val prefs2: PreferenceManager2,
+    private val prefs1: PreferenceManager,
 ) : ThemeManager(
     context,
     uiExecutor,
@@ -45,60 +42,47 @@ constructor(
     iconControllerFactory,
     lifecycle,
 ) {
+    // -----------------------------------------------------------------------
+    // Prefs whose values are folded into the IconState cache key.
+    //
+    // Upstream prefs (wrapAdaptiveIcons … forceIconMonochrome) and the mod's
+    // two colorize prefs are all tracked here so that any change triggers
+    // verifyIconState() → onThemeChanged() → full icon reload via the same
+    // fast path used by shape changes.
+    //
+    // colorizedBackgrounds and treatWhiteAdaptiveIcons are mod additions:
+    //   - "Smart icon backgrounds" (pref_colorizedLegacyTreatment)
+    //   - "Recolor white adaptive backgrounds" (pref_enableWhiteOnlyTreatment)
+    // -----------------------------------------------------------------------
+    private val statePrefs1 = listOf(
+        prefs1.wrapAdaptiveIcons,
+        prefs1.transparentIconBackground,
+        prefs1.shadowBGIcons,
+        prefs1.coloredBackgroundLightness,
+        prefs1.forceIconMonochrome,
+        prefs1.colorizedBackgrounds,
+        prefs1.treatWhiteAdaptiveIcons,
+    )
+
+    private val prefListener = PreferenceChangeListener {
+        uiExecutor.execute { verifyIconState() }
+    }
+
     override var iconState = parseIconStateV2(null)
 
-    // -----------------------------------------------------------------------
-    // Strongly-referenced listener for "Smart icon backgrounds" and
-    // "Recolor white adaptive backgrounds" prefs.
-    //
-    // These prefs live in the old SharedPreferences store and are not tracked
-    // by LauncherPrefs, so we register a separate listener here.
-    //
-    // IMPORTANT: stored as a property (not anonymous lambda) so the
-    // WeakHashMap inside SharedPreferences never GC-collects it.
-    // -----------------------------------------------------------------------
-    private val colorizePrefsListener =
-        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "pref_colorizedLegacyTreatment" || key == "pref_enableWhiteOnlyTreatment"
-                    || key == "pref_coloredBackgroundLightness") {
-                // verifyIconState() updates the iconState (colorizeSuffix changes) and fires
-                // onThemeChanged() so LawnchairIconProvider clears the caches.
-                verifyIconState()
-                // Recreate the launcher for instant visual feedback.
-                // This is done here (not in the generic ThemeChangeListener) so that shape
-                // changes don't trigger an extra recreate on top of their own reload path.
-                Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.instance?.recreateIfNotScheduled()
-                }
-            }
-        }
-
     init {
-        val scope = MainScope()
+        val scope = MainScope() + CoroutineName("LawnchairThemeManager")
         merge(
             prefs2.iconShape.get(),
             prefs2.customIconShape.get(),
         ).onEach { verifyIconState() }
             .launchIn(scope)
 
-        // Listen for specific Lawnchair SharedPreferences it's easier than trying to make prefs1 work with listener
-        val drawerThemedIcons = backedUpItem("drawer_themed_icons", false, EncryptionType.DEVICE_PROTECTED)
-        val forceMonochrome = backedUpItem("pref_forceIconMonochrome", false, EncryptionType.DEVICE_PROTECTED)
-        val keys = listOf(drawerThemedIcons, forceMonochrome)
-        val keysArray = keys.toTypedArray()
-        val prefKeySet = keys.map { it.sharedPrefKey }
-
-        val prefListener = LauncherPrefChangeListener { key ->
-            if (prefKeySet.contains(key)) verifyIconState()
-        }
-        prefs.addListener(prefListener, *keysArray)
-
-        context.prefs.registerOnSharedPreferenceChangeListener(colorizePrefsListener)
+        statePrefs1.forEach { it.addListener(prefListener) }
 
         lifecycle.addCloseable {
-            prefs.removeListener(prefListener, *keysArray)
-            context.prefs.unregisterOnSharedPreferenceChangeListener(colorizePrefsListener)
             scope.cancel()
+            statePrefs1.forEach { it.removeListener(prefListener) }
         }
     }
 
@@ -109,6 +93,8 @@ constructor(
 
         listeners.forEach { it.onThemeChanged() }
     }
+
+    private fun prefs1State(): String = statePrefs1.joinToString(",") { it.get().toString() }
 
     private fun parseIconStateV2(oldState: IconState?): IconState {
         val currentAppShape: IconShape = try {
@@ -125,19 +111,12 @@ constructor(
             IconShape.Circle
         }
 
-        // Include colorize pref values in the shape key so that toggling
-        // "Smart icon backgrounds" or "Recolor white adaptive backgrounds" produces a
-        // different IconState → verifyIconState() fires onThemeChanged() → the launcher
-        // refreshes icons through the same fast path used by shape changes.
-        val colorize   = context.shouldColorizeBackground()
-        val treatWhite = context.shouldTreatWhiteAdaptive()
-        val lightness  = context.prefs.getFloat("pref_coloredBackgroundLightness", 1f)
-        // Round to 2 decimal places so tiny float noise doesn't create new cache keys.
-        val lightnessKey = (lightness * 100).toInt()
-        val colorizeSuffix = "|c${if (colorize) 1 else 0}t${if (treatWhite) 1 else 0}l$lightnessKey"
-
-        val appShapeKey    = currentAppShape.getHashString() + colorizeSuffix
-        val folderShapeKey = currentFolderShape.getHashString()
+        // All tracked prefs (including the mod's colorize prefs) are serialised into the
+        // shape key so that toggling any of them produces a different IconState and triggers
+        // onThemeChanged() → full icon reload, with no manual SharedPreferences listener needed.
+        val currentPrefs1State = prefs1State()
+        val appShapeKey    = currentAppShape.getHashString()    + currentPrefs1State
+        val folderShapeKey = currentFolderShape.getHashString() + currentPrefs1State
 
         val appShape =
             if (oldState != null && oldState.iconMask == appShapeKey) {

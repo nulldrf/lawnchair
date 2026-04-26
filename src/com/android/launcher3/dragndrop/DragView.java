@@ -330,22 +330,33 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                         && itemInfoWithIcon.bitmap != null
                         && itemInfoWithIcon.bitmap.icon != null) {
                     // Use the already-processed cached bitmap as a full-bounds BitmapDrawable.
-                    // No InsetDrawable, no ICON_VISIBLE_AREA_FACTOR — bitmap fills the shape.
-                    // Transparent bg so the bitmap's own baked-in background shows correctly
-                    // (white, grey at 50% lightness, or colorized when recolor is enabled).
+                    // Transparent bg so the bitmap's own baked-in background shows correctly.
                     mBgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
                     mFgSpringDrawable = new android.graphics.drawable.BitmapDrawable(
                             mActivity.getResources(), itemInfoWithIcon.bitmap.icon);
-                }
+                    mBgSpringDrawable.setBounds(shrunkBounds);
+                    mFgSpringDrawable.setBounds(shrunkBounds);
 
-                if (mBgSpringDrawable == null) {
-                    mBgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
+                    // Zero the spring parallax translation.
+                    // draw() applies canvas.translate(mTranslateX.mValue, mTranslateY.mValue)
+                    // before drawing mFgSpringDrawable. For real adaptive icons this parallax
+                    // offset (≈25% of width) lets bg/fg layers animate beyond the shape edge.
+                    // For a flat BitmapDrawable it just shifts the bitmap off-center, making
+                    // the icon appear displaced/shrunk inside the shape. Reset to 0.
+                    mTranslateX = new SpringFloatValue(DragView.this, 0);
+                    mTranslateY = new SpringFloatValue(DragView.this, 0);
+                } else {
+                    // Case 1 (real adaptive): use extraInsetFraction-expanded bounds so bg/fg
+                    // parallax layers can animate beyond the shape mask edge.
+                    if (mBgSpringDrawable == null) {
+                        mBgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
+                    }
+                    if (mFgSpringDrawable == null) {
+                        mFgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
+                    }
+                    mBgSpringDrawable.setBounds(bounds);
+                    mFgSpringDrawable.setBounds(bounds);
                 }
-                if (mFgSpringDrawable == null) {
-                    mFgSpringDrawable = new ColorDrawable(Color.TRANSPARENT);
-                }
-                mBgSpringDrawable.setBounds(bounds);
-                mFgSpringDrawable.setBounds(bounds);
 
                 new Handler(Looper.getMainLooper()).post(() -> mOnDragStartCallback.add(() -> {
                     // TODO: Consider fade-in animation

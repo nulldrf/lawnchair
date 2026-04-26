@@ -27,6 +27,7 @@ import app.lawnchair.ui.preferences.components.search.SearchProviderPreferenceSc
 import app.lawnchair.ui.preferences.destinations.AppDrawerFoldersPreference
 import app.lawnchair.ui.preferences.destinations.AppDrawerPreferences
 import app.lawnchair.ui.preferences.destinations.BackupAndRestorePreference
+import app.lawnchair.ui.preferences.destinations.ColorStyleScreen
 import app.lawnchair.ui.preferences.destinations.CustomIconShapePreference
 import app.lawnchair.ui.preferences.destinations.DebugMenuPreferences
 import app.lawnchair.ui.preferences.destinations.DockPreferences
@@ -54,6 +55,7 @@ import app.lawnchair.ui.preferences.destinations.SelectAppsForDrawerFolder
 import app.lawnchair.ui.preferences.destinations.SelectIconPreference
 import app.lawnchair.ui.preferences.destinations.ShapePreference
 import app.lawnchair.ui.preferences.destinations.SmartspacePreferences
+import app.lawnchair.ui.preferences.navigation.GeneralColorStyle
 import com.android.launcher3.util.ComponentKey
 import soup.compose.material.motion.animation.materialSharedAxisXIn
 import soup.compose.material.motion.animation.materialSharedAxisXOut
@@ -121,6 +123,10 @@ fun PreferenceNavigation(
         composable<GeneralIconShape> { backStackEntry ->
             val route: GeneralIconShape = backStackEntry.toRoute()
             ShapePreference(currentTab = route.selectedId)
+        }
+		composable<GeneralColorStyle> { backStackEntry ->
+            val route: GeneralColorStyle = backStackEntry.toRoute()
+            ColorStyleScreen(showLegacyKdrag = route.showLegacyKdrag)
         }
         composable<GeneralCustomIconShapeCreator>(
             deepLinks = getDeepLink(GeneralCustomIconShapeCreator),

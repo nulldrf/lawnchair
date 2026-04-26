@@ -427,6 +427,16 @@
     <string name="color_style_content">Content</string>
     <string name="color_style_monochromatic">Monochromatic</string>
     <string name="color_style_legacy_kdrag">Legacy Engine (ZCAM)</string>
+	
+	<string name="color_style_tonal_spot_description">Default Material You colors</string>
+    <string name="color_style_spritz_description">Calm, muted colors with the same hue</string>
+    <string name="color_style_vibrant_description">Slightly varying colors, more colorful backgrounds</string>
+    <string name="color_style_expressive_description">Multiple colors that work well together. Most colorful.</string>
+    <string name="color_style_rainbow_description">No background tint, so colors stand out</string>
+    <string name="color_style_fruit_salad_description">Main color that works well with a different, colorful background</string>
+    <string name="color_style_content_description">Colors closely matched to your chosen accent. Calm and balanced.</string>
+    <string name="color_style_monochromatic_description">Single hue with varied tones. Sleek and minimalist.</string>
+    <string name="color_style_legacy_kdrag_description">Based on kdrag0n color generation. Perceptually accurate Material You colors.</string>
 
     <!-- Accent color and color picker -->
     <string name="colors">Colors</string>

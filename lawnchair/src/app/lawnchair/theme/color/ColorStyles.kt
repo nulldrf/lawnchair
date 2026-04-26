@@ -14,6 +14,7 @@ import com.android.systemui.monet.Style
 sealed class ColorStyle(
     val style: Style,
     @StringRes val nameResourceId: Int,
+    @StringRes val descriptionResourceId: Int,
 ) {
     companion object {
         fun fromString(value: String): ColorStyle = when (value) {
@@ -45,28 +46,67 @@ sealed class ColorStyle(
     }
 }
 
-object Spritz : ColorStyle(Style.SPRITZ, R.string.color_style_spritz) {
+object Spritz : ColorStyle(
+    style = Style.SPRITZ,
+    nameResourceId = R.string.color_style_spritz,
+    descriptionResourceId = R.string.color_style_spritz_description,
+) {
     override fun toString() = "spritz"
 }
-object TonalSpot : ColorStyle(Style.TONAL_SPOT, R.string.color_style_tonal_spot) {
+
+object TonalSpot : ColorStyle(
+    style = Style.TONAL_SPOT,
+    nameResourceId = R.string.color_style_tonal_spot,
+    descriptionResourceId = R.string.color_style_tonal_spot_description,
+) {
     override fun toString() = "tonal_spot"
 }
-object Vibrant : ColorStyle(Style.VIBRANT, R.string.color_style_vibrant) {
+
+object Vibrant : ColorStyle(
+    style = Style.VIBRANT,
+    nameResourceId = R.string.color_style_vibrant,
+    descriptionResourceId = R.string.color_style_vibrant_description,
+) {
     override fun toString() = "vibrant"
 }
-object Expressive : ColorStyle(Style.EXPRESSIVE, R.string.color_style_expressive) {
+
+object Expressive : ColorStyle(
+    style = Style.EXPRESSIVE,
+    nameResourceId = R.string.color_style_expressive,
+    descriptionResourceId = R.string.color_style_expressive_description,
+) {
     override fun toString() = "expressive"
 }
-object Rainbow : ColorStyle(Style.RAINBOW, R.string.color_style_rainbow) {
+
+object Rainbow : ColorStyle(
+    style = Style.RAINBOW,
+    nameResourceId = R.string.color_style_rainbow,
+    descriptionResourceId = R.string.color_style_rainbow_description,
+) {
     override fun toString() = "rainbow"
 }
-object FruitSalad : ColorStyle(Style.FRUIT_SALAD, R.string.color_style_fruit_salad) {
+
+object FruitSalad : ColorStyle(
+    style = Style.FRUIT_SALAD,
+    nameResourceId = R.string.color_style_fruit_salad,
+    descriptionResourceId = R.string.color_style_fruit_salad_description,
+) {
     override fun toString() = "fruit_salad"
 }
-object Content : ColorStyle(Style.CONTENT, R.string.color_style_content) {
+
+object Content : ColorStyle(
+    style = Style.CONTENT,
+    nameResourceId = R.string.color_style_content,
+    descriptionResourceId = R.string.color_style_content_description,
+) {
     override fun toString() = "content"
 }
-object Monochromatic : ColorStyle(Style.MONOCHROMATIC, R.string.color_style_monochromatic) {
+
+object Monochromatic : ColorStyle(
+    style = Style.MONOCHROMATIC,
+    nameResourceId = R.string.color_style_monochromatic,
+    descriptionResourceId = R.string.color_style_monochromatic_description,
+) {
     override fun toString() = "monochromatic"
 }
 
@@ -78,6 +118,10 @@ object Monochromatic : ColorStyle(Style.MONOCHROMATIC, R.string.color_style_mono
  * [Style.TONAL_SPOT] is a harmless placeholder — [ThemeProvider] never reads [style]
  * when this subtype is active.
  */
-object LegacyKdrag : ColorStyle(Style.TONAL_SPOT, R.string.color_style_legacy_kdrag) {
+object LegacyKdrag : ColorStyle(
+    style = Style.TONAL_SPOT,
+    nameResourceId = R.string.color_style_legacy_kdrag,
+    descriptionResourceId = R.string.color_style_legacy_kdrag_description,
+) {
     override fun toString() = "legacy_kdrag"
 }

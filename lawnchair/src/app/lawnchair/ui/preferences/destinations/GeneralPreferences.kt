@@ -19,18 +19,14 @@ package app.lawnchair.ui.preferences.destinations
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
-import app.lawnchair.theme.color.ColorStyle
-import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
@@ -39,8 +35,6 @@ import app.lawnchair.ui.preferences.components.NotificationDotsPreference
 import app.lawnchair.ui.preferences.components.ThemePreference
 import app.lawnchair.ui.preferences.components.colorpreference.ColorContrastWarning
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
-import app.lawnchair.ui.preferences.components.controls.ListPreference
-import app.lawnchair.ui.preferences.components.controls.ListPreferenceEntry
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
@@ -49,12 +43,12 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.notificationDotsEnabled
 import app.lawnchair.ui.preferences.components.notificationServiceEnabled
+import app.lawnchair.ui.preferences.navigation.GeneralColorStyle
 import app.lawnchair.ui.preferences.navigation.GeneralIconPack
 import app.lawnchair.ui.preferences.navigation.GeneralIconShape
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
-import com.patrykmichalik.opto.core.firstBlocking
 
 @Composable
 fun GeneralPreferences() {
@@ -239,16 +233,23 @@ fun GeneralPreferences() {
         // LegacyKdrag is only meaningful for wallpaper-derived seed colors.
         val isWallpaperAccent = accentColorValue is ColorOption.WallpaperPrimary
 
+        // Read the current style name in a composable-safe way via asState() so
+        // the subtitle updates automatically when the user changes style.
+        val currentColorStyle = prefs2.colorStyle.asState().value
+        val colorStyleSubtitle = stringResource(id = currentColorStyle.nameResourceId)
+
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
             Item { ThemePreference() }
             Item { ColorPreference(preference = prefs2.accentColor) }
+            // Color style — full-screen picker replaces the old bottom sheet.
             Item(
                 "color_style",
                 showColorStyle,
             ) {
-                ColorStylePreference(
-                    adapter = prefs2.colorStyle.getAdapter(),
-                    showLegacyKdrag = isWallpaperAccent,
+                NavigationActionPreference(
+                    label = stringResource(id = R.string.color_style_label),
+                    destination = GeneralColorStyle(showLegacyKdrag = isWallpaperAccent),
+                    subtitle = colorStyleSubtitle,
                 )
             }
         }
@@ -294,36 +295,9 @@ fun GeneralPreferences() {
 }
 
 @Composable
-private fun ColorStylePreference(
-    adapter: PreferenceAdapter<ColorStyle>,
-    modifier: Modifier = Modifier,
-    // When false the legacy kdrag0n engine option is hidden from the list.
-    showLegacyKdrag: Boolean = false,
-) {
-    val entries = remember(showLegacyKdrag) {
-        ColorStyle.values()
-            .filter { style -> style !is LegacyKdrag || showLegacyKdrag }
-            .map { mode ->
-                ListPreferenceEntry(
-                    value = mode,
-                    label = { stringResource(id = mode.nameResourceId) },
-                )
-            }
-    }
-
-    ListPreference(
-        adapter = adapter,
-        entries = entries,
-        label = stringResource(id = R.string.color_style_label),
-        modifier = modifier,
-    )
-}
-
-@Composable
 private fun NotificationDotColorContrastWarnings(
     dotColor: ColorOption,
     dotTextColor: ColorOption,
-    modifier: Modifier = Modifier,
 ) {
     val dotColorIsDynamic = when (dotColor) {
         is ColorOption.SystemAccent,
@@ -337,14 +311,12 @@ private fun NotificationDotColorContrastWarnings(
     if (dotColorIsDynamic && dotTextColor !is ColorOption.Default) {
         WarningPreference(
             text = stringResource(id = R.string.notification_dots_color_contrast_warning_sometimes),
-            modifier = modifier,
         )
     } else {
         ColorContrastWarning(
             foregroundColor = dotTextColor,
             backgroundColor = dotColor,
             text = stringResource(id = R.string.notification_dots_color_contrast_warning_always),
-            modifier = modifier,
         )
     }
 }

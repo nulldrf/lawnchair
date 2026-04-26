@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
@@ -60,29 +59,21 @@ fun ColorStyleScreen(
     val currentStyle = adapter.state.value
     val isDark = isSystemInDarkTheme()
 
-    // ── Seed colours ─────────────────────────────────────────────────────────
-    //
-    // accentColor is used as the remember key so seedArgb stays frozen while
-    // the user cycles through styles — only refreshes when the accent SOURCE
-    // changes (wallpaper / custom / system).
-    //
-    // currentPrimary is read here in the composable scope (required) and then
-    // captured by the remember lambda below.
-    val accentColorValue = prefs2.accentColor.asState().value
-    val currentPrimary = MaterialTheme.colorScheme.primary.toArgb()
-    val seedArgb = remember(accentColorValue) { currentPrimary }
-
-    // Raw wallpaper primary — used only for LegacyKdrag (ZCAM engine).
-    // WallpaperManager.getWallpaperColors returns the colours extracted directly
-    // from the wallpaper bitmap, before any Monet engine processes them.
-    // Feeding this into KdragMonetColorScheme gives the correct ZCAM palette
-    // instead of the already-transformed AOSP primary that seedArgb holds.
+    // Raw wallpaper primary — fed into every Monet engine as seed so that
+    // preview colours are driven by the actual wallpaper colour, not by the
+    // AOSP-processed primary that shifts whenever the active style changes.
+    // WallpaperManager.getWallpaperColors returns colours extracted directly
+    // from the wallpaper bitmap, before any Monet processing.
+    // Fallback if WallpaperManager returns null (e.g. solid-color wallpaper).
+    // Must be read outside the remember lambda — composable reads are not
+    // allowed inside remember { }.
+    val fallbackSeed = MaterialTheme.colorScheme.primary.toArgb()
     val rawWallpaperSeed: Int = remember {
         WallpaperManager.getInstance(context)
             .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
             ?.primaryColor
             ?.toArgb()
-            ?: currentPrimary
+            ?: fallbackSeed
     }
 
     val styles = remember(showLegacyKdrag) {
@@ -90,11 +81,10 @@ fun ColorStyleScreen(
     }
 
     // Pre-build all preview palettes in one block so card composition is cheap.
-    val allPreviewColors = remember(seedArgb, rawWallpaperSeed, isDark, showLegacyKdrag) {
+    val allPreviewColors = remember(rawWallpaperSeed, isDark, showLegacyKdrag) {
         styles.associateWith { style ->
             buildStylePreviewColors(
                 style = style,
-                seedArgb = seedArgb,
                 rawWallpaperSeed = rawWallpaperSeed,
                 isDark = isDark,
             )
@@ -306,17 +296,16 @@ private data class StylePreviewColors(
  */
 private fun buildStylePreviewColors(
     style: ColorStyle,
-    seedArgb: Int,
     rawWallpaperSeed: Int,
     isDark: Boolean,
 ): StylePreviewColors {
     val scheme: KdragColorScheme = when (style) {
         is LegacyKdrag -> KdragMonetColorScheme(rawWallpaperSeed)
-        else -> MonetColorSchemeCompat(seedArgb, style.style)
+        else -> MonetColorSchemeCompat(rawWallpaperSeed, style.style)
     }
 
     // Tone keys for light/dark theme variants.
-    val containerKey = if (isDark) 700 else 300
+    val containerKey = if (isDark) 700 else 100
     val cardBgKey = if (isDark) 900 else 50
     val onCardKey = if (isDark) 100 else 900
     val outlineKey = if (isDark) 700 else 300

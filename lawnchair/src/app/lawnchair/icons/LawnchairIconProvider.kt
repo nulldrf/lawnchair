@@ -32,6 +32,7 @@ import app.lawnchair.icons.picker.IconType
 import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
+import app.lawnchair.LawnchairLauncher
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.icons.LauncherIcons
 import com.android.launcher3.R
@@ -91,6 +92,27 @@ class LawnchairIconProvider @Inject constructor(
         }
 
     val systemIconState = themeManager.iconState
+
+    /**
+     * Overrides mSystemState to include the current icon pack package name.
+     *
+     * The disk cache key per app is: mSystemState + sourceDir (app APK path).
+     * Upstream updateSystemState() builds mSystemState from locale + SDK + theme state.
+     * None of those change when the user switches icon packs, so the disk cache key is
+     * identical before and after the switch — cached bitmaps are served unchanged.
+     *
+     * By appending the icon pack package name, the disk cache key changes whenever the
+     * icon pack changes, making all existing entries stale and forcing regeneration.
+     * This is the same approach used for colorize prefs (via LawnchairThemeManager's
+     * colorizeSuffix in toUniqueId()) but applied specifically to icon pack changes.
+     */
+    override fun updateSystemState() {
+        super.updateSystemState()
+        val iconPack = iconPackPref.get()
+        if (iconPack.isNotEmpty()) {
+            mSystemState += ",pack=$iconPack"
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Icon cache flush on adaptive icon pref changes.
@@ -310,16 +332,36 @@ class LawnchairIconProvider @Inject constructor(
             val newState = themeManager.iconState
             if (iconState != newState) {
                 iconState = newState
+            }
+            recreateCalendarAndClockChangeReceiver()
+            // Clear caches on worker thread (required by assertWorkerThread), then
+            // recreate the launcher on main thread so icons reload with the new icon pack.
+            // The recreate MUST be posted AFTER the cache clear completes — if it runs
+            // before, the launcher reloads stale icons from the still-populated cache.
+            Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
-                recreateCalendarAndClockChangeReceiver()
+                val appState = LauncherAppState.getInstance(context)
+                appState.iconCache.clearMemoryCache()
+                LauncherIcons.clearPool(context)
+                Executors.MAIN_EXECUTOR.execute {
+                    LawnchairLauncher.instance?.recreateIfNotScheduled()
+                }
             }
         }
         private val themedIconSubscription = themedIconPackPref.subscribeChanges {
             val newState = themeManager.iconState
             if (iconState != newState) {
                 iconState = newState
+            }
+            recreateCalendarAndClockChangeReceiver()
+            Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
-                recreateCalendarAndClockChangeReceiver()
+                val appState = LauncherAppState.getInstance(context)
+                appState.iconCache.clearMemoryCache()
+                LauncherIcons.clearPool(context)
+                Executors.MAIN_EXECUTOR.execute {
+                    LawnchairLauncher.instance?.recreateIfNotScheduled()
+                }
             }
         }
 

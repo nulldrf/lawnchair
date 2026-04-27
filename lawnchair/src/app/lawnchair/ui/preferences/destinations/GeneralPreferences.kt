@@ -85,6 +85,13 @@ fun GeneralPreferences() {
         backArrowVisible = !LocalIsExpandedScreen.current,
         label = stringResource(id = R.string.general_label),
     ) {
+        // ── Theme ─────────────────────────────────────────────────────────────
+        // Placed at the top of the screen so the user sees the live mockup
+        // preview and the Light / Dark / System segmented control immediately,
+        // before any other settings groups.
+        ThemePreference()
+
+        // ── Rotation ──────────────────────────────────────────────────────────
         PreferenceGroup {
             Item {
                 SwitchPreference(
@@ -94,6 +101,8 @@ fun GeneralPreferences() {
                 )
             }
         }
+
+        // ── Auto-updater (nightly builds only) ────────────────────────────────
         if (BuildConfig.APPLICATION_ID.contains("nightly")) {
             PreferenceGroup(heading = stringResource(id = R.string.updater)) {
                 Item {
@@ -105,6 +114,8 @@ fun GeneralPreferences() {
                 }
             }
         }
+
+        // ── Fonts ─────────────────────────────────────────────────────────────
         ExpandAndShrink(visible = prefs2.enableFontSelection.asState().value) {
             PreferenceGroup(heading = stringResource(id = R.string.font_label)) {
                 Item {
@@ -139,6 +150,8 @@ fun GeneralPreferences() {
                 }
             }
         }
+
+        // ── Icons ─────────────────────────────────────────────────────────────
         val wrapAdaptiveIcons = prefs.wrapAdaptiveIcons.getAdapter()
         val colorizedBackgrounds = prefs.colorizedBackgrounds.getAdapter()
 
@@ -225,6 +238,9 @@ fun GeneralPreferences() {
             }
         }
 
+        // ── Colors ────────────────────────────────────────────────────────────
+        // Note: ThemePreference has been moved to the top of this screen.
+        // This group now only contains the accent colour picker and color style.
         val accentColorAdapter = prefs2.accentColor.getAdapter()
         val accentColorValue = accentColorAdapter.state.value
         val showColorStyle = !(Utilities.ATLEAST_S && accentColorValue == ColorOption.SystemAccent) ||
@@ -239,7 +255,6 @@ fun GeneralPreferences() {
         val colorStyleSubtitle = stringResource(id = currentColorStyle.nameResourceId)
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
-            Item { ThemePreference() }
             Item { ColorPreference(preference = prefs2.accentColor) }
             // Color style — full-screen picker replaces the old bottom sheet.
             Item(
@@ -254,6 +269,7 @@ fun GeneralPreferences() {
             }
         }
 
+        // ── Notification dots ─────────────────────────────────────────────────
         val notificationEnabled by remember { notificationDotsEnabled(context) }.collectAsStateWithLifecycle(initialValue = false)
         val serviceEnabled = notificationServiceEnabled()
         val showNotificationCountAdapter = prefs2.showNotificationCount.getAdapter()

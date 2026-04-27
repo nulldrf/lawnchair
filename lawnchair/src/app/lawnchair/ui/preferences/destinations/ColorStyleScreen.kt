@@ -4,7 +4,7 @@ import android.app.WallpaperManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -57,7 +58,12 @@ fun ColorStyleScreen(
     val prefs2 = preferenceManager2()
     val adapter = prefs2.colorStyle.getAdapter()
     val currentStyle = adapter.state.value
-    val isDark = isSystemInDarkTheme()
+    // Use the luminance of Lawnchair's own resolved theme background rather than
+    // isSystemInDarkTheme() — the system and Lawnchair theme settings can differ
+    // (e.g. system=dark but Lawnchair settings forced to light, or vice versa).
+    // MaterialTheme.colorScheme is already resolved by Lawnchair's theme engine,
+    // so luminance < 0.5 reliably means Lawnchair is currently rendering dark.
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     // Raw wallpaper primary — fed into every Monet engine as seed so that
     // preview colours are driven by the actual wallpaper colour, not by the

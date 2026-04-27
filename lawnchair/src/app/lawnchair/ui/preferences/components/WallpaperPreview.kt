@@ -113,7 +113,7 @@ fun WallpaperPreview(
         painter = painter,
         contentDescription = "",
         modifier = modifier,
-        contentScale = ContentScale.FillHeight,
+        contentScale = ContentScale.Crop,
     )
 }
 

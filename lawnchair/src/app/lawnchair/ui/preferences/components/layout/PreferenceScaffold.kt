@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -144,6 +145,12 @@ fun PreferenceScaffold(
             }
             actionsFrame.addView(actionsComposeView)
 
+            // Start invisible — content will fade in after its first composition
+            // completes (see DisposableEffect inside setContent below). This prevents
+            // the navigation enter animation from playing over a blank content area
+            // on heavy screens where layout takes more than one frame to settle.
+            contentFrame.alpha = 0f
+
             // Main content — setParentCompositionContext is the key fix for the missing
             // enter animation on first navigation. It enqueues the initial composition in
             // the same Recomposer frame as the parent (Frame N) so content is rendered
@@ -158,11 +165,17 @@ fun PreferenceScaffold(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 )
                 setContent {
-                    // ComposeView starts a new composition root — bridge the parent
-                    // MaterialTheme so content sees the correct colors and typography.
-                    // Also signal that this content is inside a NestedScrollView so
-                    // PreferenceLazyColumn uses the eager Column workaround instead of
-                    // LazyColumn (which crashes under unbounded height constraints).
+                    // Fade the content frame in after the first composition so the
+                    // navigation transition never plays over an empty layout.
+                    // 150ms is short enough to feel instant on simple screens and
+                    // smooth enough to mask the layout delay on heavy ones.
+                    DisposableEffect(Unit) {
+                        contentFrame.animate()
+                            .alpha(1f)
+                            .setDuration(150)
+                            .start()
+                        onDispose { }
+                    }
                     CompositionLocalProvider(
                         LocalInsideNestedScrollView provides true,
                     ) {
@@ -183,7 +196,13 @@ fun PreferenceScaffold(
             val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
             val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
             val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
+            val scrollView = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
 
+            // Must mirror every setBackgroundColor call from factory so theme
+            // switches (light↔dark) repaint all surfaces. Omitting these was
+            // causing root/scrollView to stay at the old theme's surface color.
+            root.setBackgroundColor(surfaceColor)
+            scrollView.setBackgroundColor(surfaceColor)
             appBarLayout.setBackgroundColor(surfaceColor)
             collapsingToolbar.setContentScrimColor(surfaceContainerColor)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)

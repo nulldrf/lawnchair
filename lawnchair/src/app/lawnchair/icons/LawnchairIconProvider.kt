@@ -131,8 +131,11 @@ class LawnchairIconProvider @Inject constructor(
     // through to disk cache (now stale), and regenerate bitmaps with the new
     // background logic. This is the same fast path used by shape changes.
     //
-    // We do NOT call model.reloadIfActive() — that method is confirmed broken
-    // (see ReloadHelper.kt: "This doesn't work") and takes 30+ seconds.
+    // We use model.reloadIfActive() for icon pack changes (see IconPackChangeReceiver)
+    // because it refreshes all surfaces including the app drawer and icon pack picker,
+    // even when the launcher activity is in the background. This works correctly now
+    // because updateSystemState() includes the icon pack name, making the disk cache
+    // stale so reloadIfActive() regenerates icons rather than serving old cached bitmaps.
     // -----------------------------------------------------------------------
 
     init {
@@ -335,26 +338,31 @@ class LawnchairIconProvider @Inject constructor(
             }
             recreateCalendarAndClockChangeReceiver()
             Executors.MODEL_EXECUTOR.execute {
-                // Step 1: Preload the new icon pack XML synchronously on MODEL_EXECUTOR.
-                // loadBlocking() parses appfilter.xml and populates the icon lookup maps.
-                // Without this, each icon's first call to resolveIconEntry() triggers a
-                // fresh parse, causing icons to appear progressively (non-uniform stagger)
-                // rather than all at once when the launcher recreates.
-                iconPack?.loadBlocking()
-
-                // Step 2: Invalidate caches. updateSystemState() now includes the icon
-                // pack name (via the override of updateSystemState()), so the disk cache
-                // key changes and all SQLite entries become stale.
+                // Phase 1: Invalidate caches.
+                // updateSystemState() appends the icon pack name so the disk cache key
+                // changes → every SQLite entry is stale → reloadIfActive() regenerates.
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
 
-                // Step 3: Recreate AFTER pack is loaded and caches are cleared.
-                // Icons now resolve from the pre-parsed pack map immediately on recreation.
+                // Phase 2a: Recreate the launcher activity immediately after cache is
+                // cleared. This gives instant visual feedback on the homescreen — the
+                // new activity starts with an empty memory cache and loads fresh icons
+                // for all visible cells right away, without waiting for the full model
+                // reload to complete. If the user presses Home before this runs, the
+                // already-cleared cache means the resumed launcher also sees stale
+                // disk entries and regenerates them on first draw.
                 Executors.MAIN_EXECUTOR.execute {
                     LawnchairLauncher.instance?.recreateIfNotScheduled()
                 }
+
+                // Phase 2b: Also run reloadIfActive() to refresh the app drawer,
+                // icon pack picker, and any other surface that doesn't get rebuilt
+                // by the recreate (e.g. when the launcher is in the background).
+                // With a stale disk cache this now correctly regenerates icons
+                // instead of serving old cached bitmaps.
+                appState.model.reloadIfActive()
             }
         }
         private val themedIconSubscription = themedIconPackPref.subscribeChanges {
@@ -364,7 +372,6 @@ class LawnchairIconProvider @Inject constructor(
             }
             recreateCalendarAndClockChangeReceiver()
             Executors.MODEL_EXECUTOR.execute {
-                themedIconSource?.loadBlocking()
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
@@ -372,6 +379,7 @@ class LawnchairIconProvider @Inject constructor(
                 Executors.MAIN_EXECUTOR.execute {
                     LawnchairLauncher.instance?.recreateIfNotScheduled()
                 }
+                appState.model.reloadIfActive()
             }
         }
 

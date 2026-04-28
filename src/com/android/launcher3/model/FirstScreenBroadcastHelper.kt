@@ -78,13 +78,13 @@ object FirstScreenBroadcastHelper {
     fun createModelsForFirstScreenBroadcast(
         packageManagerHelper: PackageManagerHelper,
         firstScreenItems: List<ItemInfo>,
-        userKeyToSessionMap: Map<PackageUserKey, SessionInfo>,
+        userKeyToSessionMap: Map<PackageUserKey, SessionInfo>?,
         allWidgets: List<ItemInfo>,
     ): List<FirstScreenBroadcastModel> {
 
         // installers for installing items
         val pendingItemInstallerMap: Map<String, Set<String>> =
-            createPendingItemsMap(userKeyToSessionMap)
+            createPendingItemsMap(userKeyToSessionMap ?: emptyMap())
 
         val installingPackages = pendingItemInstallerMap.values.flatten().toSet()
 

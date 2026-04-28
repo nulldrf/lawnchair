@@ -334,15 +334,24 @@ class LawnchairIconProvider @Inject constructor(
                 iconState = newState
             }
             recreateCalendarAndClockChangeReceiver()
-            // Clear caches on worker thread (required by assertWorkerThread), then
-            // recreate the launcher on main thread so icons reload with the new icon pack.
-            // The recreate MUST be posted AFTER the cache clear completes — if it runs
-            // before, the launcher reloads stale icons from the still-populated cache.
             Executors.MODEL_EXECUTOR.execute {
+                // Step 1: Preload the new icon pack XML synchronously on MODEL_EXECUTOR.
+                // loadBlocking() parses appfilter.xml and populates the icon lookup maps.
+                // Without this, each icon's first call to resolveIconEntry() triggers a
+                // fresh parse, causing icons to appear progressively (non-uniform stagger)
+                // rather than all at once when the launcher recreates.
+                iconPack?.loadBlocking()
+
+                // Step 2: Invalidate caches. updateSystemState() now includes the icon
+                // pack name (via the override of updateSystemState()), so the disk cache
+                // key changes and all SQLite entries become stale.
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
+
+                // Step 3: Recreate AFTER pack is loaded and caches are cleared.
+                // Icons now resolve from the pre-parsed pack map immediately on recreation.
                 Executors.MAIN_EXECUTOR.execute {
                     LawnchairLauncher.instance?.recreateIfNotScheduled()
                 }
@@ -355,6 +364,7 @@ class LawnchairIconProvider @Inject constructor(
             }
             recreateCalendarAndClockChangeReceiver()
             Executors.MODEL_EXECUTOR.execute {
+                themedIconSource?.loadBlocking()
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()

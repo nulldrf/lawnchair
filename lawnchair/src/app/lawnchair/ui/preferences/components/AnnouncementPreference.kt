@@ -2,30 +2,23 @@ package app.lawnchair.ui.preferences.components
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Launch
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,15 +26,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences2.asState
@@ -51,6 +44,7 @@ import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.data.liveinfo.model.Announcement
 import app.lawnchair.ui.util.addIf
 import com.android.launcher3.R
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,7 +57,9 @@ fun AnnouncementPreference() {
     val dismissedAnnouncementIds by liveInformationManager.dismissedAnnouncementIds.asState()
     val liveInformation by liveInformationManager.liveInformation.asState()
 
-    val announcements = remember { liveInformation.announcements.filter { it.id !in dismissedAnnouncementIds } }
+    val announcements = remember(liveInformation, dismissedAnnouncementIds) {
+        liveInformation.announcements.filter { it.id !in dismissedAnnouncementIds }
+    }
 
     if (enabled && showAnnouncements) {
         AnnouncementPreference(
@@ -82,16 +78,7 @@ fun AnnouncementPreference(
     onDismiss: (Announcement) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 1. Add animateContentSize with a spring spec to the Column
-    // This makes the list "spring" into place when an item is removed.
-    Column(
-        modifier = modifier.animateContentSize(
-            animationSpec = spring(
-                stiffness = Spring.StiffnessMediumLow,
-                dampingRatio = Spring.DampingRatioLowBouncy,
-            ),
-        ),
-    ) {
+    Column(modifier = modifier) {
         announcements.forEachIndexed { index, announcement ->
             var dismissed by rememberSaveable { mutableStateOf(false) }
             val visible = announcement.shouldBeVisible && !dismissed
@@ -99,9 +86,6 @@ fun AnnouncementPreference(
             AnnouncementItem(visible, announcement) {
                 onDismiss(announcement)
                 dismissed = true
-            }
-            if (index != announcements.lastIndex && visible) {
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -136,56 +120,67 @@ private fun AnnouncementItemContent(
     onClose: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
 
-    val state = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            when (it) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    haptic.performHapticFeedback(HapticFeedbackType.GestureEnd)
-                    onClose()
-                }
+    val offsetX = remember { Animatable(0f) }
+    val itemWidth = remember { mutableStateOf(0) }
 
-                SwipeToDismissBoxValue.EndToStart -> return@rememberSwipeToDismissBoxState false
-
-                SwipeToDismissBoxValue.Settled -> return@rememberSwipeToDismissBoxState false
-            }
-            return@rememberSwipeToDismissBoxState true
-        },
-    )
-
-    val alpha = if (state.targetValue == SwipeToDismissBoxValue.Settled) {
-        1f
-    } else {
-        calculateAlpha(state.progress)
+    // Fade starts at 20% of width travelled, reaches 0 at 100%
+    val alpha = remember(offsetX.value, itemWidth.value) {
+        val width = itemWidth.value.toFloat().coerceAtLeast(1f)
+        val normalized = abs(offsetX.value) / width
+        when {
+            normalized < 0.2f -> 1f
+            normalized >= 1f -> 0f
+            else -> 1f - (normalized - 0.2f) / 0.8f
+        }
     }
 
-    SwipeToDismissBox(
-        state = state,
-        enableDismissFromEndToStart = false,
-        backgroundContent = {
-            Surface(
-                modifier = modifier
-                    .alpha(alpha)
-                    .fillMaxSize()
-                    .padding(16.dp, 0.dp, 16.dp, 0.dp),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-            ) {
-                PreferenceTemplate(
-                    {},
-                    description = {
-                        Text(stringResource(R.string.accessibility_close))
+    Box(
+        modifier = modifier
+            .onSizeChanged { itemWidth.value = it.width }
+            .graphicsLayer {
+                translationX = offsetX.value
+                this.alpha = alpha
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val width = itemWidth.value.toFloat()
+                        if (abs(offsetX.value) > width * 0.35f) {
+                            // Crossed threshold — fly off screen then dismiss
+                            coroutineScope.launch {
+                                val target = if (offsetX.value > 0) width else -width
+                                offsetX.animateTo(
+                                    targetValue = target,
+                                    animationSpec = tween(durationMillis = 180),
+                                )
+                                haptic.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                onClose()
+                            }
+                        } else {
+                            // Didn't cross threshold — spring back
+                            coroutineScope.launch {
+                                offsetX.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                                )
+                            }
+                        }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        coroutineScope.launch {
+                            offsetX.snapTo(offsetX.value + dragAmount)
+                        }
                     },
                 )
-            }
-        },
+            },
     ) {
         Surface(
-            modifier = modifier
-                .alpha(alpha)
-                .padding(16.dp, 0.dp, 16.dp, 0.dp),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.primary,
         ) {
             AnnouncementPreferenceItemContent(
                 text = text,
@@ -193,15 +188,6 @@ private fun AnnouncementItemContent(
                 icon = icon,
             )
         }
-    }
-}
-
-fun calculateAlpha(progress: Float): Float {
-    return when {
-        progress < 0.5f -> 1f
-
-        // Fully opaque until halfway
-        else -> 1f - (progress - 0.5f) * 2 // Fade out linearly from halfway to the end
     }
 }
 
@@ -232,32 +218,15 @@ private fun AnnouncementPreferenceItemContent(
             Text(
                 modifier = Modifier.fillMaxWidth(),
                 text = text,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.background,
             )
         },
         startWidget = {
             Icon(
                 imageVector = icon,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.background,
                 contentDescription = null,
             )
-        },
-        endWidget = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
-            ) {
-                if (hasLink) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.Launch,
-                        tint = MaterialTheme.colorScheme.primary,
-                        contentDescription = null,
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-            }
         },
     )
 }
@@ -266,7 +235,7 @@ private fun AnnouncementPreferenceItemContent(
 @Composable
 private fun InfoPreferenceWithoutLinkPreview() {
     AnnouncementPreferenceItemContent(
-        text = "Very important announcement ",
+        text = "Very important announcement",
         url = "",
         icon = Icons.Rounded.NewReleases,
     )

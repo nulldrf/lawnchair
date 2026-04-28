@@ -34,7 +34,16 @@ import app.lawnchair.ui.preferences.LocalIsExpandedScreen
  * Represents the layout of all Preference screens.
  * Uses a combination of [PreferenceScaffold] and [PreferenceColumn] to represent the layout.
  *
- * @param label the text to be displayed at the top of the screen
+ * @param label the text shown in the *collapsed* toolbar and used as the default
+ *   expanded title (e.g. "Settings")
+ * @param expandedLabel the text shown in the *expanded* toolbar when scrolled to the
+ *   top.  Defaults to [label] so existing callers need no changes.  Pass a different
+ *   string to repurpose the generous space the large expanded title provides —
+ *   for example a contextual prompt that replaces the plain screen title while the
+ *   user hasn't scrolled yet.
+ * @param onExpandedTitleClick optional click handler for the expanded title area.
+ *   Pass a lambda to make the large title tappable; pass null (default) to disable.
+ *   The tap is automatically suppressed once the toolbar collapses.
  * @param backArrowVisible whether to show the back arrow or not
  * @param verticalArrangement the vertical arrangement of the layout's children
  * @param horizontalAlignment the horizontal alignment of the layout's children
@@ -49,6 +58,8 @@ import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 @Composable
 fun PreferenceLayout(
     label: String,
+    expandedLabel: String = label,
+    onExpandedTitleClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     backArrowVisible: Boolean = true,
     isExpandedScreen: Boolean = LocalIsExpandedScreen.current,
@@ -63,6 +74,8 @@ fun PreferenceLayout(
         modifier = modifier,
         backArrowVisible = backArrowVisible,
         label = label,
+        expandedLabel = expandedLabel,
+        onExpandedTitleClick = onExpandedTitleClick,
         isExpandedScreen = isExpandedScreen,
         actions = actions,
         bottomBar = bottomBar,

@@ -7,15 +7,21 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.os.Process
 import android.provider.Settings
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Backup
-import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,10 +29,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
@@ -36,6 +41,7 @@ import app.lawnchair.backup.ui.restoreBackupOpener
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.observeAsState
 import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.AnnouncementPreference
@@ -45,6 +51,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.preferences.data.liveinfo.SyncLiveInformation
+import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.navigation.About
 import app.lawnchair.ui.preferences.navigation.AppDrawer
 import app.lawnchair.ui.preferences.navigation.BackupAndRestore
@@ -76,28 +83,89 @@ fun PreferencesDashboard(
     val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
-    val aboutDescrption = if (prefs.hideVersionInfo.get()) {
+    // ── Announcement state ────────────────────────────────────────────────
+    val liveInformationManager = liveInformationManager()
+    val enabled by liveInformationManager.enabled.asState()
+    val showAnnouncements by liveInformationManager.showAnnouncements.asState()
+    val dismissedAnnouncementIds by liveInformationManager.dismissedAnnouncementIds.asState()
+    val liveInformation by liveInformationManager.liveInformation.asState()
+
+    val activeAnnouncements = remember(liveInformation, dismissedAnnouncementIds) {
+        liveInformation.announcements.filter {
+            it.shouldBeVisible && it.id !in dismissedAnnouncementIds
+        }
+    }
+    val announcementShowing = enabled && showAnnouncements && activeAnnouncements.isNotEmpty()
+    val isNotDefaultLauncher = !context.isDefaultLauncher()
+
+    // ── Dynamic toolbar title ─────────────────────────────────────────────
+    // When an announcement is visible AND Lawnchair is not yet the default
+    // launcher, we repurpose the large expanded title to show the set-default
+    // prompt — saving screen space by removing that card.
+    // Once the announcement is dismissed the prompt reappears as a card and
+    // the title reverts to the regular "Settings" label.
+    val settingsLabel = stringResource(id = R.string.settings)
+    val setDefaultLabel = stringResource(id = R.string.set_default_launcher_short)
+    val expandedLabel = if (announcementShowing && isNotDefaultLauncher) setDefaultLabel else settingsLabel
+
+    // ── About description ─────────────────────────────────────────────────
+    val aboutDescription = if (prefs.hideVersionInfo.get()) {
         prefs.pseudonymVersion.get()
     } else {
         "${context.getString(R.string.derived_app_name)} ${BuildConfig.MAJOR_VERSION}"
     }
 
+    // The expanded title is tappable only while it shows the set-default prompt
+    // (i.e. an announcement card is occupying the card slot). Once the announcement
+    // is dismissed the prompt moves to a card and the title becomes plain "Settings".
+    val onExpandedTitleClick: (() -> Unit)? = if (announcementShowing && isNotDefaultLauncher) {
+        {
+            Intent(Settings.ACTION_HOME_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .let { context.startActivity(it) }
+            (context as? Activity)?.finish()
+        }
+    } else null
+
     PreferenceLayout(
-        label = stringResource(id = R.string.settings),
+        label = settingsLabel,
+        expandedLabel = expandedLabel,
+        onExpandedTitleClick = onExpandedTitleClick,
         modifier = modifier,
         verticalArrangement = Arrangement.Top,
         backArrowVisible = false,
     ) {
-        AnnouncementPreference()
-
-        if (BuildConfig.APPLICATION_ID.contains("nightly") || BuildConfig.DEBUG) {
-            PreferencesDebugWarning()
-            Spacer(modifier = Modifier.height(8.dp))
+        // ── Announcement card ─────────────────────────────────────────────
+        // Wrapped in AnimatedVisibility so that when live-info is reset in the
+        // debug menu the card block expands/fades in smoothly, coordinated with
+        // the set-default card shrinking out at the same time.
+        AnimatedVisibility(
+            visible = announcementShowing,
+            enter = expandVertically(animationSpec = tween(350)) + fadeIn(animationSpec = tween(350)),
+            exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(animationSpec = tween(250)),
+        ) {
+            AnnouncementPreference()
         }
 
-        if (!context.isDefaultLauncher()) {
-            PreferencesSetDefaultLauncherWarning()
+        // AnimatedVisibility gives the set-default card a smooth slide-from-bottom
+        // + fade entrance when the announcement is dismissed. On the way out
+        // (announcement returning) it shrinks vertically to mirror the announcement's
+        // expand, so both cards feel like a coordinated swap.
+        AnimatedVisibility(
+            visible = isNotDefaultLauncher && !announcementShowing,
+            enter = slideInVertically(
+                animationSpec = tween(durationMillis = 350),
+                initialOffsetY = { fullHeight -> fullHeight },
+            ) + fadeIn(animationSpec = tween(durationMillis = 350)),
+            exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(animationSpec = tween(250)),
+        ) {
+            PreferencesSetDefaultLauncherCard()
+        }
+
+        // ── Dev / debug warnings ──────────────────────────────────────────
+        if (BuildConfig.APPLICATION_ID.contains("nightly") || BuildConfig.DEBUG) {
             Spacer(modifier = Modifier.height(8.dp))
+            PreferencesDebugWarning()
         }
 
         val deckLayout = prefs2.deckLayout.getAdapter()
@@ -201,6 +269,7 @@ fun PreferencesDashboard(
                     isLast = it.isLast,
                 )
             }
+
             Item(
                 "quickstep",
                 LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG,
@@ -243,7 +312,7 @@ fun PreferencesDashboard(
             Item {
                 PreferenceCategory(
                     label = stringResource(R.string.about_label),
-                    description = aboutDescrption,
+                    description = aboutDescription,
                     iconResource = R.drawable.ic_about,
                     onNavigate = { onNavigate(About) },
                     isSelected = currentRoute is About,
@@ -271,36 +340,45 @@ fun PreferencesDebugWarning(
     }
 }
 
+/**
+ * Styled to match the announcement card (primary colour, same corner radius).
+ * Shown when Lawnchair is not the default launcher and there is no active
+ * announcement occupying that slot.
+ */
 @Composable
-fun PreferencesSetDefaultLauncherWarning(
+fun PreferencesSetDefaultLauncherCard(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     Surface(
         modifier = modifier.padding(horizontal = 16.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.primary,
     ) {
         PreferenceTemplate(
-            modifier = Modifier.clickable {
-                Intent(Settings.ACTION_HOME_SETTINGS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    .let { context.startActivity(it) }
-                (context as? Activity)?.finish()
-            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    Intent(Settings.ACTION_HOME_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .let { context.startActivity(it) }
+                    (context as? Activity)?.finish()
+                },
             title = {},
             description = {
                 Text(
+                    modifier = Modifier.fillMaxWidth(),
                     text = stringResource(id = R.string.set_default_launcher_tip),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.background,
                 )
             },
             startWidget = {
                 Icon(
                     imageVector = Icons.Rounded.TipsAndUpdates,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.background,
                     contentDescription = null,
                 )
+
             },
         )
     }

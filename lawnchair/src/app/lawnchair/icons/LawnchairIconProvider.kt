@@ -337,31 +337,26 @@ class LawnchairIconProvider @Inject constructor(
                 iconState = newState
             }
             recreateCalendarAndClockChangeReceiver()
+
+            // Flag for onResume() to show the loading overlay when user returns to homescreen.
+            // We do NOT call showIconPackSwitchOverlay() here because the launcher may be
+            // paused (in background) — adding a view to a non-visible dragLayer doesn't work.
+            // onResume() handles the overlay with a timed dismiss.
+            LawnchairLauncher.iconPackSwitchPending = true
+
+            // Recreate immediately if the launcher is active for instant homescreen feedback.
+            LawnchairLauncher.instance?.recreateIfNotScheduled()
+
             Executors.MODEL_EXECUTOR.execute {
-                // Phase 1: Invalidate caches.
-                // updateSystemState() appends the icon pack name so the disk cache key
-                // changes → every SQLite entry is stale → reloadIfActive() regenerates.
+                // updateSystemState() includes the icon pack name so the disk cache key
+                // changes → all SQLite entries are stale → icons regenerate from new pack.
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
-
-                // Phase 2a: Recreate the launcher activity immediately after cache is
-                // cleared. This gives instant visual feedback on the homescreen — the
-                // new activity starts with an empty memory cache and loads fresh icons
-                // for all visible cells right away, without waiting for the full model
-                // reload to complete. If the user presses Home before this runs, the
-                // already-cleared cache means the resumed launcher also sees stale
-                // disk entries and regenerates them on first draw.
-                Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.instance?.recreateIfNotScheduled()
-                }
-
-                // Phase 2b: Also run reloadIfActive() to refresh the app drawer,
-                // icon pack picker, and any other surface that doesn't get rebuilt
-                // by the recreate (e.g. when the launcher is in the background).
-                // With a stale disk cache this now correctly regenerates icons
-                // instead of serving old cached bitmaps.
+                // reloadIfActive() refreshes the app drawer and icon pack picker,
+                // which recreate() doesn't cover. With a stale disk cache this now
+                // regenerates icons correctly instead of serving old cached bitmaps.
                 appState.model.reloadIfActive()
             }
         }
@@ -371,14 +366,13 @@ class LawnchairIconProvider @Inject constructor(
                 iconState = newState
             }
             recreateCalendarAndClockChangeReceiver()
+            LawnchairLauncher.iconPackSwitchPending = true
+            LawnchairLauncher.instance?.recreateIfNotScheduled()
             Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
-                Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.instance?.recreateIfNotScheduled()
-                }
                 appState.model.reloadIfActive()
             }
         }

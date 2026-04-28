@@ -451,6 +451,15 @@ class LawnchairLauncher : QuickstepLauncher() {
         super.onResume()
         restartIfPending()
 
+        // If an icon pack switch happened while in background, show overlay now.
+        // We use a fixed 2s dismiss delay — long enough for visible icons to regenerate,
+        // short enough to not feel sluggish. The 250ms fade makes the dismiss smooth.
+        if (iconPackSwitchPending) {
+            iconPackSwitchPending = false
+            showIconPackSwitchOverlay()
+            dragLayer.postDelayed({ dismissIconPackSwitchOverlay() }, 2000)
+        }
+
         dragLayer.viewTreeObserver.addOnDrawListener(
             object : ViewTreeObserver.OnDrawListener {
                 private var handled = false
@@ -484,6 +493,57 @@ class LawnchairLauncher : QuickstepLauncher() {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Icon pack switch loading overlay
+    //
+    // When the user switches icon packs, icons regenerate progressively on
+    // MODEL_EXECUTOR. Without a loading overlay the user sees icons change
+    // one-by-one (old → new) which looks broken. We show a full-screen overlay
+    // over the workspace while the visible icons regenerate, then fade it out.
+    // -----------------------------------------------------------------------
+
+    private var iconPackOverlay: android.widget.FrameLayout? = null
+
+    fun showIconPackSwitchOverlay() {
+        if (iconPackOverlay != null) return
+        val overlay = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(
+                Themes.getAttrColor(this@LawnchairLauncher,
+                    com.android.launcher3.R.attr.overviewScrimColor).let {
+                    // Use the wallpaper-scrim color at 85% opacity
+                    android.graphics.Color.argb(217,
+                        android.graphics.Color.red(it),
+                        android.graphics.Color.green(it),
+                        android.graphics.Color.blue(it))
+                }
+            )
+            // Center a ProgressBar
+            val progress = android.widget.ProgressBar(context).apply {
+                isIndeterminate = true
+                indeterminateTintList = android.content.res.ColorStateList.valueOf(
+                    android.graphics.Color.WHITE)
+            }
+            val size = (48 * resources.displayMetrics.density).toInt()
+            addView(progress, android.widget.FrameLayout.LayoutParams(size, size).apply {
+                gravity = android.view.Gravity.CENTER
+            })
+        }
+        dragLayer.addView(overlay, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
+        iconPackOverlay = overlay
+    }
+
+    fun dismissIconPackSwitchOverlay() {
+        val overlay = iconPackOverlay ?: return
+        iconPackOverlay = null
+        overlay.animate()
+            .alpha(0f)
+            .setDuration(250)
+            .withEndAction { dragLayer.removeView(overlay) }
+            .start()
+    }
+
     private fun restartIfPending() {
         when {
             sRestartFlags and FLAG_RESTART != 0 -> lawnchairApp.restart(false)
@@ -511,6 +571,9 @@ class LawnchairLauncher : QuickstepLauncher() {
         private const val FLAG_RESTART = 1 shl 1
 
         var sRestartFlags = 0
+
+        /** Set to true when an icon pack switch is in progress. Checked in onResume(). */
+        @Volatile var iconPackSwitchPending = false
 
         val instance get() = LawnchairApp.launcher
     }

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
@@ -57,6 +59,15 @@ fun PreferenceScaffold(
     val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
 
+    // Capture the parent CompositionContext so both inner ComposeViews can be
+    // linked to it via setParentCompositionContext(). Without this, each ComposeView
+    // schedules its initial composition independently on the next Recomposer frame
+    // (Frame N+1), causing content to be absent during the enter animation.
+    // With the parent context, their initial compositions are enqueued in the same
+    // Recomposer pipeline as the navigation transition — Frame N — so content is
+    // ready before the first draw pass.
+    val parentCompositionContext = rememberCompositionContext()
+
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { ctx ->
@@ -82,6 +93,15 @@ fun PreferenceScaffold(
                 insets
             }
 
+            // Set the root background immediately. The inner ComposeView defers its
+            // first composition to the frame after window attachment (Frame N+1), so
+            // on first navigation the content area is empty during the enter animation
+            // (Frame N). Without this, Compose's AnimatedContent animates a transparent
+            // rectangle, making the transition look instant/broken. Setting surfaceColor
+            // here ensures Frame N shows the correct opaque surface rather than blank.
+            root.setBackgroundColor(surfaceColor)
+            scrollView.setBackgroundColor(surfaceColor)
+
             // Apply Lawnchair dynamic colors
             appBarLayout.setBackgroundColor(surfaceColor)
             collapsingToolbar.setContentScrimColor(surfaceContainerColor)
@@ -101,9 +121,10 @@ fun PreferenceScaffold(
                 toolbar.navigationIcon = null
             }
 
-            // Toolbar actions — ViewCompositionStrategy ensures lifecycle sync
-            // with parent composition so toolbar icons animate correctly
+            // Toolbar actions — setParentCompositionContext links this ComposeView to the
+            // parent Recomposer so its initial composition is batched with Frame N.
             val actionsComposeView = ComposeView(ctx).apply {
+                setParentCompositionContext(parentCompositionContext)
                 setViewCompositionStrategy(
                     ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
                 )
@@ -123,9 +144,12 @@ fun PreferenceScaffold(
             }
             actionsFrame.addView(actionsComposeView)
 
-            // Main content — ViewCompositionStrategy syncs frame timing with
-            // parent Compose composition so navigation animations don't skip frames
+            // Main content — setParentCompositionContext is the key fix for the missing
+            // enter animation on first navigation. It enqueues the initial composition in
+            // the same Recomposer frame as the parent (Frame N) so content is rendered
+            // before the first draw pass, rather than deferring to Frame N+1.
             val composeView = ComposeView(ctx).apply {
+                setParentCompositionContext(parentCompositionContext)
                 setViewCompositionStrategy(
                     ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
                 )
@@ -134,7 +158,21 @@ fun PreferenceScaffold(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 )
                 setContent {
-                    content(PaddingValues())
+                    // ComposeView starts a new composition root — bridge the parent
+                    // MaterialTheme so content sees the correct colors and typography.
+                    // Also signal that this content is inside a NestedScrollView so
+                    // PreferenceLazyColumn uses the eager Column workaround instead of
+                    // LazyColumn (which crashes under unbounded height constraints).
+                    CompositionLocalProvider(
+                        LocalInsideNestedScrollView provides true,
+                    ) {
+                        MaterialTheme(
+                            colorScheme = MaterialTheme.colorScheme,
+                            typography = MaterialTheme.typography,
+                        ) {
+                            content(PaddingValues())
+                        }
+                    }
                 }
             }
             contentFrame.addView(composeView)

@@ -8,17 +8,29 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+
+/**
+ * Set to true inside [PreferenceScaffold]'s content ComposeView, which sits inside a
+ * [StretchNestedScrollView]. LazyColumn crashes under NestedScrollView (unbounded height
+ * constraints), so [PreferenceLazyColumn] switches to an eager Column in that context.
+ * Screens backed by a plain Compose Scaffold (e.g. [PreferenceSearchScaffold]) leave this
+ * false and get a real LazyColumn with proper item virtualization.
+ */
+val LocalInsideNestedScrollView = compositionLocalOf { false }
 
 @Composable
 fun PreferenceColumn(
@@ -53,26 +65,43 @@ fun PreferenceLazyColumn(
     state: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
-    // LazyColumn crashes inside NestedScrollView (infinite height constraints).
-    // Render all items eagerly in a Column instead — this fixes the font list
-    // crash and About screen crash while keeping NestedScrollView scrolling.
-    val scope = remember { EagerLazyListScope() }
-    scope.reset()
-    scope.content()
+    if (LocalInsideNestedScrollView.current) {
+        // LazyColumn crashes inside NestedScrollView (unbounded height constraints).
+        // Render all items eagerly in a Column instead. Only screens inside
+        // PreferenceScaffold (which uses StretchNestedScrollView) hit this path.
+        val scope = remember { EagerLazyListScope() }
+        scope.reset()
+        scope.content()
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(contentPadding),
-    ) {
-        scope.items.forEach { item ->
-            item()
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(contentPadding),
+        ) {
+            scope.items.forEach { keyed ->
+                key(keyed.key) {
+                    keyed.content()
+                }
+            }
         }
+    } else {
+        // Pure-Compose Scaffold (e.g. PreferenceSearchScaffold) — use a real
+        // LazyColumn so only visible items are composed. This is critical for
+        // the font list: without virtualization, all 1000+ items recompose on
+        // every selection change, freezing the main thread.
+        LazyColumn(
+            modifier = modifier.fillMaxWidth(),
+            contentPadding = contentPadding,
+            state = state,
+            content = content,
+        )
     }
 }
 
 private class EagerLazyListScope : LazyListScope {
-    val items = mutableListOf<@Composable () -> Unit>()
+    data class KeyedItem(val key: Any?, val content: @Composable () -> Unit)
+
+    val items = mutableListOf<KeyedItem>()
 
     fun reset() = items.clear()
 
@@ -81,7 +110,7 @@ private class EagerLazyListScope : LazyListScope {
         contentType: Any?,
         content: @Composable LazyItemScope.() -> Unit,
     ) {
-        items.add { FakeLazyItemScope.content() }
+        items.add(KeyedItem(key) { FakeLazyItemScope.content() })
     }
 
     override fun items(
@@ -91,7 +120,7 @@ private class EagerLazyListScope : LazyListScope {
         itemContent: @Composable LazyItemScope.(index: Int) -> Unit,
     ) {
         for (i in 0 until count) {
-            items.add { FakeLazyItemScope.itemContent(i) }
+            items.add(KeyedItem(key?.invoke(i)) { FakeLazyItemScope.itemContent(i) })
         }
     }
 
@@ -100,7 +129,7 @@ private class EagerLazyListScope : LazyListScope {
         contentType: Any?,
         content: @Composable LazyItemScope.() -> Unit,
     ) {
-        items.add { FakeLazyItemScope.content() }
+        items.add(KeyedItem(key) { FakeLazyItemScope.content() })
     }
 }
 

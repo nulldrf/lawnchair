@@ -6,7 +6,7 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.util.AttributeSet
 import android.util.Log
-import android.view.ViewGroup
+import android.view.Gravity
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -54,18 +54,21 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         preview = ViewCompat.requireViewById(this, R.id.files_preview)
         FontManager.INSTANCE.get(context).setCustomFont(title, R.id.font_body)
 
-        // SearchResultIcon.bind() overrides its own width/height to
-        // (iconSize + compoundDrawablePadding) and sets marginStart to
-        // search_result_margin. Mirror those same values on files_preview
-        // so both a vector icon and a photo thumbnail have identical
-        // visual footprint and left alignment regardless of XML dimensions.
+        // Mirror avatar's exact size onto files_preview and apply CENTER_VERTICAL
+        // gravity so photo thumbnails align with the Google G icon and all other
+        // icons in the list. Must use LinearLayout.LayoutParams — assigning a bare
+        // ViewGroup.MarginLayoutParams silently drops the gravity set in XML.
         val iconSizeWithPadding = avatar.iconSize + avatar.compoundDrawablePadding
         val iconMargin = resources.getDimensionPixelSize(R.dimen.search_result_margin)
-        (preview.layoutParams as ViewGroup.MarginLayoutParams).apply {
-            width = iconSizeWithPadding
-            height = iconSizeWithPadding
+        preview.layoutParams = LinearLayout.LayoutParams(iconSizeWithPadding, iconSizeWithPadding).apply {
+            gravity = Gravity.CENTER_VERTICAL
             marginStart = iconMargin
         }
+
+        // Set gravity once here — it survives orientation changes and view recycling.
+        // The actual height is set to a concrete pixel value in bind() after setUpdateResources()
+        // has determined the card height, so MATCH_PARENT is never needed.
+        textRows.gravity = Gravity.CENTER_VERTICAL
 
         setUpdateResources()
     }
@@ -84,13 +87,13 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
             avatar.visibility = GONE
             preview.visibility = VISIBLE
         }
-        // Contact rows: fixed compact height (single line, no wrapping).
-        // File rows: wrap content so the card sizes to the 2-line title
-        // rather than leaving dead space from the old large-icon height.
+        // Both file and contact rows use fixed heights.
+        // File rows match search_result_row_height — the same height as the
+        // Google G card — so all cards in the list have a consistent size.
         val heightRes = if (isSmall) {
             resources.getDimensionPixelSize(R.dimen.search_result_small_row_height)
         } else {
-            LayoutParams.WRAP_CONTENT
+            resources.getDimensionPixelSize(R.dimen.search_result_row_height)
         }
         val layoutParams = LayoutParams(
             LayoutParams.MATCH_PARENT,
@@ -99,6 +102,13 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         layoutParams.leftMargin = grid.allAppsPadding.left
         layoutParams.rightMargin = grid.allAppsPadding.right
         this.layoutParams = layoutParams
+
+        // Give textRows the exact same pixel height as the card so that
+        // gravity="center_vertical" has real space to work with. MATCH_PARENT
+        // is unreliable here because it resolves against the root view's measured
+        // height, which may be 0 during onFinishInflate and early layout passes.
+        (textRows.layoutParams as LinearLayout.LayoutParams).height = heightRes
+        textRows.requestLayout()
     }
 
     override val isQuickLaunch: Boolean get() = hasFlag(flags, SearchResultView.FLAG_QUICK_LAUNCH)
@@ -171,11 +181,7 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
 
             textRows.orientation = VERTICAL
             title.isSingleLine = false
-            title.maxLines = 2
-
-            // Remove top/bottom padding from text_rows so layout_gravity="center_vertical"
-            // centers the actual text lines rather than a padded-out wrap_content box.
-            textRows.setPadding(textRows.paddingLeft, 0, textRows.paddingRight, 0)
+            title.maxLines = 3
         }
 
         if (shouldHandleClick(target)) {

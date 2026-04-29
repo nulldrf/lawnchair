@@ -29,6 +29,7 @@
         style="@style/BaseIcon"
         android:layout_width="@dimen/search_row_icon_size"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:drawableTint="?android:textColorPrimary"
         launcher:iconDisplay="search_result_tall"
         launcher:layoutHorizontal="true" />
@@ -46,11 +47,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:layout_weight="1.0"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="@dimen/dynamic_grid_edge_margin"
-        android:paddingTop="@dimen/dynamic_grid_edge_margin"
-        android:paddingEnd="@dimen/dynamic_grid_edge_margin"
-        android:paddingBottom="@dimen/dynamic_grid_edge_margin">
+        android:paddingEnd="@dimen/dynamic_grid_edge_margin">
 
         <TextView
             android:id="@+id/title"
@@ -85,7 +85,8 @@
             android:paddingStart="4dp"
             android:singleLine="true"
             android:textColor="?android:textColorSecondary"
-            android:textSize="@dimen/search_result_hero_subtitle_size" />
+            android:textSize="@dimen/search_result_hero_subtitle_size"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout

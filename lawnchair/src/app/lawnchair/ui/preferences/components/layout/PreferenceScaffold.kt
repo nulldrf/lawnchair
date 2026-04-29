@@ -35,15 +35,11 @@ import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.android.launcher3.R
 import com.google.android.material.R as MaterialR
 import com.google.android.material.appbar.AppBarLayout
@@ -94,12 +90,6 @@ fun PreferenceScaffold(
     val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
     val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
-
-    // Capture from parent Compose scope. These are set on the ComposeView manually
-    // before createComposition() is called, so the synchronous composition can
-    // resolve ViewTreeLifecycleOwner without the view being attached to a window.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val savedStateRegistryOwner = LocalSavedStateRegistryOwner.current
 
     val parentCompositionContext = rememberCompositionContext()
 
@@ -218,12 +208,6 @@ fun PreferenceScaffold(
             }
             actionsFrame.addView(actionsComposeView)
 
-            // Main content — setParentCompositionContext sets the Recomposer, but
-            // composition is still normally deferred until onAttachedToWindow fires,
-            // which is after factory returns — too late for the enter transition.
-            // createComposition() forces the content lambda to run synchronously
-            // right here, so content is fully composed before the view is attached
-            // and before the first draw pass of the navigation transition.
             val composeView = ComposeView(ctx).apply {
                 setParentCompositionContext(parentCompositionContext)
                 setViewCompositionStrategy(
@@ -245,15 +229,6 @@ fun PreferenceScaffold(
                         }
                     }
                 }
-                // Set lifecycle owners explicitly so createComposition() can resolve
-                // ViewTreeLifecycleOwner synchronously without the view being attached.
-                // Without these, createComposition() crashes with:
-                // "Composed into the View which doesn't propagate ViewTreeLifecycleOwner"
-                // onAttachedToWindow will find these already set and skip re-setting them,
-                // so DisposeOnViewTreeLifecycleDestroyed still works correctly.
-                setViewTreeLifecycleOwner(lifecycleOwner)
-                setViewTreeSavedStateRegistryOwner(savedStateRegistryOwner)
-                createComposition()
             }
             contentFrame.addView(composeView)
 

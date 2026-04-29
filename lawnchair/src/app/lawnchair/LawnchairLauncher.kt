@@ -451,13 +451,10 @@ class LawnchairLauncher : QuickstepLauncher() {
         super.onResume()
         restartIfPending()
 
-        // If an icon pack switch happened while in background, show overlay now.
-        // We use a fixed 2s dismiss delay — long enough for visible icons to regenerate,
-        // short enough to not feel sluggish. The 250ms fade makes the dismiss smooth.
+        // If an icon pack switch was triggered while in background, show overlay now.
+        // Dismiss is posted by LawnchairIconProvider after MODEL + MAIN queues drain.
         if (iconPackSwitchPending) {
-            iconPackSwitchPending = false
             showIconPackSwitchOverlay()
-            dragLayer.postDelayed({ dismissIconPackSwitchOverlay() }, 2000)
         }
 
         dragLayer.viewTreeObserver.addOnDrawListener(
@@ -496,42 +493,70 @@ class LawnchairLauncher : QuickstepLauncher() {
     // -----------------------------------------------------------------------
     // Icon pack switch loading overlay
     //
-    // When the user switches icon packs, icons regenerate progressively on
-    // MODEL_EXECUTOR. Without a loading overlay the user sees icons change
-    // one-by-one (old → new) which looks broken. We show a full-screen overlay
-    // over the workspace while the visible icons regenerate, then fade it out.
+    // Shows a Material 3 expressive container with a circular spinner while
+    // icons regenerate after an icon pack change. Dismisses by draining both
+    // MODEL_EXECUTOR and MAIN_EXECUTOR queues — no fixed timer needed.
     // -----------------------------------------------------------------------
 
-    private var iconPackOverlay: android.widget.FrameLayout? = null
+    private var iconPackOverlay: android.view.View? = null
 
     fun showIconPackSwitchOverlay() {
         if (iconPackOverlay != null) return
-        val overlay = android.widget.FrameLayout(this).apply {
-            setBackgroundColor(
-                Themes.getAttrColor(this@LawnchairLauncher,
-                    com.android.launcher3.R.attr.overviewScrimColor).let {
-                    // Use the wallpaper-scrim color at 85% opacity
-                    android.graphics.Color.argb(217,
-                        android.graphics.Color.red(it),
-                        android.graphics.Color.green(it),
-                        android.graphics.Color.blue(it))
-                }
-            )
-            // Center a ProgressBar
-            val progress = android.widget.ProgressBar(context).apply {
-                isIndeterminate = true
-                indeterminateTintList = android.content.res.ColorStateList.valueOf(
-                    android.graphics.Color.WHITE)
-            }
-            val size = (48 * resources.displayMetrics.density).toInt()
-            addView(progress, android.widget.FrameLayout.LayoutParams(size, size).apply {
-                gravity = android.view.Gravity.CENTER
-            })
+
+        val density = resources.displayMetrics.density
+
+        // Read system primaryColor once
+        val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
+        val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
+        ta.recycle()
+
+        // M3 Expressive "Loading indicator with container":
+        // A circular container (filled circle at ~12% opacity of primaryColor)
+        // with the indeterminate spinner centered inside it.
+        // Container: 72dp, Spinner: 40dp — matches the M3 spec proportions.
+        val containerSize = (72 * density).toInt()
+        val spinnerSize  = (40 * density).toInt()
+
+        val containerBg = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(android.graphics.Color.argb(
+                30, // ~12% opacity
+                android.graphics.Color.red(primaryColor),
+                android.graphics.Color.green(primaryColor),
+                android.graphics.Color.blue(primaryColor),
+            ))
         }
-        dragLayer.addView(overlay, android.widget.FrameLayout.LayoutParams(
+
+        val container = android.widget.FrameLayout(this).apply {
+            background = containerBg
+        }
+
+        val spinner = android.widget.ProgressBar(this, null,
+            android.R.attr.progressBarStyle).apply {
+            isIndeterminate = true
+            indeterminateTintList =
+                android.content.res.ColorStateList.valueOf(primaryColor)
+        }
+        container.addView(spinner, android.widget.FrameLayout.LayoutParams(
+            spinnerSize, spinnerSize).apply {
+            gravity = android.view.Gravity.CENTER
+        })
+
+        // Dim scrim behind the indicator
+        val scrim = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))
+        }
+        scrim.addView(container, android.widget.FrameLayout.LayoutParams(
+            containerSize, containerSize).apply {
+            gravity = android.view.Gravity.CENTER
+        })
+
+        scrim.alpha = 0f
+        dragLayer.addView(scrim, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
-        iconPackOverlay = overlay
+        scrim.animate().alpha(1f).setDuration(200).start()
+        iconPackOverlay = scrim
     }
 
     fun dismissIconPackSwitchOverlay() {
@@ -539,7 +564,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         iconPackOverlay = null
         overlay.animate()
             .alpha(0f)
-            .setDuration(250)
+            .setDuration(300)
             .withEndAction { dragLayer.removeView(overlay) }
             .start()
     }

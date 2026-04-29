@@ -337,27 +337,27 @@ class LawnchairIconProvider @Inject constructor(
                 iconState = newState
             }
             recreateCalendarAndClockChangeReceiver()
-
-            // Flag for onResume() to show the loading overlay when user returns to homescreen.
-            // We do NOT call showIconPackSwitchOverlay() here because the launcher may be
-            // paused (in background) — adding a view to a non-visible dragLayer doesn't work.
-            // onResume() handles the overlay with a timed dismiss.
             LawnchairLauncher.iconPackSwitchPending = true
-
-            // Recreate immediately if the launcher is active for instant homescreen feedback.
+            LawnchairLauncher.instance?.showIconPackSwitchOverlay()
             LawnchairLauncher.instance?.recreateIfNotScheduled()
 
             Executors.MODEL_EXECUTOR.execute {
-                // updateSystemState() includes the icon pack name so the disk cache key
-                // changes → all SQLite entries are stale → icons regenerate from new pack.
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
-                // reloadIfActive() refreshes the app drawer and icon pack picker,
-                // which recreate() doesn't cover. With a stale disk cache this now
-                // regenerates icons correctly instead of serving old cached bitmaps.
+                // reloadIfActive() posts icon-update runnables to MAIN_EXECUTOR.
                 appState.model.reloadIfActive()
+                // Queue-drain: bounce MAIN→MODEL→MAIN to ensure all icon-update
+                // runnables posted by reloadIfActive() have been consumed before dismiss.
+                Executors.MAIN_EXECUTOR.execute {
+                    Executors.MODEL_EXECUTOR.execute {
+                        Executors.MAIN_EXECUTOR.execute {
+                            LawnchairLauncher.iconPackSwitchPending = false
+                            LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
+                        }
+                    }
+                }
             }
         }
         private val themedIconSubscription = themedIconPackPref.subscribeChanges {
@@ -367,6 +367,7 @@ class LawnchairIconProvider @Inject constructor(
             }
             recreateCalendarAndClockChangeReceiver()
             LawnchairLauncher.iconPackSwitchPending = true
+            LawnchairLauncher.instance?.showIconPackSwitchOverlay()
             LawnchairLauncher.instance?.recreateIfNotScheduled()
             Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
@@ -374,6 +375,14 @@ class LawnchairIconProvider @Inject constructor(
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
                 appState.model.reloadIfActive()
+                Executors.MAIN_EXECUTOR.execute {
+                    Executors.MODEL_EXECUTOR.execute {
+                        Executors.MAIN_EXECUTOR.execute {
+                            LawnchairLauncher.iconPackSwitchPending = false
+                            LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
+                        }
+                    }
+                }
             }
         }
 

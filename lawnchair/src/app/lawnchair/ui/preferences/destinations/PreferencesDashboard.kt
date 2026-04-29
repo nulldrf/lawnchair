@@ -14,22 +14,25 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.TipsAndUpdates
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -46,7 +49,6 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.AnnouncementPreference
 import app.lawnchair.ui.preferences.components.controls.PreferenceCategory
-import app.lawnchair.ui.preferences.components.controls.WarningPreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
@@ -127,6 +129,25 @@ fun PreferencesDashboard(
         }
     } else null
 
+    // ── Debug badge dialog ────────────────────────────────────────────────
+    val isDebugBuild = BuildConfig.APPLICATION_ID.contains("nightly") || BuildConfig.DEBUG
+    var showDebugDialog by remember { mutableStateOf(false) }
+
+    if (showDebugDialog) {
+        AlertDialog(
+            onDismissRequest = { showDebugDialog = false },
+            title = { Text("Debug Build") },
+            text = {
+                Text("You are using a development build, which may contain bugs and broken features. Use at your own risk!")
+            },
+            confirmButton = {
+                TextButton(onClick = { showDebugDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+
     PreferenceLayout(
         label = settingsLabel,
         expandedLabel = expandedLabel,
@@ -134,6 +155,11 @@ fun PreferencesDashboard(
         modifier = modifier,
         verticalArrangement = Arrangement.Top,
         backArrowVisible = false,
+        actions = {
+            if (isDebugBuild) {
+                DebugBadge(onClick = { showDebugDialog = true })
+            }
+        },
     ) {
         // ── Announcement card ─────────────────────────────────────────────
         // Wrapped in AnimatedVisibility so that when live-info is reset in the
@@ -163,10 +189,8 @@ fun PreferencesDashboard(
         }
 
         // ── Dev / debug warnings ──────────────────────────────────────────
-        if (BuildConfig.APPLICATION_ID.contains("nightly") || BuildConfig.DEBUG) {
-            Spacer(modifier = Modifier.height(8.dp))
-            PreferencesDebugWarning()
-        }
+        // Debug warning is now shown as a badge in the toolbar — see DebugBadge
+        // and the AlertDialog above. Nothing to render here.
 
         val deckLayout = prefs2.deckLayout.getAdapter()
         PreferenceGroup {
@@ -324,18 +348,28 @@ fun PreferencesDashboard(
     }
 }
 
+/**
+ * A small pill-shaped badge rendered in the toolbar actions area.
+ * Tapping it shows the debug warning dialog. Only shown in debug/nightly builds.
+ */
 @Composable
-fun PreferencesDebugWarning(
-    modifier: Modifier = Modifier,
+private fun DebugBadge(
+    onClick: () -> Unit,
 ) {
     Surface(
-        modifier = modifier.padding(horizontal = 16.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.errorContainer,
+        onClick = onClick,
+        shape = RoundedCornerShape(percent = 50),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
+        ),
     ) {
-        WarningPreference(
-            // Don't move to strings.xml, no need to translate this warning
-            text = "You are using a development build, which may contain bugs and broken features. Use at your own risk!",
+        Text(
+            text = "debug",
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
         )
     }
 }

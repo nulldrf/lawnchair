@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,7 +34,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences2.asState
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
@@ -228,25 +226,5 @@ private fun AnnouncementPreferenceItemContent(
                 contentDescription = null,
             )
         },
-    )
-}
-
-@Preview
-@Composable
-private fun InfoPreferenceWithoutLinkPreview() {
-    AnnouncementPreferenceItemContent(
-        text = "Very important announcement",
-        url = "",
-        icon = Icons.Rounded.NewReleases,
-    )
-}
-
-@Preview
-@Composable
-private fun InfoPreferenceWithLinkPreview() {
-    AnnouncementPreferenceItemContent(
-        text = "Very important announcement with a very important link",
-        url = "https://lawnchair.app/",
-        icon = Icons.Rounded.NewReleases,
     )
 }

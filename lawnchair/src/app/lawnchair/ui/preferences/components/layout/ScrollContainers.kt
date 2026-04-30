@@ -15,9 +15,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
@@ -67,18 +71,30 @@ fun PreferenceLazyColumn(
 ) {
     if (LocalInsideNestedScrollView.current) {
         // LazyColumn crashes inside NestedScrollView (unbounded height constraints).
-        // Render all items eagerly in a Column instead. Only screens inside
+        // Render items eagerly in a Column instead. Only screens inside
         // PreferenceScaffold (which uses StretchNestedScrollView) hit this path.
         val scope = remember { EagerLazyListScope() }
         scope.reset()
         scope.content()
+
+        // Render only the first INITIAL_VISIBLE_ITEMS on the first composition so
+        // the initial pass finishes within one frame. Heavy screens (About, Dock,
+        // Search) have 30-50+ items — composing all of them eagerly takes 50-100ms
+        // on a cold process, dropping frames during the navigation enter transition.
+        // LaunchedEffect expands to all items on the next frame after composition
+        // settles; items below the fold aren't visible yet so the user never sees
+        // the expansion.
+        var visibleCount by remember { mutableIntStateOf(INITIAL_VISIBLE_ITEMS) }
+        LaunchedEffect(scope.items.size) {
+            visibleCount = scope.items.size
+        }
 
         Column(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(contentPadding),
         ) {
-            scope.items.forEach { keyed ->
+            scope.items.take(visibleCount).forEach { keyed ->
                 key(keyed.key) {
                     keyed.content()
                 }
@@ -97,6 +113,11 @@ fun PreferenceLazyColumn(
         )
     }
 }
+
+// Number of items composed on the first frame. Enough to fill any phone screen
+// (preference rows are ~56-72dp tall, so 8 covers ~450-580dp). The rest are
+// added by LaunchedEffect on the next frame after the enter transition starts.
+private const val INITIAL_VISIBLE_ITEMS = 8
 
 private class EagerLazyListScope : LazyListScope {
     data class KeyedItem(val key: Any?, val content: @Composable () -> Unit)

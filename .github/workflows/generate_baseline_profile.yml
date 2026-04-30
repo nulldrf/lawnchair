@@ -1,0 +1,54 @@
+name: Generate Baseline Profile
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'lawnchair/src/**/PreferenceScaffold.kt'
+      - 'lawnchair/src/**/ScrollContainers.kt'
+      - 'baseline-profile/src/**'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Generate Baseline Profile
+        run: |
+          ./gradlew generateBaselineProfile \
+            -Pandroid.testoptions.manageddevices.emulator.gpu="swiftshader_indirect" \
+            -Pandroid.experimental.testOptions.managedDevices.emulator.showKernelLogs=true \
+            --stacktrace
+
+      - name: Upload baseline-prof.txt as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-prof
+          path: src/main/baseline-prof.txt
+          if-no-files-found: error

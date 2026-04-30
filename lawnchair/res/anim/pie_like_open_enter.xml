@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~     This file is part of Lawnchair Launcher.
+  ~
+  ~     Licensed under the GNU General Public License v3.
+  -->
+
+<!--
+    Android Pie-like APP ENTER animation when opening an app.
+
+    The app window scales up from 30% to 100% (pivot centre) while fading in.
+    Mirrors the scale/alpha constants from the old
+    LawnchairAppTransitionManagerImpl companion object:
+      APP_OPEN_APP_ENTER_SCALE_FROM = 0.3, _TO = 1.0, _DURATION = 350
+      APP_OPEN_APP_ENTER_ALPHA_FROM = 0.0, _TO = 1.0, _DURATION = 233, _OFFSET = 30
+
+    Note: on Android 12+ cold starts the system SplashScreen API may replace
+    this animation with a splash icon animation. On warm/hot starts (app already
+    in memory) and on Android 11 and below this animation always plays.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false">
+    <scale
+        android:fromXScale="0.3"
+        android:toXScale="1.0"
+        android:fromYScale="0.3"
+        android:toYScale="1.0"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:interpolator="@android:interpolator/decelerate_quad"
+        android:fillBefore="true"
+        android:fillAfter="true"
+        android:duration="350" />
+    <alpha
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0"
+        android:interpolator="@android:interpolator/decelerate_quad"
+        android:fillBefore="true"
+        android:fillAfter="true"
+        android:startOffset="30"
+        android:duration="233" />
+</set>

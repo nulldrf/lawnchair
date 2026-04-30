@@ -18,9 +18,14 @@
 -->
 
 <!--
-    Slide-Up app-open animation.  The app enters by sliding up from below
-    the screen (fromYDelta=110%) while fading in — matching the system
-    task_open transition introduced in Android L.
+    Slide-Up app-open animation. The app enters by sliding up from below the
+    screen (fromYDelta=110%) while fading in.
+
+    FIX: Changed @interpolator/decelerate_quart and @interpolator/decelerate_quint
+    to reference the app-local copies in res/interpolator/ (decelerate_quart.xml
+    and decelerate_quint.xml). The old references without a package prefix were
+    silently failing on Android 14 because those names don't exist in the app's
+    resource table and the animationlib doesn't ship them either.
 -->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:shareInterpolator="false"

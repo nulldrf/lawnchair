@@ -17,8 +17,6 @@
 package app.lawnchair
 
 import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.ActivityOptions
 import android.content.Context
@@ -30,7 +28,6 @@ import android.util.Pair
 import android.view.Display
 import android.view.View
 import android.view.ViewTreeObserver
-import android.view.animation.PathInterpolator
 import android.window.SplashScreen
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -105,6 +102,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         WindowInsetsControllerCompat(window, rootView)
     }
     private val themeProvider by unsafeLazy { ThemeProvider.INSTANCE.get(this) }
+
     private val noStatusBarStateListener = object : StateManager.StateListener<LauncherState> {
         override fun onStateTransitionStart(toState: LauncherState) {
             if (toState is OverviewState) {
@@ -134,7 +132,6 @@ class LawnchairLauncher : QuickstepLauncher() {
                 -> {
                     LawnchairApp.instance.restoreClockInStatusBar()
                 }
-
                 else -> {
                     workspace.updateStatusbarClock()
                 }
@@ -156,8 +153,9 @@ class LawnchairLauncher : QuickstepLauncher() {
     private var hasBackGesture = false
 
     /**
-     * Tracks which app-open animation was most recently used so that
-     * [onResume] can play the correct return transition (PIE / BLINK / FADE).
+     * Tracks the last-used app-open animation type so [onResume] can apply the
+     * correct paired return transition (PIE/BLINK/FADE each have a matching
+     * "close" animation).
      */
     private var lastAppOpenAnimationType: AppOpenAnimationType = AppOpenAnimationType.DEFAULT
 
@@ -185,18 +183,12 @@ class LawnchairLauncher : QuickstepLauncher() {
 
         preferenceManager2.showStatusBar.get().distinctUntilChanged().onEach {
             with(insetsController) {
-                if (it) {
-                    show(WindowInsetsCompat.Type.statusBars())
-                } else {
-                    hide(WindowInsetsCompat.Type.statusBars())
-                }
+                if (it) show(WindowInsetsCompat.Type.statusBars())
+                else hide(WindowInsetsCompat.Type.statusBars())
             }
             with(launcher.stateManager) {
-                if (it) {
-                    removeStateListener(noStatusBarStateListener)
-                } else {
-                    addStateListener(noStatusBarStateListener)
-                }
+                if (it) removeStateListener(noStatusBarStateListener)
+                else addStateListener(noStatusBarStateListener)
             }
         }.launchIn(scope = lifecycleScope)
 
@@ -212,11 +204,8 @@ class LawnchairLauncher : QuickstepLauncher() {
         }
         preferenceManager2.rememberPosition.get().onEach {
             with(launcher.stateManager) {
-                if (it) {
-                    addStateListener(rememberPositionStateListener)
-                } else {
-                    removeStateListener(rememberPositionStateListener)
-                }
+                if (it) addStateListener(rememberPositionStateListener)
+                else removeStateListener(rememberPositionStateListener)
             }
         }.launchIn(scope = lifecycleScope)
 
@@ -250,9 +239,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         colorScheme = themeProvider.colorScheme
 
         showQuickstepWarningIfNecessary()
-
         reloadIconsIfNeeded()
-
         AppDatabase.INSTANCE.get(this).checkpointSync()
     }
 
@@ -264,7 +251,6 @@ class LawnchairLauncher : QuickstepLauncher() {
                 gestureController.handle(config)
             }
         }
-
         super.onNewIntent(intent)
     }
 
@@ -306,13 +292,7 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     fun bindItems(items: List<ItemInfo>, forceAnimateIcons: Boolean) {
         val inflatedItems = items.map { i ->
-            Pair.create(
-                i,
-                itemInflater?.inflateItem(
-                    i,
-                    null,
-                ),
-            )
+            Pair.create(i, itemInflater?.inflateItem(i, null))
         }.toList()
         bindInflatedItems(inflatedItems, if (forceAnimateIcons) AnimatorSet() else null)
     }
@@ -339,7 +319,6 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     override fun showDefaultOptions(x: Float, y: Float) {
         val showWallpaperCarousel = "+carousel" in preferenceManager2.launcherPopupOrder.firstBlocking()
-
         if (showWallpaperCarousel) {
             show<LawnchairLauncher>(
                 this,
@@ -359,17 +338,13 @@ class LawnchairLauncher : QuickstepLauncher() {
         width: Int = 0,
     ): OptionsPopupView<T>? where T : Context?, T : ActivityContext? {
         if (activityContext == null) return null
-
         val isEmpty = WallpaperService.INSTANCE.get(this).getTopWallpapers().isEmpty()
         val layout = if (isEmpty) R.layout.longpress_options_menu else R.layout.wallpaper_options_popup
-
         val popup = activityContext.layoutInflater.inflate(layout, activityContext.dragLayer, false) as OptionsPopupView<T>
         popup.setTargetRect(targetRect)
         popup.setShouldAddArrow(shouldAddArrow)
-
         for (item in items) {
             val deepLayout = if (isEmpty) R.layout.system_shortcut else R.layout.wallpaper_options_popup_item
-
             val view = popup.inflateAndAdd<DeepShortcutView>(deepLayout, popup)
             if (width > 0) view.layoutParams.width = width
             view.iconView.setBackgroundDrawable(item.icon)
@@ -378,7 +353,6 @@ class LawnchairLauncher : QuickstepLauncher() {
             view.setOnLongClickListener(popup)
             popup.mItemMap[view] = item
         }
-
         popup.show()
         return popup
     }
@@ -395,11 +369,8 @@ class LawnchairLauncher : QuickstepLauncher() {
         val callbacks = RunnableList()
         val options = if (Utilities.ATLEAST_Q) {
             LawnchairQuickstepCompat.activityOptionsCompat.makeCustomAnimation(
-                this,
-                0,
-                0,
-                Executors.MAIN_EXECUTOR.handler,
-                null,
+                this, 0, 0,
+                Executors.MAIN_EXECUTOR.handler, null,
             ) {
                 callbacks.executeAllAndDestroy()
             }
@@ -409,29 +380,42 @@ class LawnchairLauncher : QuickstepLauncher() {
         if (Utilities.ATLEAST_T) {
             options.splashScreenStyle = splashScreenStyle
         }
-
         Utilities.allowBGLaunch(options)
         return ActivityOptionsWrapper(options, callbacks)
     }
 
-    // ── App-open animation (backported from Lawnchair 2) ─────────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // App-open animation (backported from Lawnchair 2 + fixed for modern Android)
+    // ═══════════════════════════════════════════════════════════════════════════
     //
-    // getActivityLaunchOptions is the single intercept point for every app-open
-    // gesture (icon tap, shortcut, etc.).  We read the user's preference and
-    // return the matching ActivityOptions, optionally driving a concurrent
-    // launcher-side animator for the PIE and BLINK modes.
+    // KEY DESIGN PRINCIPLE (learned from Android internals):
+    //   makeCustomAnimation(context, enterRes, exitRes) operates at the WINDOW
+    //   COMPOSITOR layer — the window manager applies the animations to the
+    //   entire launcher window (exit) and the entire app window (enter) at the
+    //   SurfaceFlinger level, BEFORE Compose / View drawing happens.
+    //
+    //   This means:
+    //     1. Driving a View-layer ObjectAnimator on dragLayer simultaneously with
+    //        a window-layer animation causes them to FIGHT — the window layer
+    //        wins and the View-layer animator is invisible or causes flicker.
+    //        → REMOVED schedulePieLauncherExitAnimation() and scheduleBlinkLauncherExitAnimation()
+    //
+    //     2. The LAUNCHER EXIT (2nd parameter) always works on all Android versions.
+    //
+    //     3. The APP ENTER (1st parameter) may be replaced by the system SplashScreen
+    //        on Android 12+ cold starts. On warm/hot starts it always shows.
+    //
+    //   Therefore all animations are expressed as pure XML window transitions.
     //
     // Mapping from old ch.deletescape.lawnchair.animations.AnimationType:
-    //   DEFAULT  → passthrough to super (system clip-reveal)
-    //   PIE      → makeCustomAnimation(dummy_anim_enter, dummy_anim_exit)
-    //              + run launcher scale-up/fade-out animator on dragLayer
-    //   REVEAL   → makeClipRevealAnimation from icon bounds
-    //   SLIDE_UP → makeCustomAnimation(task_open_enter, no_anim)
-    //   SCALE_UP → makeScaleUpAnimation from icon bounds
-    //   BLINK    → makeCustomAnimation(blink_open_enter, blink_open_exit)
-    //              + run blink animator on dragLayer
-    //   FADE     → makeCustomAnimation(fade_in_short, no_anim_short)
-    // ─────────────────────────────────────────────────────────────────────────
+    //   DEFAULT  → system clip-reveal (passthrough to super)
+    //   PIE      → XML: launcher scales-up+fades (exit) / app scales-in (enter)
+    //   REVEAL   → ActivityOptions.makeClipRevealAnimation from icon bounds
+    //   SLIDE_UP → XML: task_open_enter (fixed interpolator refs) / no_anim exit
+    //   SCALE_UP → ActivityOptions.makeScaleUpAnimation from icon bounds
+    //   BLINK    → XML: blink_open_enter / blink_open_exit (launcher flashes)
+    //   FADE     → XML: no_anim enter / fade_out_launcher exit (always visible)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     override fun getActivityLaunchOptions(v: View?, item: ItemInfo?): ActivityOptionsWrapper {
         val animationType = preferenceManager2.appOpenAnimation.firstBlocking()
@@ -441,22 +425,34 @@ class LawnchairLauncher : QuickstepLauncher() {
             AppOpenAnimationType.DEFAULT -> getActivityLaunchOptionsDefault(v)
 
             AppOpenAnimationType.PIE -> {
-                // Play a Pie-like launcher exit (scale up + fade) and suppress the
-                // system transition with dummy anims so only our animator is visible.
-                schedulePieLauncherExitAnimation()
+                // ── Pie (Android 9 style) ────────────────────────────────────
+                // EXIT  (launcher): pie_like_open_exit.xml
+                //         Launcher scales from 1.0→1.5 and fades from 1→0.
+                //         This is the hallmark Pie "home screen zooms away" feel.
+                // ENTER (app):      pie_like_open_enter.xml
+                //         App scales from 0.3→1.0 and fades from 0→1.
+                //         May be replaced by SplashScreen on Android 12+ cold start.
+                //
+                // REMOVED: schedulePieLauncherExitAnimation() — a View-layer
+                // ObjectAnimator on dragLayer is invisible when the window layer
+                // is already running makeCustomAnimation, causing broken animation
+                // on all Android versions.
                 val options = ActivityOptions.makeCustomAnimation(
                     this,
-                    R.anim.dummy_anim_enter,
-                    R.anim.dummy_anim_exit,
+                    R.anim.pie_like_open_enter,
+                    R.anim.pie_like_open_exit,
                 )
                 Utilities.allowBGLaunch(options)
                 ActivityOptionsWrapper(options, RunnableList())
             }
 
             AppOpenAnimationType.REVEAL -> {
+                // ── Clip Reveal ──────────────────────────────────────────────
                 // Circular clip-reveal expanding from the tapped icon bounds.
+                // makeClipRevealAnimation operates at the window compositor level
+                // so it works on all Android versions including 14.
                 val bounds = getIconBoundsForView(v)
-                val options = if (bounds != null) {
+                val options = if (bounds != null && v != null) {
                     ActivityOptions.makeClipRevealAnimation(
                         v,
                         bounds.left,
@@ -465,7 +461,8 @@ class LawnchairLauncher : QuickstepLauncher() {
                         bounds.height(),
                     )
                 } else {
-                    // Fallback if we can't resolve icon bounds.
+                    // Fallback when icon bounds can't be resolved (e.g. launched
+                    // from a shortcut without a visible icon).
                     ActivityOptions.makeBasic()
                 }
                 Utilities.allowBGLaunch(options)
@@ -473,7 +470,17 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
 
             AppOpenAnimationType.SLIDE_UP -> {
+                // ── Slide Up ─────────────────────────────────────────────────
                 // App slides in from below the screen.
+                // EXIT (launcher): no_anim — stays put while app slides up over it.
+                // ENTER (app):     task_open_enter.xml
+                //
+                // FIX: task_open_enter.xml previously referenced
+                // @interpolator/decelerate_quart and @interpolator/decelerate_quint
+                // without the @android: prefix. Those names don't exist in the
+                // app's own resource table (animationlib ships only emphasized_*
+                // and standard_*). Added decelerate_quart.xml and decelerate_quint.xml
+                // to res/interpolator/ so the references resolve correctly.
                 val options = ActivityOptions.makeCustomAnimation(
                     this,
                     R.anim.task_open_enter,
@@ -484,7 +491,9 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
 
             AppOpenAnimationType.SCALE_UP -> {
-                // Scale from the icon position — system makeScaleUpAnimation.
+                // ── Scale Up ─────────────────────────────────────────────────
+                // System makeScaleUpAnimation — operates at compositor level,
+                // reliable on all Android versions.
                 val bounds = getIconBoundsForView(v)
                 val options = if (bounds != null && v != null) {
                     ActivityOptions.makeScaleUpAnimation(
@@ -502,8 +511,14 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
 
             AppOpenAnimationType.BLINK -> {
-                // Three rapid blink flashes on the launcher then app appears.
-                scheduleBlinkLauncherExitAnimation()
+                // ── Blink ────────────────────────────────────────────────────
+                // EXIT  (launcher): blink_open_exit.xml — three rapid alpha flashes.
+                // ENTER (app):      blink_open_enter.xml — stays invisible, then snaps.
+                //
+                // REMOVED: scheduleBlinkLauncherExitAnimation() — a View-layer
+                // alpha ValueAnimator on dragLayer conflicts with the window-layer
+                // blink_open_exit XML, causing double-flash and visual glitches.
+                // The XML alone produces the correct blink effect.
                 val options = ActivityOptions.makeCustomAnimation(
                     this,
                     R.anim.blink_open_enter,
@@ -514,11 +529,20 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
 
             AppOpenAnimationType.FADE -> {
-                // Simple cross-fade.
+                // ── Fade ─────────────────────────────────────────────────────
+                // EXIT  (launcher): fade_out_launcher.xml — launcher fades to 0.
+                // ENTER (app):      no_anim — let system/splash handle app appearance.
+                //
+                // FIX: The previous implementation put the fade on the APP ENTER
+                // side (fade_in_short.xml / no_anim_short exit). Android 12+
+                // SplashScreen overrides app-enter animations on cold starts, making
+                // FADE indistinguishable from DEFAULT.  Putting the fade on the
+                // LAUNCHER EXIT side bypasses SplashScreen entirely — the window
+                // manager always applies the launcher exit animation.
                 val options = ActivityOptions.makeCustomAnimation(
                     this,
-                    R.anim.fade_in_short,
-                    R.anim.no_anim_short,
+                    R.anim.no_anim,
+                    R.anim.fade_out_launcher,
                 )
                 Utilities.allowBGLaunch(options)
                 ActivityOptionsWrapper(options, RunnableList())
@@ -527,10 +551,11 @@ class LawnchairLauncher : QuickstepLauncher() {
     }
 
     /**
-     * Resolve the pixel-space bounds of a [BubbleTextView]'s icon (or the full
-     * view rect for any other view type).  Returns null when [v] is null.
+     * Resolves the pixel-space icon bounds from a [BubbleTextView]'s drawable
+     * (or the full view rect for any other view type).
      *
-     * Mirrors getBounds() in the old AnimationType base class.
+     * Matches getBounds() from the old Lawnchair 2 AnimationType base class.
+     * Returns null when [v] is null so callers can fall back gracefully.
      */
     private fun getIconBoundsForView(v: View?): android.graphics.Rect? {
         if (v == null) return null
@@ -551,105 +576,27 @@ class LawnchairLauncher : QuickstepLauncher() {
         return android.graphics.Rect(left, top, left + width, top + height)
     }
 
-    /**
-     * Android Pie-style launcher exit animation.
-     *
-     * The dragLayer scales from 1.0 → 1.5 (Pie "zoom-out" effect) while
-     * fading from fully opaque to transparent over ~250 ms. This runs in
-     * parallel with the dummy_anim_exit window transition so only the
-     * launcher-driven ObjectAnimators are visible.
-     *
-     * Constants mirror the old [LawnchairAppTransitionManagerImpl] companion:
-     *   APP_OPEN_HOME_EXIT_SCALE_FROM = 1.0, _TO = 1.5, _DURATION = 250
-     *   APP_OPEN_HOME_EXIT_ALPHA_FROM = 1.0, _TO = 0.0, _DURATION = 250
-     */
-    private fun schedulePieLauncherExitAnimation() {
-        val layer = dragLayer ?: return
-
-        // Pivot on the centre of the screen — same as old resetPivot() when
-        // iconBounds is null (no specific icon target in Pie-emulated mode).
-        layer.pivotX = layer.width / 2f
-        layer.pivotY = layer.height / 2f
-
-        val exitScaleInterp = PathInterpolator(0.2f, 0.5f, 0.2f, 1.0f)
-        val exitAlphaInterp = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
-        val duration = 250L
-
-        val scaleAnim = ObjectAnimator.ofFloat(layer, View.SCALE_X, 1.0f, 1.5f).apply {
-            this.duration = duration
-            interpolator = exitScaleInterp
-        }
-        val scaleAnimY = ObjectAnimator.ofFloat(layer, View.SCALE_Y, 1.0f, 1.5f).apply {
-            this.duration = duration
-            interpolator = exitScaleInterp
-        }
-        val alphaAnim = ObjectAnimator.ofFloat(layer, View.ALPHA, 1.0f, 0.0f).apply {
-            this.duration = duration
-            interpolator = exitAlphaInterp
-        }
-
-        AnimatorSet().apply {
-            playTogether(scaleAnim, scaleAnimY, alphaAnim)
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    // Reset so the launcher is visible when it resumes.
-                    layer.scaleX = 1.0f
-                    layer.scaleY = 1.0f
-                    layer.alpha = 1.0f
-                }
-            })
-            start()
-        }
-    }
-
-    /**
-     * Blink launcher exit animation — three rapid alpha flashes over ~400 ms.
-     *
-     * The dragLayer flashes on/off three times so the user perceives a
-     * "blink" before the app window appears.  The system's blink_open_exit
-     * animation runs in parallel but on the Window layer, so this dragLayer
-     * animator ensures the Compose / View hierarchy also flashes.
-     */
-    private fun scheduleBlinkLauncherExitAnimation() {
-        val layer = dragLayer ?: return
-
-        // Total duration matches blink_open_enter startOffset (360 ms) + its
-        // own duration (40 ms) = 400 ms.
-        val blinkAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 400
-            addUpdateListener { anim ->
-                val t = anim.animatedFraction
-                // Map time into 5 equal bands: off-on-off-on-off
-                layer.alpha = when {
-                    t < 0.2f -> 1.0f  // visible
-                    t < 0.4f -> 0.0f  // flash 1 off
-                    t < 0.6f -> 1.0f  // back on
-                    t < 0.8f -> 0.0f  // flash 2 off
-                    else     -> 0.0f  // final off — app window takes over
-                }
-            }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    layer.alpha = 1.0f
-                }
-            })
-        }
-        blinkAnimator.start()
-    }
-
-    // ── onResume: play return transition for PIE / BLINK / FADE ─────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // onResume — apply paired return transition
+    // ═══════════════════════════════════════════════════════════════════════════
     //
-    // When the user presses Back from an app and the launcher resumes, we need
-    // to play the matching return animation.  The old code called
-    // overridePendingTransition() from AnimationType.overrideResumeAnimation().
-    // We replicate that here using the same anim resources.
-    // ─────────────────────────────────────────────────────────────────────────
+    // When the user presses Back from an app and the launcher resumes, the system
+    // needs to know what animation to use for the return journey.
+    // overridePendingTransition() (deprecated in API 34 but still functional)
+    // sets the enter/exit pair for the NEXT activity transition, i.e. the one
+    // triggered by the Back press that surfaces the launcher.
+    //
+    // Mirrors AnimationType.overrideResumeAnimation() from the old codebase:
+    //   PIE   → pie_like_close_enter / pie_like_close_exit
+    //   BLINK → blink_close_enter   / blink_close_exit
+    //   FADE  → no_anim_short       / fade_out_short
+    //   others → no override (system handles the return)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     override fun onResume() {
         super.onResume()
         restartIfPending()
 
-        // Apply the return-to-launcher transition that matches the launch animation.
         applyResumeTransitionForAnimationType(lastAppOpenAnimationType)
 
         if (iconPackSwitchPending) {
@@ -659,13 +606,9 @@ class LawnchairLauncher : QuickstepLauncher() {
         dragLayer.viewTreeObserver.addOnDrawListener(
             object : ViewTreeObserver.OnDrawListener {
                 private var handled = false
-
                 override fun onDraw() {
-                    if (handled) {
-                        return
-                    }
+                    if (handled) return
                     handled = true
-
                     dragLayer.post {
                         dragLayer.viewTreeObserver.removeOnDrawListener(this)
                     }
@@ -677,43 +620,36 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     /**
      * Applies [Activity.overridePendingTransition] with the correct pair of
-     * enter/exit animations that match the last app-open animation type.
+     * enter/exit XML animations that mirror the opening animation used to
+     * launch the app.
      *
-     * Mirrors AnimationType.overrideResumeAnimation() from the old codebase:
-     *   PIE      → pie_like_close_enter / pie_like_close_exit
-     *   BLINK    → blink_close_enter / blink_close_exit
-     *   FADE     → no_anim_short / fade_out_short
-     *   others   → no override (system handles it)
+     * Called from [onResume] so the transition is set before the system
+     * commits the window swap.
      */
+    @Suppress("DEPRECATION") // overridePendingTransition still works on API 34
     private fun applyResumeTransitionForAnimationType(type: AppOpenAnimationType) {
         when (type) {
-            AppOpenAnimationType.PIE -> {
-                @Suppress("DEPRECATION")
-                overridePendingTransition(
-                    R.anim.pie_like_close_enter,
-                    R.anim.pie_like_close_exit,
-                )
-            }
-            AppOpenAnimationType.BLINK -> {
-                @Suppress("DEPRECATION")
-                overridePendingTransition(
-                    R.anim.blink_close_enter,
-                    R.anim.blink_close_exit,
-                )
-            }
-            AppOpenAnimationType.FADE -> {
-                @Suppress("DEPRECATION")
-                overridePendingTransition(
-                    R.anim.no_anim_short,
-                    R.anim.fade_out_short,
-                )
-            }
-            // DEFAULT, REVEAL, SLIDE_UP, SCALE_UP — system handles the return transition.
+            AppOpenAnimationType.PIE -> overridePendingTransition(
+                R.anim.pie_like_close_enter,
+                R.anim.pie_like_close_exit,
+            )
+            AppOpenAnimationType.BLINK -> overridePendingTransition(
+                R.anim.blink_close_enter,
+                R.anim.blink_close_exit,
+            )
+            AppOpenAnimationType.FADE -> overridePendingTransition(
+                R.anim.no_anim_short,
+                R.anim.fade_out_short,
+            )
+            // DEFAULT, REVEAL, SLIDE_UP, SCALE_UP — system handles the return.
             else -> Unit
         }
     }
 
-    // ── Fallback launcher-options launch path (no icon view) ─────────────────
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Default launch options (clip-reveal from icon, used for DEFAULT mode and
+    // as fallback when we can't resolve ActivityOptions from the user's choice)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     private fun getActivityLaunchOptionsDefault(v: View?): ActivityOptionsWrapper {
         var left = 0
@@ -731,20 +667,14 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
         }
         val options = Utilities.allowBGLaunch(
-            ActivityOptions.makeClipRevealAnimation(
-                v,
-                left,
-                top,
-                width,
-                height,
-            ),
+            ActivityOptions.makeClipRevealAnimation(v, left, top, width, height),
         )
         if (Utilities.ATLEAST_T) {
             options.splashScreenStyle = SplashScreen.SPLASH_SCREEN_STYLE_ICON
         }
-        options.launchDisplayId = if (v?.display != null) v.display.displayId else Display.DEFAULT_DISPLAY
-        val callback = RunnableList()
-        return ActivityOptionsWrapper(options, callback)
+        options.launchDisplayId =
+            if (v?.display != null) v.display.displayId else Display.DEFAULT_DISPLAY
+        return ActivityOptionsWrapper(options, RunnableList())
     }
 
     override fun onDestroy() {
@@ -755,27 +685,21 @@ class LawnchairLauncher : QuickstepLauncher() {
     override fun getDefaultOverlay(): LauncherOverlayManager = defaultOverlay
 
     fun recreateIfNotScheduled() {
-        if (sRestartFlags == 0) {
-            recreate()
-        }
+        if (sRestartFlags == 0) recreate()
     }
 
-    // ── Icon pack switch overlay ─────────────────────────────────────────────
+    // ── Icon pack switch loading overlay ────────────────────────────────────
 
     private var iconPackOverlay: android.view.View? = null
 
     fun showIconPackSwitchOverlay() {
         if (iconPackOverlay != null) return
-
         val density = resources.displayMetrics.density
-
         val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
         val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
         ta.recycle()
-
         val containerSize = (72 * density).toInt()
-        val spinnerSize  = (40 * density).toInt()
-
+        val spinnerSize = (40 * density).toInt()
         val containerBg = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.OVAL
             setColor(android.graphics.Color.argb(
@@ -785,34 +709,25 @@ class LawnchairLauncher : QuickstepLauncher() {
                 android.graphics.Color.blue(primaryColor),
             ))
         }
-
-        val container = android.widget.FrameLayout(this).apply {
-            background = containerBg
-        }
-
-        val spinner = android.widget.ProgressBar(this, null,
-            android.R.attr.progressBarStyle).apply {
+        val container = android.widget.FrameLayout(this).apply { background = containerBg }
+        val spinner = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyle).apply {
             isIndeterminate = true
-            indeterminateTintList =
-                android.content.res.ColorStateList.valueOf(primaryColor)
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(primaryColor)
         }
-        container.addView(spinner, android.widget.FrameLayout.LayoutParams(
-            spinnerSize, spinnerSize).apply {
+        container.addView(spinner, android.widget.FrameLayout.LayoutParams(spinnerSize, spinnerSize).apply {
             gravity = android.view.Gravity.CENTER
         })
-
         val scrim = android.widget.FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))
         }
-        scrim.addView(container, android.widget.FrameLayout.LayoutParams(
-            containerSize, containerSize).apply {
+        scrim.addView(container, android.widget.FrameLayout.LayoutParams(containerSize, containerSize).apply {
             gravity = android.view.Gravity.CENTER
         })
-
         scrim.alpha = 0f
         dragLayer.addView(scrim, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-            android.widget.FrameLayout.LayoutParams.MATCH_PARENT))
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+        ))
         scrim.animate().alpha(1f).setDuration(200).start()
         iconPackOverlay = scrim
     }
@@ -830,7 +745,6 @@ class LawnchairLauncher : QuickstepLauncher() {
     private fun restartIfPending() {
         when {
             sRestartFlags and FLAG_RESTART != 0 -> lawnchairApp.restart(false)
-
             sRestartFlags and FLAG_RECREATE != 0 -> {
                 sRestartFlags = 0
                 recreate()

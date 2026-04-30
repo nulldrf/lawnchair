@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Equivalent to android:interpolator/decelerate_quart (factor=2 DecelerateInterpolator).
+    Referenced by task_open_enter.xml for the Slide Up animation.
+    Added to the app's own res/interpolator/ so it is available without the
+    @android: prefix, ensuring reliable inflation on all API levels.
+-->
+<decelerateInterpolator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:factor="2.0" />

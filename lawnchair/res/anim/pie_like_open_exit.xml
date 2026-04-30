@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~     This file is part of Lawnchair Launcher.
+  ~
+  ~     Licensed under the GNU General Public License v3.
+  -->
+
+<!--
+    Android Pie-like LAUNCHER EXIT animation when opening an app.
+
+    The launcher window scales up (1.0 → 1.5, pivot centre) and fades out
+    simultaneously, giving the "home screen zooms away" effect from Pie.
+    This runs at the Window compositor layer via ActivityOptions.makeCustomAnimation,
+    which is why it works reliably on all Android versions — unlike a View-layer
+    ObjectAnimator that gets occluded before it is visible.
+
+    Duration: 300ms — long enough to be perceptible, short enough to feel snappy.
+    Interpolator: decelerate so the zoom-out reads as the launcher "launching" the app.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false">
+    <scale
+        android:fromXScale="1.0"
+        android:toXScale="1.5"
+        android:fromYScale="1.0"
+        android:toYScale="1.5"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:interpolator="@android:interpolator/decelerate_quad"
+        android:fillAfter="true"
+        android:duration="300" />
+    <alpha
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0"
+        android:interpolator="@android:interpolator/decelerate_quad"
+        android:fillAfter="true"
+        android:duration="250" />
+</set>

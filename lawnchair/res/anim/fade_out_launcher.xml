@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher EXIT animation for the Fade app-open mode.
+
+    FIX: The previous implementation put the fade on the APP ENTER side
+    (fade_in_short.xml), which is overridden by Android 12+ SplashScreen on
+    cold starts and therefore had no visible effect.  Putting the fade on the
+    LAUNCHER EXIT side means the window manager always applies it regardless
+    of what the app's splash screen does.
+
+    250ms fade-out with accelerate curve (feels like the launcher "lets go").
+-->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromAlpha="1.0"
+    android:toAlpha="0.0"
+    android:interpolator="@android:interpolator/accelerate_quad"
+    android:fillAfter="true"
+    android:duration="250" />

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Blink open exit — the launcher side of the blink animation.
+    Three rapid alpha flashes (on-off-on-off-on) over ~400 ms,
+    ending invisible so the app can take over.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- flash 1 on -->
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.0"
+        android:startOffset="0"   android:duration="80" />
+    <!-- flash 1 off -->
+    <alpha android:fromAlpha="0.0" android:toAlpha="1.0"
+        android:startOffset="80"  android:duration="80" />
+    <!-- flash 2 on -->
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.0"
+        android:startOffset="160" android:duration="80" />
+    <!-- flash 2 off -->
+    <alpha android:fromAlpha="0.0" android:toAlpha="1.0"
+        android:startOffset="240" android:duration="80" />
+    <!-- final off — let app appear -->
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.0"
+        android:startOffset="320" android:duration="80" />
+</set>

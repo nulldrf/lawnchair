@@ -52,6 +52,7 @@ import app.lawnchair.ui.popup.toOptionOrderString
 import app.lawnchair.ui.preferences.components.HiddenAppsInSearch
 import app.lawnchair.ui.preferences.data.liveinfo.LiveInformationManager
 import app.lawnchair.util.kotlinxJson
+import app.lawnchair.views.overlay.AppOpenAnimationType
 import app.lawnchair.views.overlay.FullScreenOverlayMode
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.InvariantDeviceProfile
@@ -531,12 +532,35 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = context.resources.getBoolean(R.bool.config_default_enable_fuzzy_search),
     )
 
+    // ── App-close / GNC overlay ───────────────────────────────────────────────
     val closingAppOverlay = preference(
         key = stringPreferencesKey(name = "closing_app_overlay"),
         defaultValue = FullScreenOverlayMode.fromValue(context.resources.getString(R.string.config_default_overlay)),
         parse = { FullScreenOverlayMode.fromValue(it) },
         save = { it.value },
         onSet = { reloadHelper.reloadGrid() },
+    )
+
+    // ── App-open / launch animation (backported from Lawnchair 2) ─────────────
+    /**
+     * Controls the [ActivityOptions] and optional launcher-side animation used when
+     * the user taps an app icon to launch it.  Mirrors the old `pref_animationType`
+     * preference from ch.deletescape.lawnchair.animations.
+     *
+     *  DEFAULT  → system clip-reveal (no change from base Launcher3 behaviour)
+     *  PIE      → Android 9 Pie-style: launcher zooms out while app zooms in
+     *  REVEAL   → circular clip-reveal from icon bounds
+     *  SLIDE_UP → app slides in from the bottom edge (task_open_enter)
+     *  SCALE_UP → app scales up from the icon position
+     *  BLINK    → quick blink flash then app appears
+     *  FADE     → simple cross-fade
+     */
+    val appOpenAnimation = preference(
+        key = stringPreferencesKey(name = "app_open_animation"),
+        defaultValue = AppOpenAnimationType.DEFAULT,
+        parse = { AppOpenAnimationType.fromValue(it) },
+        save = { it.value },
+        // No launcher restart needed — ActivityOptions are resolved at launch time.
     )
 
     val matchHotseatQsbStyle = preference(

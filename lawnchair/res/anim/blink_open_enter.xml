@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Blink open enter — the app side of the blink animation.
+    Stays invisible while the launcher does three quick flashes,
+    then snaps to full opacity.
+-->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromAlpha="0.0"
+    android:toAlpha="1.0"
+    android:startOffset="360"
+    android:duration="40" />

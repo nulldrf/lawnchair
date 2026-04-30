@@ -17,6 +17,9 @@
 package app.lawnchair
 
 import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.app.Activity
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
@@ -27,6 +30,7 @@ import android.util.Pair
 import android.view.Display
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.animation.PathInterpolator
 import android.window.SplashScreen
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -50,6 +54,7 @@ import app.lawnchair.ui.popup.LawnchairShortcut
 import app.lawnchair.util.getThemedIconPacksInstalled
 import app.lawnchair.util.unsafeLazy
 import app.lawnchair.views.LawnchairFloatingSurfaceView
+import app.lawnchair.views.overlay.AppOpenAnimationType
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.BaseActivity
 import com.android.launcher3.BubbleTextView
@@ -150,6 +155,12 @@ class LawnchairLauncher : QuickstepLauncher() {
     private lateinit var colorScheme: ColorScheme
     private var hasBackGesture = false
 
+    /**
+     * Tracks which app-open animation was most recently used so that
+     * [onResume] can play the correct return transition (PIE / BLINK / FADE).
+     */
+    private var lastAppOpenAnimationType: AppOpenAnimationType = AppOpenAnimationType.DEFAULT
+
     val gestureController by unsafeLazy { GestureController(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -195,7 +206,6 @@ class LawnchairLauncher : QuickstepLauncher() {
                     addStateListener(statusBarClockListener)
                 } else {
                     removeStateListener(statusBarClockListener)
-                    // Make sure status bar clock is restored when the preference is toggled off
                     LawnchairApp.instance.restoreClockInStatusBar()
                 }
             }
@@ -230,7 +240,6 @@ class LawnchairLauncher : QuickstepLauncher() {
         LauncherOptionsPopup.restoreMissingPopupOptions(launcher)
         LauncherOptionsPopup.migrateLegacyPreferences(launcher)
 
-        // Handle update from version 12 Alpha 4 to version 12 Alpha 5.
         if (
             prefs.themedIcons.get() &&
             packageManager.getThemedIconPacksInstalled(this).isEmpty()
@@ -296,7 +305,6 @@ class LawnchairLauncher : QuickstepLauncher() {
     }
 
     fun bindItems(items: List<ItemInfo>, forceAnimateIcons: Boolean) {
-        // pE-TODO(QPR1): Note: null is modelWriter + bindItems override something
         val inflatedItems = items.map { i ->
             Pair.create(
                 i,
@@ -406,53 +414,244 @@ class LawnchairLauncher : QuickstepLauncher() {
         return ActivityOptionsWrapper(options, callbacks)
     }
 
+    // ── App-open animation (backported from Lawnchair 2) ─────────────────────
+    //
+    // getActivityLaunchOptions is the single intercept point for every app-open
+    // gesture (icon tap, shortcut, etc.).  We read the user's preference and
+    // return the matching ActivityOptions, optionally driving a concurrent
+    // launcher-side animator for the PIE and BLINK modes.
+    //
+    // Mapping from old ch.deletescape.lawnchair.animations.AnimationType:
+    //   DEFAULT  → passthrough to super (system clip-reveal)
+    //   PIE      → makeCustomAnimation(dummy_anim_enter, dummy_anim_exit)
+    //              + run launcher scale-up/fade-out animator on dragLayer
+    //   REVEAL   → makeClipRevealAnimation from icon bounds
+    //   SLIDE_UP → makeCustomAnimation(task_open_enter, no_anim)
+    //   SCALE_UP → makeScaleUpAnimation from icon bounds
+    //   BLINK    → makeCustomAnimation(blink_open_enter, blink_open_exit)
+    //              + run blink animator on dragLayer
+    //   FADE     → makeCustomAnimation(fade_in_short, no_anim_short)
+    // ─────────────────────────────────────────────────────────────────────────
+
     override fun getActivityLaunchOptions(v: View?, item: ItemInfo?): ActivityOptionsWrapper {
-        return runCatching {
-            super.getActivityLaunchOptions(v, item)
-        }.getOrElse {
-            getActivityLaunchOptionsDefault(v)
+        val animationType = preferenceManager2.appOpenAnimation.firstBlocking()
+        lastAppOpenAnimationType = animationType
+
+        return when (animationType) {
+            AppOpenAnimationType.DEFAULT -> getActivityLaunchOptionsDefault(v)
+
+            AppOpenAnimationType.PIE -> {
+                // Play a Pie-like launcher exit (scale up + fade) and suppress the
+                // system transition with dummy anims so only our animator is visible.
+                schedulePieLauncherExitAnimation()
+                val options = ActivityOptions.makeCustomAnimation(
+                    this,
+                    R.anim.dummy_anim_enter,
+                    R.anim.dummy_anim_exit,
+                )
+                Utilities.allowBGLaunch(options)
+                ActivityOptionsWrapper(options, RunnableList())
+            }
+
+            AppOpenAnimationType.REVEAL -> {
+                // Circular clip-reveal expanding from the tapped icon bounds.
+                val bounds = getIconBoundsForView(v)
+                val options = if (bounds != null) {
+                    ActivityOptions.makeClipRevealAnimation(
+                        v,
+                        bounds.left,
+                        bounds.top,
+                        bounds.width(),
+                        bounds.height(),
+                    )
+                } else {
+                    // Fallback if we can't resolve icon bounds.
+                    ActivityOptions.makeBasic()
+                }
+                Utilities.allowBGLaunch(options)
+                ActivityOptionsWrapper(options, RunnableList())
+            }
+
+            AppOpenAnimationType.SLIDE_UP -> {
+                // App slides in from below the screen.
+                val options = ActivityOptions.makeCustomAnimation(
+                    this,
+                    R.anim.task_open_enter,
+                    R.anim.no_anim,
+                )
+                Utilities.allowBGLaunch(options)
+                ActivityOptionsWrapper(options, RunnableList())
+            }
+
+            AppOpenAnimationType.SCALE_UP -> {
+                // Scale from the icon position — system makeScaleUpAnimation.
+                val bounds = getIconBoundsForView(v)
+                val options = if (bounds != null && v != null) {
+                    ActivityOptions.makeScaleUpAnimation(
+                        v,
+                        bounds.left,
+                        bounds.top,
+                        bounds.width(),
+                        bounds.height(),
+                    )
+                } else {
+                    ActivityOptions.makeBasic()
+                }
+                Utilities.allowBGLaunch(options)
+                ActivityOptionsWrapper(options, RunnableList())
+            }
+
+            AppOpenAnimationType.BLINK -> {
+                // Three rapid blink flashes on the launcher then app appears.
+                scheduleBlinkLauncherExitAnimation()
+                val options = ActivityOptions.makeCustomAnimation(
+                    this,
+                    R.anim.blink_open_enter,
+                    R.anim.blink_open_exit,
+                )
+                Utilities.allowBGLaunch(options)
+                ActivityOptionsWrapper(options, RunnableList())
+            }
+
+            AppOpenAnimationType.FADE -> {
+                // Simple cross-fade.
+                val options = ActivityOptions.makeCustomAnimation(
+                    this,
+                    R.anim.fade_in_short,
+                    R.anim.no_anim_short,
+                )
+                Utilities.allowBGLaunch(options)
+                ActivityOptionsWrapper(options, RunnableList())
+            }
         }
     }
 
-    private fun getActivityLaunchOptionsDefault(v: View?): ActivityOptionsWrapper {
+    /**
+     * Resolve the pixel-space bounds of a [BubbleTextView]'s icon (or the full
+     * view rect for any other view type).  Returns null when [v] is null.
+     *
+     * Mirrors getBounds() in the old AnimationType base class.
+     */
+    private fun getIconBoundsForView(v: View?): android.graphics.Rect? {
+        if (v == null) return null
         var left = 0
         var top = 0
-        var width = v!!.measuredWidth
+        var width = v.measuredWidth
         var height = v.measuredHeight
         if (v is BubbleTextView) {
-            // Launch from center of icon, not entire view
             val icon: Drawable? = v.icon
             if (icon != null) {
-                val bounds = icon.bounds
-                left = (width - bounds.width()) / 2
+                val b = icon.bounds
+                left = (width - b.width()) / 2
                 top = v.paddingTop
-                width = bounds.width()
-                height = bounds.height()
+                width = b.width()
+                height = b.height()
             }
         }
-        val options = Utilities.allowBGLaunch(
-            ActivityOptions.makeClipRevealAnimation(
-                v,
-                left,
-                top,
-                width,
-                height,
-            ),
-        )
-        if (Utilities.ATLEAST_T) {
-            options.splashScreenStyle = SplashScreen.SPLASH_SCREEN_STYLE_ICON
-        }
-        options.launchDisplayId = if (v.display != null) v.display.displayId else Display.DEFAULT_DISPLAY
-        val callback = RunnableList()
-        return ActivityOptionsWrapper(options, callback)
+        return android.graphics.Rect(left, top, left + width, top + height)
     }
+
+    /**
+     * Android Pie-style launcher exit animation.
+     *
+     * The dragLayer scales from 1.0 → 1.5 (Pie "zoom-out" effect) while
+     * fading from fully opaque to transparent over ~250 ms. This runs in
+     * parallel with the dummy_anim_exit window transition so only the
+     * launcher-driven ObjectAnimators are visible.
+     *
+     * Constants mirror the old [LawnchairAppTransitionManagerImpl] companion:
+     *   APP_OPEN_HOME_EXIT_SCALE_FROM = 1.0, _TO = 1.5, _DURATION = 250
+     *   APP_OPEN_HOME_EXIT_ALPHA_FROM = 1.0, _TO = 0.0, _DURATION = 250
+     */
+    private fun schedulePieLauncherExitAnimation() {
+        val layer = dragLayer ?: return
+
+        // Pivot on the centre of the screen — same as old resetPivot() when
+        // iconBounds is null (no specific icon target in Pie-emulated mode).
+        layer.pivotX = layer.width / 2f
+        layer.pivotY = layer.height / 2f
+
+        val exitScaleInterp = PathInterpolator(0.2f, 0.5f, 0.2f, 1.0f)
+        val exitAlphaInterp = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
+        val duration = 250L
+
+        val scaleAnim = ObjectAnimator.ofFloat(layer, View.SCALE_X, 1.0f, 1.5f).apply {
+            this.duration = duration
+            interpolator = exitScaleInterp
+        }
+        val scaleAnimY = ObjectAnimator.ofFloat(layer, View.SCALE_Y, 1.0f, 1.5f).apply {
+            this.duration = duration
+            interpolator = exitScaleInterp
+        }
+        val alphaAnim = ObjectAnimator.ofFloat(layer, View.ALPHA, 1.0f, 0.0f).apply {
+            this.duration = duration
+            interpolator = exitAlphaInterp
+        }
+
+        AnimatorSet().apply {
+            playTogether(scaleAnim, scaleAnimY, alphaAnim)
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    // Reset so the launcher is visible when it resumes.
+                    layer.scaleX = 1.0f
+                    layer.scaleY = 1.0f
+                    layer.alpha = 1.0f
+                }
+            })
+            start()
+        }
+    }
+
+    /**
+     * Blink launcher exit animation — three rapid alpha flashes over ~400 ms.
+     *
+     * The dragLayer flashes on/off three times so the user perceives a
+     * "blink" before the app window appears.  The system's blink_open_exit
+     * animation runs in parallel but on the Window layer, so this dragLayer
+     * animator ensures the Compose / View hierarchy also flashes.
+     */
+    private fun scheduleBlinkLauncherExitAnimation() {
+        val layer = dragLayer ?: return
+
+        // Total duration matches blink_open_enter startOffset (360 ms) + its
+        // own duration (40 ms) = 400 ms.
+        val blinkAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 400
+            addUpdateListener { anim ->
+                val t = anim.animatedFraction
+                // Map time into 5 equal bands: off-on-off-on-off
+                layer.alpha = when {
+                    t < 0.2f -> 1.0f  // visible
+                    t < 0.4f -> 0.0f  // flash 1 off
+                    t < 0.6f -> 1.0f  // back on
+                    t < 0.8f -> 0.0f  // flash 2 off
+                    else     -> 0.0f  // final off — app window takes over
+                }
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    layer.alpha = 1.0f
+                }
+            })
+        }
+        blinkAnimator.start()
+    }
+
+    // ── onResume: play return transition for PIE / BLINK / FADE ─────────────
+    //
+    // When the user presses Back from an app and the launcher resumes, we need
+    // to play the matching return animation.  The old code called
+    // overridePendingTransition() from AnimationType.overrideResumeAnimation().
+    // We replicate that here using the same anim resources.
+    // ─────────────────────────────────────────────────────────────────────────
 
     override fun onResume() {
         super.onResume()
         restartIfPending()
 
-        // If an icon pack switch was triggered while in background, show overlay now.
-        // Dismiss is posted by LawnchairIconProvider after MODEL + MAIN queues drain.
+        // Apply the return-to-launcher transition that matches the launch animation.
+        applyResumeTransitionForAnimationType(lastAppOpenAnimationType)
+
         if (iconPackSwitchPending) {
             showIconPackSwitchOverlay()
         }
@@ -476,9 +675,80 @@ class LawnchairLauncher : QuickstepLauncher() {
         )
     }
 
+    /**
+     * Applies [Activity.overridePendingTransition] with the correct pair of
+     * enter/exit animations that match the last app-open animation type.
+     *
+     * Mirrors AnimationType.overrideResumeAnimation() from the old codebase:
+     *   PIE      → pie_like_close_enter / pie_like_close_exit
+     *   BLINK    → blink_close_enter / blink_close_exit
+     *   FADE     → no_anim_short / fade_out_short
+     *   others   → no override (system handles it)
+     */
+    private fun applyResumeTransitionForAnimationType(type: AppOpenAnimationType) {
+        when (type) {
+            AppOpenAnimationType.PIE -> {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(
+                    R.anim.pie_like_close_enter,
+                    R.anim.pie_like_close_exit,
+                )
+            }
+            AppOpenAnimationType.BLINK -> {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(
+                    R.anim.blink_close_enter,
+                    R.anim.blink_close_exit,
+                )
+            }
+            AppOpenAnimationType.FADE -> {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(
+                    R.anim.no_anim_short,
+                    R.anim.fade_out_short,
+                )
+            }
+            // DEFAULT, REVEAL, SLIDE_UP, SCALE_UP — system handles the return transition.
+            else -> Unit
+        }
+    }
+
+    // ── Fallback launcher-options launch path (no icon view) ─────────────────
+
+    private fun getActivityLaunchOptionsDefault(v: View?): ActivityOptionsWrapper {
+        var left = 0
+        var top = 0
+        var width = v?.measuredWidth ?: 0
+        var height = v?.measuredHeight ?: 0
+        if (v is BubbleTextView) {
+            val icon: Drawable? = v.icon
+            if (icon != null) {
+                val bounds = icon.bounds
+                left = (width - bounds.width()) / 2
+                top = v.paddingTop
+                width = bounds.width()
+                height = bounds.height()
+            }
+        }
+        val options = Utilities.allowBGLaunch(
+            ActivityOptions.makeClipRevealAnimation(
+                v,
+                left,
+                top,
+                width,
+                height,
+            ),
+        )
+        if (Utilities.ATLEAST_T) {
+            options.splashScreenStyle = SplashScreen.SPLASH_SCREEN_STYLE_ICON
+        }
+        options.launchDisplayId = if (v?.display != null) v.display.displayId else Display.DEFAULT_DISPLAY
+        val callback = RunnableList()
+        return ActivityOptionsWrapper(options, callback)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        // Only actually closes if required, safe to call if not enabled
         SmartspacerClient.close()
     }
 
@@ -490,13 +760,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Icon pack switch loading overlay
-    //
-    // Shows a Material 3 expressive container with a circular spinner while
-    // icons regenerate after an icon pack change. Dismisses by draining both
-    // MODEL_EXECUTOR and MAIN_EXECUTOR queues — no fixed timer needed.
-    // -----------------------------------------------------------------------
+    // ── Icon pack switch overlay ─────────────────────────────────────────────
 
     private var iconPackOverlay: android.view.View? = null
 
@@ -505,22 +769,17 @@ class LawnchairLauncher : QuickstepLauncher() {
 
         val density = resources.displayMetrics.density
 
-        // Read system primaryColor once
         val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
         val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
         ta.recycle()
 
-        // M3 Expressive "Loading indicator with container":
-        // A circular container (filled circle at ~12% opacity of primaryColor)
-        // with the indeterminate spinner centered inside it.
-        // Container: 72dp, Spinner: 40dp — matches the M3 spec proportions.
         val containerSize = (72 * density).toInt()
         val spinnerSize  = (40 * density).toInt()
 
         val containerBg = android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.OVAL
             setColor(android.graphics.Color.argb(
-                30, // ~12% opacity
+                30,
                 android.graphics.Color.red(primaryColor),
                 android.graphics.Color.green(primaryColor),
                 android.graphics.Color.blue(primaryColor),
@@ -542,7 +801,6 @@ class LawnchairLauncher : QuickstepLauncher() {
             gravity = android.view.Gravity.CENTER
         })
 
-        // Dim scrim behind the indicator
         val scrim = android.widget.FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))
         }
@@ -580,13 +838,8 @@ class LawnchairLauncher : QuickstepLauncher() {
         }
     }
 
-    /**
-     * Reloads app icons if there is an active icon pack & [PreferenceManager2.alwaysReloadIcons] is enabled.
-     */
     private fun reloadIconsIfNeeded() {
-        if (
-            preferenceManager2.alwaysReloadIcons.firstBlocking()
-        ) {
+        if (preferenceManager2.alwaysReloadIcons.firstBlocking()) {
             LauncherAppState.getInstance(this).model.reloadIfActive()
         }
     }
@@ -597,7 +850,6 @@ class LawnchairLauncher : QuickstepLauncher() {
 
         var sRestartFlags = 0
 
-        /** Set to true when an icon pack switch is in progress. Checked in onResume(). */
         @Volatile var iconPackSwitchPending = false
 
         val instance get() = LawnchairApp.launcher

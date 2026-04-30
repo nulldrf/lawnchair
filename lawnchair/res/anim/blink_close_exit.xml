@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Blink close exit — app exits with a quick double-flash before
+    the launcher blinks back in.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- flash 1 on -->
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.0"
+        android:startOffset="0"   android:duration="80" />
+    <!-- flash 1 off -->
+    <alpha android:fromAlpha="0.0" android:toAlpha="1.0"
+        android:startOffset="80"  android:duration="80" />
+    <!-- final off -->
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.0"
+        android:startOffset="160" android:duration="40" />
+</set>

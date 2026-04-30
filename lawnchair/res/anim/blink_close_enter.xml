@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Blink close enter — launcher re-appears after the blink return.
+    Mirrors blink_open_enter but in reverse: snaps from invisible to
+    visible after a short delay matching the app's exit blink.
+-->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromAlpha="0.0"
+    android:toAlpha="1.0"
+    android:startOffset="160"
+    android:duration="40" />

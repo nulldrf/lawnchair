@@ -256,6 +256,16 @@
     <string name="app_closing_animation">App closing animation</string>
     <string name="overlay_label">Overlay</string>
     <string name="overlay_none">None</string>
+	
+	<!-- App Opening Animation -->
+    <string name="app_opening_animation">App Opening Animation</string>
+    <string name="animation_type_default">Default</string>
+    <string name="animation_type_pie_like">Android Pie</string>
+    <string name="animation_type_reveal">Reveal</string>
+    <string name="animation_type_slide_up">Slide Up</string>
+    <string name="animation_type_scale_up">Scale Up</string>
+    <string name="animation_type_blink">Blink</string>
+    <string name="animation_type_fade">Fade</string>
 
     <!--
 

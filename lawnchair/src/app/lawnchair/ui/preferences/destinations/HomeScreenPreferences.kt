@@ -33,6 +33,7 @@ import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
+import app.lawnchair.ui.preferences.components.AppOpenAnimationPreference
 import app.lawnchair.ui.preferences.components.FeedPreference
 import app.lawnchair.ui.preferences.components.GestureHandlerPreference
 import app.lawnchair.ui.preferences.components.HomeLayoutSettings
@@ -140,6 +141,14 @@ fun HomeScreenPreferences(
         }
         PreferenceGroup(heading = stringResource(R.string.style)) {
             Item { HomeScreenTextColorPreference() }
+            // ── App-open animation (backported from Lawnchair 2) ──────────────
+            Item {
+                AppOpenAnimationPreference(
+                    adapter = prefs2.appOpenAnimation.getAdapter(),
+                    label = stringResource(id = R.string.app_opening_animation),
+                )
+            }
+            // ── GNC / app-close overlay ───────────────────────────────────────
             Item {
                 OverlayHandlerPreference(
                     adapter = prefs2.closingAppOverlay.getAdapter(),

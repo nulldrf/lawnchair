@@ -25,8 +25,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -127,7 +127,8 @@ class LawnchairBackup(
         )
 
         fun generateBackupFileName(): String {
-            val fileName = "Lawnchair_Backup ${SimpleDateFormat.getDateTimeInstance().format(Date())}"
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")
+            val fileName = "Lawnchair_Backup_${LocalDateTime.now().format(formatter)}"
             return "$fileName.lawnchairbackup"
         }
 

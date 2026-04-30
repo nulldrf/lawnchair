@@ -10,11 +10,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -44,11 +47,9 @@ import app.lawnchair.ui.preferences.components.DummyLauncherBox
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
 import app.lawnchair.ui.preferences.components.WallpaperPreview
 import app.lawnchair.ui.preferences.components.WithWallpaper
-import app.lawnchair.ui.preferences.components.controls.ClickablePreference
 import app.lawnchair.ui.preferences.components.controls.FlagSwitchPreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
-import app.lawnchair.ui.preferences.navigation.AppDrawerFolder
 import app.lawnchair.util.BackHandler
 import app.lawnchair.util.FileAccessState
 import app.lawnchair.util.hasFlag
@@ -126,30 +127,43 @@ fun CreateBackupScreen(
             onDispose { }
         }
 
-        if (isPortrait) {
-            WithWallpaper(
-                displayWallpaperButton = false,
-            ) { wallpaper ->
-                DummyLauncherBox(
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .weight(1f)
-                        .align(Alignment.CenterHorizontally)
-                        .clip(MaterialTheme.shapes.large),
-                ) {
-                    if (contents.hasFlag(LawnchairBackup.INCLUDE_WALLPAPER)) {
-                        WallpaperPreview(
-                            wallpaper = wallpaper,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                    if (contents.hasFlag(LawnchairBackup.INCLUDE_LAYOUT_AND_SETTINGS)) {
-                        Image(
-                            bitmap = screenshot.asImageBitmap(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.FillHeight,
-                        )
+        // ── Phone-frame mockup ───────────────────────────────────────────────
+        // Same pattern as IconPackPreferences / HomeScreenGridPreferences:
+        // only constrain width, let DummyLauncherBox's internal aspectRatio()
+        // own the height so border + clip always trace the exact box — no gaps.
+        // Shown in both portrait and landscape (width fraction adjusts).
+        val primary = MaterialTheme.colorScheme.primary
+        val phoneShape = RoundedCornerShape(28.dp)
+        val borderColor = primary.copy(alpha = 0.25f)
+        val widthFraction = if (isPortrait) 0.65f else 0.45f
+
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            // WithWallpaper is a ColumnScope extension — Column is required.
+            Column(modifier = Modifier.fillMaxWidth(widthFraction)) {
+                WithWallpaper(displayWallpaperButton = false) { wallpaper ->
+                    DummyLauncherBox(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(width = 1.dp, color = borderColor, shape = phoneShape)
+                            .clip(phoneShape),
+                    ) {
+                        if (contents.hasFlag(LawnchairBackup.INCLUDE_WALLPAPER)) {
+                            WallpaperPreview(
+                                wallpaper = wallpaper,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        if (contents.hasFlag(LawnchairBackup.INCLUDE_LAYOUT_AND_SETTINGS)) {
+                            Image(
+                                bitmap = screenshot.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
                     }
                 }
             }

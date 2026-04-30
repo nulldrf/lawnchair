@@ -9,12 +9,14 @@ import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -146,13 +148,25 @@ fun ColumnScope.RestoreBackupOptions(
         }
     }
 
-    if (isPortrait) {
+    // ── Phone-frame mockup ───────────────────────────────────────────────────
+    // Same pattern as IconPackPreferences: only constrain width, let
+    // DummyLauncherBox's internal aspectRatio() own the height so the border
+    // and clip always trace the exact computed box — no gaps.
+    // No WithWallpaper needed here — the backup contains its own bitmap assets.
+    val primary = MaterialTheme.colorScheme.primary
+    val phoneShape = RoundedCornerShape(28.dp)
+    val borderColor = primary.copy(alpha = 0.25f)
+    val widthFraction = if (isPortrait) 0.65f else 0.45f
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
         DummyLauncherBox(
             modifier = Modifier
-                .padding(top = 8.dp)
-                .weight(1f)
-                .align(Alignment.CenterHorizontally)
-                .clip(MaterialTheme.shapes.large),
+                .fillMaxWidth(widthFraction)
+                .border(width = 1.dp, color = borderColor, shape = phoneShape)
+                .clip(phoneShape),
             darkText = backup.info.previewDarkText,
         ) {
             val wallpaper = backup.wallpaper
@@ -161,7 +175,7 @@ fun ColumnScope.RestoreBackupOptions(
                     bitmap = wallpaper.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillHeight,
+                    contentScale = ContentScale.Crop,
                 )
             }
             val screenshot = backup.screenshot
@@ -170,7 +184,7 @@ fun ColumnScope.RestoreBackupOptions(
                     bitmap = screenshot.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillHeight,
+                    contentScale = ContentScale.Crop,
                 )
             }
         }

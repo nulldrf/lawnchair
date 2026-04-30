@@ -2,6 +2,7 @@ package app.lawnchair.baseline
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest

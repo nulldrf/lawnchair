@@ -44,6 +44,8 @@ jobs:
           ./gradlew generateBaselineProfile \
             -Pandroid.testoptions.manageddevices.emulator.gpu="swiftshader_indirect" \
             -Pandroid.experimental.testOptions.managedDevices.emulator.showKernelLogs=true \
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:+HeapDumpOnOutOfMemoryError" \
+            -Pkotlin.daemon.jvm.options="-Xmx4g" \
             --stacktrace
 
       - name: Upload baseline-prof.txt as artifact

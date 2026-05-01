@@ -242,6 +242,75 @@ class LawnchairLauncher : QuickstepLauncher() {
         showQuickstepWarningIfNecessary()
         reloadIconsIfNeeded()
         AppDatabase.INSTANCE.get(this).checkpointSync()
+
+        // Inject our custom QuickstepTransitionManager so that app→home
+        // (closing) animations respect the user's chosen animation type.
+        // Done after super.onCreate() because QuickstepLauncher constructs
+        // its transition manager during setupViews() which runs inside super.
+        injectLawnchairTransitionManager()
+    }
+
+    /**
+     * Replaces QuickstepLauncher's default [QuickstepTransitionManager] with
+     * [LawnchairQuickstepTransitionManager] via reflection.
+     *
+     * We walk the class hierarchy looking for the field that holds the
+     * QuickstepTransitionManager instance, trying the most common names.
+     * If the field is found and the current value is a plain
+     * QuickstepTransitionManager (not already our subclass), we:
+     *   1. Unregister the old manager's remote animations/transitions
+     *   2. Set our custom manager
+     *   3. Register our custom manager's remote animations/transitions
+     *
+     * If reflection fails (field renamed upstream) we log a warning and
+     * fall back gracefully — opening animations still work via
+     * [startActivitySafely]; only closing will use the system default.
+     */
+    private fun injectLawnchairTransitionManager() {
+        val customManager = LawnchairQuickstepTransitionManager(this)
+        val fieldNames = listOf(
+            "mAppTransitionManager",
+            "appTransitionManager",
+            "mTransitionManager",
+            "transitionManager",
+        )
+        var injected = false
+        var clazz: Class<*>? = this::class.java
+        outer@ while (clazz != null) {
+            for (name in fieldNames) {
+                try {
+                    val field = clazz.getDeclaredField(name)
+                    field.isAccessible = true
+                    val current = field.get(this)
+                    if (current is com.android.launcher3.QuickstepTransitionManager &&
+                        current !is LawnchairQuickstepTransitionManager
+                    ) {
+                        runCatching { current.unregisterRemoteAnimations() }
+                        runCatching { current.unregisterRemoteTransitions() }
+                        field.set(this, customManager)
+                        runCatching { customManager.registerRemoteAnimations() }
+                        runCatching { customManager.registerRemoteTransitions() }
+                        injected = true
+                        break@outer
+                    }
+                } catch (_: NoSuchFieldException) {
+                    // Try next field name
+                } catch (e: Exception) {
+                    android.util.Log.w(
+                        "LawnchairLauncher",
+                        "injectLawnchairTransitionManager: failed via $name: $e",
+                    )
+                }
+            }
+            clazz = clazz.superclass
+        }
+        if (!injected) {
+            android.util.Log.w(
+                "LawnchairLauncher",
+                "injectLawnchairTransitionManager: field not found — " +
+                    "closing animations will use system default",
+            )
+        }
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -803,16 +872,14 @@ class LawnchairLauncher : QuickstepLauncher() {
     /**
      * Called when the launcher is made visible again (e.g. user pressed Back).
      *
-     * overridePendingTransition must be called in onStart() — earlier than
-     * onResume() — so it is set before the system commits the window swap.
-     * Mirrors old LawnchairLauncher.onStart() → animationType.overrideResumeAnimation().
+     * [overridePendingTransition] here acts as a secondary fallback for devices
+     * where [LawnchairQuickstepTransitionManager] could not be injected (e.g.
+     * reflection failed). On Android 11 and without Quickstep this is the
+     * primary closing animation path. On Android 14 with Quickstep the
+     * transition manager's [createWallpaperOpenAnimations] override handles it.
      *
-     * NOTE: On Android 12+ with Quickstep (system launcher), QuickstepTransitionManager
-     * registers a RemoteAnimationRunner for ACTIVITY_CLOSE transitions which intercepts
-     * this call. overridePendingTransition is effectively a no-op in that configuration.
-     * Fixing the closing animation there requires hooking into QuickstepTransitionManager
-     * which is out of scope here. It works correctly on Android 11 and on Android 12+
-     * when Lawnchair is used without system/Quickstep integration.
+     * Must be called from [onStart] (not [onResume]) so it is registered before
+     * the system commits the window swap.
      */
     override fun onStart() {
         super.onStart()

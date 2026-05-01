@@ -41,11 +41,13 @@ jobs:
 
       - name: Generate Baseline Profile
         run: |
-          ./gradlew generateBaselineProfile \
+          ./gradlew collectLawnWithQuickstepGithubNonMinifiedReleaseBaselineProfile \
+            mergeBaselineProfile \
             -Pandroid.testoptions.manageddevices.emulator.gpu="swiftshader_indirect" \
             -Pandroid.experimental.testOptions.managedDevices.emulator.showKernelLogs=true \
-            -Dorg.gradle.jvmargs="-Xmx6g -XX:+HeapDumpOnOutOfMemoryError" \
-            -Pkotlin.daemon.jvm.options="-Xmx4g" \
+            -Dorg.gradle.jvmargs="-Xmx8g -XX:+HeapDumpOnOutOfMemoryError" \
+            -Pkotlin.daemon.jvm.options="-Xmx6g" \
+            --max-workers=4 \
             --stacktrace
 
       - name: Upload baseline-prof.txt as artifact

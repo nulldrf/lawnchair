@@ -17,36 +17,75 @@
 package app.lawnchair.ui.preferences.destinations
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.annotation.Keep
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import android.graphics.Path as AndroidPath
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.Matrix
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.lawnchair.icons.shape.IconShape
 import app.lawnchair.icons.shape.IconShapeManager
@@ -56,27 +95,28 @@ import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalNavController
+import app.lawnchair.ui.preferences.components.DummyLauncherBox
+import app.lawnchair.ui.preferences.components.DummyLauncherLayout
+import app.lawnchair.ui.preferences.components.WallpaperPreview
+import app.lawnchair.ui.preferences.components.WithWallpaper
 import app.lawnchair.ui.preferences.components.controls.ListPreferenceEntry
+import app.lawnchair.ui.preferences.components.invariantDeviceProfile
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
-import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
-import app.lawnchair.ui.preferences.components.layout.TwoTabPreferenceLayout
 import app.lawnchair.ui.preferences.navigation.GeneralCustomIconShapeCreator
+import app.lawnchair.ui.theme.preferenceGroupColor
 import com.android.launcher3.R
+import kotlinx.coroutines.launch
 
-@Keep // This is refed by a Kotlin serializer, we must keep it's fully qualified name.
+@Keep
 enum class ShapeRoute {
     APP_SHAPE,
     FOLDER_SHAPE,
 }
 
-/**
- * @return The list of all [IconShape]s each wrapped inside a [ListPreferenceEntry].
- */
 fun iconShapeEntries(context: Context): List<ListPreferenceEntry<IconShape>> {
     val systemShape = IconShapeManager.getSystemIconShape(context)
     return listOf(
-        // Organized as seen in /lawnchair/res/values/strings.xml
         ListPreferenceEntry(systemShape) { stringResource(id = R.string.icon_shape_system) },
         ListPreferenceEntry(IconShape.Circle) { stringResource(id = R.string.icon_shape_circle) },
         ListPreferenceEntry(IconShape.Cylinder) { stringResource(id = R.string.icon_shape_cylinder) },
@@ -108,166 +148,92 @@ fun iconShapeEntries(context: Context): List<ListPreferenceEntry<IconShape>> {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Top-level entry point
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ShapePreference(
     modifier: Modifier = Modifier,
     currentTab: ShapeRoute = ShapeRoute.APP_SHAPE,
 ) {
     val prefs2 = preferenceManager2()
-    if (prefs2.enableFolderIconShapeCustomization.getAdapter().state.value) {
-        TwoTabPreferenceLayout(
-            label = stringResource(id = R.string.icon_shape_label),
-            backArrowVisible = !LocalIsExpandedScreen.current,
-            defaultPage = currentTab.ordinal,
-            firstPageLabel = stringResource(id = R.string.app_icon_shape_label),
-            firstPageContent = {
-                AppIconShapeContent()
-            },
-            secondPageLabel = stringResource(id = R.string.folder_shape_label),
-            secondPageContent = {
-                FolderShapeContent()
-            },
+    val folderCustomEnabled = prefs2.enableFolderIconShapeCustomization.getAdapter().state.value
+
+    if (folderCustomEnabled) {
+        TwoTabShapePreference(
             modifier = modifier,
+            currentTab = currentTab,
         )
     } else {
-        IconShapePreference()
+        IconShapePreference(modifier = modifier)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Two-tab variant (app shape + folder shape)
+// Inlined instead of using TwoTabPreferenceLayout so the mockup can sit
+// above the tab row and react to whichever tab is active.
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AppIconShapeContent() {
-    val context = LocalContext.current
-    val preferenceManager2 = preferenceManager2()
-    val entries = remember { iconShapeEntries(context) }
-    val iconShapeAdapter = preferenceManager2.iconShape.getAdapter()
-    val customIconShape = preferenceManager2.customIconShape.asState()
-
-    PreferenceGroup(
-        heading = stringResource(id = R.string.custom),
-    ) {
-        Item(visible = customIconShape.value != null) {
-            CustomIconShapePreferenceOption(
-                iconShapeAdapter = iconShapeAdapter,
-                customIconShape = customIconShape.value!!,
-            )
-        }
-        Item {
-            ModifyCustomIconShapePreference(
-                customIconShape = customIconShape.value,
-            )
-        }
-    }
-    PreferenceGroup(
-        heading = stringResource(id = R.string.presets),
-    ) {
-        entries.forEach { item ->
-            Item {
-                PreferenceTemplate(
-                    enabled = item.enabled,
-                    title = { Text(item.label()) },
-                    modifier = Modifier.clickable(item.enabled) {
-                        iconShapeAdapter.onChange(newValue = item.value)
-                    },
-                    startWidget = {
-                        RadioButton(
-                            selected = item.value == iconShapeAdapter.state.value,
-                            onClick = null,
-                            enabled = item.enabled,
-                        )
-                    },
-                    endWidget = {
-                        IconShapePreview(iconShape = item.value)
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FolderShapeContent() {
-    val context = LocalContext.current
-    val preferenceManager2 = preferenceManager2()
-    val entries = remember { iconShapeEntries(context) }
-    val folderShapeAdapter = preferenceManager2.folderShape.getAdapter()
-
-    PreferenceGroup(
-        heading = stringResource(id = R.string.presets),
-    ) {
-        entries.forEach { item ->
-            Item {
-                PreferenceTemplate(
-                    enabled = item.enabled,
-                    title = { Text(item.label()) },
-                    modifier = Modifier.clickable(item.enabled) {
-                        folderShapeAdapter.onChange(newValue = item.value)
-                    },
-                    startWidget = {
-                        RadioButton(
-                            selected = item.value == folderShapeAdapter.state.value,
-                            onClick = null,
-                            enabled = item.enabled,
-                        )
-                    },
-                    endWidget = {
-                        IconShapePreview(iconShape = item.value)
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun IconShapePreference(
+private fun TwoTabShapePreference(
     modifier: Modifier = Modifier,
+    currentTab: ShapeRoute = ShapeRoute.APP_SHAPE,
 ) {
     val context = LocalContext.current
-    val preferenceManager2 = preferenceManager2()
+    val prefs2 = preferenceManager2()
     val entries = remember { iconShapeEntries(context) }
-    val iconShapeAdapter = preferenceManager2.iconShape.getAdapter()
-    val customIconShape = preferenceManager2.customIconShape.asState()
+    val iconShapeAdapter = prefs2.iconShape.getAdapter()
+    val folderShapeAdapter = prefs2.folderShape.getAdapter()
+    val customIconShape = prefs2.customIconShape.asState()
+
+    val pagerState = rememberPagerState(
+        initialPage = currentTab.ordinal,
+        pageCount = { 2 },
+    )
+    val scope = rememberCoroutineScope()
+
+    // The active adapter drives the mockup — switches when the user swipes tabs.
+    val activeAdapter = if (pagerState.currentPage == 0) iconShapeAdapter else folderShapeAdapter
 
     PreferenceLayout(
         label = stringResource(id = R.string.icon_shape_label),
         modifier = modifier,
+        backArrowVisible = !LocalIsExpandedScreen.current,
+        isExpandedScreen = true,
     ) {
-        PreferenceGroup(
-            heading = stringResource(id = R.string.custom),
-        ) {
-            Item(visible = customIconShape.value != null) {
-                CustomIconShapePreferenceOption(
-                    iconShapeAdapter = iconShapeAdapter,
-                    customIconShape = customIconShape.value!!,
-                )
-            }
-            Item {
-                ModifyCustomIconShapePreference(
-                    customIconShape = customIconShape.value,
-                )
-            }
-        }
-        PreferenceGroup(
-            heading = stringResource(id = R.string.presets),
-        ) {
-            entries.forEach { item ->
-                Item {
-                    PreferenceTemplate(
-                        enabled = item.enabled,
-                        title = { Text(item.label()) },
-                        modifier = Modifier.clickable(item.enabled) {
-                            iconShapeAdapter.onChange(newValue = item.value)
-                        },
-                        startWidget = {
-                            RadioButton(
-                                selected = item.value == iconShapeAdapter.state.value,
-                                onClick = null,
-                                enabled = item.enabled,
-                            )
-                        },
-                        endWidget = {
-                            IconShapePreview(iconShape = item.value)
-                        },
+        // ── Mockup ───────────────────────────────────────────────────────────
+        ShapeMockup(shapeAdapter = activeAdapter)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ── Tab row ──────────────────────────────────────────────────────────
+        ShapeTabRow(
+            selectedPage = pagerState.currentPage,
+            onSelectPage = { scope.launch { pagerState.scrollToPage(it) } },
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ── Pager ────────────────────────────────────────────────────────────
+        HorizontalPager(
+            state = pagerState,
+            verticalAlignment = Alignment.Top,
+        ) { page ->
+            Column {
+                when (page) {
+                    0 -> ShapeGridContent(
+                        entries = entries,
+                        shapeAdapter = iconShapeAdapter,
+                        customIconShape = customIconShape.value,
+                    )
+                    1 -> ShapeGridContent(
+                        entries = entries,
+                        shapeAdapter = folderShapeAdapter,
+                        customIconShape = null, // folder shape has no custom option
                     )
                 }
             }
@@ -275,28 +241,332 @@ fun IconShapePreference(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Single-tab variant
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun CustomIconShapePreferenceOption(
-    iconShapeAdapter: PreferenceAdapter<IconShape>,
-    customIconShape: IconShape,
+fun IconShapePreference(
     modifier: Modifier = Modifier,
 ) {
-    PreferenceTemplate(
-        title = { Text(stringResource(id = R.string.custom)) },
-        modifier = modifier.clickable {
-            iconShapeAdapter.onChange(newValue = customIconShape)
-        },
-        startWidget = {
-            RadioButton(
-                selected = IconShape.isCustomShape(iconShapeAdapter.state.value),
-                onClick = null,
-            )
-        },
-        endWidget = {
-            IconShapePreview(iconShape = customIconShape)
-        },
-    )
+    val context = LocalContext.current
+    val prefs2 = preferenceManager2()
+    val entries = remember { iconShapeEntries(context) }
+    val iconShapeAdapter = prefs2.iconShape.getAdapter()
+    val customIconShape = prefs2.customIconShape.asState()
+
+    PreferenceLayout(
+        label = stringResource(id = R.string.icon_shape_label),
+        modifier = modifier,
+        isExpandedScreen = true,
+    ) {
+        // ── Mockup ───────────────────────────────────────────────────────────
+        ShapeMockup(shapeAdapter = iconShapeAdapter)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ── Shape grid + custom button ────────────────────────────────────────
+        ShapeGridContent(
+            entries = entries,
+            shapeAdapter = iconShapeAdapter,
+            customIconShape = customIconShape.value,
+        )
+    }
 }
+
+// ---------------------------------------------------------------------------
+// Phone-frame mockup
+// ---------------------------------------------------------------------------
+
+/**
+ * Live phone-frame preview that re-renders whenever [shapeAdapter] changes,
+ * using the same gap-free pattern established in IconPackPreferences:
+ * width-only constraint + DummyLauncherBox internal aspectRatio owns the height.
+ */
+@Composable
+private fun ShapeMockup(
+    shapeAdapter: PreferenceAdapter<IconShape>,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val phoneShape = RoundedCornerShape(28.dp)
+    val borderColor = primary.copy(alpha = 0.25f)
+    val isLandscape = LocalConfiguration.current.orientation ==
+        Configuration.ORIENTATION_LANDSCAPE
+    val widthFraction = if (isLandscape) 0.45f else 0.65f
+    val idp = invariantDeviceProfile()
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth(widthFraction)) {
+            WithWallpaper(displayWallpaperButton = false) { wallpaper ->
+                DummyLauncherBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(width = 1.dp, color = borderColor, shape = phoneShape)
+                        .clip(phoneShape),
+                ) {
+                    WallpaperPreview(
+                        wallpaper = wallpaper,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // key() forces DummyLauncherLayout to recompose when the
+                    // shape changes so the live preview updates immediately.
+                    key(shapeAdapter.state.value) {
+                        DummyLauncherLayout(
+                            idp = idp,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tab row (same outlined/filled style as IconPackPreferences)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ShapeTabRow(
+    selectedPage: Int,
+    onSelectPage: (Int) -> Unit,
+) {
+    val tabs = listOf(
+        stringResource(id = R.string.app_icon_shape_label),
+        stringResource(id = R.string.folder_shape_label),
+    )
+    val primary = MaterialTheme.colorScheme.primary
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val outline = MaterialTheme.colorScheme.outline
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        tabs.forEachIndexed { index, label ->
+            val isSelected = selectedPage == index
+            val containerColor by animateColorAsState(
+                targetValue = if (isSelected) primary else Color.Transparent,
+                animationSpec = tween(250), label = "tab_bg_$index",
+            )
+            val contentColor by animateColorAsState(
+                targetValue = if (isSelected) onPrimary else onSurface,
+                animationSpec = tween(250), label = "tab_fg_$index",
+            )
+            val cornerRadius by animateDpAsState(
+                targetValue = if (isSelected) 50.dp else 16.dp,
+                animationSpec = tween(250), label = "tab_corner_$index",
+            )
+            val borderColor by animateColorAsState(
+                targetValue = if (isSelected) Color.Transparent else outline,
+                animationSpec = tween(250), label = "tab_border_$index",
+            )
+            Surface(
+                onClick = { onSelectPage(index) },
+                modifier = Modifier.weight(1f).height(44.dp),
+                shape = RoundedCornerShape(cornerRadius),
+                color = containerColor,
+                contentColor = contentColor,
+                border = BorderStroke(1.dp, borderColor),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shape grid content (grid + custom shape button at bottom)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ShapeGridContent(
+    entries: List<ListPreferenceEntry<IconShape>>,
+    shapeAdapter: PreferenceAdapter<IconShape>,
+    customIconShape: IconShape?,
+) {
+    val navController = LocalNavController.current
+
+    PreferenceGroup(heading = stringResource(id = R.string.presets)) {
+        Item {
+            ShapeGrid(
+                entries = entries,
+                shapeAdapter = shapeAdapter,
+            )
+        }
+    }
+
+    // Custom shape option — shown after the presets grid.
+    // If a custom shape exists it appears as a selectable card before the
+    // create/edit button, matching the visual language of the presets grid.
+    if (customIconShape != null) {
+        PreferenceGroup(heading = stringResource(id = R.string.custom)) {
+            Item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ShapeCard(
+                        iconShape = customIconShape,
+                        label = stringResource(id = R.string.custom),
+                        selected = IconShape.isCustomShape(shapeAdapter.state.value),
+                        modifier = Modifier.size(80.dp),
+                        onClick = { shapeAdapter.onChange(customIconShape) },
+                    )
+                }
+            }
+            Item {
+                ModifyCustomIconShapePreference(customIconShape = customIconShape)
+            }
+        }
+    } else {
+        PreferenceGroup(heading = stringResource(id = R.string.custom)) {
+            Item {
+                ModifyCustomIconShapePreference(customIconShape = null)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shape grid row
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ShapeGrid(
+    entries: List<ListPreferenceEntry<IconShape>>,
+    shapeAdapter: PreferenceAdapter<IconShape>,
+) {
+    val lazyListState = rememberLazyListState()
+    val selectedShape = shapeAdapter.state.value
+
+    // Scroll to selected shape on first composition.
+    LaunchedEffect(selectedShape) {
+        val index = entries.indexOfFirst { it.value == selectedShape }
+        if (index != -1) lazyListState.scrollToItem(index)
+    }
+
+    LazyRow(
+        state = lazyListState,
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+    ) {
+        items(entries, key = { it.value.key }) { entry ->
+            ShapeCard(
+                iconShape = entry.value,
+                label = entry.label(),
+                selected = entry.value == selectedShape,
+                modifier = Modifier.size(72.dp),
+                isSystem = entry.value is IconShape.SystemBased,
+                onClick = { shapeAdapter.onChange(entry.value) },
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Individual shape card
+// ---------------------------------------------------------------------------
+
+/**
+ * A square card showing only the shape preview canvas. No label is shown
+ * unless the user long-presses, which triggers a [PlainTooltip] with the
+ * shape name — keeping the grid clean while remaining discoverable.
+ *
+ * Selected state: [MaterialTheme.colorScheme.primaryContainer] background.
+ * Unselected state: [preferenceGroupColor] background.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun ShapeCard(
+    iconShape: IconShape,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    isSystem: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val tooltipState = rememberTooltipState()
+    val scope = rememberCoroutineScope()
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(
+                    text = label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        state = tooltipState,
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                preferenceGroupColor()
+            },
+            modifier = modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = { scope.launch { tooltipState.show() } },
+            ),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                // Shape canvas — fills 60% of the card area
+                IconShapePreview(
+                    iconShape = iconShape,
+                    modifier = Modifier.fillMaxSize(0.6f),
+                )
+                // Permanent "System" badge at the bottom of the card so the
+                // system shape is always distinguishable from Circle regardless
+                // of how similar their outlines look on a given device.
+                if (isSystem) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Create / Edit custom icon shape button (unchanged logic, kept at bottom)
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun ModifyCustomIconShapePreference(
@@ -304,24 +574,18 @@ private fun ModifyCustomIconShapePreference(
     modifier: Modifier = Modifier,
 ) {
     val navController = LocalNavController.current
-    val route = GeneralCustomIconShapeCreator
-
     val created = customIconShape != null
-
     val text = if (created) {
         stringResource(id = R.string.custom_icon_shape_edit)
     } else {
         stringResource(id = R.string.custom_icon_shape_create)
     }
-
     val icon = if (created) Icons.Rounded.Edit else Icons.Rounded.Add
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clickable {
-                navController.navigate(route = route)
-            },
+            .clickable { navController.navigate(route = GeneralCustomIconShapeCreator) },
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -332,9 +596,7 @@ private fun ModifyCustomIconShapePreference(
                 LocalContentColor provides MaterialTheme.colorScheme.secondary,
                 LocalTextStyle provides MaterialTheme.typography.bodyMedium,
             ) {
-                Text(
-                    text = text,
-                )
+                Text(text = text)
             }
             Spacer(modifier = Modifier.requiredWidth(12.dp))
             Icon(
@@ -346,9 +608,10 @@ private fun ModifyCustomIconShapePreference(
     }
 }
 
-/**
- * Draws a preview of an [IconShape].
- */
+// ---------------------------------------------------------------------------
+// IconShapePreview canvas (unchanged — reused by grid cards and GeneralPreferences)
+// ---------------------------------------------------------------------------
+
 @Composable
 fun IconShapePreview(
     iconShape: IconShape,
@@ -356,38 +619,46 @@ fun IconShapePreview(
     strokeColor: Color = MaterialTheme.colorScheme.primary,
     fillColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
 ) {
-    val path = iconShape.getMaskPath().asComposePath()
-
-    var translated = remember { false }
-    fun translatePath(canvasWidth: Float, canvasHeight: Float) {
-        if (!translated) {
-            translated = true
-            val pathHeight = path.getBounds().size.height
-            val pathWidth = path.getBounds().size.width
-            path.translate(
-                Offset(
-                    x = (canvasWidth - pathWidth) / 2,
-                    y = (canvasHeight - pathHeight) / 2,
-                ),
-            )
+    // getMaskPath() on SystemBased delegates to nearestShape.getMaskPath(), which
+    // approximates the system shape from a short list. On Samsung, the nearest
+    // match is Circle — making the System card indistinguishable from Circle in
+    // the preview even though actual icons use the real squircle path.
+    //
+    // Fix: for SystemBased, bypass getMaskPath() and read the raw iconMask from
+    // AdaptiveIconDrawable directly. Android normalises this path to [0,100]×[0,100]
+    // (MASK_SIZE = 100 in AOSP), so it slots into our scaling pipeline unchanged.
+    // For all other shapes, getMaskPath() is correct as documented.
+    val basePath = remember(iconShape) {
+        if (iconShape is IconShape.SystemBased) {
+            AdaptiveIconDrawable(null, null).iconMask
+        } else {
+            iconShape.getMaskPath()
         }
     }
 
-    Canvas(
-        modifier = modifier.requiredSize(48.dp),
-    ) {
-        translatePath(
-            canvasWidth = size.width,
-            canvasHeight = size.height,
-        )
-        drawPath(
-            path = path,
-            color = fillColor,
-        )
-        drawPath(
-            path = path,
-            color = strokeColor,
-            style = Stroke(width = 4f),
-        )
+    Canvas(modifier = modifier.requiredSize(48.dp)) {
+        // Step 1: scale from the 100×100 viewport to the actual canvas size.
+        val scaleX = size.width / 100f
+        val scaleY = size.height / 100f
+        val matrix = Matrix()
+        matrix.setScale(scaleX, scaleY)
+
+        val scaledPath = AndroidPath()
+        basePath.transform(matrix, scaledPath)
+
+        // Step 2: center the scaled path within the canvas.
+        // Shapes like Hexagon, Teardrop etc. don't fill the full [0,100]
+        // viewport symmetrically, so after scaling their bounding box sits
+        // off-center. computeBounds() gives us the actual bounds so we can
+        // translate to the geometric center of the canvas.
+        val bounds = android.graphics.RectF()
+        scaledPath.computeBounds(bounds, true)
+        val dx = (size.width - bounds.width()) / 2f - bounds.left
+        val dy = (size.height - bounds.height()) / 2f - bounds.top
+        scaledPath.offset(dx, dy)
+
+        val composePath = scaledPath.asComposePath()
+        drawPath(path = composePath, color = fillColor)
+        drawPath(path = composePath, color = strokeColor, style = Stroke(width = 4f))
     }
 }

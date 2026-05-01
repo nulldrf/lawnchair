@@ -23,14 +23,21 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.widget.FrameLayout
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -39,6 +46,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.updatePadding
 import com.android.launcher3.R
 import com.google.android.material.R as MaterialR
@@ -90,6 +98,22 @@ fun PreferenceScaffold(
     val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
     val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
+
+    // Capture colorScheme and typography from the outer LawnchairTheme scope.
+    // Reading MaterialTheme.* inside setContent{} reads from the inner ComposeView's
+    // composition root which has no LawnchairTheme provider — falling back to default
+    // M3 values (system font, default colors).
+    // State is updated via SideEffect (non-composable lambda) after capturing the
+    // @Composable values into plain vals first, avoiding the compiler error caused by
+    // passing a @Composable expression directly to a non-composable delegate setter.
+    val currentColorScheme = MaterialTheme.colorScheme
+    val currentTypography = MaterialTheme.typography
+    val innerColorSchemeState = remember { mutableStateOf(currentColorScheme) }
+    val innerTypographyState = remember { mutableStateOf(currentTypography) }
+    SideEffect {
+        innerColorSchemeState.value = currentColorScheme
+        innerTypographyState.value = currentTypography
+    }
 
     val parentCompositionContext = rememberCompositionContext()
 
@@ -198,9 +222,11 @@ fun PreferenceScaffold(
                     Gravity.END or Gravity.CENTER_VERTICAL,
                 )
                 setContent {
-                    MaterialTheme(
-                        colorScheme = MaterialTheme.colorScheme,
-                        typography = MaterialTheme.typography,
+                    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                    MaterialExpressiveTheme(
+                        colorScheme = innerColorSchemeState.value,
+                        typography = innerTypographyState.value,
+                        motionScheme = MotionScheme.expressive(),
                     ) {
                         Row { actions() }
                     }
@@ -221,9 +247,11 @@ fun PreferenceScaffold(
                     CompositionLocalProvider(
                         LocalInsideNestedScrollView provides true,
                     ) {
-                        MaterialTheme(
-                            colorScheme = MaterialTheme.colorScheme,
-                            typography = MaterialTheme.typography,
+                        @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                        MaterialExpressiveTheme(
+                            colorScheme = innerColorSchemeState.value,
+                            typography = innerTypographyState.value,
+                            motionScheme = MotionScheme.expressive(),
                         ) {
                             content(PaddingValues())
                         }
@@ -231,6 +259,48 @@ fun PreferenceScaffold(
                 }
             }
             contentFrame.addView(composeView)
+
+            // bottomBar is pinned outside StretchNestedScrollView so it stays
+            // fixed at the bottom of the screen rather than scrolling with content.
+            // Added as a direct child of root (CoordinatorLayout/FrameLayout) with
+            // BOTTOM gravity. scrollView bottom padding is updated after layout so
+            // content scrolls fully into view and is never hidden behind the bar.
+            val bottomBarFrame = FrameLayout(ctx).apply {
+                // root is a CoordinatorLayout — must use its LayoutParams, not FrameLayout's.
+                layoutParams = CoordinatorLayout.LayoutParams(
+                    CoordinatorLayout.LayoutParams.MATCH_PARENT,
+                    CoordinatorLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { gravity = Gravity.BOTTOM }
+            }
+            val bottomBarComposeView = ComposeView(ctx).apply {
+                setParentCompositionContext(parentCompositionContext)
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
+                )
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                )
+                setContent {
+                    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                    MaterialExpressiveTheme(
+                        colorScheme = innerColorSchemeState.value,
+                        typography = innerTypographyState.value,
+                        motionScheme = MotionScheme.expressive(),
+                    ) {
+                        bottomBar()
+                    }
+                }
+            }
+            bottomBarFrame.addView(bottomBarComposeView)
+            (root as CoordinatorLayout).addView(bottomBarFrame)
+
+            // Once bottomBarFrame is laid out and its height known, add that
+            // height as extra bottom padding on scrollView. The window-insets
+            // listener already covers navigation bar padding; this stacks on top.
+            bottomBarFrame.doOnLayout { bar ->
+                scrollView.updatePadding(bottom = scrollView.paddingBottom + bar.height)
+            }
 
             root
         },

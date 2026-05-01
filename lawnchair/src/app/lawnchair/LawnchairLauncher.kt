@@ -267,67 +267,86 @@ class LawnchairLauncher : QuickstepLauncher() {
      * [startActivitySafely]; only closing will use the system default.
      */
     private fun injectLawnchairTransitionManager() {
-        val customManager = LawnchairQuickstepTransitionManager(this)
-        val fieldNames = listOf(
-            "mAppTransitionManager",
-            "appTransitionManager",
-            "mTransitionManager",
-            "transitionManager",
-        )
-        var injected = false
-        var clazz: Class<*>? = this::class.java
-        outer@ while (clazz != null) {
-            for (name in fieldNames) {
-                try {
-                    val field = clazz.getDeclaredField(name)
-                    field.isAccessible = true
-                    val current = field.get(this)
-                    if (current is com.android.launcher3.QuickstepTransitionManager &&
-                        current !is LawnchairQuickstepTransitionManager
-                    ) {
-                        // Both unregisterRemoteAnimations (private) and
-                        // unregisterRemoteTransitions (protected) are not
-                        // directly callable here — use reflection for both.
-                        listOf(
-                            "unregisterRemoteAnimations",
-                            "unregisterRemoteTransitions",
-                        ).forEach { methodName ->
-                            runCatching {
-                                var c: Class<*>? = current::class.java
-                                while (c != null) {
-                                    try {
-                                        val m = c.getDeclaredMethod(methodName)
-                                        m.isAccessible = true
-                                        m.invoke(current)
-                                        break
-                                    } catch (_: NoSuchMethodException) {
-                                        c = c.superclass
+        // LauncherBackAnimationController (instantiated inside
+        // QuickstepTransitionManager's constructor) references
+        // com.android.internal.policy.SystemBarUtils which was added in
+        // Android 12 (API 31). Instantiating our subclass on API 30 or below
+        // throws NoClassDefFoundError before we even reach the field swap.
+        // Also skip when Quickstep/Recents is disabled — the transition manager
+        // injection is only meaningful when Quickstep intercepts close transitions.
+        if (!Utilities.ATLEAST_S || !LawnchairApp.isRecentsEnabled) return
+
+        try {
+            val customManager = LawnchairQuickstepTransitionManager(this)
+            val fieldNames = listOf(
+                "mAppTransitionManager",
+                "appTransitionManager",
+                "mTransitionManager",
+                "transitionManager",
+            )
+            var injected = false
+            var clazz: Class<*>? = this::class.java
+            outer@ while (clazz != null) {
+                for (name in fieldNames) {
+                    try {
+                        val field = clazz.getDeclaredField(name)
+                        field.isAccessible = true
+                        val current = field.get(this)
+                        if (current is com.android.launcher3.QuickstepTransitionManager &&
+                            current !is LawnchairQuickstepTransitionManager
+                        ) {
+                            // Both unregisterRemoteAnimations (private) and
+                            // unregisterRemoteTransitions (protected) are not
+                            // directly callable here — use reflection for both.
+                            listOf(
+                                "unregisterRemoteAnimations",
+                                "unregisterRemoteTransitions",
+                            ).forEach { methodName ->
+                                runCatching {
+                                    var c: Class<*>? = current::class.java
+                                    while (c != null) {
+                                        try {
+                                            val m = c.getDeclaredMethod(methodName)
+                                            m.isAccessible = true
+                                            m.invoke(current)
+                                            break
+                                        } catch (_: NoSuchMethodException) {
+                                            c = c.superclass
+                                        }
                                     }
                                 }
                             }
+                            field.set(this, customManager)
+                            runCatching { customManager.registerRemoteAnimations() }
+                            runCatching { customManager.registerRemoteTransitions() }
+                            injected = true
+                            break@outer
                         }
-                        field.set(this, customManager)
-                        runCatching { customManager.registerRemoteAnimations() }
-                        runCatching { customManager.registerRemoteTransitions() }
-                        injected = true
-                        break@outer
+                    } catch (_: NoSuchFieldException) {
+                        // Try next field name
+                    } catch (e: Exception) {
+                        android.util.Log.w(
+                            "LawnchairLauncher",
+                            "injectLawnchairTransitionManager: failed via $name: $e",
+                        )
                     }
-                } catch (_: NoSuchFieldException) {
-                    // Try next field name
-                } catch (e: Exception) {
-                    android.util.Log.w(
-                        "LawnchairLauncher",
-                        "injectLawnchairTransitionManager: failed via $name: $e",
-                    )
                 }
+                clazz = clazz.superclass
             }
-            clazz = clazz.superclass
-        }
-        if (!injected) {
+            if (!injected) {
+                android.util.Log.w(
+                    "LawnchairLauncher",
+                    "injectLawnchairTransitionManager: field not found — " +
+                        "closing animations will use system default",
+                )
+            }
+        } catch (t: Throwable) {
+            // Catches NoClassDefFoundError and any other Error/Exception that
+            // may arise from constructing QuickstepTransitionManager on
+            // unexpected OS configurations.
             android.util.Log.w(
                 "LawnchairLauncher",
-                "injectLawnchairTransitionManager: field not found — " +
-                    "closing animations will use system default",
+                "injectLawnchairTransitionManager: aborted — $t",
             )
         }
     }

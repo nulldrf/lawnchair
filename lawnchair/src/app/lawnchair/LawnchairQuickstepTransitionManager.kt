@@ -15,6 +15,7 @@ import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.views.overlay.AppOpenAnimationType
 import com.android.launcher3.QuickstepTransitionManager
 import com.android.launcher3.uioverrides.QuickstepLauncher
+import com.android.quickstep.util.BackAnimState
 import com.android.quickstep.util.RectFSpringAnim
 import com.patrykmichalik.opto.core.firstBlocking
 
@@ -96,7 +97,7 @@ class LawnchairQuickstepTransitionManager(
         startRect: RectF,
         startWindowCornerRadius: Float,
         fromPredictiveBack: Boolean,
-    ): QuickstepTransitionManager.BackAnimState {
+    ): BackAnimState {
         // Always run the base implementation: it sets up the RectFSpringAnim
         // that moves the app window back to the icon, and registers the
         // WallpaperOpen callback chain with the system.

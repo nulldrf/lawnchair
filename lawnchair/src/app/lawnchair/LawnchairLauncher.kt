@@ -285,8 +285,27 @@ class LawnchairLauncher : QuickstepLauncher() {
                     if (current is com.android.launcher3.QuickstepTransitionManager &&
                         current !is LawnchairQuickstepTransitionManager
                     ) {
-                        runCatching { current.unregisterRemoteAnimations() }
-                        runCatching { current.unregisterRemoteTransitions() }
+                        // Both unregisterRemoteAnimations (private) and
+                        // unregisterRemoteTransitions (protected) are not
+                        // directly callable here — use reflection for both.
+                        listOf(
+                            "unregisterRemoteAnimations",
+                            "unregisterRemoteTransitions",
+                        ).forEach { methodName ->
+                            runCatching {
+                                var c: Class<*>? = current::class.java
+                                while (c != null) {
+                                    try {
+                                        val m = c.getDeclaredMethod(methodName)
+                                        m.isAccessible = true
+                                        m.invoke(current)
+                                        break
+                                    } catch (_: NoSuchMethodException) {
+                                        c = c.superclass
+                                    }
+                                }
+                            }
+                        }
                         field.set(this, customManager)
                         runCatching { customManager.registerRemoteAnimations() }
                         runCatching { customManager.registerRemoteTransitions() }

@@ -5,91 +5,61 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
-import android.graphics.PointF
+import android.graphics.Color
 import android.graphics.RectF
-import android.util.Log
 import android.view.RemoteAnimationTarget
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.PathInterpolator
+import android.widget.FrameLayout
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.views.overlay.AppOpenAnimationType
 import com.android.launcher3.QuickstepTransitionManager
 import com.android.launcher3.uioverrides.QuickstepLauncher
 import com.android.quickstep.util.BackAnimState
-import com.android.quickstep.util.RectFSpringAnim
 import com.patrykmichalik.opto.core.firstBlocking
 
 /**
- * Lawnchair's custom [QuickstepTransitionManager] that adds support for
- * per-animation-type closing (app→launcher) transitions.
+ * Lawnchair's custom [QuickstepTransitionManager] that overrides the
+ * app-to-home (closing) transition for custom animation types.
  *
- * HOW CLOSING WORKS IN QUICKSTEP (confirmed by reading QuickstepTransitionManager.java):
+ * WHY PREVIOUS APPROACH FAILED:
+ * [createWallpaperOpenAnimations] in the base class adds either a
+ * ScalingWorkspaceRevealAnim or StaggeredWorkspaceAnim which animate
+ * workspace + hotseat (scale, alpha, translateY). Our previous attempt
+ * also animated those same views, causing undefined fighting behaviour —
+ * two ObjectAnimators on the same View property where whichever writes
+ * last per frame wins.
  *
- * 1. System dispatches TRANSIT_CLOSE/TRANSIT_TO_BACK via the registered
- *    RemoteTransition ([WallpaperOpenLauncherAnimationRunner]).
- * 2. That runner calls [createWallpaperOpenAnimations].
- * 3. [createWallpaperOpenAnimations] calls [getClosingWindowAnimators] to get a
- *    [RectFSpringAnim] that moves the app window back to the launcher icon.
- * 4. It also adds a workspace reveal animation (StaggeredWorkspaceAnim /
- *    ScalingWorkspaceRevealAnim) to make the launcher reappear.
+ * FIX — Full-screen overlay approach:
+ * 1. Let super() run completely — workspace reveal, spring animation, all of it.
+ *    We do NOT touch workspace or hotseat.
+ * 2. Add a full-screen opaque View to mDragLayer.parent (above dragLayer,
+ *    not inside it — so it is not affected by any scale on dragLayer).
+ * 3. Animate the overlay away according to the animation type:
+ *      PIE   → overlay scales 1.5→1.0 + fades 1→0  (zoom-in feel)
+ *      BLINK → overlay flashes 3 times then disappears
+ *      FADE  → overlay fades 1→0
+ * 4. As the overlay peels away, the base class workspace reveal
+ *    (running beneath the overlay the whole time) is revealed naturally.
  *
- * OUR OVERRIDE STRATEGY:
- * - Override [createWallpaperOpenAnimations] to:
- *     a) Call super so the app window spring/spring-reveal animation still runs.
- *     b) Inject our custom LAUNCHER-SIDE animation on top:
- *        PIE   → workspace scale 1.5→1.0 + alpha 0→1 (launcher zooms back in)
- *        BLINK → workspace alpha blink (three flashes)
- *        FADE  → workspace alpha 0→1
- *
- * - Override [getClosingWindowAnimators] only for PIE: additionally scale the
- *   app window down (0→0.1) using a ValueAnimator on the standard
- *   SyncRtSurfaceTransactionApplier path that the base class already sets up.
- *   For other types we call super and let the spring animation handle it.
- *
- * NOTE: [getLauncherContentAnimator] is private in the base class, so we cannot
- * override it. Instead we run our custom animations in parallel with the base
- * class's workspace reveal, which effectively replaces the visual appearance
- * because our animators run on LAYER_TYPE_HARDWARE views and win compositing.
- *
- * CONSTANTS mirror LawnchairAppTransitionManagerImpl companion object from the
- * old Lawnchair 2 codebase (ch.deletescape.lawnchair.animations):
- *   APP_CLOSE_HOME_ENTER_SCALE_FROM/TO = 1.5f / 1.0f, DURATION = 250L
- *   APP_CLOSE_HOME_ENTER_ALPHA_FROM/TO = 0.0f / 1.0f, DURATION = 100L
+ * Zero interference with the base class. The overlay just covers and
+ * uncovers the launcher with our custom animation.
  */
 class LawnchairQuickstepTransitionManager(
     private val launcher: QuickstepLauncher,
 ) : QuickstepTransitionManager(launcher) {
 
     private val prefs2 by lazy { PreferenceManager2.getInstance(launcher) }
-    private val tag = "LawnchairQTM"
 
-    // ── App-close-to-home animation constants (from old Lawnchair 2) ──────────
+    private val overlayColor: Int
+        get() {
+            val ta = launcher.obtainStyledAttributes(intArrayOf(android.R.attr.colorBackground))
+            val color = ta.getColor(0, Color.BLACK)
+            ta.recycle()
+            return color
+        }
 
-    // Launcher (workspace+hotseat) zooms from 1.5 → 1.0 while fading 0 → 1
-    private val closeHomeEnterScaleFrom  = 1.5f
-    private val closeHomeEnterScaleTo    = 1.0f
-    private val closeHomeEnterScaleDuration = 250L
-    private val closeHomeEnterScaleInterp   = PathInterpolator(0.33f, 0.0f, 0.2f, 1.0f)
-
-    private val closeHomeEnterAlphaFrom  = 0.0f
-    private val closeHomeEnterAlphaTo    = 1.0f
-    private val closeHomeEnterAlphaDuration = 100L
-    private val closeHomeEnterAlphaInterp   = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
-
-    // ── Override: inject custom launcher-appear animation on close ────────────
-
-    /**
-     * Called by [WallpaperOpenLauncherAnimationRunner] when the user navigates
-     * back to the launcher (app→home transition).
-     *
-     * We call super first so the app window spring animation and base workspace
-     * reveal are set up correctly, then we add our custom launcher-side animator.
-     *
-     * The custom animator runs on LAYER_TYPE_HARDWARE views so it composites
-     * on top of the base workspace reveal. Because our alpha/scale animators
-     * start from a different state (e.g. alpha=0, scale=1.5 for PIE) they
-     * visually override the standard reveal.
-     */
     override fun createWallpaperOpenAnimations(
         appTargets: Array<RemoteAnimationTarget>,
         wallpapers: Array<RemoteAnimationTarget>,
@@ -98,200 +68,116 @@ class LawnchairQuickstepTransitionManager(
         startWindowCornerRadius: Float,
         fromPredictiveBack: Boolean,
     ): BackAnimState {
-        // Always run the base implementation: it sets up the RectFSpringAnim
-        // that moves the app window back to the icon, and registers the
-        // WallpaperOpen callback chain with the system.
+        // Always let the base class run fully — RectFSpringAnim, workspace reveal, etc.
         val baseState = super.createWallpaperOpenAnimations(
             appTargets, wallpapers, nonAppTargets,
             startRect, startWindowCornerRadius, fromPredictiveBack,
         )
 
-        // Now inject our custom launcher-side animation.
         val animType = runCatching { prefs2.appOpenAnimation.firstBlocking() }
             .getOrDefault(AppOpenAnimationType.DEFAULT)
 
         when (animType) {
             AppOpenAnimationType.PIE,
             AppOpenAnimationType.SLIDE_UP,
-            -> schedulePieCloseEnterAnimation()
-
-            AppOpenAnimationType.BLINK  -> scheduleBlinkCloseEnterAnimation()
-            AppOpenAnimationType.FADE   -> scheduleFadeCloseEnterAnimation()
-
-            // DEFAULT, REVEAL, SCALE_UP: base class handles it correctly.
+            -> playOverlay(OverlayStyle.PIE)
+            AppOpenAnimationType.BLINK  -> playOverlay(OverlayStyle.BLINK)
+            AppOpenAnimationType.FADE   -> playOverlay(OverlayStyle.FADE)
             else -> Unit
         }
 
         return baseState
     }
 
-    // ── Launcher-side close animations (View layer, LAYER_TYPE_HARDWARE) ──────
+    private enum class OverlayStyle { PIE, BLINK, FADE }
 
     /**
-     * PIE / SLIDE_UP close: launcher scales from 1.5 → 1.0 and fades 0 → 1.
+     * Adds a full-screen opaque overlay to mDragLayer.parent and animates
+     * it away, revealing the launcher beneath.
      *
-     * We animate workspace + hotseat separately (same views the base class
-     * uses in getLauncherContentAnimator) with LAYER_TYPE_HARDWARE so they
-     * composite on top of the system's workspace reveal.
-     *
-     * Start values (scale=1.5, alpha=0) are set immediately before the
-     * animation begins so there is no single-frame flash of the normal state.
+     * mDragLayer is protected in QuickstepTransitionManager so it is
+     * accessible here without reflection.
      */
-    private fun schedulePieCloseEnterAnimation() {
-        val views = getContentViews()
-        if (views.isEmpty()) return
+    private fun playOverlay(style: OverlayStyle) {
+        val parent = mDragLayer.parent as? ViewGroup ?: return
 
-        views.forEach { v ->
-            v.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            v.scaleX = closeHomeEnterScaleFrom
-            v.scaleY = closeHomeEnterScaleFrom
-            v.alpha  = closeHomeEnterAlphaFrom
+        val w = mDragLayer.width.takeIf { it > 0 } ?: return
+        val h = mDragLayer.height.takeIf { it > 0 } ?: return
+
+        val overlay = FrameLayout(launcher).apply {
+            setBackgroundColor(overlayColor)
+            alpha  = 1f
+            scaleX = if (style == OverlayStyle.PIE) 1.5f else 1.0f
+            scaleY = if (style == OverlayStyle.PIE) 1.5f else 1.0f
+            pivotX = w / 2f
+            pivotY = h / 2f
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
         }
 
-        val animators = mutableListOf<Animator>()
-        views.forEach { v ->
-            animators += ObjectAnimator.ofFloat(v, View.SCALE_X,
-                closeHomeEnterScaleFrom, closeHomeEnterScaleTo,
-            ).apply {
-                duration     = closeHomeEnterScaleDuration
-                interpolator = closeHomeEnterScaleInterp
-            }
-            animators += ObjectAnimator.ofFloat(v, View.SCALE_Y,
-                closeHomeEnterScaleFrom, closeHomeEnterScaleTo,
-            ).apply {
-                duration     = closeHomeEnterScaleDuration
-                interpolator = closeHomeEnterScaleInterp
-            }
-            animators += ObjectAnimator.ofFloat(v, View.ALPHA,
-                closeHomeEnterAlphaFrom, closeHomeEnterAlphaTo,
-            ).apply {
-                duration     = closeHomeEnterAlphaDuration
-                interpolator = closeHomeEnterAlphaInterp
-            }
+        parent.addView(
+            overlay,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        val cleanup = {
+            overlay.setLayerType(View.LAYER_TYPE_NONE, null)
+            parent.removeView(overlay)
         }
 
-        AnimatorSet().apply {
-            playTogether(animators)
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    views.forEach { v ->
-                        v.scaleX = 1.0f
-                        v.scaleY = 1.0f
-                        v.alpha  = 1.0f
-                        v.setLayerType(View.LAYER_TYPE_NONE, null)
-                    }
+        val endListener = object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) = cleanup()
+            override fun onAnimationCancel(animation: Animator) = cleanup()
+        }
+
+        val interp    = PathInterpolator(0.33f, 0.0f, 0.2f, 1.0f)
+        val duration  = 250L
+
+        when (style) {
+            OverlayStyle.PIE -> {
+                AnimatorSet().apply {
+                    playTogether(
+                        ObjectAnimator.ofFloat(overlay, View.SCALE_X, 1.5f, 1.0f).apply {
+                            this.duration = duration; interpolator = interp
+                        },
+                        ObjectAnimator.ofFloat(overlay, View.SCALE_Y, 1.5f, 1.0f).apply {
+                            this.duration = duration; interpolator = interp
+                        },
+                        ObjectAnimator.ofFloat(overlay, View.ALPHA, 1.0f, 0.0f).apply {
+                            this.duration = duration; interpolator = interp
+                        },
+                    )
+                    addListener(endListener)
+                    start()
                 }
-            })
-            start()
-        }
-    }
-
-    /**
-     * BLINK close: launcher flashes three times while appearing.
-     *
-     * Alpha pattern (each segment ≈ 67ms of 400ms total):
-     *   0–20%  0 (invisible)
-     *   20–40% 1 (flash 1)
-     *   40–60% 0 (off)
-     *   60–80% 1 (flash 2)
-     *   80–100%1 (settle visible)
-     */
-    private fun scheduleBlinkCloseEnterAnimation() {
-        val views = getContentViews()
-        if (views.isEmpty()) return
-
-        views.forEach { v ->
-            v.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            v.alpha = 0f
-        }
-
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 400L
-            addUpdateListener { anim ->
-                val t = anim.animatedFraction
-                val alpha = when {
-                    t < 0.20f -> 0.0f
-                    t < 0.40f -> 1.0f
-                    t < 0.60f -> 0.0f
-                    t < 0.80f -> 1.0f
-                    else      -> 1.0f
-                }
-                views.forEach { it.alpha = alpha }
             }
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    views.forEach { v ->
-                        v.alpha = 1.0f
-                        v.setLayerType(View.LAYER_TYPE_NONE, null)
-                    }
-                }
-            })
-            start()
-        }
-    }
-
-    /**
-     * FADE close: launcher fades from 0 → 1 over 250ms.
-     */
-    private fun scheduleFadeCloseEnterAnimation() {
-        val views = getContentViews()
-        if (views.isEmpty()) return
-
-        views.forEach { v ->
-            v.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            v.alpha = 0f
-        }
-
-        val animators = views.map { v ->
-            ObjectAnimator.ofFloat(v, View.ALPHA, 0f, 1f).apply {
-                duration     = 250L
-                interpolator = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
-            }
-        }
-
-        AnimatorSet().apply {
-            playTogether(animators)
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    views.forEach { v ->
-                        v.alpha = 1.0f
-                        v.setLayerType(View.LAYER_TYPE_NONE, null)
-                    }
-                }
-            })
-            start()
-        }
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Returns the list of content views to animate when the launcher reappears.
-     * Mirrors the view list used by [getLauncherContentAnimator] in the base class.
-     *
-     * For NORMAL state: workspace + hotseat (or QSB if taskbar is present)
-     * For ALL_APPS state: the apps view
-     */
-    private fun getContentViews(): List<View> {
-        return runCatching {
-            val views = mutableListOf<View>()
-            val dp = launcher.deviceProfile
-            when {
-                launcher.isInState(com.android.launcher3.LauncherState.ALL_APPS) -> {
-                    views += launcher.appsView
-                }
-                else -> {
-                    views += launcher.workspace
-                    if (dp.isTaskbarPresent) {
-                        if (!dp.isQsbInline) {
-                            views += launcher.hotseat.qsb
+            OverlayStyle.BLINK -> {
+                ValueAnimator.ofFloat(0f, 1f).apply {
+                    this.duration = 400L
+                    addUpdateListener { anim ->
+                        val t = anim.animatedFraction
+                        overlay.alpha = when {
+                            t < 0.20f -> 1.0f
+                            t < 0.40f -> 0.0f
+                            t < 0.60f -> 1.0f
+                            t < 0.80f -> 0.0f
+                            else      -> 0.0f
                         }
-                    } else {
-                        views += launcher.hotseat
                     }
+                    addListener(endListener)
+                    start()
                 }
             }
-            views
-        }.getOrElse { emptyList() }
+            OverlayStyle.FADE -> {
+                ObjectAnimator.ofFloat(overlay, View.ALPHA, 1.0f, 0.0f).apply {
+                    this.duration = duration
+                    interpolator  = interp
+                    addListener(endListener)
+                    start()
+                }
+            }
+        }
     }
 }

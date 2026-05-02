@@ -655,21 +655,35 @@ class LawnchairLauncher : QuickstepLauncher() {
         // ── Step 2: Capture icon bitmap ────────────────────────────────────
         val iconBitmap = captureIconBitmap(iconView, iconBounds)
 
-        // ── Step 3: Create floating icon ImageView on the dragLayer ────────
-        val floatingIcon: ImageView? = if (iconBitmap != null) {
+        // ── Step 3: Create floating icon ImageView on dragLayer.PARENT ────
+        //
+        // CRITICAL FIX: add the floating icon to dragLayer.parent, NOT to
+        // dragLayer itself. dragLayer is the view being scaled 1.0→1.5 in the
+        // exit animation. If the floating ImageView is a child of dragLayer, it
+        // is transformed along with dragLayer — so instead of flying to screen
+        // centre it appears to slide toward the edge (inheriting the scale pivot
+        // displacement). Adding it to the parent puts it in a coordinate space
+        // that is unaffected by the dragLayer scale, matching the old
+        // LawnchairAppTransitionManagerImpl behaviour where the FloatingIconView
+        // was added directly to the drag layer's parent container.
+        val iconParent = layer.parent as? ViewGroup
+        val floatingIcon: ImageView? = if (iconBitmap != null && iconParent != null) {
             ImageView(this).apply {
                 setImageBitmap(iconBitmap)
                 scaleType = ImageView.ScaleType.FIT_XY
             }
         } else null
 
+        // Position is relative to iconParent (same coordinate space as dragLayer
+        // since dragLayer fills iconParent, but without being subject to dragLayer's
+        // own scale transform).
         val floatingLp = FrameLayout.LayoutParams(iconW.toInt(), iconH.toInt()).apply {
             leftMargin = iconRelLeft.toInt()
             topMargin  = iconRelTop.toInt()
         }
 
         if (floatingIcon != null) {
-            layer.addView(floatingIcon, floatingLp)
+            iconParent?.addView(floatingIcon, floatingLp)
         }
 
         // ── Step 4: Set dragLayer pivot to icon centre ─────────────────────
@@ -734,7 +748,7 @@ class LawnchairLauncher : QuickstepLauncher() {
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     if (floatingIcon != null) {
-                        layer.removeView(floatingIcon)
+                        iconParent?.removeView(floatingIcon)
                         iconBitmap?.recycle()
                     }
                     layer.scaleX = 1.0f

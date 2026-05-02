@@ -88,7 +88,23 @@ sealed class IconShape {
             findNearestShape()
         }
 
-        override fun getMaskPath(): Path = nearestShape.getMaskPath()
+        /**
+         * Returns the actual platform icon mask rather than the nearest approximated shape.
+         *
+         * The original implementation returned [nearestShape].getMaskPath() — an approximation
+         * from a short list (Circle, Squircle, Sammy, …). On Samsung One UI, the nearest match
+         * is Circle, so both the preview and the actual icon clipping in [PathShapeDelegate]
+         * rendered all icons as circles instead of the real squircle shape.
+         *
+         * [iconMask] from [android.graphics.drawable.AdaptiveIconDrawable] is already
+         * normalised to a 100×100 viewport (Android's MASK_SIZE = 100), matching the contract
+         * of [getMaskPath]. Returning a copy of it gives PathShapeDelegate the exact same
+         * path the platform uses internally, so icons clip to the true system shape.
+         *
+         * [nearestShape] is still used by [PathShapeDelegate.createRevealAnimator] for folder
+         * expansion morphing — it is intentionally left unchanged.
+         */
+        override fun getMaskPath(): Path = Path(iconMask)
 
         override val key = "system"
 

@@ -26,7 +26,6 @@ import androidx.compose.foundation.BorderStroke
 import android.graphics.Path as AndroidPath
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -475,7 +474,6 @@ private fun ShapeGrid(
                 label = entry.label(),
                 selected = entry.value == selectedShape,
                 modifier = Modifier.size(72.dp),
-                isSystem = entry.value is IconShape.SystemBased,
                 onClick = { shapeAdapter.onChange(entry.value) },
             )
         }
@@ -501,7 +499,6 @@ private fun ShapeCard(
     label: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
-    isSystem: Boolean = false,
     onClick: () -> Unit,
 ) {
     val tooltipState = rememberTooltipState()
@@ -538,27 +535,7 @@ private fun ShapeCard(
                     iconShape = iconShape,
                     modifier = Modifier.fillMaxSize(0.6f),
                 )
-                // Permanent "System" badge at the bottom of the card so the
-                // system shape is always distinguishable from Circle regardless
-                // of how similar their outlines look on a given device.
-                if (isSystem) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 4.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
-                            .padding(horizontal = 4.dp, vertical = 1.dp),
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+
             }
         }
     }

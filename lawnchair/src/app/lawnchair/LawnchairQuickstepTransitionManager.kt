@@ -20,31 +20,23 @@ import com.android.quickstep.util.BackAnimState
 import com.patrykmichalik.opto.core.firstBlocking
 
 /**
- * Lawnchair's custom [QuickstepTransitionManager] that overrides the
- * app-to-home (closing) transition for custom animation types.
+ * Lawnchair custom [QuickstepTransitionManager].
  *
- * WHY PREVIOUS APPROACH FAILED:
- * [createWallpaperOpenAnimations] in the base class adds either a
- * ScalingWorkspaceRevealAnim or StaggeredWorkspaceAnim which animate
- * workspace + hotseat (scale, alpha, translateY). Our previous attempt
- * also animated those same views, causing undefined fighting behaviour —
- * two ObjectAnimators on the same View property where whichever writes
- * last per frame wins.
+ * CLOSING ANIMATION DESIGN (fully ported from old LawnchairAppTransitionManagerImpl):
  *
- * FIX — Full-screen overlay approach:
- * 1. Let super() run completely — workspace reveal, spring animation, all of it.
- *    We do NOT touch workspace or hotseat.
- * 2. Add a full-screen opaque View to mDragLayer.parent (above dragLayer,
- *    not inside it — so it is not affected by any scale on dragLayer).
- * 3. Animate the overlay away according to the animation type:
- *      PIE   → overlay scales 1.5→1.0 + fades 1→0  (zoom-in feel)
- *      BLINK → overlay flashes 3 times then disappears
- *      FADE  → overlay fades 1→0
- * 4. As the overlay peels away, the base class workspace reveal
- *    (running beneath the overlay the whole time) is revealed naturally.
+ * Old code used createLauncherResumeAnimation() which animated mDragLayer directly:
+ *   - mDragLayer.scaleX/Y: APP_CLOSE_HOME_ENTER_SCALE_FROM(1.5) → TO(1.0), 250ms
+ *   - dragLayerAlpha:       APP_CLOSE_HOME_ENTER_ALPHA_FROM(0.0) → TO(1.0), 100ms
+ *   - mDragLayer.setLayerType(LAYER_TYPE_HARDWARE)
  *
- * Zero interference with the base class. The overlay just covers and
- * uncovers the launcher with our custom animation.
+ * QuickstepTransitionManager has no createLauncherResumeAnimation().
+ * Its getLauncherContentAnimator(false) animates workspace + hotseat separately.
+ * We cannot call it (private), so we animate mDragLayer directly instead —
+ * which is what the old code did and what the user sees as correct.
+ *
+ * We override createWallpaperOpenAnimations, call super for the app-window spring,
+ * then immediately set mDragLayer start values and schedule our animator.
+ * mDragLayer is protected in the base class, accessible here.
  */
 class LawnchairQuickstepTransitionManager(
     private val launcher: QuickstepLauncher,
@@ -52,13 +44,20 @@ class LawnchairQuickstepTransitionManager(
 
     private val prefs2 by lazy { PreferenceManager2.getInstance(launcher) }
 
-    private val overlayColor: Int
-        get() {
-            val ta = launcher.obtainStyledAttributes(intArrayOf(android.R.attr.colorBackground))
-            val color = ta.getColor(0, Color.BLACK)
-            ta.recycle()
-            return color
-        }
+    // ── Constants from old LawnchairAppTransitionManagerImpl companion object ──
+
+    // App close: home (dragLayer) enter
+    private val closeHomeEnterScaleFrom   = 1.5f
+    private val closeHomeEnterScaleTo     = 1.0f
+    private val closeHomeEnterScaleDur    = 250L
+    private val closeHomeEnterScaleInterp = PathInterpolator(0.33f, 0.0f, 0.2f, 1.0f)
+
+    private val closeHomeEnterAlphaFrom   = 0.0f
+    private val closeHomeEnterAlphaTo     = 1.0f
+    private val closeHomeEnterAlphaDur    = 100L
+    private val closeHomeEnterAlphaInterp = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
+
+    // ── createWallpaperOpenAnimations override ────────────────────────────────
 
     override fun createWallpaperOpenAnimations(
         appTargets: Array<RemoteAnimationTarget>,
@@ -68,116 +67,139 @@ class LawnchairQuickstepTransitionManager(
         startWindowCornerRadius: Float,
         fromPredictiveBack: Boolean,
     ): BackAnimState {
-        // Always let the base class run fully — RectFSpringAnim, workspace reveal, etc.
+        val animType = runCatching { prefs2.appOpenAnimation.firstBlocking() }
+            .getOrDefault(AppOpenAnimationType.DEFAULT)
+
+        // For all custom types: set mDragLayer initial state BEFORE calling
+        // super so there is no single-frame flash of the normal state.
+        if (animType == AppOpenAnimationType.PIE ||
+            animType == AppOpenAnimationType.SLIDE_UP
+        ) {
+            // PIE close: dragLayer zooms in from enlarged state.
+            // Reset pivot to centre — it may have been moved during the opening
+            // animation's icon-pivot logic.
+            mDragLayer.pivotX = mDragLayer.width  / 2f
+            mDragLayer.pivotY = mDragLayer.height / 2f
+            mDragLayer.scaleX = closeHomeEnterScaleFrom
+            mDragLayer.scaleY = closeHomeEnterScaleFrom
+            mDragLayer.alpha  = closeHomeEnterAlphaFrom
+            mDragLayer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        }
+
+        // Run base class — handles the app-window spring (RectFSpringAnim) and
+        // workspace reveal. We do NOT interfere with those.
         val baseState = super.createWallpaperOpenAnimations(
             appTargets, wallpapers, nonAppTargets,
             startRect, startWindowCornerRadius, fromPredictiveBack,
         )
 
-        val animType = runCatching { prefs2.appOpenAnimation.firstBlocking() }
-            .getOrDefault(AppOpenAnimationType.DEFAULT)
-
+        // Now schedule our custom launcher-side (mDragLayer) animation.
         when (animType) {
             AppOpenAnimationType.PIE,
             AppOpenAnimationType.SLIDE_UP,
-            -> playOverlay(OverlayStyle.PIE)
-            AppOpenAnimationType.BLINK  -> playOverlay(OverlayStyle.BLINK)
-            AppOpenAnimationType.FADE   -> playOverlay(OverlayStyle.FADE)
+            -> playPieCloseDragLayerAnimation()
+
+            AppOpenAnimationType.BLINK -> playBlinkCloseDragLayerAnimation()
+            AppOpenAnimationType.FADE  -> playFadeCloseDragLayerAnimation()
+
+            // DEFAULT, REVEAL, SCALE_UP — base class handles.
             else -> Unit
         }
 
         return baseState
     }
 
-    private enum class OverlayStyle { PIE, BLINK, FADE }
+    // ── dragLayer close animations — ported 1:1 from old createLauncherResumeAnimation ──
 
     /**
-     * Adds a full-screen opaque overlay to mDragLayer.parent and animates
-     * it away, revealing the launcher beneath.
-     *
-     * mDragLayer is protected in QuickstepTransitionManager so it is
-     * accessible here without reflection.
+     * PIE / SLIDE_UP close: dragLayer scales 1.5→1.0 (zoom-in) and alpha 0→1.
+     * Exactly mirrors old LawnchairAppTransitionManagerImpl.createLauncherResumeAnimation()
+     * for the useScaleAnim=true path.
      */
-    private fun playOverlay(style: OverlayStyle) {
-        val parent = mDragLayer.parent as? ViewGroup ?: return
+    private fun playPieCloseDragLayerAnimation() {
+        val layer = mDragLayer
 
-        val w = mDragLayer.width.takeIf { it > 0 } ?: return
-        val h = mDragLayer.height.takeIf { it > 0 } ?: return
-
-        val overlay = FrameLayout(launcher).apply {
-            setBackgroundColor(overlayColor)
-            alpha  = 1f
-            scaleX = if (style == OverlayStyle.PIE) 1.5f else 1.0f
-            scaleY = if (style == OverlayStyle.PIE) 1.5f else 1.0f
-            pivotX = w / 2f
-            pivotY = h / 2f
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        val scaleAnim = ObjectAnimator.ofFloat(layer, View.SCALE_X, closeHomeEnterScaleFrom, closeHomeEnterScaleTo).apply {
+            duration     = closeHomeEnterScaleDur
+            interpolator = closeHomeEnterScaleInterp
+        }
+        val scaleAnimY = ObjectAnimator.ofFloat(layer, View.SCALE_Y, closeHomeEnterScaleFrom, closeHomeEnterScaleTo).apply {
+            duration     = closeHomeEnterScaleDur
+            interpolator = closeHomeEnterScaleInterp
+        }
+        val alphaAnim = ObjectAnimator.ofFloat(layer, View.ALPHA, closeHomeEnterAlphaFrom, closeHomeEnterAlphaTo).apply {
+            duration     = closeHomeEnterAlphaDur
+            interpolator = closeHomeEnterAlphaInterp
         }
 
-        parent.addView(
-            overlay,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
-
-        val cleanup = {
-            overlay.setLayerType(View.LAYER_TYPE_NONE, null)
-            parent.removeView(overlay)
+        AnimatorSet().apply {
+            playTogether(scaleAnim, scaleAnimY, alphaAnim)
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    layer.scaleX = 1f
+                    layer.scaleY = 1f
+                    layer.alpha  = 1f
+                    layer.pivotX = layer.width  / 2f
+                    layer.pivotY = layer.height / 2f
+                    layer.setLayerType(View.LAYER_TYPE_NONE, null)
+                }
+            })
+            start()
         }
+    }
 
-        val endListener = object : AnimatorListenerAdapter() {
-            override fun onAnimationEnd(animation: Animator) = cleanup()
-            override fun onAnimationCancel(animation: Animator) = cleanup()
+    /**
+     * BLINK close: dragLayer flashes three times while fading in.
+     * Mirrors BlinkAnimation.overrideResumeAnimation — blink_close_enter plays on
+     * the launcher side, but since that's a window-level anim we replicate it here
+     * on the dragLayer View so it works with Quickstep.
+     */
+    private fun playBlinkCloseDragLayerAnimation() {
+        val layer = mDragLayer
+        layer.alpha = 0f
+        layer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 400L
+            addUpdateListener { anim ->
+                val t = anim.animatedFraction
+                layer.alpha = when {
+                    t < 0.20f -> 0.0f  // invisible start
+                    t < 0.40f -> 1.0f  // flash 1 on
+                    t < 0.60f -> 0.0f  // flash 1 off
+                    t < 0.80f -> 1.0f  // flash 2 on
+                    else      -> 1.0f  // settle visible
+                }
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    layer.alpha = 1f
+                    layer.setLayerType(View.LAYER_TYPE_NONE, null)
+                }
+            })
+            start()
         }
+    }
 
-        val interp    = PathInterpolator(0.33f, 0.0f, 0.2f, 1.0f)
-        val duration  = 250L
+    /**
+     * FADE close: dragLayer fades from 0→1 as the launcher appears.
+     * Mirrors FadeAnimation.overrideResumeAnimation but on dragLayer View.
+     */
+    private fun playFadeCloseDragLayerAnimation() {
+        val layer = mDragLayer
+        layer.alpha = 0f
+        layer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
-        when (style) {
-            OverlayStyle.PIE -> {
-                AnimatorSet().apply {
-                    playTogether(
-                        ObjectAnimator.ofFloat(overlay, View.SCALE_X, 1.5f, 1.0f).apply {
-                            this.duration = duration; interpolator = interp
-                        },
-                        ObjectAnimator.ofFloat(overlay, View.SCALE_Y, 1.5f, 1.0f).apply {
-                            this.duration = duration; interpolator = interp
-                        },
-                        ObjectAnimator.ofFloat(overlay, View.ALPHA, 1.0f, 0.0f).apply {
-                            this.duration = duration; interpolator = interp
-                        },
-                    )
-                    addListener(endListener)
-                    start()
+        ObjectAnimator.ofFloat(layer, View.ALPHA, 0f, 1f).apply {
+            duration     = 250L
+            interpolator = closeHomeEnterAlphaInterp
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    layer.alpha = 1f
+                    layer.setLayerType(View.LAYER_TYPE_NONE, null)
                 }
-            }
-            OverlayStyle.BLINK -> {
-                ValueAnimator.ofFloat(0f, 1f).apply {
-                    this.duration = 400L
-                    addUpdateListener { anim ->
-                        val t = anim.animatedFraction
-                        overlay.alpha = when {
-                            t < 0.20f -> 1.0f
-                            t < 0.40f -> 0.0f
-                            t < 0.60f -> 1.0f
-                            t < 0.80f -> 0.0f
-                            else      -> 0.0f
-                        }
-                    }
-                    addListener(endListener)
-                    start()
-                }
-            }
-            OverlayStyle.FADE -> {
-                ObjectAnimator.ofFloat(overlay, View.ALPHA, 1.0f, 0.0f).apply {
-                    this.duration = duration
-                    interpolator  = interp
-                    addListener(endListener)
-                    start()
-                }
-            }
+            })
+            start()
         }
     }
 }

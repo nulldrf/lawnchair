@@ -29,15 +29,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -98,22 +92,6 @@ fun PreferenceScaffold(
     val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
     val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
-
-    // Capture colorScheme and typography from the outer LawnchairTheme scope.
-    // Reading MaterialTheme.* inside setContent{} reads from the inner ComposeView's
-    // composition root which has no LawnchairTheme provider — falling back to default
-    // M3 values (system font, default colors).
-    // State is updated via SideEffect (non-composable lambda) after capturing the
-    // @Composable values into plain vals first, avoiding the compiler error caused by
-    // passing a @Composable expression directly to a non-composable delegate setter.
-    val currentColorScheme = MaterialTheme.colorScheme
-    val currentTypography = MaterialTheme.typography
-    val innerColorSchemeState = remember { mutableStateOf(currentColorScheme) }
-    val innerTypographyState = remember { mutableStateOf(currentTypography) }
-    SideEffect {
-        innerColorSchemeState.value = currentColorScheme
-        innerTypographyState.value = currentTypography
-    }
 
     val parentCompositionContext = rememberCompositionContext()
 
@@ -222,11 +200,9 @@ fun PreferenceScaffold(
                     Gravity.END or Gravity.CENTER_VERTICAL,
                 )
                 setContent {
-                    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                    MaterialExpressiveTheme(
-                        colorScheme = innerColorSchemeState.value,
-                        typography = innerTypographyState.value,
-                        motionScheme = MotionScheme.expressive(),
+                    MaterialTheme(
+                        colorScheme = MaterialTheme.colorScheme,
+                        typography = MaterialTheme.typography,
                     ) {
                         Row { actions() }
                     }
@@ -247,11 +223,9 @@ fun PreferenceScaffold(
                     CompositionLocalProvider(
                         LocalInsideNestedScrollView provides true,
                     ) {
-                        @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                        MaterialExpressiveTheme(
-                            colorScheme = innerColorSchemeState.value,
-                            typography = innerTypographyState.value,
-                            motionScheme = MotionScheme.expressive(),
+                        MaterialTheme(
+                            colorScheme = MaterialTheme.colorScheme,
+                            typography = MaterialTheme.typography,
                         ) {
                             content(PaddingValues())
                         }
@@ -282,11 +256,9 @@ fun PreferenceScaffold(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 )
                 setContent {
-                    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                    MaterialExpressiveTheme(
-                        colorScheme = innerColorSchemeState.value,
-                        typography = innerTypographyState.value,
-                        motionScheme = MotionScheme.expressive(),
+                    MaterialTheme(
+                        colorScheme = MaterialTheme.colorScheme,
+                        typography = MaterialTheme.typography,
                     ) {
                         bottomBar()
                     }

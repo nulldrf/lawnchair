@@ -1092,22 +1092,20 @@ class LawnchairLauncher : QuickstepLauncher() {
     // ── Icon pack switch loading overlay ──────────────────────────────────
 
     private var iconPackOverlay: View? = null
-    private var iconPackOverlayShownAt = 0L
+    private val iconPackIdleRunnable = Runnable { dismissIconPackSwitchOverlay() }
+    private val iconPackIdleDelayMs = 600L
 
     fun showIconPackSwitchOverlay() {
         if (iconPackOverlay != null) return
-        iconPackOverlayShownAt = System.currentTimeMillis()
 
         val density = resources.displayMetrics.density
         val indicatorSize = (72 * density).toInt()
 
-        // M3 Expressive "Contained loading indicator" — blob/squircle animated shape.
-        // The contained style must be applied via ContextThemeWrapper using the bundled
-        // Material style name. We look it up at runtime so no hard dependency is needed.
+        // M3 Expressive "Contained loading indicator" via ContextThemeWrapper.
+        // Falls back to plain ProgressBar if Material alpha library is unavailable.
         val indicator: View = try {
             val cls = Class.forName(
                 "com.google.android.material.loadingindicator.LoadingIndicator")
-            // Android resource names use underscores; dot-notation is the display name.
             val styleId = resources.getIdentifier(
                 "Widget_Material3_LoadingIndicator_Contained", "style", packageName)
             val ctx = if (styleId != 0) android.view.ContextThemeWrapper(this, styleId)
@@ -1115,7 +1113,6 @@ class LawnchairLauncher : QuickstepLauncher() {
             cls.getConstructor(android.content.Context::class.java)
                 .newInstance(ctx) as View
         } catch (_: Exception) {
-            // Fallback: plain circular ProgressBar tinted with colorPrimary
             val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
             val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
             ta.recycle()
@@ -1130,39 +1127,38 @@ class LawnchairLauncher : QuickstepLauncher() {
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))
         }
-        scrim.addView(
-            indicator,
-            FrameLayout.LayoutParams(indicatorSize, indicatorSize).apply {
-                gravity = android.view.Gravity.CENTER
-            },
-        )
+        scrim.addView(indicator, FrameLayout.LayoutParams(indicatorSize, indicatorSize).apply {
+            gravity = android.view.Gravity.CENTER
+        })
         scrim.alpha = 0f
-        dragLayer.addView(
-            scrim,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
+        dragLayer.addView(scrim, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
+        ))
         scrim.animate().alpha(1f).setDuration(200).start()
         iconPackOverlay = scrim
     }
 
+    /**
+     * Called by LawnchairIconProvider after reloadIfActive() has posted its work.
+     * Starts a 600ms idle timer. Each call resets the timer so the overlay stays
+     * visible as long as icon updates keep arriving. When updates stop for 600ms
+     * (meaning all icons have been redrawn), the overlay fades out.
+     */
+    fun startIconPackSwitchIdleTimer() {
+        dragLayer.removeCallbacks(iconPackIdleRunnable)
+        dragLayer.postDelayed(iconPackIdleRunnable, iconPackIdleDelayMs)
+    }
+
     fun dismissIconPackSwitchOverlay() {
+        dragLayer.removeCallbacks(iconPackIdleRunnable)
         val overlay = iconPackOverlay ?: return
-        // Enforce a minimum display time so the overlay doesn't flash away on fast devices
-        // before all icons have finished regenerating.
-        val elapsed = System.currentTimeMillis() - iconPackOverlayShownAt
-        val minDisplay = 1500L
-        val remaining = maxOf(0L, minDisplay - elapsed)
-        dragLayer.postDelayed({
-            iconPackOverlay = null
-            overlay.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction { dragLayer.removeView(overlay) }
-                .start()
-        }, remaining)
+        iconPackOverlay = null
+        overlay.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction { dragLayer.removeView(overlay) }
+            .start()
     }
 
     private fun restartIfPending() {

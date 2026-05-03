@@ -333,46 +333,37 @@ class LawnchairIconProvider @Inject constructor(
 
         private val subscription = iconPackPref.subscribeChanges {
             val newState = themeManager.iconState
-            if (iconState != newState) {
-                iconState = newState
-            }
+            if (iconState != newState) iconState = newState
             recreateCalendarAndClockChangeReceiver()
+
+            // Show overlay — dismissed when icon updates stop arriving (idle for 500ms).
+            // Do NOT call recreateIfNotScheduled() — it creates a new launcher that takes
+            // 3s to start independently of reloadIfActive(), causing the overlay to dismiss
+            // while the new instance is still loading. reloadIfActive() updates icons in-place.
             LawnchairLauncher.iconPackSwitchPending = true
             LawnchairLauncher.instance?.showIconPackSwitchOverlay()
-            LawnchairLauncher.instance?.recreateIfNotScheduled()
 
             Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
-                // reloadIfActive() posts multiple rounds of MODEL→MAIN work per icon.
-                // We drain the queues 3 times (MODEL→MAIN×3) to ensure all icon-update
-                // runnables have completed before dismissing the overlay.
                 appState.model.reloadIfActive()
+                // After reloadIfActive() posts its icon-update callbacks to MAIN_EXECUTOR,
+                // signal the overlay to start its idle timer. The overlay will dismiss
+                // itself 500ms after the last onIconsUpdated() call arrives.
                 Executors.MAIN_EXECUTOR.execute {
-                    Executors.MODEL_EXECUTOR.execute {
-                        Executors.MAIN_EXECUTOR.execute {
-                            Executors.MODEL_EXECUTOR.execute {
-                                Executors.MAIN_EXECUTOR.execute {
-                                    LawnchairLauncher.iconPackSwitchPending = false
-                                    LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
-                                }
-                            }
-                        }
-                    }
+                    LawnchairLauncher.iconPackSwitchPending = false
+                    LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
                 }
             }
         }
         private val themedIconSubscription = themedIconPackPref.subscribeChanges {
             val newState = themeManager.iconState
-            if (iconState != newState) {
-                iconState = newState
-            }
+            if (iconState != newState) iconState = newState
             recreateCalendarAndClockChangeReceiver()
             LawnchairLauncher.iconPackSwitchPending = true
             LawnchairLauncher.instance?.showIconPackSwitchOverlay()
-            LawnchairLauncher.instance?.recreateIfNotScheduled()
             Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
@@ -380,16 +371,8 @@ class LawnchairIconProvider @Inject constructor(
                 LauncherIcons.clearPool(context)
                 appState.model.reloadIfActive()
                 Executors.MAIN_EXECUTOR.execute {
-                    Executors.MODEL_EXECUTOR.execute {
-                        Executors.MAIN_EXECUTOR.execute {
-                            Executors.MODEL_EXECUTOR.execute {
-                                Executors.MAIN_EXECUTOR.execute {
-                                    LawnchairLauncher.iconPackSwitchPending = false
-                                    LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
-                                }
-                            }
-                        }
-                    }
+                    LawnchairLauncher.iconPackSwitchPending = false
+                    LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
                 }
             }
         }

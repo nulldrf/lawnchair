@@ -1095,40 +1095,42 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     fun showIconPackSwitchOverlay() {
         if (iconPackOverlay != null) return
+
         val density = resources.displayMetrics.density
-        val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
-        val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
-        ta.recycle()
-        val containerSize = (72 * density).toInt()
-        val spinnerSize   = (40 * density).toInt()
-        val containerBg = android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(android.graphics.Color.argb(
-                30,
-                android.graphics.Color.red(primaryColor),
-                android.graphics.Color.green(primaryColor),
-                android.graphics.Color.blue(primaryColor),
-            ))
+        val indicatorSize = (72 * density).toInt()
+
+        // Use M3 Expressive ContainedLoadingIndicator if available (Material alpha library).
+        // Falls back to a plain circular ProgressBar if the class is not on the classpath.
+        val indicator: android.view.View = try {
+            val cls = Class.forName(
+                "com.google.android.material.loadingindicator.LoadingIndicator")
+            val view = cls.getConstructor(android.content.Context::class.java)
+                .newInstance(this) as android.view.View
+            // Switch to "contained" variant (blob with outer container circle)
+            try {
+                cls.getMethod("setContained", Boolean::class.javaPrimitiveType)
+                    .invoke(view, true)
+            } catch (_: Exception) { }
+            view
+        } catch (_: Exception) {
+            // Fallback: circular spinner tinted with colorPrimary
+            val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
+            val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
+            ta.recycle()
+            android.widget.ProgressBar(this, null,
+                android.R.attr.progressBarStyle).apply {
+                isIndeterminate = true
+                indeterminateTintList =
+                    android.content.res.ColorStateList.valueOf(primaryColor)
+            }
         }
-        val container = FrameLayout(this).apply { background = containerBg }
-        val spinner = android.widget.ProgressBar(
-            this, null, android.R.attr.progressBarStyle,
-        ).apply {
-            isIndeterminate = true
-            indeterminateTintList = android.content.res.ColorStateList.valueOf(primaryColor)
-        }
-        container.addView(
-            spinner,
-            FrameLayout.LayoutParams(spinnerSize, spinnerSize).apply {
-                gravity = android.view.Gravity.CENTER
-            },
-        )
+
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))
         }
         scrim.addView(
-            container,
-            FrameLayout.LayoutParams(containerSize, containerSize).apply {
+            indicator,
+            FrameLayout.LayoutParams(indicatorSize, indicatorSize).apply {
                 gravity = android.view.Gravity.CENTER
             },
         )

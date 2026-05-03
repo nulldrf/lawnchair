@@ -346,15 +346,19 @@ class LawnchairIconProvider @Inject constructor(
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
-                // reloadIfActive() posts icon-update runnables to MAIN_EXECUTOR.
+                // reloadIfActive() posts multiple rounds of MODEL→MAIN work per icon.
+                // We drain the queues 3 times (MODEL→MAIN×3) to ensure all icon-update
+                // runnables have completed before dismissing the overlay.
                 appState.model.reloadIfActive()
-                // Queue-drain: bounce MAIN→MODEL→MAIN to ensure all icon-update
-                // runnables posted by reloadIfActive() have been consumed before dismiss.
                 Executors.MAIN_EXECUTOR.execute {
                     Executors.MODEL_EXECUTOR.execute {
                         Executors.MAIN_EXECUTOR.execute {
-                            LawnchairLauncher.iconPackSwitchPending = false
-                            LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
+                            Executors.MODEL_EXECUTOR.execute {
+                                Executors.MAIN_EXECUTOR.execute {
+                                    LawnchairLauncher.iconPackSwitchPending = false
+                                    LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
+                                }
+                            }
                         }
                     }
                 }
@@ -378,8 +382,12 @@ class LawnchairIconProvider @Inject constructor(
                 Executors.MAIN_EXECUTOR.execute {
                     Executors.MODEL_EXECUTOR.execute {
                         Executors.MAIN_EXECUTOR.execute {
-                            LawnchairLauncher.iconPackSwitchPending = false
-                            LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
+                            Executors.MODEL_EXECUTOR.execute {
+                                Executors.MAIN_EXECUTOR.execute {
+                                    LawnchairLauncher.iconPackSwitchPending = false
+                                    LawnchairLauncher.instance?.dismissIconPackSwitchOverlay()
+                                }
+                            }
                         }
                     }
                 }

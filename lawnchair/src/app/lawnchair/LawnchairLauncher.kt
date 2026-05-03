@@ -1092,28 +1092,30 @@ class LawnchairLauncher : QuickstepLauncher() {
     // ── Icon pack switch loading overlay ──────────────────────────────────
 
     private var iconPackOverlay: View? = null
+    private var iconPackOverlayShownAt = 0L
 
     fun showIconPackSwitchOverlay() {
         if (iconPackOverlay != null) return
+        iconPackOverlayShownAt = System.currentTimeMillis()
 
         val density = resources.displayMetrics.density
         val indicatorSize = (72 * density).toInt()
 
-        // Use M3 Expressive ContainedLoadingIndicator if available (Material alpha library).
-        // Falls back to a plain circular ProgressBar if the class is not on the classpath.
-        val indicator: android.view.View = try {
+        // M3 Expressive "Contained loading indicator" — blob/squircle animated shape.
+        // The contained style must be applied via ContextThemeWrapper using the bundled
+        // Material style name. We look it up at runtime so no hard dependency is needed.
+        val indicator: View = try {
             val cls = Class.forName(
                 "com.google.android.material.loadingindicator.LoadingIndicator")
-            val view = cls.getConstructor(android.content.Context::class.java)
-                .newInstance(this) as android.view.View
-            // Switch to "contained" variant (blob with outer container circle)
-            try {
-                cls.getMethod("setContained", Boolean::class.javaPrimitiveType)
-                    .invoke(view, true)
-            } catch (_: Exception) { }
-            view
+            // Android resource names use underscores; dot-notation is the display name.
+            val styleId = resources.getIdentifier(
+                "Widget_Material3_LoadingIndicator_Contained", "style", packageName)
+            val ctx = if (styleId != 0) android.view.ContextThemeWrapper(this, styleId)
+                      else this
+            cls.getConstructor(android.content.Context::class.java)
+                .newInstance(ctx) as View
         } catch (_: Exception) {
-            // Fallback: circular spinner tinted with colorPrimary
+            // Fallback: plain circular ProgressBar tinted with colorPrimary
             val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
             val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
             ta.recycle()
@@ -1148,12 +1150,19 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     fun dismissIconPackSwitchOverlay() {
         val overlay = iconPackOverlay ?: return
-        iconPackOverlay = null
-        overlay.animate()
-            .alpha(0f)
-            .setDuration(300)
-            .withEndAction { dragLayer.removeView(overlay) }
-            .start()
+        // Enforce a minimum display time so the overlay doesn't flash away on fast devices
+        // before all icons have finished regenerating.
+        val elapsed = System.currentTimeMillis() - iconPackOverlayShownAt
+        val minDisplay = 1500L
+        val remaining = maxOf(0L, minDisplay - elapsed)
+        dragLayer.postDelayed({
+            iconPackOverlay = null
+            overlay.animate()
+                .alpha(0f)
+                .setDuration(300)
+                .withEndAction { dragLayer.removeView(overlay) }
+                .start()
+        }, remaining)
     }
 
     private fun restartIfPending() {

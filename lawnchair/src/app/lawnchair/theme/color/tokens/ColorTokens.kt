@@ -100,11 +100,14 @@ object ColorTokens {
 
     @JvmField val FocusHighlight = DayNightColorToken(Neutral1_0, Neutral1_700)
 
-    @JvmField val FocusHighlightBlur = DayNightColorToken(Neutral1_0, Neutral1_700).setAlpha(.40f)
+    @JvmField val FocusHighlightBlur = DayNightColorToken(
+        Neutral1_0.setAlpha(0.32f),
+        Accent1_100.setAlpha(0.15f),
+    )
 
     @JvmField val GroupHighlight = Surface
 
-    @JvmField val GroupHighlightBlur = Surface.setAlpha(.40f)
+    @JvmField val GroupHighlightBlur = Surface.setAlpha(0.54f)
 
     @JvmField val OverviewScrimColor = DayNightColorToken(Neutral2_100.setLStar(87.0), Neutral1_800)
 
@@ -193,19 +196,16 @@ object ColorTokens {
     @JvmField val PredictedPlateColor = Accent1_300
 
     // Material 3 Expressive
-    @JvmField val ExpressiveAllApps = DayNightColorToken(Accent1_100, Accent1_800)
+    @JvmField val ExpressiveAllApps = DayNightColorToken(Accent1_100, Accent1_800).setAlpha(0.5f)
 
     @JvmField val BottomSheetBackgroundColorBlurFallback = DayNightColorToken(Neutral1_50, Neutral1_900)
 
     @JvmField val shade_panel_fg_color = DayNightColorToken(
-        Neutral1_100.setAlpha(0.32f),
-        Neutral1_800.setAlpha(0.32f),
+        Accent1_100.setAlpha(0.32f),
+        Accent1_800.setAlpha(0.32f),
     )
 
-    @JvmField val shade_panel_bg_color = DayNightColorToken(
-        Neutral1_500.setLStar(98.0).setAlpha(0.32f),
-        Neutral1_500.setLStar(4.0).setAlpha(0.32f),
-    )
+    @JvmField val shade_panel_bg_color = Surface.setAlpha(0.32f)
 
     @JvmField val pageIndicatorDotColor = DayNightColorToken(
         Accent1_600,

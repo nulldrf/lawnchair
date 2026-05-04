@@ -14,6 +14,7 @@ import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
+import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.SystemColorScheme
 import app.lawnchair.ui.theme.getSystemAccent
@@ -109,7 +110,14 @@ class ThemeProvider @Inject constructor(
         is ColorOption.WallpaperDerived ->
             getColorScheme(accentColor.color, colorStyle)
 
-        is ColorOption.CustomColor -> getColorScheme(accentColor.color, colorStyle)
+        // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
+        // When the user has picked a specific custom colour, silently fall back
+        // to TonalSpot so the engine choice doesn't accidentally affect
+        // manually-picked accents and the Custom page swatch grid.
+        is ColorOption.CustomColor -> {
+            val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+            getColorScheme(accentColor.color, effectiveStyle)
+        }
 
         else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle)
     }

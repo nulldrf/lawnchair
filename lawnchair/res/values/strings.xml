@@ -545,6 +545,18 @@
     <string name="smartspace_mode_google">Google</string>
     <string name="smartspace_mode_google_search">Google Search</string>
     <string name="smartspace_mode_smartspacer" translatable="false">Smartspacer</string>
+	
+	<!-- Weather providers -->
+    <string name="smartspace_open_meteo_weather">Open-Meteo Weather</string>
+    <string name="smartspace_pirate_weather">PirateWeather</string>
+
+    <!-- Shared location permission dialog (used by both providers) -->
+    <string name="smartspace_weather_location_permission_title">Location permission needed</string>
+    <string name="smartspace_weather_location_permission_description">This weather provider needs your location to show local weather. Please grant the location permission in Settings.</string>
+
+    <!-- PirateWeather API key dialog -->
+    <string name="smartspace_pirate_weather_api_key_title">API key required</string>
+    <string name="smartspace_pirate_weather_api_key_description">PirateWeather requires a free API key from pirateweather.net. Please enter it in the weather settings.</string>
 
     <!-- Miscellaneous Smartspace strings -->
     <string name="smartspace_media_info_separator">" — "</string>

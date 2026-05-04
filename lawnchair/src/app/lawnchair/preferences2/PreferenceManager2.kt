@@ -714,6 +714,16 @@ class PreferenceManager2 @Inject constructor(
     val smartspaceOnboarding = preference(
         key = booleanPreferencesKey("enable_smartspace_onboarding"),
         defaultValue = true,
+	)
+	
+	val smartspaceOpenMeteoWeather = preference(
+        key = booleanPreferencesKey("enable_smartspace_open_meteo_weather"),
+        defaultValue = false,
+    )
+
+    val smartspacePirateWeather = preference(
+        key = booleanPreferencesKey("enable_smartspace_pirate_weather"),
+        defaultValue = false,
     )
 
     val smartspaceShowDate = preference(

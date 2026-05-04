@@ -27,6 +27,8 @@ import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
+import app.lawnchair.theme.color.LegacyKdrag
+import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
@@ -245,7 +247,15 @@ fun GeneralPreferences() {
             accentColorValue is ColorOption.WallpaperDerived
 
         val currentColorStyle = prefs2.colorStyle.asState().value
-        val colorStyleSubtitle = stringResource(id = currentColorStyle.nameResourceId)
+        // When LegacyKdrag is active but the accent is not wallpaper-based,
+        // the engine has no effect — show TonalSpot as the effective style so
+        // the subtitle doesn't mislead the user.
+        val effectiveColorStyle = if (!isWallpaperAccent && currentColorStyle is LegacyKdrag) {
+            TonalSpot
+        } else {
+            currentColorStyle
+        }
+        val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
             Item { ColorPreference(preference = prefs2.accentColor) }

@@ -157,17 +157,11 @@ fun ShapePreference(
     modifier: Modifier = Modifier,
     currentTab: ShapeRoute = ShapeRoute.APP_SHAPE,
 ) {
-    val prefs2 = preferenceManager2()
-    val folderCustomEnabled = prefs2.enableFolderIconShapeCustomization.getAdapter().state.value
-
-    if (folderCustomEnabled) {
-        TwoTabShapePreference(
-            modifier = modifier,
-            currentTab = currentTab,
-        )
-    } else {
-        IconShapePreference(modifier = modifier)
-    }
+    // Folder shape customisation is now stable — always show both tabs.
+    TwoTabShapePreference(
+        modifier = modifier,
+        currentTab = currentTab,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +182,7 @@ private fun TwoTabShapePreference(
     val iconShapeAdapter = prefs2.iconShape.getAdapter()
     val folderShapeAdapter = prefs2.folderShape.getAdapter()
     val customIconShape = prefs2.customIconShape.asState()
+    val customFolderShape = prefs2.customFolderShape.asState()
 
     val pagerState = rememberPagerState(
         initialPage = currentTab.ordinal,
@@ -228,49 +223,17 @@ private fun TwoTabShapePreference(
                         entries = entries,
                         shapeAdapter = iconShapeAdapter,
                         customIconShape = customIconShape.value,
+                        currentTab = ShapeRoute.APP_SHAPE,
                     )
                     1 -> ShapeGridContent(
                         entries = entries,
                         shapeAdapter = folderShapeAdapter,
-                        customIconShape = null, // folder shape has no custom option
+                        customIconShape = customFolderShape.value,
+                        currentTab = ShapeRoute.FOLDER_SHAPE,
                     )
                 }
             }
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Single-tab variant
-// ---------------------------------------------------------------------------
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun IconShapePreference(
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val prefs2 = preferenceManager2()
-    val entries = remember { iconShapeEntries(context) }
-    val iconShapeAdapter = prefs2.iconShape.getAdapter()
-    val customIconShape = prefs2.customIconShape.asState()
-
-    PreferenceLayout(
-        label = stringResource(id = R.string.icon_shape_label),
-        modifier = modifier,
-        isExpandedScreen = true,
-    ) {
-        // ── Mockup ───────────────────────────────────────────────────────────
-        ShapeMockup(shapeAdapter = iconShapeAdapter)
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ── Shape grid + custom button ────────────────────────────────────────
-        ShapeGridContent(
-            entries = entries,
-            shapeAdapter = iconShapeAdapter,
-            customIconShape = customIconShape.value,
-        )
     }
 }
 
@@ -396,6 +359,7 @@ private fun ShapeGridContent(
     entries: List<ListPreferenceEntry<IconShape>>,
     shapeAdapter: PreferenceAdapter<IconShape>,
     customIconShape: IconShape?,
+    currentTab: ShapeRoute = ShapeRoute.APP_SHAPE,
 ) {
     val navController = LocalNavController.current
 
@@ -430,13 +394,19 @@ private fun ShapeGridContent(
                 }
             }
             Item {
-                ModifyCustomIconShapePreference(customIconShape = customIconShape)
+                ModifyCustomIconShapePreference(
+                    customIconShape = customIconShape,
+                    currentTab = currentTab,
+                )
             }
         }
     } else {
         PreferenceGroup(heading = stringResource(id = R.string.custom)) {
             Item {
-                ModifyCustomIconShapePreference(customIconShape = null)
+                ModifyCustomIconShapePreference(
+                    customIconShape = null,
+                    currentTab = currentTab,
+                )
             }
         }
     }
@@ -548,21 +518,28 @@ private fun ShapeCard(
 @Composable
 private fun ModifyCustomIconShapePreference(
     customIconShape: IconShape?,
+    currentTab: ShapeRoute,
     modifier: Modifier = Modifier,
 ) {
     val navController = LocalNavController.current
+    // Pass the active tab so the creator screen opens in the right context.
+    val route = GeneralCustomIconShapeCreator(selectedId = currentTab)
+
     val created = customIconShape != null
-    val text = if (created) {
-        stringResource(id = R.string.custom_icon_shape_edit)
-    } else {
-        stringResource(id = R.string.custom_icon_shape_create)
-    }
+
+    val text = stringResource(
+        when (currentTab) {
+            ShapeRoute.APP_SHAPE -> if (created) R.string.custom_icon_shape_edit else R.string.custom_icon_shape_create
+            ShapeRoute.FOLDER_SHAPE -> if (created) R.string.custom_folder_shape_edit else R.string.custom_folder_shape_create
+        },
+    )
+
     val icon = if (created) Icons.Rounded.Edit else Icons.Rounded.Add
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { navController.navigate(route = GeneralCustomIconShapeCreator) },
+            .clickable { navController.navigate(route = route) },
         contentAlignment = Alignment.Center,
     ) {
         Row(

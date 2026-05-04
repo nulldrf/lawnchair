@@ -40,11 +40,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.lawnchair.theme.color.ColorStyle
+import app.lawnchair.theme.color.KdragMonetColorScheme
+import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.toAndroidColor
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.ui.theme.isSelectedThemeDark
-import com.android.systemui.monet.Style
+import dev.kdrag0n.monet.theme.ColorScheme
 
 object SwatchGridDefaults {
     val GutterSize = 12.dp
@@ -52,6 +55,11 @@ object SwatchGridDefaults {
     const val COLUMN_COUNT = 4
 }
 
+/**
+ * @param colorStyle When non-null each swatch is rendered using this Monet style
+ *   so the grid reflects the currently selected colour style (Presets page only).
+ *   Pass null to always render with TONAL_SPOT (Custom page).
+ */
 @Composable
 fun <T> SwatchGrid(
     entries: List<ColorPreferenceEntry<T>>,
@@ -59,6 +67,7 @@ fun <T> SwatchGrid(
     isSwatchSelected: (T) -> Boolean,
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
+    colorStyle: ColorStyle? = null,
 ) {
     val columnCount = SwatchGridDefaults.COLUMN_COUNT
     val rowCount = if (entries.isEmpty()) 0 else (entries.size - 1) / columnCount + 1
@@ -80,6 +89,7 @@ fun <T> SwatchGrid(
                                 entry = entry,
                                 onClick = { onSwatchClick(entry.value) },
                                 selected = isSwatchSelected(entry.value),
+                                colorStyle = colorStyle,
                                 modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
                             )
                         }
@@ -97,24 +107,26 @@ fun <T> ColorSwatch(
     onClick: () -> Unit,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    colorStyle: ColorStyle? = null,
 ) {
     val context = LocalContext.current
     val isDark = isSelectedThemeDark
     val baseColorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
 
-    // Build a full Monet palette seeded from this swatch's colour so every
-    // swatch is visually consistent with the M3 token system.
-    val scheme = remember(baseColorInt) {
-        MonetColorSchemeCompat(baseColorInt, Style.TONAL_SPOT)
+    // Build a Monet palette seeded from this swatch's colour.
+    // When colorStyle is provided (Presets page) use it so swatches visually
+    // reflect the active style (e.g. Monochromatic looks desaturated).
+    // When null (Custom page) always use TONAL_SPOT for consistent static colours.
+    val scheme: ColorScheme = remember(baseColorInt, colorStyle) {
+        buildScheme(baseColorInt, colorStyle)
     }
 
-    // accent1[100] = light primary pastel  → top half of outer circle
-    // accent3[100] = light tertiary pastel → bottom half of outer circle
-    // accent1[600] = bold/vibrant primary  → inner circle fill
-    //
-    // Container background:
-    //   Light mode → accent1[50]  (very light tinted surface)
-    //   Dark mode  → accent1[900] (very dark tinted surface)
+    // accent1[100] → top half of outer circle   (light primary pastel)
+    // accent3[100] → bottom half of outer circle (light tertiary pastel)
+    // accent1[600] → inner circle fill           (bold/vibrant primary)
+    // Container bg:
+    //   light → accent1[50]  (faint tinted surface)
+    //   dark  → accent1[900] (deep tinted surface)
     val topHalf = remember(scheme) {
         Color(scheme.accent1[100]?.toAndroidColor() ?: baseColorInt)
     }
@@ -131,7 +143,6 @@ fun <T> ColorSwatch(
             Color(scheme.accent1[50]?.toAndroidColor() ?: baseColorInt)
         }
     }
-    // Checkmark uses accent1[100] so it contrasts on the bold inner circle.
     val checkTint = topHalf
 
     val centerCircleSize by animateDpAsState(
@@ -152,7 +163,6 @@ fun <T> ColorSwatch(
             .background(containerBg)
             .clickable(onClick = onClick),
     ) {
-        // Split circle: top = accent1[100], bottom = accent3[100]
         Canvas(modifier = Modifier.size(54.dp)) {
             val radius = size.minDimension / 2f
             val circlePath = Path().apply { addOval(Rect(center, radius)) }
@@ -170,7 +180,6 @@ fun <T> ColorSwatch(
             }
         }
 
-        // Animated inner circle: accent1[600], grows + checkmark on select
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -193,3 +202,15 @@ fun <T> ColorSwatch(
         }
     }
 }
+
+/**
+ * Builds a [ColorScheme] for [seedColor] using the given [colorStyle].
+ * LegacyKdrag uses the kdrag0n ZCAM engine; everything else uses [MonetColorSchemeCompat].
+ * When [colorStyle] is null, defaults to TONAL_SPOT.
+ */
+private fun buildScheme(seedColor: Int, colorStyle: ColorStyle?): ColorScheme =
+    when (colorStyle) {
+        is LegacyKdrag -> KdragMonetColorScheme(seedColor)
+        null -> MonetColorSchemeCompat(seedColor, com.android.systemui.monet.Style.TONAL_SPOT)
+        else -> MonetColorSchemeCompat(seedColor, colorStyle.style)
+    }

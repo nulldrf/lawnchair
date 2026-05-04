@@ -104,6 +104,11 @@ class ThemeProvider @Inject constructor(
             getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle)
         }
 
+        // WallpaperDerived: a specific colour extracted from the wallpaper —
+        // honour the user's chosen color style just like WallpaperPrimary.
+        is ColorOption.WallpaperDerived ->
+            getColorScheme(accentColor.color, colorStyle)
+
         is ColorOption.CustomColor -> getColorScheme(accentColor.color, colorStyle)
 
         else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle)

@@ -22,6 +22,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
+import app.lawnchair.preferences2.preferenceManager2
+import app.lawnchair.preferences2.asState
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.wallpaper.WallpaperManagerCompat
@@ -40,13 +42,14 @@ private const val DEDUPE_DISTANCE = 48.0
 /**
  * Wallpaper colour grid for the Presets page.
  *
- * Layout (up to [MAX_SWATCHES] total):
+ * Reads [preferenceManager2.colorStyle] reactively so every swatch re-renders
+ * with the correct Monet style whenever the user changes it — without touching
+ * the Custom page's grid at all.
+ *
+ * Slot layout (up to [MAX_SWATCHES] total):
  *  [0]    SystemAccent
  *  [1..N] WallpaperDerived colours (up to 6, or 7 if no Default)
  *  [last] Default — only when [includeDefault] is true
- *
- * Tapping a wallpaper swatch applies [ColorOption.WallpaperDerived] which
- * stores the exact color int but shows "Wallpaper" as its label everywhere.
  */
 @Composable
 fun WallpaperColorGrid(
@@ -56,6 +59,11 @@ fun WallpaperColorGrid(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+
+    // Read the active colour style reactively — recomposition happens
+    // automatically when the user picks a different style.
+    val currentColorStyle = preferenceManager2().colorStyle.asState().value
+
     var extractedEntries by remember {
         mutableStateOf<List<ColorPreferenceEntry<ColorOption>>>(emptyList())
     }
@@ -98,11 +106,12 @@ fun WallpaperColorGrid(
                     appliedColor is ColorOption.WallpaperDerived ->
                     option.color == appliedColor.color
 
-                // Also highlight if WallpaperPrimary is active and this is
-                // the first wallpaper swatch (legacy preference value).
+                // Legacy: if WallpaperPrimary is still stored, highlight the
+                // first wallpaper swatch so the page doesn't look unselected.
                 option is ColorOption.WallpaperDerived &&
                     appliedColor is ColorOption.WallpaperPrimary ->
-                    extractedEntries.firstOrNull { it.value is ColorOption.WallpaperDerived }
+                    extractedEntries
+                        .firstOrNull { it.value is ColorOption.WallpaperDerived }
                         ?.value == option
 
                 else -> false
@@ -110,6 +119,9 @@ fun WallpaperColorGrid(
         },
         modifier = modifier,
         contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+        // Pass the active style so presets swatches reflect e.g. Monochromatic.
+        // The banner still shows the raw dot colour, not the processed palette.
+        colorStyle = currentColorStyle,
     )
 }
 

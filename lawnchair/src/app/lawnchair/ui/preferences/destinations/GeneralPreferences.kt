@@ -86,9 +86,6 @@ fun GeneralPreferences() {
         label = stringResource(id = R.string.general_label),
     ) {
         // ── Theme ─────────────────────────────────────────────────────────────
-        // Placed at the top of the screen so the user sees the live mockup
-        // preview and the Light / Dark / System segmented control immediately,
-        // before any other settings groups.
         ThemePreference()
 
         // ── Rotation ──────────────────────────────────────────────────────────
@@ -212,7 +209,6 @@ fun GeneralPreferences() {
                     showAsPercentage = true,
                 )
             }
-            // Smart background color analysis — only visible when auto-adaptive icons is on
             Item(
                 "colorized_backgrounds",
                 wrapAdaptiveIcons.state.value,
@@ -223,9 +219,6 @@ fun GeneralPreferences() {
                     description = stringResource(id = R.string.colorized_backgrounds_description),
                 )
             }
-            // Recolor adaptive icon backgrounds — only visible when both
-            // auto-adaptive icons AND colorized backgrounds are on.
-            // Now handles white, very dark, and desaturated gray backgrounds (not just white).
             Item(
                 "treat_white_adaptive_icons",
                 wrapAdaptiveIcons.state.value && colorizedBackgrounds.state.value,
@@ -239,24 +232,23 @@ fun GeneralPreferences() {
         }
 
         // ── Colors ────────────────────────────────────────────────────────────
-        // Note: ThemePreference has been moved to the top of this screen.
-        // This group now only contains the accent colour picker and color style.
         val accentColorAdapter = prefs2.accentColor.getAdapter()
         val accentColorValue = accentColorAdapter.state.value
         val showColorStyle = !(Utilities.ATLEAST_S && accentColorValue == ColorOption.SystemAccent) ||
             !Utilities.ATLEAST_S
 
-        // LegacyKdrag is only meaningful for wallpaper-derived seed colors.
-        val isWallpaperAccent = accentColorValue is ColorOption.WallpaperPrimary
+        // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
+        // WallpaperDerived is a specific extracted wallpaper colour — it should
+        // behave identically to WallpaperPrimary for the purposes of showing
+        // the LegacyKdrag engine option and the full style picker.
+        val isWallpaperAccent = accentColorValue is ColorOption.WallpaperPrimary ||
+            accentColorValue is ColorOption.WallpaperDerived
 
-        // Read the current style name in a composable-safe way via asState() so
-        // the subtitle updates automatically when the user changes style.
         val currentColorStyle = prefs2.colorStyle.asState().value
         val colorStyleSubtitle = stringResource(id = currentColorStyle.nameResourceId)
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
             Item { ColorPreference(preference = prefs2.accentColor) }
-            // Color style — full-screen picker replaces the old bottom sheet.
             Item(
                 "color_style",
                 showColorStyle,
@@ -318,6 +310,7 @@ private fun NotificationDotColorContrastWarnings(
     val dotColorIsDynamic = when (dotColor) {
         is ColorOption.SystemAccent,
         is ColorOption.WallpaperPrimary,
+        is ColorOption.WallpaperDerived,
         is ColorOption.Default,
         -> true
 

@@ -1059,8 +1059,13 @@ class LawnchairLauncher : QuickstepLauncher() {
         super.onResume()
         restartIfPending()
 
+        // If an icon pack switch happened while in background, show overlay now.
+        // We also start the idle timer here — the timer from LawnchairIconProvider
+        // may have already fired against a null/paused instance and been lost.
+        // Starting it fresh in onResume ensures it runs against the live dragLayer.
         if (iconPackSwitchPending) {
             showIconPackSwitchOverlay()
+            startIconPackSwitchIdleTimer()
         }
 
         dragLayer.viewTreeObserver.addOnDrawListener(
@@ -1096,6 +1101,9 @@ class LawnchairLauncher : QuickstepLauncher() {
     private val iconPackIdleDelayMs = 600L
 
     fun showIconPackSwitchOverlay() {
+        // Guard: dragLayer must be attached and visible before we can add views.
+        // If the launcher is paused/stopped, skip — onResume() will show it later.
+        if (!dragLayer.isAttachedToWindow) return
         if (iconPackOverlay != null) return
 
         val density = resources.displayMetrics.density
@@ -1140,18 +1148,23 @@ class LawnchairLauncher : QuickstepLauncher() {
     }
 
     /**
-     * Called by LawnchairIconProvider after reloadIfActive() has posted its work.
-     * Starts a 600ms idle timer. Each call resets the timer so the overlay stays
-     * visible as long as icon updates keep arriving. When updates stop for 600ms
-     * (meaning all icons have been redrawn), the overlay fades out.
+     * Starts or resets the 600ms idle timer. When no further call arrives for 600ms,
+     * the overlay is dismissed — meaning all visible icon updates have completed.
+     * Also clears [iconPackSwitchPending] so that if the launcher is recreated or
+     * resumed after dismiss, it does not show a stale overlay.
      */
     fun startIconPackSwitchIdleTimer() {
+        // Only run if the overlay is actually showing. If the launcher was in the
+        // background when this was called, the overlay may not exist yet — onResume()
+        // will show it and call startIconPackSwitchIdleTimer() again.
+        if (iconPackOverlay == null && !iconPackSwitchPending) return
         dragLayer.removeCallbacks(iconPackIdleRunnable)
         dragLayer.postDelayed(iconPackIdleRunnable, iconPackIdleDelayMs)
     }
 
     fun dismissIconPackSwitchOverlay() {
         dragLayer.removeCallbacks(iconPackIdleRunnable)
+        iconPackSwitchPending = false
         val overlay = iconPackOverlay ?: return
         iconPackOverlay = null
         overlay.animate()

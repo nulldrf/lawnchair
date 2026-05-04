@@ -349,12 +349,16 @@ class LawnchairIconProvider @Inject constructor(
                 appState.iconCache.clearMemoryCache()
                 LauncherIcons.clearPool(context)
                 appState.model.reloadIfActive()
-                // After reloadIfActive() posts its icon-update callbacks to MAIN_EXECUTOR,
-                // signal the overlay to start its idle timer. The overlay will dismiss
-                // itself 500ms after the last onIconsUpdated() call arrives.
+                // Signal idle timer to start. If the launcher is active (foreground),
+                // this starts the 600ms countdown. If it's paused (user in Settings),
+                // the timer call is a no-op — onResume() will start it when the user
+                // returns, guaranteeing the overlay stays until icons are fully updated.
                 Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.iconPackSwitchPending = false
                     LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
+                        ?: run {
+                            // Launcher is paused — leave iconPackSwitchPending=true so
+                            // onResume() shows the overlay and starts the timer fresh.
+                        }
                 }
             }
         }
@@ -371,7 +375,6 @@ class LawnchairIconProvider @Inject constructor(
                 LauncherIcons.clearPool(context)
                 appState.model.reloadIfActive()
                 Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.iconPackSwitchPending = false
                     LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
                 }
             }

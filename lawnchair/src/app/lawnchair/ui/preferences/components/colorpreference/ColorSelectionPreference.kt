@@ -81,12 +81,11 @@ fun ColorSelection(
 
     // Page 0 = Presets (system + wallpaper colours)
     // Page 1 = Custom (static grid + canvas picker dialog)
-    val defaultTabIndex = if (
-        appliedColor is ColorOption.WallpaperPrimary ||
-        appliedColor is ColorOption.Default ||
-        appliedColor is ColorOption.SystemAccent ||
-        dynamicEntries.any { it.value == appliedColor }
-    ) 0 else 1
+    // Default to Presets tab — wallpaper-extracted colours are applied as
+    // CustomColor now (so the accent actually changes), but conceptually they
+    // live on the Presets page. We only open Custom when the applied colour
+    // is one of the static staticEntries.
+    val defaultTabIndex = if (staticEntries.any { it.value == appliedColor }) 1 else 0
 
     val pagerState = rememberPagerState(
         initialPage = defaultTabIndex,
@@ -226,37 +225,37 @@ private fun SelectionIndicator(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surface,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(containerTint)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 18.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Colour dot
+                // Colour dot — large and prominent like Repainter
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
                         .background(dotColor),
                 )
                 // Labels
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = bigLabel,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = smallLabel,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

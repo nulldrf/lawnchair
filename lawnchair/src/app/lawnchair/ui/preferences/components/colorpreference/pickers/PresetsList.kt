@@ -69,14 +69,6 @@ fun WallpaperColorGrid(
         mutableStateOf<List<ColorPreferenceEntry<ColorOption>>>(emptyList())
     }
 
-    // Track which wallpaper swatch the user last tapped for visual feedback.
-    var lastTappedWallpaperValue by remember { mutableStateOf<ColorOption?>(null) }
-
-    // Reset tracked swatch when the applied preference moves away from WallpaperPrimary.
-    LaunchedEffect(appliedColor) {
-        if (appliedColor !is ColorOption.WallpaperPrimary) lastTappedWallpaperValue = null
-    }
-
     LaunchedEffect(Unit) {
         extractedEntries = withContext(Dispatchers.IO) {
             buildPresetEntries(context, includeDefault)
@@ -100,30 +92,12 @@ fun WallpaperColorGrid(
         return
     }
 
-    // First wallpaper-colour entry (used as fallback selection indicator when
-    // WallpaperPrimary is active but the user hasn't tapped a swatch yet).
-    val firstWallpaperEntry = extractedEntries.firstOrNull { it.value is ColorOption.CustomColor }
-
     SwatchGrid(
         entries = extractedEntries,
         onSwatchClick = { option ->
-            when (option) {
-                is ColorOption.SystemAccent -> {
-                    lastTappedWallpaperValue = null
-                    onApplyOption(ColorOption.SystemAccent)
-                }
-                is ColorOption.Default -> {
-                    lastTappedWallpaperValue = null
-                    onApplyOption(ColorOption.Default)
-                }
-                is ColorOption.CustomColor -> {
-                    // All wallpaper swatches resolve to WallpaperPrimary in the
-                    // preference, but we track which tile was tapped for feedback.
-                    lastTappedWallpaperValue = option
-                    onApplyOption(ColorOption.WallpaperPrimary)
-                }
-                else -> Unit
-            }
+            // Apply the exact option — CustomColor for each wallpaper swatch so
+            // the specific colour is persisted and the accent updates immediately.
+            onApplyOption(option)
         },
         isSwatchSelected = { option ->
             when {
@@ -134,12 +108,8 @@ fun WallpaperColorGrid(
                     appliedColor is ColorOption.Default
 
                 option is ColorOption.CustomColor &&
-                    appliedColor is ColorOption.WallpaperPrimary -> {
-                    // Highlight the last tapped swatch, or the first wallpaper
-                    // swatch if the preference was already WallpaperPrimary on entry.
-                    val target = lastTappedWallpaperValue ?: firstWallpaperEntry?.value
-                    option == target
-                }
+                    appliedColor is ColorOption.CustomColor ->
+                    option.color == appliedColor.color
 
                 else -> false
             }

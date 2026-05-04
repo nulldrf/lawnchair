@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import app.lawnchair.theme.color.AndroidColor
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.toAndroidColor
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
@@ -68,7 +67,6 @@ fun <T> SwatchGrid(
     Column(modifier = modifier.then(contentModifier)) {
         for (rowNo in 1..rowCount) {
             val firstIndex = (rowNo - 1) * columnCount
-
             Row(modifier = Modifier.fillMaxWidth()) {
                 for (colIdx in 0 until columnCount) {
                     if (colIdx > 0) Spacer(modifier = Modifier.width(gutter))
@@ -88,7 +86,6 @@ fun <T> SwatchGrid(
                     }
                 }
             }
-
             if (rowNo != rowCount) Spacer(modifier = Modifier.height(gutter))
         }
     }
@@ -105,17 +102,19 @@ fun <T> ColorSwatch(
     val isDark = isSelectedThemeDark
     val baseColorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
 
-    // Build a full Monet palette seeded from this swatch's own colour so
-    // every swatch is visually consistent with the M3 token system, regardless
-    // of the global theme accent.
+    // Build a full Monet palette seeded from this swatch's colour so every
+    // swatch is visually consistent with the M3 token system.
     val scheme = remember(baseColorInt) {
         MonetColorSchemeCompat(baseColorInt, Style.TONAL_SPOT)
     }
 
-    // Outer-circle top half  → accent1 shade 100 (light primary pastel)
-    // Outer-circle bottom half → accent3 shade 100 (light tertiary pastel)
-    // Inner circle            → accent1 shade 600 (bold/vibrant primary)
-    // Container background    → accent1 shade 50  (barely-there tint)
+    // accent1[100] = light primary pastel  → top half of outer circle
+    // accent3[100] = light tertiary pastel → bottom half of outer circle
+    // accent1[600] = bold/vibrant primary  → inner circle fill
+    //
+    // Container background:
+    //   Light mode → accent1[50]  (very light tinted surface)
+    //   Dark mode  → accent1[900] (very dark tinted surface)
     val topHalf = remember(scheme) {
         Color(scheme.accent1[100]?.toAndroidColor() ?: baseColorInt)
     }
@@ -125,13 +124,14 @@ fun <T> ColorSwatch(
     val innerCircle = remember(scheme) {
         Color(scheme.accent1[600]?.toAndroidColor() ?: baseColorInt)
     }
-    val containerBg = remember(scheme) {
-        // accent1 shade 50 is the lightest tinted surface
-        Color(scheme.accent1[50]?.toAndroidColor() ?: baseColorInt)
+    val containerBg = remember(scheme, isDark) {
+        if (isDark) {
+            Color(scheme.accent1[900]?.toAndroidColor() ?: baseColorInt)
+        } else {
+            Color(scheme.accent1[50]?.toAndroidColor() ?: baseColorInt)
+        }
     }
-
-    // Checkmark tint sits on the inner circle — use accent1[100] so it
-    // always contrasts against the vibrant inner circle fill.
+    // Checkmark uses accent1[100] so it contrasts on the bold inner circle.
     val checkTint = topHalf
 
     val centerCircleSize by animateDpAsState(
@@ -152,7 +152,7 @@ fun <T> ColorSwatch(
             .background(containerBg)
             .clickable(onClick = onClick),
     ) {
-        // Split-circle: top = accent1[100], bottom = accent3[100]
+        // Split circle: top = accent1[100], bottom = accent3[100]
         Canvas(modifier = Modifier.size(54.dp)) {
             val radius = size.minDimension / 2f
             val circlePath = Path().apply { addOval(Rect(center, radius)) }
@@ -170,7 +170,7 @@ fun <T> ColorSwatch(
             }
         }
 
-        // Animated inner circle: accent1[600], grows + shows checkmark on select
+        // Animated inner circle: accent1[600], grows + checkmark on select
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier

@@ -42,6 +42,31 @@ sealed class ColorOption {
         override fun toString() = "wallpaper_primary"
     }
 
+    /**
+     * A wallpaper-derived colour that stores a specific extracted [color] int
+     * but shows "Wallpaper" as its label everywhere (preference row, indicator
+     * banner, etc.).  Used when the user picks a non-primary wallpaper swatch
+     * from the Presets grid so the exact tapped colour is persisted while the
+     * UI correctly identifies it as a wallpaper-based choice.
+     */
+    class WallpaperDerived(val color: Int) : ColorOption() {
+        override val isSupported = Utilities.ATLEAST_O_MR1
+
+        override val colorPreferenceEntry = ColorPreferenceEntry<ColorOption>(
+            this,
+            { stringResource(id = R.string.wallpaper) },
+            { color },
+        )
+
+        constructor(color: Long) : this(color.toInt())
+
+        override fun equals(other: Any?) = other is WallpaperDerived && other.color == color
+
+        override fun hashCode() = color
+
+        override fun toString() = "wallpaper_derived|#${String.format("%08x", color)}"
+    }
+
     class CustomColor(val color: Int) : ColorOption() {
         override val isSupported = true
 
@@ -84,6 +109,10 @@ sealed class ColorOption {
 
         private fun instantiateCustomColor(stringValue: String): ColorOption {
             try {
+                if (stringValue.startsWith("wallpaper_derived")) {
+                    val color = Color.parseColor(stringValue.substring(18))
+                    return WallpaperDerived(color)
+                }
                 if (stringValue.startsWith("custom")) {
                     val color = Color.parseColor(stringValue.substring(7))
                     return CustomColor(color)

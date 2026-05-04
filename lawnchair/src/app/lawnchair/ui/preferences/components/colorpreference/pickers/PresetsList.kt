@@ -32,30 +32,21 @@ import kotlinx.coroutines.withContext
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-// Minimum HSV saturation a Palette swatch must have to be considered colourful.
 private const val MIN_SATURATION = 0.10f
-
-// Maximum colour buckets requested from the Palette API.
 private const val PALETTE_MAX_COUNT = 32
-
-// Maximum swatches in the grid (including SystemAccent and optionally Default).
 const val MAX_SWATCHES = 8
-
-// Minimum Euclidean RGB distance before two colours are treated as duplicates.
 private const val DEDUPE_DISTANCE = 48.0
 
 /**
  * Wallpaper colour grid for the Presets page.
  *
  * Layout (up to [MAX_SWATCHES] total):
- *  [0] SystemAccent — always the first slot
- *  [1..N] Wallpaper-extracted colours (up to 6, or 7 if no Default)
- *  [last] Default ("Managed by Lawnchair") — only when [includeDefault] is true
+ *  [0]    SystemAccent
+ *  [1..N] WallpaperDerived colours (up to 6, or 7 if no Default)
+ *  [last] Default — only when [includeDefault] is true
  *
- * All wallpaper-colour taps call [onApplyOption] with [ColorOption.WallpaperPrimary].
- * The last-tapped wallpaper swatch is tracked locally so the user gets clear
- * per-swatch visual feedback even though all wallpaper taps resolve to the same
- * preference value.
+ * Tapping a wallpaper swatch applies [ColorOption.WallpaperDerived] which
+ * stores the exact color int but shows "Wallpaper" as its label everywhere.
  */
 @Composable
 fun WallpaperColorGrid(
@@ -94,11 +85,7 @@ fun WallpaperColorGrid(
 
     SwatchGrid(
         entries = extractedEntries,
-        onSwatchClick = { option ->
-            // Apply the exact option — CustomColor for each wallpaper swatch so
-            // the specific colour is persisted and the accent updates immediately.
-            onApplyOption(option)
-        },
+        onSwatchClick = { option -> onApplyOption(option) },
         isSwatchSelected = { option ->
             when {
                 option is ColorOption.SystemAccent ->
@@ -107,9 +94,16 @@ fun WallpaperColorGrid(
                 option is ColorOption.Default ->
                     appliedColor is ColorOption.Default
 
-                option is ColorOption.CustomColor &&
-                    appliedColor is ColorOption.CustomColor ->
+                option is ColorOption.WallpaperDerived &&
+                    appliedColor is ColorOption.WallpaperDerived ->
                     option.color == appliedColor.color
+
+                // Also highlight if WallpaperPrimary is active and this is
+                // the first wallpaper swatch (legacy preference value).
+                option is ColorOption.WallpaperDerived &&
+                    appliedColor is ColorOption.WallpaperPrimary ->
+                    extractedEntries.firstOrNull { it.value is ColorOption.WallpaperDerived }
+                        ?.value == option
 
                 else -> false
             }
@@ -123,34 +117,29 @@ fun WallpaperColorGrid(
 // Entry building
 // ---------------------------------------------------------------------------
 
-/**
- * Builds the full preset entry list:
- *  1. [ColorOption.SystemAccent] — always first
- *  2. Wallpaper-extracted colours — up to (MAX_SWATCHES − 1 − if(includeDefault) 1 else 0)
- *  3. [ColorOption.Default] — only when [includeDefault] is true, always last
- */
 private fun buildPresetEntries(
     context: Context,
     includeDefault: Boolean,
 ): List<ColorPreferenceEntry<ColorOption>> {
     val entries = mutableListOf<ColorPreferenceEntry<ColorOption>>()
 
-    // ── Slot 0: System accent ────────────────────────────────────────────────
+    // Slot 0: System accent
     entries += ColorOption.SystemAccent.colorPreferenceEntry
 
-    // ── Slots 1..N: Wallpaper colours ────────────────────────────────────────
-    val wallpaperSlots = MAX_SWATCHES - 1 - (if (includeDefault) 1 else 0)  // 6 or 7
+    // Slots 1..N: Wallpaper-derived colours
+    val wallpaperSlots = MAX_SWATCHES - 1 - (if (includeDefault) 1 else 0)
     val wallpaperColors = extractWallpaperColors(context, wallpaperSlots)
     wallpaperColors.forEach { colorInt ->
+        val option = ColorOption.WallpaperDerived(colorInt)
         entries += ColorPreferenceEntry<ColorOption>(
-            value = ColorOption.CustomColor(colorInt),
+            value = option,
             label = { stringResource(R.string.wallpaper) },
             lightColor = { colorInt },
             darkColor = { colorInt },
         )
     }
 
-    // ── Last slot: Default (Managed by Lawnchair) ────────────────────────────
+    // Last slot: Default (Managed by Lawnchair)
     if (includeDefault) {
         entries += ColorOption.Default.colorPreferenceEntry
     }
@@ -159,23 +148,13 @@ private fun buildPresetEntries(
 }
 
 // ---------------------------------------------------------------------------
-// Wallpaper colour extraction
+// Extraction
 // ---------------------------------------------------------------------------
 
-/**
- * Extracts up to [maxCount] dominant colours from the current wallpaper.
- *
- * Strategy:
- *  1. On API 27+: [android.app.WallpaperManager.getWallpaperColors] → primary /
- *     secondary / tertiary (no bitmap permission required).
- *  2. Supplement with [Palette] run on the wallpaper bitmap for additional slots.
- *  3. De-duplicate by Euclidean RGB distance.
- */
 private fun extractWallpaperColors(context: Context, maxCount: Int): List<Int> {
     val wm = android.app.WallpaperManager.getInstance(context)
     val colorInts = mutableListOf<Int>()
 
-    // Step 1: WallpaperColors API (API 27+, no permission needed)
     if (Utilities.ATLEAST_O_MR1) {
         runCatching {
             val wc = wm.getWallpaperColors(android.app.WallpaperManager.FLAG_SYSTEM)
@@ -190,7 +169,6 @@ private fun extractWallpaperColors(context: Context, maxCount: Int): List<Int> {
             ?.primaryColor?.let { colorInts.add(it) }
     }
 
-    // Step 2: Palette API for additional colours
     if (colorInts.size < maxCount) {
         runCatching {
             val bitmap = getBitmapFromWallpaper(wm)
@@ -213,16 +191,10 @@ private fun extractWallpaperColors(context: Context, maxCount: Int): List<Int> {
     return colorInts.distinct().take(maxCount)
 }
 
-/**
- * Attempts to get a [Bitmap] from the wallpaper manager drawable.
- * Works for [BitmapDrawable] and any other drawable type by drawing it
- * onto an offscreen canvas.
- */
 private fun getBitmapFromWallpaper(wm: android.app.WallpaperManager): Bitmap? {
     val drawable = runCatching { wm.drawable }.getOrNull()
         ?: runCatching { wm.peekDrawable() }.getOrNull()
         ?: return null
-
     return when (drawable) {
         is BitmapDrawable -> drawable.bitmap
         else -> runCatching {
@@ -236,10 +208,6 @@ private fun getBitmapFromWallpaper(wm: android.app.WallpaperManager): Bitmap? {
         }.getOrNull()
     }
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 private fun MutableList<Int>.addIfDistinct(color: Int) {
     if (none { existing -> rgbDistance(existing, color) < DEDUPE_DISTANCE }) add(color)

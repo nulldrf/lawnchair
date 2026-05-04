@@ -40,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import app.lawnchair.ui.theme.isSelectedThemeDark
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -52,6 +51,7 @@ import app.lawnchair.ui.preferences.components.colorpreference.pickers.CustomCol
 import app.lawnchair.ui.preferences.components.colorpreference.pickers.WallpaperColorGrid
 import app.lawnchair.ui.preferences.components.layout.BottomSpacer
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.theme.isSelectedThemeDark
 import com.android.launcher3.R
 import com.patrykmichalik.opto.domain.Preference
 import kotlinx.coroutines.launch
@@ -77,16 +77,12 @@ fun ColorSelection(
         }
     }
 
-    // Whether this preference supports "Managed by Lawnchair" (Default).
     val includeDefault = dynamicEntries.any { it.value is ColorOption.Default }
 
-    // Page 0 = Presets (system + wallpaper colours)
-    // Page 1 = Custom (static grid + canvas picker dialog)
-    // Default to Presets tab — wallpaper-extracted colours are applied as
-    // CustomColor now (so the accent actually changes), but conceptually they
-    // live on the Presets page. We only open Custom when the applied colour
-    // is one of the static staticEntries.
-    val defaultTabIndex = if (staticEntries.any { it.value == appliedColor }) 1 else 0
+    // Open Custom tab only when a manually-picked CustomColor is active.
+    // WallpaperDerived, SystemAccent, WallpaperPrimary, and Default all live
+    // on the Presets tab.
+    val defaultTabIndex = if (appliedColor is ColorOption.CustomColor) 1 else 0
 
     val pagerState = rememberPagerState(
         initialPage = defaultTabIndex,
@@ -94,8 +90,6 @@ fun ColorSelection(
     )
     val scope = rememberCoroutineScope()
 
-    // Track which specific custom color was last selected on page 1 so the
-    // indicator dot shows the right color before the user hits Apply.
     var pendingCustomColor by remember { mutableStateOf<Int?>(null) }
 
     PreferenceLayout(
@@ -129,17 +123,14 @@ fun ColorSelection(
         },
     ) {
         Column {
-            // ── Selection indicator ──────────────────────────────────────────
             SelectionIndicator(
                 appliedColor = appliedColor,
                 pendingCustomColor = pendingCustomColor,
                 currentPage = pagerState.currentPage,
-                includeDefault = includeDefault,
                 context = context,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
-            // ── Tab row — exact ShapeTabRow pattern from IconShapePreference ─
             ColorTabRow(
                 selectedPage = pagerState.currentPage,
                 onSelectPage = { scope.launch { pagerState.animateScrollToPage(it) } },
@@ -178,66 +169,50 @@ fun ColorSelection(
 // Selection indicator banner
 // ---------------------------------------------------------------------------
 
-/**
- * Displays a tinted container with:
- *  - A filled circle showing the currently active colour.
- *  - A bold label ("Presets" or "Custom") matching the active page.
- *  - A secondary description label ("System", "Wallpaper",
- *    "Managed by Lawnchair", or "Custom").
- *
- * Mirrors the top-of-card indicator from Repainter.
- */
 @Composable
 private fun SelectionIndicator(
     appliedColor: ColorOption,
     pendingCustomColor: Int?,
     currentPage: Int,
-    includeDefault: Boolean,
     context: Context,
     modifier: Modifier = Modifier,
 ) {
-    // Resolve the colour to display in the dot.
+    val isDark = isSelectedThemeDark
+
     val dotColorInt = when {
         currentPage == 1 && pendingCustomColor != null -> pendingCustomColor
         appliedColor is ColorOption.CustomColor -> appliedColor.color
+        appliedColor is ColorOption.WallpaperDerived -> appliedColor.color
         else -> appliedColor.colorPreferenceEntry.lightColor(context)
     }
     val dotColor = if (dotColorInt != 0) ComposeColor(dotColorInt)
         else MaterialTheme.colorScheme.primary
 
-    // Container tint: stronger in dark mode so it registers on dark surfaces.
-    val isDark = isSelectedThemeDark
+    // Tint alpha is stronger on dark backgrounds so the wash registers.
     val containerTint = dotColor.copy(alpha = if (isDark) 0.28f else 0.14f)
 
-    // Big label matches the active tab.
     val bigLabel = if (currentPage == 0) {
         stringResource(id = R.string.presets)
     } else {
         stringResource(id = R.string.custom)
     }
 
-    // Small description reflects the actual applied preference.
-    // CustomColor on page 0 (Presets) means a wallpaper-extracted colour —
-    // show "Wallpaper". On page 1 (Custom) it is a manually picked colour.
-    val smallLabel = when {
-        appliedColor is ColorOption.SystemAccent ->
-            stringResource(id = R.string.system)
-        appliedColor is ColorOption.WallpaperPrimary ->
-            stringResource(id = R.string.wallpaper)
-        appliedColor is ColorOption.Default ->
-            stringResource(id = R.string.managed_by_lawnchair)
-        appliedColor is ColorOption.CustomColor && currentPage == 0 ->
-            stringResource(id = R.string.wallpaper)
-        else ->
-            stringResource(id = R.string.custom)
+    // WallpaperDerived shows "Wallpaper" — this is the fix for the label bug.
+    val smallLabel = when (appliedColor) {
+        is ColorOption.SystemAccent -> stringResource(id = R.string.system)
+        is ColorOption.WallpaperPrimary -> stringResource(id = R.string.wallpaper)
+        is ColorOption.WallpaperDerived -> stringResource(id = R.string.wallpaper)
+        is ColorOption.Default -> stringResource(id = R.string.managed_by_lawnchair)
+        is ColorOption.CustomColor -> stringResource(id = R.string.custom)
+        else -> stringResource(id = R.string.custom)
     }
 
+    // Use surfaceContainer so the base is always a visible step above the
+    // background in both light and dark mode without touching surfaceContainerHigh.
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
-        // surfaceContainerHigh gives enough elevation contrast in both light
-        // and dark mode so the tinted wash on top is always visible.
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Box(
             modifier = Modifier
@@ -249,14 +224,12 @@ private fun SelectionIndicator(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Colour dot — large and prominent like Repainter
                 Box(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
                         .background(dotColor),
                 )
-                // Labels
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = bigLabel,
@@ -276,8 +249,7 @@ private fun SelectionIndicator(
 }
 
 // ---------------------------------------------------------------------------
-// Tab row — exact ShapeTabRow from IconShapePreference.kt
-// Centered and compact: constrained width so it doesn't stretch full-screen.
+// Tab row
 // ---------------------------------------------------------------------------
 
 @Composable

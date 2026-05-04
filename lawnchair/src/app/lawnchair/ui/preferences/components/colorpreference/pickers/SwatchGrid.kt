@@ -70,8 +70,7 @@ fun <T> SwatchGrid(
                     if (colIdx > 0) {
                         Spacer(modifier = Modifier.width(gutter))
                     }
-                    val entryIdx = firstIndex + colIdx
-                    val entry = entries.getOrNull(entryIdx)
+                    val entry = entries.getOrNull(firstIndex + colIdx)
                     Box(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center,
@@ -103,47 +102,53 @@ fun <T> ColorSwatch(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val baseColorInt = if (isSelectedThemeDark) {
+    val isDark = isSelectedThemeDark
+
+    val baseColorInt = if (isDark) {
         entry.darkColor(context)
     } else {
         entry.lightColor(context)
     }
 
-    // Derive three visual layers from the base color HSV
     val hsv = remember(baseColorInt) {
         FloatArray(3).also { android.graphics.Color.colorToHSV(baseColorInt, it) }
     }
+
+    // In dark mode keep colours fairly dark; in light mode use noticeably
+    // lighter shades so the split-circle doesn't look like a black blob.
+    val darkFactor = if (isDark) 0.58f else 0.72f
+    val accentDarkFactor = if (isDark) 0.54f else 0.68f
 
     // Top half of the outer circle: darkened primary
     val darkPrimary = Color.hsv(
         hue = hsv[0],
         saturation = hsv[1],
-        value = (hsv[2] * 0.55f).coerceIn(0.15f, 0.75f),
+        value = (hsv[2] * darkFactor).coerceIn(0.12f, 0.85f),
     )
-    // Bottom half of the outer circle: darkened analogous accent (hue shifted ~28°)
+    // Bottom half: analogous accent, shifted ~28° in hue, also darkened
     val darkAccent = Color.hsv(
         hue = (hsv[0] + 28f) % 360f,
-        saturation = (hsv[1] * 0.85f).coerceAtLeast(0.2f),
-        value = (hsv[2] * 0.55f).coerceIn(0.15f, 0.75f),
+        saturation = (hsv[1] * 0.85f).coerceAtLeast(0.18f),
+        value = (hsv[2] * accentDarkFactor).coerceIn(0.12f, 0.82f),
     )
-    // Center circle: lighter/brighter version of the primary
+    // Center circle: bright / light version of the primary
     val lightPrimary = Color.hsv(
         hue = hsv[0],
-        saturation = (hsv[1] * 0.75f).coerceAtLeast(0.15f),
-        value = (hsv[2] + 0.25f).coerceAtMost(1f),
+        saturation = (hsv[1] * 0.70f).coerceAtLeast(0.12f),
+        value = (hsv[2] + 0.28f).coerceAtMost(1f),
     )
 
-    // Container tint: surface + a very light wash of the base color
+    // Container: surface with a very light wash of the base colour
     val containerTint = Color(baseColorInt).copy(alpha = 0.13f)
 
-    // Center circle animates larger when selected
+    // Center circle grows on selection with a bouncy spring
     val centerCircleSize by animateDpAsState(
-        targetValue = if (selected) 26.dp else 18.dp,
+        targetValue = if (selected) 32.dp else 24.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMediumLow,
         ),
-        label = "centerCircleSize",
+        label = "centerCircle_$selected",
     )
 
     Box(
@@ -156,15 +161,12 @@ fun <T> ColorSwatch(
             .background(containerTint)
             .clickable(onClick = onClick),
     ) {
-        // Outer split circle drawn via Canvas
-        Canvas(modifier = Modifier.size(52.dp)) {
+        // Split-circle drawn via Canvas
+        Canvas(modifier = Modifier.size(54.dp)) {
             val radius = size.minDimension / 2f
-            val circleCenter = center
-
             val circlePath = Path().apply {
-                addOval(Rect(circleCenter, radius))
+                addOval(Rect(center, radius))
             }
-
             clipPath(circlePath) {
                 // Top half — dark primary
                 drawRect(
@@ -181,7 +183,7 @@ fun <T> ColorSwatch(
             }
         }
 
-        // Center circle — animated size, shows checkmark when selected
+        // Animated center circle with Done checkmark when selected
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -198,7 +200,7 @@ fun <T> ColorSwatch(
                     imageVector = Icons.Rounded.Done,
                     contentDescription = null,
                     tint = darkPrimary,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }

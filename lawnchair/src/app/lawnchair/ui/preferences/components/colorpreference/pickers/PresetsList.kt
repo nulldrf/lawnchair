@@ -2,15 +2,11 @@ package app.lawnchair.ui.preferences.components.colorpreference.pickers
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,26 +26,41 @@ import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.R
+import com.android.launcher3.Utilities
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.pow
+import kotlin.math.sqrt
 
-// Minimum HSV saturation (0–1) for a swatch to be considered "colorful".
-// Swatches below this threshold are treated as near-monochrome.
-private const val MIN_SATURATION = 0.12f
+// Minimum HSV saturation (0–1) a Palette swatch must have to be kept.
+private const val MIN_SATURATION = 0.10f
 
-// Maximum distinct colors to extract via Palette before filtering.
-private const val PALETTE_MAX_COUNT = 24
+// Maximum color buckets requested from the Palette API.
+private const val PALETTE_MAX_COUNT = 32
 
-// Maximum swatches shown in the grid when the wallpaper is colorful.
-private const val MAX_SWATCHES = 8
+// Maximum swatches shown when the wallpaper is colorful.
+const val MAX_SWATCHES = 8
 
-// Minimum swatches always shown regardless of saturation filtering.
-private const val MIN_SWATCHES = 2
+// Minimum Euclidean RGB distance before two colours are treated as duplicates.
+private const val DEDUPE_DISTANCE = 48.0
 
+/**
+ * Wallpaper colour grid for the Presets page.
+ *
+ * Every non-Default swatch tap stores [ColorOption.WallpaperPrimary] in the
+ * preference so the description label always reads "Wallpaper".  The extracted
+ * colours are only used for rendering: the most-dominant swatch is highlighted
+ * whenever [ColorOption.WallpaperPrimary] is the applied preference.
+ *
+ * When [includeDefault] is true (used by preferences that support
+ * "Managed by Lawnchair"), the last slot is always [ColorOption.Default].
+ */
 @Composable
 fun WallpaperColorGrid(
-    onSwatchClick: (ColorOption) -> Unit,
-    isSwatchSelected: (ColorOption) -> Boolean,
+    appliedColor: ColorOption,
+    onApplyWallpaper: () -> Unit,
+    onApplyDefault: () -> Unit,
+    includeDefault: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -59,12 +70,11 @@ fun WallpaperColorGrid(
 
     LaunchedEffect(Unit) {
         extractedEntries = withContext(Dispatchers.IO) {
-            extractWallpaperSwatches(context)
+            extractWallpaperSwatches(context, includeDefault)
         }
     }
 
     if (extractedEntries.isEmpty()) {
-        // Show a loading placeholder with the same grid shape
         Column(
             modifier = modifier
                 .fillMaxWidth()
@@ -81,89 +91,165 @@ fun WallpaperColorGrid(
         return
     }
 
+    // The first entry (most-dominant colour) is the visual proxy for
+    // WallpaperPrimary selection state.
+    val firstEntry = extractedEntries.firstOrNull()
+
     SwatchGrid(
         entries = extractedEntries,
-        onSwatchClick = onSwatchClick,
-        isSwatchSelected = isSwatchSelected,
+        onSwatchClick = { option ->
+            if (option is ColorOption.Default) onApplyDefault() else onApplyWallpaper()
+        },
+        isSwatchSelected = { option ->
+            when {
+                // Default swatch selected when Default is the applied colour.
+                option is ColorOption.Default ->
+                    appliedColor is ColorOption.Default
+
+                // All other swatches: highlight only the first (most-dominant)
+                // one when WallpaperPrimary is the active preference — every
+                // swatch tap resolves to WallpaperPrimary anyway.
+                appliedColor is ColorOption.WallpaperPrimary ->
+                    option == firstEntry?.value
+
+                else -> false
+            }
+        },
         modifier = modifier,
         contentModifier = Modifier.padding(
-            start = 16.dp,
-            end = 16.dp,
-            top = 16.dp,
-            bottom = 16.dp,
+            horizontal = 16.dp,
+            vertical = 16.dp,
         ),
     )
 }
 
+// ---------------------------------------------------------------------------
+// Extraction logic
+// ---------------------------------------------------------------------------
+
 /**
- * Extracts up to [MAX_SWATCHES] dominant colors from the current home-screen
- * wallpaper, sorted by population (most dominant first).
+ * Returns up to [MAX_SWATCHES] dominant colours from the current home-screen
+ * wallpaper, sorted by dominance.
  *
  * Strategy:
- *  1. Get wallpaper bitmap via [WallpaperManagerCompat].
- *  2. Run [Palette] with [PALETTE_MAX_COUNT] buckets.
- *  3. Sort by population descending.
- *  4. Filter out near-monochrome swatches (saturation < [MIN_SATURATION]).
- *  5. If fewer than [MIN_SWATCHES] survive the filter, fall back to the
- *     top-[MIN_SWATCHES] by population regardless of saturation.
- *  6. Cap at [MAX_SWATCHES].
- *  7. Wrap each ARGB int into a [ColorPreferenceEntry] pointing to
- *     [ColorOption.CustomColor] so it integrates with the existing
- *     preference adapter without touching [ColorOption].
+ *  1. On Android 8.1+ use [android.app.WallpaperManager.getWallpaperColors]
+ *     for primary / secondary / tertiary — no bitmap or extra permissions.
+ *  2. Supplement by running [Palette] on the wallpaper bitmap for additional
+ *     colours up to the target count.
+ *  3. Deduplicate using Euclidean RGB distance.
+ *  4. If [includeDefault] is true, cap extracted slots at MAX_SWATCHES − 1
+ *     and append [ColorOption.Default] as the final entry.
  */
-private fun extractWallpaperSwatches(context: Context): List<ColorPreferenceEntry<ColorOption>> {
-    val wallpaperManager = WallpaperManagerCompat.INSTANCE.get(context)
+private fun extractWallpaperSwatches(
+    context: Context,
+    includeDefault: Boolean,
+): List<ColorPreferenceEntry<ColorOption>> {
+    val wm = android.app.WallpaperManager.getInstance(context)
+    val colorInts = mutableListOf<Int>()
 
-    // Obtain the wallpaper bitmap.  On API < 27 the manager's drawable is the
-    // only route; on 27+ we can ask WallpaperManager directly.
-    val bitmap: Bitmap? = runCatching {
-        val drawable = wallpaperManager.wallpaperManager.drawable
-        (drawable as? BitmapDrawable)?.bitmap
-    }.getOrNull()
-
-    // If we cannot get the bitmap at all, fall back to just the primaryColor.
-    if (bitmap == null) {
-        val fallback = wallpaperManager.wallpaperColors?.primaryColor
-            ?: return emptyList()
-        return listOf(colorIntToEntry(fallback))
+    // ── Step 1: WallpaperColors API (Android 8.1+, permission-safe) ─────────
+    if (Utilities.ATLEAST_O_MR1) {
+        runCatching {
+            val colors = wm.getWallpaperColors(android.app.WallpaperManager.FLAG_SYSTEM)
+            if (colors != null) {
+                colorInts.add(colors.primaryColor.toArgb())
+                colors.secondaryColor?.toArgb()?.let { colorInts.addIfDistinct(it) }
+                colors.tertiaryColor?.toArgb()?.let { colorInts.addIfDistinct(it) }
+            }
+        }
+    } else {
+        // Pre-8.1: fall back to the single primary colour stored by Lawnchair.
+        WallpaperManagerCompat.INSTANCE.get(context).wallpaperColors
+            ?.primaryColor
+            ?.let { colorInts.add(it) }
     }
 
-    // Resize to a small area so Palette runs fast on the UI-blocked IO dispatcher.
-    val palette = Palette.Builder(bitmap)
-        .maximumColorCount(PALETTE_MAX_COUNT)
-        .resizeBitmapArea(15_000)
-        .generate()
-
-    val allSwatches = palette.swatches
-        .sortedByDescending { it.population }
-
-    if (allSwatches.isEmpty()) {
-        val fallback = wallpaperManager.wallpaperColors?.primaryColor
-            ?: return emptyList()
-        return listOf(colorIntToEntry(fallback))
+    // ── Step 2: Palette API on the wallpaper bitmap ──────────────────────────
+    val targetCount = if (includeDefault) MAX_SWATCHES - 1 else MAX_SWATCHES
+    if (colorInts.size < targetCount) {
+        runCatching {
+            val bitmap = getBitmapFromWallpaper(wm)
+            if (bitmap != null) {
+                val hsv = FloatArray(3)
+                Palette.Builder(bitmap)
+                    .maximumColorCount(PALETTE_MAX_COUNT)
+                    .resizeBitmapArea(20_000)
+                    .generate()
+                    .swatches
+                    .sortedByDescending { it.population }
+                    .forEach { swatch ->
+                        android.graphics.Color.colorToHSV(swatch.rgb, hsv)
+                        if (hsv[1] >= MIN_SATURATION) {
+                            colorInts.addIfDistinct(swatch.rgb)
+                        }
+                    }
+            }
+        }
     }
 
-    // Filter to colorful swatches only.
-    val hsv = FloatArray(3)
-    val colorful = allSwatches.filter { swatch ->
-        android.graphics.Color.colorToHSV(swatch.rgb, hsv)
-        hsv[1] >= MIN_SATURATION
+    if (colorInts.isEmpty()) return emptyList()
+
+    // ── Step 3: Build entries ────────────────────────────────────────────────
+    // Each entry keeps its own distinct CustomColor value so SwatchGrid can
+    // tell swatches apart visually. The click handler in WallpaperColorGrid
+    // always applies WallpaperPrimary, keeping the preference label as "Wallpaper".
+    val distinct = colorInts.distinct().take(targetCount)
+    val entries: MutableList<ColorPreferenceEntry<ColorOption>> = distinct.map { colorInt ->
+        ColorPreferenceEntry<ColorOption>(
+            value = ColorOption.CustomColor(colorInt),
+            label = { stringResource(R.string.wallpaper) },
+            lightColor = { colorInt },
+            darkColor = { colorInt },
+        )
+    }.toMutableList()
+
+    // ── Step 4: Append Default if requested ─────────────────────────────────
+    if (includeDefault) {
+        entries += ColorOption.Default.colorPreferenceEntry
     }
 
-    // Use colorful list if it has enough entries, otherwise fall back gracefully.
-    val candidates = if (colorful.size >= MIN_SWATCHES) colorful else allSwatches
-
-    return candidates
-        .take(MAX_SWATCHES)
-        .map { colorIntToEntry(it.rgb) }
+    return entries
 }
 
-private fun colorIntToEntry(colorInt: Int): ColorPreferenceEntry<ColorOption> {
-    val option = ColorOption.CustomColor(colorInt)
-    return ColorPreferenceEntry(
-        value = option,
-        label = { "" },
-        lightColor = { colorInt },
-        darkColor = { colorInt },
-    )
+/**
+ * Attempts to obtain a [Bitmap] from the system wallpaper manager drawable.
+ * Handles [BitmapDrawable] directly and draws any other drawable type onto
+ * an offscreen [Bitmap] so Palette can still analyse it.
+ */
+private fun getBitmapFromWallpaper(wm: android.app.WallpaperManager): Bitmap? {
+    val drawable = runCatching { wm.drawable }.getOrNull()
+        ?: runCatching { wm.peekDrawable() }.getOrNull()
+        ?: return null
+
+    return when (drawable) {
+        is BitmapDrawable -> drawable.bitmap
+        else -> runCatching {
+            val w = drawable.intrinsicWidth.takeIf { it > 0 }?.coerceAtMost(720) ?: 360
+            val h = drawable.intrinsicHeight.takeIf { it > 0 }?.coerceAtMost(1280) ?: 640
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            drawable.setBounds(0, 0, w, h)
+            drawable.draw(canvas)
+            bmp
+        }.getOrNull()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Adds [color] only if it is perceptually distinct from all existing entries. */
+private fun MutableList<Int>.addIfDistinct(color: Int) {
+    if (none { existing -> rgbDistance(existing, color) < DEDUPE_DISTANCE }) {
+        add(color)
+    }
+}
+
+/** Euclidean distance in RGB space. */
+private fun rgbDistance(c1: Int, c2: Int): Double {
+    val dr = (android.graphics.Color.red(c1) - android.graphics.Color.red(c2)).toDouble()
+    val dg = (android.graphics.Color.green(c1) - android.graphics.Color.green(c2)).toDouble()
+    val db = (android.graphics.Color.blue(c1) - android.graphics.Color.blue(c2)).toDouble()
+    return sqrt(dr.pow(2) + dg.pow(2) + db.pow(2))
 }

@@ -40,8 +40,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.lawnchair.theme.color.AndroidColor
+import app.lawnchair.theme.color.MonetColorSchemeCompat
+import app.lawnchair.theme.toAndroidColor
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.ui.theme.isSelectedThemeDark
+import com.android.systemui.monet.Style
 
 object SwatchGridDefaults {
     val GutterSize = 12.dp
@@ -67,9 +71,7 @@ fun <T> SwatchGrid(
 
             Row(modifier = Modifier.fillMaxWidth()) {
                 for (colIdx in 0 until columnCount) {
-                    if (colIdx > 0) {
-                        Spacer(modifier = Modifier.width(gutter))
-                    }
+                    if (colIdx > 0) Spacer(modifier = Modifier.width(gutter))
                     val entry = entries.getOrNull(firstIndex + colIdx)
                     Box(
                         modifier = Modifier.weight(1f),
@@ -87,9 +89,7 @@ fun <T> SwatchGrid(
                 }
             }
 
-            if (rowNo != rowCount) {
-                Spacer(modifier = Modifier.height(gutter))
-            }
+            if (rowNo != rowCount) Spacer(modifier = Modifier.height(gutter))
         }
     }
 }
@@ -103,45 +103,37 @@ fun <T> ColorSwatch(
 ) {
     val context = LocalContext.current
     val isDark = isSelectedThemeDark
+    val baseColorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
 
-    val baseColorInt = if (isDark) {
-        entry.darkColor(context)
-    } else {
-        entry.lightColor(context)
+    // Build a full Monet palette seeded from this swatch's own colour so
+    // every swatch is visually consistent with the M3 token system, regardless
+    // of the global theme accent.
+    val scheme = remember(baseColorInt) {
+        MonetColorSchemeCompat(baseColorInt, Style.TONAL_SPOT)
     }
 
-    val hsv = remember(baseColorInt) {
-        FloatArray(3).also { android.graphics.Color.colorToHSV(baseColorInt, it) }
+    // Outer-circle top half  → accent1 shade 100 (light primary pastel)
+    // Outer-circle bottom half → accent3 shade 100 (light tertiary pastel)
+    // Inner circle            → accent1 shade 600 (bold/vibrant primary)
+    // Container background    → accent1 shade 50  (barely-there tint)
+    val topHalf = remember(scheme) {
+        Color(scheme.accent1[100]?.toAndroidColor() ?: baseColorInt)
+    }
+    val bottomHalf = remember(scheme) {
+        Color(scheme.accent3[100]?.toAndroidColor() ?: baseColorInt)
+    }
+    val innerCircle = remember(scheme) {
+        Color(scheme.accent1[600]?.toAndroidColor() ?: baseColorInt)
+    }
+    val containerBg = remember(scheme) {
+        // accent1 shade 50 is the lightest tinted surface
+        Color(scheme.accent1[50]?.toAndroidColor() ?: baseColorInt)
     }
 
-    // In dark mode keep colours fairly dark; in light mode use noticeably
-    // lighter shades so the split-circle doesn't look like a black blob.
-    val darkFactor = if (isDark) 0.58f else 0.72f
-    val accentDarkFactor = if (isDark) 0.54f else 0.68f
+    // Checkmark tint sits on the inner circle — use accent1[100] so it
+    // always contrasts against the vibrant inner circle fill.
+    val checkTint = topHalf
 
-    // Top half of the outer circle: darkened primary
-    val darkPrimary = Color.hsv(
-        hue = hsv[0],
-        saturation = hsv[1],
-        value = (hsv[2] * darkFactor).coerceIn(0.12f, 0.85f),
-    )
-    // Bottom half: analogous accent, shifted ~28° in hue, also darkened
-    val darkAccent = Color.hsv(
-        hue = (hsv[0] + 28f) % 360f,
-        saturation = (hsv[1] * 0.85f).coerceAtLeast(0.18f),
-        value = (hsv[2] * accentDarkFactor).coerceIn(0.12f, 0.82f),
-    )
-    // Center circle: bright / light version of the primary
-    val lightPrimary = Color.hsv(
-        hue = hsv[0],
-        saturation = (hsv[1] * 0.70f).coerceAtLeast(0.12f),
-        value = (hsv[2] + 0.28f).coerceAtMost(1f),
-    )
-
-    // Container: surface with a very light wash of the base colour
-    val containerTint = Color(baseColorInt).copy(alpha = 0.13f)
-
-    // Center circle grows on selection with a bouncy spring
     val centerCircleSize by animateDpAsState(
         targetValue = if (selected) 32.dp else 24.dp,
         animationSpec = spring(
@@ -157,39 +149,34 @@ fun <T> ColorSwatch(
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surface)
-            .background(containerTint)
+            .background(containerBg)
             .clickable(onClick = onClick),
     ) {
-        // Split-circle drawn via Canvas
+        // Split-circle: top = accent1[100], bottom = accent3[100]
         Canvas(modifier = Modifier.size(54.dp)) {
             val radius = size.minDimension / 2f
-            val circlePath = Path().apply {
-                addOval(Rect(center, radius))
-            }
+            val circlePath = Path().apply { addOval(Rect(center, radius)) }
             clipPath(circlePath) {
-                // Top half — dark primary
                 drawRect(
-                    color = darkPrimary,
+                    color = topHalf,
                     topLeft = Offset.Zero,
                     size = Size(size.width, size.height / 2f),
                 )
-                // Bottom half — dark accent
                 drawRect(
-                    color = darkAccent,
+                    color = bottomHalf,
                     topLeft = Offset(0f, size.height / 2f),
                     size = Size(size.width, size.height / 2f),
                 )
             }
         }
 
-        // Animated center circle with Done checkmark when selected
+        // Animated inner circle: accent1[600], grows + shows checkmark on select
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(centerCircleSize)
                 .clip(CircleShape)
-                .background(lightPrimary),
+                .background(innerCircle),
         ) {
             AnimatedVisibility(
                 visible = selected,
@@ -199,7 +186,7 @@ fun <T> ColorSwatch(
                 Icon(
                     imageVector = Icons.Rounded.Done,
                     contentDescription = null,
-                    tint = darkPrimary,
+                    tint = checkTint,
                     modifier = Modifier.size(16.dp),
                 )
             }

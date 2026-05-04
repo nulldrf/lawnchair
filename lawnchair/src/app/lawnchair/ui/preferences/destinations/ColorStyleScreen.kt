@@ -38,7 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
+import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
+import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
@@ -65,21 +67,29 @@ fun ColorStyleScreen(
     // so luminance < 0.5 reliably means Lawnchair is currently rendering dark.
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-    // Raw wallpaper primary — fed into every Monet engine as seed so that
-    // preview colours are driven by the actual wallpaper colour, not by the
-    // AOSP-processed primary that shifts whenever the active style changes.
-    // WallpaperManager.getWallpaperColors returns colours extracted directly
-    // from the wallpaper bitmap, before any Monet processing.
-    // Fallback if WallpaperManager returns null (e.g. solid-color wallpaper).
-    // Must be read outside the remember lambda — composable reads are not
-    // allowed inside remember { }.
+    // Derive the raw seed from the accent source before any Monet engine
+    // processes it, so previews stay stable when the user switches styles.
+    //
+    // · CustomColor      → use the stored ARGB int directly.
+    // · WallpaperPrimary → extract the raw colour from WallpaperManager.
+    // · Anything else    → fall back to the current MaterialTheme primary.
+    //
+    // accentColorValue is the remember key so the seed only re-derives when
+    // the accent SOURCE changes, not when the style changes.
+    // fallbackSeed must be read outside the lambda (composable restriction).
+    val accentColorValue = prefs2.accentColor.asState().value
     val fallbackSeed = MaterialTheme.colorScheme.primary.toArgb()
-    val rawWallpaperSeed: Int = remember {
-        WallpaperManager.getInstance(context)
-            .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-            ?.primaryColor
-            ?.toArgb()
-            ?: fallbackSeed
+    val rawWallpaperSeed: Int = remember(accentColorValue) {
+        when (accentColorValue) {
+            is ColorOption.CustomColor -> accentColorValue.color
+            is ColorOption.WallpaperPrimary ->
+                WallpaperManager.getInstance(context)
+                    .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                    ?.primaryColor
+                    ?.toArgb()
+                    ?: fallbackSeed
+            else -> fallbackSeed
+        }
     }
 
     val styles = remember(showLegacyKdrag) {

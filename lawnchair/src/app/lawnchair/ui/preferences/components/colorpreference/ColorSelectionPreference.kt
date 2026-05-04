@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import app.lawnchair.ui.theme.isSelectedThemeDark
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -204,8 +205,9 @@ private fun SelectionIndicator(
     val dotColor = if (dotColorInt != 0) ComposeColor(dotColorInt)
         else MaterialTheme.colorScheme.primary
 
-    // Container tint: very light wash of the dot colour.
-    val containerTint = dotColor.copy(alpha = 0.12f)
+    // Container tint: stronger in dark mode so it registers on dark surfaces.
+    val isDark = isSelectedThemeDark
+    val containerTint = dotColor.copy(alpha = if (isDark) 0.28f else 0.14f)
 
     // Big label matches the active tab.
     val bigLabel = if (currentPage == 0) {
@@ -215,18 +217,27 @@ private fun SelectionIndicator(
     }
 
     // Small description reflects the actual applied preference.
-    val smallLabel = when (appliedColor) {
-        is ColorOption.SystemAccent -> stringResource(id = R.string.system)
-        is ColorOption.WallpaperPrimary -> stringResource(id = R.string.wallpaper)
-        is ColorOption.Default -> stringResource(id = R.string.managed_by_lawnchair)
-        is ColorOption.CustomColor -> stringResource(id = R.string.custom)
-        else -> stringResource(id = R.string.custom)
+    // CustomColor on page 0 (Presets) means a wallpaper-extracted colour —
+    // show "Wallpaper". On page 1 (Custom) it is a manually picked colour.
+    val smallLabel = when {
+        appliedColor is ColorOption.SystemAccent ->
+            stringResource(id = R.string.system)
+        appliedColor is ColorOption.WallpaperPrimary ->
+            stringResource(id = R.string.wallpaper)
+        appliedColor is ColorOption.Default ->
+            stringResource(id = R.string.managed_by_lawnchair)
+        appliedColor is ColorOption.CustomColor && currentPage == 0 ->
+            stringResource(id = R.string.wallpaper)
+        else ->
+            stringResource(id = R.string.custom)
     }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surface,
+        // surfaceContainerHigh gives enough elevation contrast in both light
+        // and dark mode so the tinted wash on top is always visible.
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Box(
             modifier = Modifier

@@ -6,46 +6,33 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
-import app.lawnchair.preferences2.PreferenceManager2
-import com.patrykmichalik.opto.core.firstBlocking
 
 class WeatherIconProvider(private val context: Context) {
 
-    fun getIcon(condition: WeatherCondition, isDay: Boolean): Icon? {
-        val packPackageName = getSelectedPack() ?: return null
+    /**
+     * Resolves a [WeatherCondition] to an [Icon] from the given Chronus icon pack.
+     * Returns null if [packPackageName] is blank or the resource isn't found —
+     * the smartspace card will show without an icon in that case.
+     *
+     * [packPackageName] is passed in rather than read from prefs internally to avoid
+     * calling firstBlocking() inside a coroutine flow on the IO dispatcher.
+     */
+    fun getIcon(condition: WeatherCondition, isDay: Boolean, packPackageName: String?): Icon? {
+        if (packPackageName.isNullOrBlank()) return null
         return try {
             val res = context.packageManager.getResourcesForApplication(packPackageName)
             val resName = resNameFor(condition, isDay)
             val resId = res.getIdentifier(resName, "drawable", packPackageName)
-            if (resId == 0) return null
+            if (resId == 0) {
+                Log.w(TAG, "Drawable '$resName' not found in pack $packPackageName")
+                return null
+            }
             val drawable = res.getDrawable(resId, null) ?: return null
             Icon.createWithBitmap(drawable.toBitmap())
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to load icon from pack $packPackageName", e)
+            Log.w(TAG, "Failed to load icon '$condition' from pack $packPackageName", e)
             null
         }
-    }
-
-    /**
-     * Returns the selected Chronus icon pack package name from prefs,
-     * or the first installed one if the user hasn't picked yet,
-     * or null if nothing is installed.
-     */
-    private fun getSelectedPack(): String? {
-        val saved = PreferenceManager2.getInstance(context)
-            .smartspaceWeatherIconPack
-            .firstBlocking()
-        if (saved.isNotBlank()) return saved
-
-        // Fall back to first installed pack if pref not set yet
-        return context.packageManager
-            .queryIntentActivities(
-                Intent(Intent.ACTION_MAIN).addCategory(CHRONUS_CATEGORY),
-                PackageManager.GET_META_DATA,
-            )
-            .firstOrNull()
-            ?.activityInfo
-            ?.packageName
     }
 
     companion object {

@@ -43,10 +43,18 @@ class ThemeProvider @Inject constructor(
 ) : SafeCloseable {
     private val preferenceManager2 = PreferenceManager2.getInstance(context)
     private val wallpaperManager = WallpaperManagerCompat.INSTANCE.get(context)
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
+    // Main dispatcher: onEach callbacks and listeners must run on the main thread
+    // because ColorSchemeChangeListener implementations call Activity.recreate().
+    private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     private var accentColor: ColorOption = preferenceManager2.accentColor.firstBlocking()
     private var colorStyle: ColorStyle = preferenceManager2.colorStyle.firstBlocking()
+
+    // Startup sync: if the stored accent is WallpaperDerived but the wallpaper
+    // has since changed (e.g. changed while Lawnchair was not running), update
+    // the preference immediately so the theme and UI are correct from first frame.
+    // We read wallpaperManager.wallpaperColors here — it is populated before
+    // ThemeProvider in the Dagger graph, so the value is available synchronously.
 
     // Cache for Android-system Monet schemes — keyed by (seedColor, Style).
     private val colorSchemeMap = HashMap<Pair<Int, Style>, ColorScheme>()
@@ -58,30 +66,19 @@ class ThemeProvider @Inject constructor(
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
     init {
+        syncWallpaperDerivedOnStartup()
+
         if (Utilities.ATLEAST_S) {
             colorSchemeMap[Pair(0, Style.TONAL_SPOT)] = SystemColorScheme(context)
             registerOverlayChangedListener()
         }
         wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
             override fun onColorsChanged() {
-                when (accentColor) {
-                    is ColorOption.WallpaperPrimary -> {
-                        notifyColorSchemeChanged()
-                    }
-                    is ColorOption.WallpaperDerived -> {
-                        // Write the new dominant wallpaper colour back to the preference
-                        // so the banner dot and swatch selection stay in sync.
-                        val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
-                        if (newPrimary != null) {
-                            coroutineScope.launch {
-                                preferenceManager2.accentColor.set(
-                                    ColorOption.WallpaperDerived(newPrimary),
-                                )
-                            }
-                        }
-                        notifyColorSchemeChanged()
-                    }
-                    else -> Unit
+                // WallpaperPrimary: notify so colorScheme re-reads the live primary.
+                // WallpaperDerived: handled by the direct system WallpaperManager
+                // listener below which receives the new colors as a parameter.
+                if (accentColor is ColorOption.WallpaperPrimary) {
+                    notifyColorSchemeChanged()
                 }
             }
         })
@@ -92,6 +89,31 @@ class ThemeProvider @Inject constructor(
         preferenceManager2.colorStyle.onEach(launchIn = coroutineScope) {
             colorStyle = it
             notifyColorSchemeChanged()
+        }
+
+        // Register a direct system WallpaperManager listener for WallpaperDerived.
+        // Unlike WallpaperManagerCompat.OnColorsChangedListener, this callback
+        // receives the new WallpaperColors as a parameter — no cache read needed,
+        // so the update is always immediate and reliable.
+        if (Utilities.ATLEAST_O_MR1) {
+            android.app.WallpaperManager.getInstance(context)
+                .addOnColorsChangedListener(
+                    { colors, which ->
+                        if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0 &&
+                            accentColor is ColorOption.WallpaperDerived
+                        ) {
+                            val newPrimary = colors?.primaryColor?.toArgb()
+                            if (newPrimary != null) {
+                                coroutineScope.launch {
+                                    preferenceManager2.accentColor.set(
+                                        ColorOption.WallpaperDerived(newPrimary),
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    Handler(Looper.getMainLooper()),
+                )
         }
     }
 
@@ -122,14 +144,12 @@ class ThemeProvider @Inject constructor(
             getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle)
         }
 
-        // WallpaperDerived: always follow the live wallpaper primary colour so
-        // the accent updates automatically when the wallpaper changes.  The
-        // stored color int is only used as a fallback when wallpaper colours
-        // are not yet available (e.g. on first boot).
-        is ColorOption.WallpaperDerived -> {
-            val livePrimary = wallpaperManager.wallpaperColors?.primaryColor
-            getColorScheme(livePrimary ?: accentColor.color, colorStyle)
-        }
+        // WallpaperDerived: use the specific colour the user tapped (stored in
+        // accentColor.color). When the wallpaper changes, the onColorsChanged()
+        // listener writes a new WallpaperDerived to the preference and onEach
+        // fires, updating accentColor here and triggering notifyColorSchemeChanged().
+        is ColorOption.WallpaperDerived ->
+            getColorScheme(accentColor.color, colorStyle)
 
         // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
         // When the user has picked a specific custom colour, silently fall back
@@ -186,6 +206,20 @@ class ThemeProvider @Inject constructor(
 
     override fun close() {
         TODO("Not yet implemented")
+    }
+
+    private fun syncWallpaperDerivedOnStartup() {
+        val stored = accentColor
+        if (stored !is ColorOption.WallpaperDerived) return
+        val currentPrimary = wallpaperManager.wallpaperColors?.primaryColor ?: return
+        if (currentPrimary == stored.color) return
+        // Wallpaper changed while Lawnchair was closed — write the new primary.
+        // onEach will fire after the write and call notifyColorSchemeChanged().
+        coroutineScope.launch {
+            preferenceManager2.accentColor.set(
+                ColorOption.WallpaperDerived(currentPrimary),
+            )
+        }
     }
 
     companion object {

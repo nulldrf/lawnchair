@@ -16,13 +16,16 @@ import android.widget.TextView
 import androidx.core.view.descendants
 import app.lawnchair.BlankActivity
 import app.lawnchair.HeadlessWidgetsManager
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.smartspace.model.SmartspaceAction
 import app.lawnchair.smartspace.model.SmartspaceScores
 import app.lawnchair.smartspace.model.SmartspaceTarget
+import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import app.lawnchair.util.Temperature
 import app.lawnchair.util.pendingIntent
 import com.android.launcher3.R
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
@@ -47,7 +50,25 @@ class SmartspaceWidgetReader(context: Context) :
             val widgetsManager = HeadlessWidgetsManager.INSTANCE.get(context)
             widgetsManager.getWidget(provider, "smartspaceWidgetId")
         }
-        internalTargets = widget?.updates?.map(this::extractWidgetLayout) ?: flowOf(disabledTargets)
+
+        val prefs = PreferenceManager2.getInstance(context)
+        val widgetFlow = widget?.updates?.map(this::extractWidgetLayout) ?: flowOf(disabledTargets)
+
+        // When a custom weather provider is active, strip FEATURE_WEATHER targets so the
+        // GSA widget's temperature doesn't compete with our provider's data.
+        // If stripping leaves an empty list, fall back to disabledTargets so the base class
+        // has something to work with (avoids a fully blank smartspace card).
+        internalTargets = combine(
+            widgetFlow,
+            prefs.smartspaceWeatherProvider.get(),
+        ) { targets, weatherProvider ->
+            if (weatherProvider != WeatherProvider.NONE) {
+                val filtered = targets.filter { it.featureType != SmartspaceTarget.FeatureType.FEATURE_WEATHER }
+                filtered.ifEmpty { disabledTargets }
+            } else {
+                targets
+            }
+        }
     }
 
     override suspend fun requiresSetup() = widget?.isBound == false
@@ -118,14 +139,8 @@ class SmartspaceWidgetReader(context: Context) :
     private fun parseWeatherData(weatherIcon: Bitmap?, temperatureText: TextView?): SmartspaceTarget? {
         val temperature = temperatureText?.text?.toString()
         val pendingIntent = (temperatureText?.parent as? View)?.pendingIntent
-        val weatherData = parseWeatherData(
-            weatherIcon,
-            temperature,
-            pendingIntent,
-        ) ?: return null
-        val intent = Intent().apply {
-            component = WEATHER_COMPONENT
-        }
+        val weatherData = parseWeatherData(weatherIcon, temperature, pendingIntent) ?: return null
+        val intent = Intent().apply { component = WEATHER_COMPONENT }
         return SmartspaceTarget(
             id = "smartspaceWidgetWeather",
             headerAction = SmartspaceAction(
@@ -141,9 +156,8 @@ class SmartspaceWidgetReader(context: Context) :
         )
     }
 
-    private fun extractBitmap(imageView: ImageView?): Bitmap? {
-        return (imageView?.drawable as? BitmapDrawable)?.bitmap
-    }
+    private fun extractBitmap(imageView: ImageView?): Bitmap? =
+        (imageView?.drawable as? BitmapDrawable)?.bitmap
 
     data class WeatherData(
         val icon: Bitmap,
@@ -152,10 +166,8 @@ class SmartspaceWidgetReader(context: Context) :
         val forecastIntent: Intent? = null,
         val pendingIntent: PendingIntent? = null,
     ) {
-
-        fun getTitle(unit: Temperature.Unit = temperature.unit): String {
-            return "${temperature.inUnit(unit)}${unit.suffix}"
-        }
+        fun getTitle(unit: Temperature.Unit = temperature.unit): String =
+            "${temperature.inUnit(unit)}${unit.suffix}"
     }
 
     companion object {
@@ -172,7 +184,10 @@ class SmartspaceWidgetReader(context: Context) :
         fun parseWeatherData(weatherIcon: Bitmap?, temperature: String?, intent: PendingIntent? = null): WeatherData? {
             return if (weatherIcon != null && temperature != null) {
                 try {
-                    val value = temperature.substring(0, temperature.indexOfFirst { (it < '0' || it > '9') && it != '-' }).toInt()
+                    val value = temperature.substring(
+                        0,
+                        temperature.indexOfFirst { (it < '0' || it > '9') && it != '-' },
+                    ).toInt()
                     WeatherData(
                         weatherIcon,
                         Temperature(

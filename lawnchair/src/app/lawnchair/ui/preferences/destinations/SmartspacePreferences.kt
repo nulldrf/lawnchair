@@ -106,9 +106,7 @@ private fun LawnchairSmartspaceSettings(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        // Custom weather section replaces the auto-generated toggle for WeatherDataProvider
         SmartspaceWeatherSettings()
-
         PreferenceGroup(
             heading = stringResource(id = R.string.what_to_show),
             modifier = Modifier.padding(top = 8.dp),
@@ -116,7 +114,7 @@ private fun LawnchairSmartspaceSettings(
             smartspaceProvider.dataSources
                 .asSequence()
                 .filter { it.isAvailable }
-                .filter { it !is WeatherDataProvider } // handled by SmartspaceWeatherSettings
+                .filter { it !is WeatherDataProvider }
                 .forEach {
                     key(it.providerName) {
                         Item { _ ->
@@ -133,9 +131,7 @@ private fun LawnchairSmartspaceSettings(
 }
 
 @Composable
-private fun SmartspaceWeatherSettings(
-    modifier: Modifier = Modifier,
-) {
+private fun SmartspaceWeatherSettings(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val prefs = preferenceManager2()
 
@@ -166,13 +162,9 @@ private fun SmartspaceWeatherSettings(
                 label = stringResource(id = R.string.smartspace_weather_source),
             )
         }
-
-        // API key — only visible when PirateWeather is selected
         Item(visible = selectedProvider == WeatherProvider.PIRATE_WEATHER) {
             PirateWeatherApiKeyPreference(adapter = prefs.pirateWeatherApiKey.getAdapter())
         }
-
-        // Icon pack — only visible when a real source is selected
         Item(visible = selectedProvider != WeatherProvider.NONE) {
             ListPreference(
                 adapter = iconPackAdapter,
@@ -198,7 +190,6 @@ private fun PirateWeatherApiKeyPreference(
         "*".repeat(minOf(currentKey.length, 32))
     }
 
-    // ClickablePreference with the masked key shown underneath via a wrapping Column
     Column(modifier = modifier) {
         ClickablePreference(
             label = "${stringResource(R.string.smartspace_pirate_weather_api_key)} — $subtitle",
@@ -261,9 +252,7 @@ fun SmartspaceProviderPreference(
 }
 
 @Composable
-fun SmartspacePreview(
-    modifier: Modifier = Modifier,
-) {
+fun SmartspacePreview(modifier: Modifier = Modifier) {
     val themeRes = if (isSelectedThemeDark) R.style.AppTheme_Dark else R.style.AppTheme_DarkText
     val context = LocalContext.current
     val themedContext = remember(themeRes) { ContextThemeWrapper(context, themeRes) }
@@ -293,26 +282,23 @@ fun SmartspacePreview(
 }
 
 @Composable
-fun SmartspaceDateAndTimePreferences(
-    modifier: Modifier = Modifier,
-) {
+fun SmartspaceDateAndTimePreferences(modifier: Modifier = Modifier) {
     val preferenceManager2 = preferenceManager2()
     val calendarAdapter = preferenceManager2.smartspaceCalendar.getAdapter()
     val showDateAdapter = preferenceManager2.smartspaceShowDate.getAdapter()
     val showTimeAdapter = preferenceManager2.smartspaceShowTime.getAdapter()
-    val calendarHasMinimumContent = !showDateAdapter.state.value || !showTimeAdapter.state.value
     val calendar = calendarAdapter.state.value
+    val supportCustomizationFormat = calendar.formatCustomizationSupport
 
     PreferenceGroup(
         heading = stringResource(id = R.string.smartspace_date_and_time),
         modifier = modifier.padding(top = 8.dp),
     ) {
-        val supportCustomizationFormat = calendar.formatCustomizationSupport
+        // Date and Time toggles are always fully enabled — no minimum-content lock
         Item(key = "smartspace_date", visible = supportCustomizationFormat) {
             SwitchPreference(
                 adapter = showDateAdapter,
                 label = stringResource(id = R.string.smartspace_date),
-                enabled = if (showDateAdapter.state.value) !calendarHasMinimumContent else true,
             )
         }
         Item("smartspace_calendar", supportCustomizationFormat && showDateAdapter.state.value) {
@@ -322,7 +308,6 @@ fun SmartspaceDateAndTimePreferences(
             SwitchPreference(
                 adapter = showTimeAdapter,
                 label = stringResource(id = R.string.smartspace_time),
-                enabled = if (showTimeAdapter.state.value) !calendarHasMinimumContent else true,
             )
         }
         Item("smartspace_time_format", supportCustomizationFormat && showTimeAdapter.state.value) {

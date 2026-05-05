@@ -44,6 +44,7 @@ import app.lawnchair.search.algorithms.engine.provider.web.WebSearchProvider
 import app.lawnchair.smartspace.model.SmartspaceCalendar
 import app.lawnchair.smartspace.model.SmartspaceMode
 import app.lawnchair.smartspace.model.SmartspaceTimeFormat
+import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
@@ -716,14 +717,26 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = true,
 	)
 	
-	val smartspaceOpenMeteoWeather = preference(
-        key = booleanPreferencesKey("enable_smartspace_open_meteo_weather"),
-        defaultValue = false,
+	val smartspaceWeatherEnabled = preference(
+        key = booleanPreferencesKey("enable_smartspace_weather"),
+        defaultValue = true,
     )
 
-    val smartspacePirateWeather = preference(
-        key = booleanPreferencesKey("enable_smartspace_pirate_weather"),
-        defaultValue = false,
+    val smartspaceWeatherProvider = preference(
+        key = stringPreferencesKey("smartspace_weather_provider"),
+        defaultValue = WeatherProvider.NONE,
+        parse = { WeatherProvider.fromString(it) },
+        save = { it.name },
+    )
+
+    val pirateWeatherApiKey = preference(
+        key = stringPreferencesKey("pirate_weather_api_key"),
+        defaultValue = "",
+    )
+
+    val smartspaceWeatherIconPack = preference(
+        key = stringPreferencesKey("smartspace_weather_icon_pack"),
+        defaultValue = "",
     )
 
     val smartspaceShowDate = preference(

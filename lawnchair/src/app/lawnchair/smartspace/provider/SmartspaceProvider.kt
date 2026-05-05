@@ -26,8 +26,7 @@ class SmartspaceProvider @Inject constructor(
 ) : SafeCloseable {
 
     val dataSources = listOf(
-        OpenMeteoWeatherDataProvider(context),
-        PirateWeatherDataProvider(context),SmartspaceWidgetReader(context),
+        WeatherDataProvider(context),
         SmartspaceWidgetReader(context),
 		BatteryStatusProvider(context),
         NowPlayingProvider(context),

@@ -34,6 +34,7 @@ import dev.kdrag0n.colorkt.rgb.Srgb
 import dev.kdrag0n.monet.theme.ColorScheme
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 
 @LauncherAppSingleton
@@ -63,8 +64,24 @@ class ThemeProvider @Inject constructor(
         }
         wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
             override fun onColorsChanged() {
-                if (accentColor is ColorOption.WallpaperPrimary) {
-                    notifyColorSchemeChanged()
+                when (accentColor) {
+                    is ColorOption.WallpaperPrimary -> {
+                        notifyColorSchemeChanged()
+                    }
+                    is ColorOption.WallpaperDerived -> {
+                        // Write the new dominant wallpaper colour back to the preference
+                        // so the banner dot and swatch selection stay in sync.
+                        val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
+                        if (newPrimary != null) {
+                            coroutineScope.launch {
+                                preferenceManager2.accentColor.set(
+                                    ColorOption.WallpaperDerived(newPrimary),
+                                )
+                            }
+                        }
+                        notifyColorSchemeChanged()
+                    }
+                    else -> Unit
                 }
             }
         })
@@ -105,10 +122,14 @@ class ThemeProvider @Inject constructor(
             getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle)
         }
 
-        // WallpaperDerived: a specific colour extracted from the wallpaper —
-        // honour the user's chosen color style just like WallpaperPrimary.
-        is ColorOption.WallpaperDerived ->
-            getColorScheme(accentColor.color, colorStyle)
+        // WallpaperDerived: always follow the live wallpaper primary colour so
+        // the accent updates automatically when the wallpaper changes.  The
+        // stored color int is only used as a fallback when wallpaper colours
+        // are not yet available (e.g. on first boot).
+        is ColorOption.WallpaperDerived -> {
+            val livePrimary = wallpaperManager.wallpaperColors?.primaryColor
+            getColorScheme(livePrimary ?: accentColor.color, colorStyle)
+        }
 
         // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
         // When the user has picked a specific custom colour, silently fall back

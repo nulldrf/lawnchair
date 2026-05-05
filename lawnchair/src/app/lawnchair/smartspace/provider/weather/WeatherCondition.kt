@@ -1,10 +1,5 @@
 package app.lawnchair.smartspace.provider.weather
 
-/**
- * Canonical set of weather conditions shared by all weather providers.
- * All provider-specific codes (WMO, PirateWeather icon strings, etc.)
- * are mapped to this enum before reaching [WeatherIconProvider].
- */
 enum class WeatherCondition {
     CLEAR,
     MOSTLY_CLEAR,
@@ -45,10 +40,6 @@ enum class WeatherCondition {
     }
 
     companion object {
-        /**
-         * Maps WMO weather interpretation codes to [WeatherCondition].
-         * Full table: https://open-meteo.com/en/docs#weathervariables
-         */
         fun fromWmoCode(code: Int?, isDay: Boolean): WeatherCondition = when (code) {
             0 -> CLEAR
             1 -> MOSTLY_CLEAR
@@ -56,10 +47,8 @@ enum class WeatherCondition {
             3 -> OVERCAST
             45, 48 -> FOG
             51, 53 -> DRIZZLE
-            55 -> RAIN
-            56, 57 -> FREEZING_RAIN
-            61, 63, 65 -> RAIN
-            66, 67 -> FREEZING_RAIN
+            55, 61, 63, 65 -> RAIN
+            56, 57, 66, 67 -> FREEZING_RAIN
             71, 73, 75 -> SNOW
             77 -> FLURRIES
             80, 81, 82 -> RAIN
@@ -68,21 +57,17 @@ enum class WeatherCondition {
             else -> NA
         }
 
-        /**
-         * Maps PirateWeather / Dark Sky icon strings to [WeatherCondition].
-         * Ref: https://docs.pirateweather.net/en/latest/Specification/#icon
-         */
         fun fromPirateIcon(icon: String?): WeatherCondition = when (icon) {
-            "clear-day", "clear-night"                   -> CLEAR
-            "partly-cloudy-day", "partly-cloudy-night"   -> PARTLY_CLOUDY
-            "cloudy"                                      -> CLOUDY
-            "rain"                                        -> RAIN
-            "sleet"                                       -> SLEET
-            "snow"                                        -> SNOW
-            "fog"                                         -> FOG
-            "wind"                                        -> WINDY
-            "thunderstorm"                                -> THUNDERSTORM
-            else                                          -> NA
+            "clear-day", "clear-night"                 -> CLEAR
+            "partly-cloudy-day", "partly-cloudy-night" -> PARTLY_CLOUDY
+            "cloudy"                                   -> CLOUDY
+            "rain"                                     -> RAIN
+            "sleet"                                    -> SLEET
+            "snow"                                     -> SNOW
+            "fog"                                      -> FOG
+            "wind"                                     -> WINDY
+            "thunderstorm"                             -> THUNDERSTORM
+            else                                       -> NA
         }
     }
 }

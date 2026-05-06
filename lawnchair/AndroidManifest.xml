@@ -48,7 +48,7 @@
         </intent>
 		
 		<intent>
-            <action android:name="org.breezyweather.ICON_PROVIDER_ACTION" />
+            <action android:name="org.breezyweather.ICON_PROVIDER" />
 			<category android:name="android.intent.category.DEFAULT" />
         </intent>
     </queries>

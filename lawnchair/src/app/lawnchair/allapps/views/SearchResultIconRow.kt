@@ -39,10 +39,15 @@ class SearchResultIconRow(context: Context, attrs: AttributeSet?) :
         isSmall = id == R.id.search_result_small_icon_row
         icon = ViewCompat.requireViewById(this, R.id.icon)
         icon.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        val iconSize = icon.iconSize
-        icon.layoutParams.apply {
-            width = iconSize
-            height = iconSize
+        // Small rows use iconSize (the bitmap pixel size) to keep things compact.
+        // Tall rows use the XML-declared search_row_icon_size — overriding with
+        // iconSize here was shrinking the icon and making app names look cramped.
+        if (isSmall) {
+            val iconSize = icon.iconSize
+            icon.layoutParams.apply {
+                width = iconSize
+                height = iconSize
+            }
         }
         icon.setTextVisibility(false)
         title = ViewCompat.requireViewById(this, R.id.title)
@@ -62,9 +67,12 @@ class SearchResultIconRow(context: Context, attrs: AttributeSet?) :
             .toTypedArray()
         shortcutIcons.forEach {
             it.setTextVisibility(false)
+            // Shortcut icons always use search_result_small display so iconSize
+            // is the correct value regardless of whether this is a tall or small row.
+            val shortcutIconSize = it.iconSize
             it.layoutParams.apply {
-                width = icon.iconSize
-                height = icon.iconSize
+                width = shortcutIconSize
+                height = shortcutIconSize
             }
         }
     }

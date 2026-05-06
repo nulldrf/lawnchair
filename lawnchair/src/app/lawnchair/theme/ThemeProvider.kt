@@ -65,6 +65,13 @@ class ThemeProvider @Inject constructor(
 
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
+    // Holds the most-recent wallpaper primary received directly from the system
+    // OnColorsChangedListener callback — always fresh, never stale from cache.
+    // Read by the colorScheme getter to render the correct colour immediately
+    // without waiting for the async preference write to complete.
+    @Volatile
+    private var freshWallpaperPrimary: Int? = null
+
     init {
         // Startup sync: if the wallpaper changed while Lawnchair was not running,
         // the live primary will differ from the stored fingerprint.
@@ -97,11 +104,12 @@ class ThemeProvider @Inject constructor(
                 when (val current = accentColor) {
                     is ColorOption.WallpaperPrimary -> notifyColorSchemeChanged()
                     is ColorOption.WallpaperDerived -> {
+                        // WallpaperManagerCompat.wallpaperColors is updated before
+                        // notifyChange() fires, so this value is current.
                         val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
                             ?: return
-                        // Only update if the wallpaper actually changed.
-                        // Compare against the stored fingerprint, not the chosen
-                        // swatch color, so non-primary swatch picks are preserved.
+                        freshWallpaperPrimary = newPrimary
+                        notifyColorSchemeChanged()
                         if (newPrimary != current.wallpaperPrimary) {
                             coroutineScope.launch {
                                 preferenceManager2.accentColor.set(
@@ -119,6 +127,8 @@ class ThemeProvider @Inject constructor(
         })
         preferenceManager2.accentColor.onEach(launchIn = coroutineScope) {
             accentColor = it
+            // Clear the live override — the preference now stores the correct value.
+            freshWallpaperPrimary = null
             notifyColorSchemeChanged()
         }
         preferenceManager2.colorStyle.onEach(launchIn = coroutineScope) {
@@ -139,15 +149,23 @@ class ThemeProvider @Inject constructor(
                             current is ColorOption.WallpaperDerived
                         ) {
                             val newPrimary = colors?.primaryColor?.toArgb()
-                            // Only update if the wallpaper fingerprint changed.
-                            if (newPrimary != null && newPrimary != current.wallpaperPrimary) {
-                                coroutineScope.launch {
-                                    preferenceManager2.accentColor.set(
-                                        ColorOption.WallpaperDerived(
-                                            color = newPrimary,
-                                            wallpaperPrimary = newPrimary,
-                                        ),
-                                    )
+                            if (newPrimary != null) {
+                                // Store the fresh primary so the colorScheme getter
+                                // can use it immediately on the next render call.
+                                freshWallpaperPrimary = newPrimary
+                                // Trigger re-render immediately — no waiting for
+                                // the async preference write.
+                                notifyColorSchemeChanged()
+                                // Persist to preference if wallpaper actually changed.
+                                if (newPrimary != current.wallpaperPrimary) {
+                                    coroutineScope.launch {
+                                        preferenceManager2.accentColor.set(
+                                            ColorOption.WallpaperDerived(
+                                                color = newPrimary,
+                                                wallpaperPrimary = newPrimary,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -184,12 +202,19 @@ class ThemeProvider @Inject constructor(
             getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle)
         }
 
-        // WallpaperDerived: use the specific colour the user tapped (stored in
-        // accentColor.color). When the wallpaper changes, the onColorsChanged()
-        // listener writes a new WallpaperDerived to the preference and onEach
-        // fires, updating accentColor here and triggering notifyColorSchemeChanged().
-        is ColorOption.WallpaperDerived ->
-            getColorScheme(accentColor.color, colorStyle)
+        // WallpaperDerived: use stored chosen swatch color normally.
+        // If freshWallpaperPrimary (set by the system listener callback which
+        // always receives colors as a parameter) differs from the stored fingerprint,
+        // the wallpaper changed — use it immediately for rendering.
+        is ColorOption.WallpaperDerived -> {
+            val fresh = freshWallpaperPrimary
+            val seedColor = if (fresh != null && fresh != accentColor.wallpaperPrimary) {
+                fresh
+            } else {
+                accentColor.color
+            }
+            getColorScheme(seedColor, colorStyle)
+        }
 
         // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
         // When the user has picked a specific custom colour, silently fall back

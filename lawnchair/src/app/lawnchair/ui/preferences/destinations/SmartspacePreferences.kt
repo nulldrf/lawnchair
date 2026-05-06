@@ -8,10 +8,16 @@ import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,9 +29,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.lawnchair.preferences.PreferenceAdapter
@@ -154,10 +162,6 @@ private fun SmartspaceWeatherSettings(
     }
 
     val installedPacks = remember { WeatherIconProvider.getInstalledPacks(context) }
-    val iconPackEntries = remember(installedPacks) {
-        listOf(ListPreferenceEntry("") { stringResource(R.string.smartspace_weather_icon_pack_none) }) +
-            installedPacks.map { (pkg, label) -> ListPreferenceEntry(pkg) { label } }
-    }
 
     val intervalEntries = remember {
         WeatherDataProvider.REFRESH_INTERVAL_OPTIONS.map { minutes ->
@@ -186,22 +190,11 @@ private fun SmartspaceWeatherSettings(
         Item(visible = selectedProvider == WeatherProvider.PIRATE_WEATHER) {
             PirateWeatherApiKeyPreference(adapter = prefs.pirateWeatherApiKey.getAdapter())
         }
+        // Custom icon pack picker with "Get more" link inside the dialog
         Item(visible = selectedProvider != WeatherProvider.NONE) {
-            ListPreference(
+            IconPackPreference(
                 adapter = iconPackAdapter,
-                entries = iconPackEntries,
-                label = stringResource(id = R.string.smartspace_weather_icon_pack),
-            )
-        }
-        // "Get more" — opens the Breezy icon packs repo
-        Item(visible = selectedProvider != WeatherProvider.NONE) {
-            ClickablePreference(
-                label = stringResource(R.string.smartspace_weather_icon_pack_get_more),
-                onClick = {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(ICON_PACK_REPO_URL)),
-                    )
-                },
+                installedPacks = installedPacks,
             )
         }
         Item(visible = selectedProvider != WeatherProvider.NONE) {
@@ -227,6 +220,91 @@ private fun SmartspaceWeatherSettings(
     }
 }
 
+/**
+ * A preference that shows a custom AlertDialog with:
+ * - Radio-button list of installed icon packs (+ "None" option)
+ * - "Get more" TextButton at the bottom linking to the Breezy icon packs repo
+ */
+@Composable
+private fun IconPackPreference(
+    adapter: PreferenceAdapter<String>,
+    installedPacks: List<Pair<String, String>>,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var showDialog by remember { mutableStateOf(false) }
+    val currentPack = adapter.state.value
+
+    // Build entry list: ("" → None) + installed packs
+    val entries: List<Pair<String, String>> = remember(installedPacks) {
+        listOf("" to context.getString(R.string.smartspace_weather_icon_pack_none)) +
+            installedPacks
+    }
+
+    val currentLabel = entries.firstOrNull { it.first == currentPack }?.second
+        ?: context.getString(R.string.smartspace_weather_icon_pack_none)
+
+    ClickablePreference(
+        label = "${stringResource(R.string.smartspace_weather_icon_pack)} — $currentLabel",
+        modifier = modifier,
+        onClick = { showDialog = true },
+    )
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text(stringResource(R.string.smartspace_weather_icon_pack)) },
+            text = {
+                Column {
+                    // Radio-button list
+                    Column(modifier = Modifier.selectableGroup()) {
+                        entries.forEach { (pkg, label) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = pkg == currentPack,
+                                        role = Role.RadioButton,
+                                        onClick = {
+                                            adapter.onChange(pkg)
+                                            showDialog = false
+                                        },
+                                    )
+                                    .padding(vertical = 4.dp),
+                            ) {
+                                RadioButton(
+                                    selected = pkg == currentPack,
+                                    onClick = null,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                // "Get more" opens the Breezy icon pack repo
+                TextButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(ICON_PACK_REPO_URL)),
+                        )
+                    },
+                ) {
+                    Text(stringResource(R.string.smartspace_weather_icon_pack_get_more))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+}
+
 @Composable
 private fun PirateWeatherApiKeyPreference(
     adapter: PreferenceAdapter<String>,
@@ -245,10 +323,7 @@ private fun PirateWeatherApiKeyPreference(
     Column(modifier = modifier) {
         ClickablePreference(
             label = "${stringResource(R.string.smartspace_pirate_weather_api_key)} — $subtitle",
-            onClick = {
-                inputValue = adapter.state.value
-                showDialog = true
-            },
+            onClick = { inputValue = adapter.state.value; showDialog = true },
         )
     }
 
@@ -266,10 +341,9 @@ private fun PirateWeatherApiKeyPreference(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    adapter.onChange(inputValue.trim())
-                    showDialog = false
-                }) { Text(stringResource(android.R.string.ok)) }
+                TextButton(onClick = { adapter.onChange(inputValue.trim()); showDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
@@ -295,12 +369,7 @@ fun SmartspaceProviderPreference(
             )
         }.toList()
     }
-    ListPreference(
-        adapter = adapter,
-        entries = entries,
-        label = stringResource(id = R.string.smartspace_mode_label),
-        modifier = modifier,
-    )
+    ListPreference(adapter = adapter, entries = entries, label = stringResource(id = R.string.smartspace_mode_label), modifier = modifier)
 }
 
 @Composable
@@ -308,18 +377,13 @@ fun SmartspacePreview(modifier: Modifier = Modifier) {
     val themeRes = if (isSelectedThemeDark) R.style.AppTheme_Dark else R.style.AppTheme_DarkText
     val context = LocalContext.current
     val themedContext = remember(themeRes) { ContextThemeWrapper(context, themeRes) }
-
-    PreferenceGroup(
-        heading = stringResource(id = R.string.preview_label),
-        modifier = modifier,
-    ) {
+    PreferenceGroup(heading = stringResource(id = R.string.preview_label), modifier = modifier) {
         Item {
             CompositionLocalProvider(LocalContext provides themedContext) {
                 AndroidView(
                     factory = {
                         val view = SmartspaceViewContainer(it, previewMode = true)
-                        val height = it.resources
-                            .getDimensionPixelSize(R.dimen.enhanced_smartspace_height)
+                        val height = it.resources.getDimensionPixelSize(R.dimen.enhanced_smartspace_height)
                         view.layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, height)
                         view
                     },
@@ -347,19 +411,13 @@ fun SmartspaceDateAndTimePreferences(modifier: Modifier = Modifier) {
         modifier = modifier.padding(top = 8.dp),
     ) {
         Item(key = "smartspace_date", visible = supportCustomizationFormat) {
-            SwitchPreference(
-                adapter = showDateAdapter,
-                label = stringResource(id = R.string.smartspace_date),
-            )
+            SwitchPreference(adapter = showDateAdapter, label = stringResource(id = R.string.smartspace_date))
         }
         Item("smartspace_calendar", supportCustomizationFormat && showDateAdapter.state.value) {
             SmartspaceCalendarPreference()
         }
         Item("smartspace_time", supportCustomizationFormat) {
-            SwitchPreference(
-                adapter = showTimeAdapter,
-                label = stringResource(id = R.string.smartspace_time),
-            )
+            SwitchPreference(adapter = showTimeAdapter, label = stringResource(id = R.string.smartspace_time))
         }
         Item("smartspace_time_format", supportCustomizationFormat && showTimeAdapter.state.value) {
             SmartspaceTimeFormatPreference()
@@ -374,12 +432,7 @@ fun SmartspaceTimeFormatPreference(modifier: Modifier = Modifier) {
             ListPreferenceEntry(format) { stringResource(id = format.nameResourceId) }
         }
     }
-    ListPreference(
-        adapter = preferenceManager2().smartspaceTimeFormat.getAdapter(),
-        entries = entries,
-        label = stringResource(id = R.string.smartspace_time_format),
-        modifier = modifier,
-    )
+    ListPreference(adapter = preferenceManager2().smartspaceTimeFormat.getAdapter(), entries = entries, label = stringResource(id = R.string.smartspace_time_format), modifier = modifier)
 }
 
 @Composable
@@ -389,12 +442,7 @@ fun SmartspaceCalendarPreference(modifier: Modifier = Modifier) {
             ListPreferenceEntry(calendar) { stringResource(id = calendar.nameResourceId) }
         }
     }
-    ListPreference(
-        adapter = preferenceManager2().smartspaceCalendar.getAdapter(),
-        entries = entries,
-        label = stringResource(id = R.string.smartspace_calendar),
-        modifier = modifier,
-    )
+    ListPreference(adapter = preferenceManager2().smartspaceCalendar.getAdapter(), entries = entries, label = stringResource(id = R.string.smartspace_calendar), modifier = modifier)
 }
 
 @Composable
@@ -413,10 +461,9 @@ fun SmartspacerSettings(modifier: Modifier = Modifier) {
             }
             Item {
                 ClickablePreference(label = stringResource(R.string.open_smartspacer_settings)) {
-                    val intent = context.packageManager.getLaunchIntentForPackage(
-                        SmartspacerConstants.SMARTSPACER_PACKAGE_NAME,
+                    context.startActivity(
+                        context.packageManager.getLaunchIntentForPackage(SmartspacerConstants.SMARTSPACER_PACKAGE_NAME),
                     )
-                    context.startActivity(intent)
                 }
             }
         }

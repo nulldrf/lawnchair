@@ -7,11 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
-import android.location.LocationRequest
 import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.Handler
+import android.os.HandlerThread
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -31,14 +33,15 @@ import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import com.android.launcher3.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -46,7 +49,6 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.Executors
-import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -54,6 +56,7 @@ private data class WeatherConfig(
     val provider: WeatherProvider,
     val iconPack: String?,
     val pirateApiKey: String,
+    val refreshInterval: Long,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -71,17 +74,21 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         prefs.smartspaceWeatherProvider.get(),
         prefs.smartspaceWeatherIconPack.get(),
         prefs.pirateWeatherApiKey.get(),
-    ) { provider, iconPack, apiKey ->
+        prefs.smartspaceWeatherRefreshInterval.get(),
+    ) { provider, iconPack, apiKey, interval ->
         WeatherConfig(
             provider = provider,
             iconPack = iconPack.ifBlank { null },
             pirateApiKey = apiKey,
+            refreshInterval = interval,
         )
     }.flatMapLatest { config ->
         when (config.provider) {
             WeatherProvider.NONE -> flowOf(emptyList())
-            WeatherProvider.OPEN_METEO -> pollingFlow { fetchOpenMeteo(config.iconPack) }
-            WeatherProvider.PIRATE_WEATHER -> pollingFlow { fetchPirateWeather(config.iconPack, config.pirateApiKey) }
+            WeatherProvider.OPEN_METEO ->
+                pollingFlow(config.refreshInterval) { fetchOpenMeteo(config.iconPack) }
+            WeatherProvider.PIRATE_WEATHER ->
+                pollingFlow(config.refreshInterval) { fetchPirateWeather(config.iconPack, config.pirateApiKey) }
         }
     }.flowOn(Dispatchers.IO)
 
@@ -119,10 +126,13 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
     private suspend fun fetchOpenMeteo(iconPack: String?): List<SmartspaceTarget> {
         return try {
             val loc = getLocation()
-                ?: return emptyList<SmartspaceTarget>().also { Log.w(TAG, "No location for Open-Meteo") }
+                ?: return emptyList<SmartspaceTarget>().also {
+                    Log.w(TAG, "No location available for Open-Meteo")
+                }
+            Log.d(TAG, "Open-Meteo fetching for ${loc.latitude}, ${loc.longitude}")
             val result = openMeteoApi.getWeather(loc.latitude, loc.longitude, OPEN_METEO_CURRENT_FIELDS)
             if (result.error == true) {
-                Log.w(TAG, "Open-Meteo error: ${result.reason}")
+                Log.w(TAG, "Open-Meteo API error: ${result.reason}")
                 return emptyList()
             }
             listOfNotNull(result.current?.let { buildOpenMeteoTarget(it, iconPack) })
@@ -136,13 +146,18 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         val temp = current.temperature ?: return null
         val isDay = current.isDay != 0
         val condition = WeatherCondition.fromWmoCode(current.weatherCode, isDay)
+
+        // title must be EMPTY so BcSmartspaceCard attaches the icon to the subtitle row.
+        // subtitle holds the temperature — matching the pattern used by SmartspaceWidgetReader.
+        // The condition description goes into contentDescription for accessibility only.
         return SmartspaceTarget(
             id = "openMeteoWeather",
             headerAction = SmartspaceAction(
                 id = "openMeteoWeatherAction",
                 icon = iconProvider.getIcon(condition, isDay, iconPack),
-                title = "${temp.toInt()}°C",
-                subtitle = condition.toDisplayString(),
+                title = "",
+                subtitle = "${temp.toInt()}°C",
+                contentDescription = condition.toDisplayString(),
             ),
             score = SmartspaceScores.SCORE_WEATHER,
             featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
@@ -153,9 +168,15 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     private suspend fun fetchPirateWeather(iconPack: String?, apiKey: String): List<SmartspaceTarget> {
         return try {
-            if (apiKey.isBlank()) return emptyList()
+            if (apiKey.isBlank()) {
+                Log.w(TAG, "PirateWeather: API key is blank")
+                return emptyList()
+            }
             val loc = getLocation()
-                ?: return emptyList<SmartspaceTarget>().also { Log.w(TAG, "No location for PirateWeather") }
+                ?: return emptyList<SmartspaceTarget>().also {
+                    Log.w(TAG, "No location available for PirateWeather")
+                }
+            Log.d(TAG, "PirateWeather fetching for ${loc.latitude}, ${loc.longitude}")
             val result = pirateApi.getForecast(apiKey, loc.latitude, loc.longitude)
             listOfNotNull(result.currently?.let { buildPirateTarget(it, iconPack) })
         } catch (e: Exception) {
@@ -168,13 +189,17 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         val temp = currently.temperature ?: return null
         val isDay = currently.icon?.endsWith("-night") == false
         val condition = WeatherCondition.fromPirateIcon(currently.icon)
+        val conditionText = currently.summary ?: condition.toDisplayString()
+
+        // Same pattern: empty title, temperature in subtitle, condition in contentDescription.
         return SmartspaceTarget(
             id = "pirateWeather",
             headerAction = SmartspaceAction(
                 id = "pirateWeatherAction",
                 icon = iconProvider.getIcon(condition, isDay, iconPack),
-                title = "${temp.toInt()}°C",
-                subtitle = currently.summary ?: condition.toDisplayString(),
+                title = "",
+                subtitle = "${temp.toInt()}°C",
+                contentDescription = conditionText,
             ),
             score = SmartspaceScores.SCORE_WEATHER,
             featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
@@ -183,69 +208,84 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     // ── Location ──────────────────────────────────────────────────────────────
 
-    /**
-     * Tries to get location in this order:
-     * 1. Last known fix from NETWORK or GPS (instant, no battery cost)
-     * 2. Fresh single update from NETWORK with a 10s timeout (handles cold start)
-     * 3. Fresh single update from GPS with a 10s timeout
-     */
     @Suppress("MissingPermission")
     private suspend fun getLocation(): Location? {
-        if (!hasLocationPermission()) return null
+        if (!hasLocationPermission()) {
+            Log.w(TAG, "Location permission not granted")
+            return null
+        }
         val lm = context.getSystemService<LocationManager>() ?: return null
 
-        // Fast path — cached fix
-        val cached = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            ?: lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-        if (cached != null) return cached
-
-        // Slow path — request a fresh fix, try network first then GPS
+        // Fast path — use any cached fix
         val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-            .filter { lm.isProviderEnabled(it) }
-
-        for (provider in providers) {
-            val loc = requestSingleLocation(lm, provider)
-            if (loc != null) return loc
+        for (p in providers) {
+            val cached = lm.getLastKnownLocation(p)
+            if (cached != null) {
+                Log.d(TAG, "Using cached location from $p: ${cached.latitude}, ${cached.longitude}")
+                return cached
+            }
         }
+        Log.d(TAG, "No cached location — requesting fresh fix")
+
+        // Slow path — fresh single update with a dedicated HandlerThread (has its own Looper)
+        for (provider in providers.filter { lm.isProviderEnabled(it) }) {
+            val loc = requestFreshLocation(lm, provider)
+            if (loc != null) {
+                Log.d(TAG, "Got fresh fix from $provider: ${loc.latitude}, ${loc.longitude}")
+                return loc
+            }
+        }
+        Log.w(TAG, "All location providers timed out or unavailable")
         return null
     }
 
-    @Suppress("MissingPermission")
-    private suspend fun requestSingleLocation(
-        lm: LocationManager,
-        provider: String,
-    ): Location? = withTimeoutOrNull(LOCATION_TIMEOUT) {
-        suspendCancellableCoroutine { cont ->
-            val signal = CancellationSignal()
-            cont.invokeOnCancellation { signal.cancel() }
+    @Suppress("MissingPermission", "DEPRECATION")
+    private suspend fun requestFreshLocation(lm: LocationManager, provider: String): Location? =
+        withTimeoutOrNull(LOCATION_TIMEOUT) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                lm.getCurrentLocation(
-                    provider,
-                    signal,
-                    Executors.newSingleThreadExecutor(),
-                ) { location -> cont.resume(location) }
+                callbackFlow {
+                    val signal = CancellationSignal()
+                    lm.getCurrentLocation(
+                        provider,
+                        signal,
+                        Executors.newSingleThreadExecutor(),
+                    ) { location ->
+                        trySend(location)
+                        close()
+                    }
+                    awaitClose { signal.cancel() }
+                }.first()
             } else {
-                @Suppress("DEPRECATION")
-                lm.requestSingleUpdate(
-                    provider,
-                    { location -> cont.resume(location) },
-                    null,
-                )
+                callbackFlow<Location?> {
+                    val thread = HandlerThread("WeatherLocation-$provider").also { it.start() }
+                    val handler = Handler(thread.looper)
+                    val listener = LocationListener { location ->
+                        trySend(location)
+                        close()
+                    }
+                    lm.requestSingleUpdate(provider, listener, thread.looper)
+                    awaitClose {
+                        lm.removeUpdates(listener)
+                        thread.quit()
+                    }
+                }.first()
             }
         }
-    }
 
     private fun hasLocationPermission(): Boolean =
         ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_COARSE_LOCATION,
         ) == PackageManager.PERMISSION_GRANTED
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Polling ───────────────────────────────────────────────────────────────
 
-    private fun pollingFlow(fetch: suspend () -> List<SmartspaceTarget>) = flow {
+    private fun pollingFlow(
+        intervalMinutes: Long,
+        fetch: suspend () -> List<SmartspaceTarget>,
+    ) = flow {
         while (true) {
             emit(fetch())
-            delay(REFRESH_INTERVAL)
+            delay(intervalMinutes.minutes)
         }
     }
 
@@ -254,8 +294,9 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         private const val OPEN_METEO_BASE_URL = "https://api.open-meteo.com/"
         private const val PIRATE_BASE_URL = "https://api.pirateweather.net/"
         private const val OPEN_METEO_CURRENT_FIELDS = "temperature_2m,weather_code,is_day"
-        private val REFRESH_INTERVAL = 30.minutes
-        private val LOCATION_TIMEOUT = 10.seconds
+        private val LOCATION_TIMEOUT = 15.seconds
+
+        val REFRESH_INTERVAL_OPTIONS = listOf(15L, 30L, 60L, 180L)
 
         private fun buildRetrofit(baseUrl: String): Retrofit {
             val json = Json { ignoreUnknownKeys = true }

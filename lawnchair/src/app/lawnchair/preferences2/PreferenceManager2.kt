@@ -25,6 +25,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -737,6 +738,11 @@ class PreferenceManager2 @Inject constructor(
     val smartspaceWeatherIconPack = preference(
         key = stringPreferencesKey("smartspace_weather_icon_pack"),
         defaultValue = "",
+    )
+
+    val smartspaceWeatherRefreshInterval = preference(
+        key = longPreferencesKey("smartspace_weather_refresh_interval"),
+        defaultValue = 30L,
     )
 
     val smartspaceShowDate = preference(

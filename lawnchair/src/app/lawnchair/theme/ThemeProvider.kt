@@ -66,8 +66,6 @@ class ThemeProvider @Inject constructor(
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
     init {
-        syncWallpaperDerivedOnStartup()
-
         if (Utilities.ATLEAST_S) {
             colorSchemeMap[Pair(0, Style.TONAL_SPOT)] = SystemColorScheme(context)
             registerOverlayChangedListener()
@@ -206,20 +204,6 @@ class ThemeProvider @Inject constructor(
 
     override fun close() {
         TODO("Not yet implemented")
-    }
-
-    private fun syncWallpaperDerivedOnStartup() {
-        val stored = accentColor
-        if (stored !is ColorOption.WallpaperDerived) return
-        val currentPrimary = wallpaperManager.wallpaperColors?.primaryColor ?: return
-        if (currentPrimary == stored.color) return
-        // Wallpaper changed while Lawnchair was closed — write the new primary.
-        // onEach will fire after the write and call notifyColorSchemeChanged().
-        coroutineScope.launch {
-            preferenceManager2.accentColor.set(
-                ColorOption.WallpaperDerived(currentPrimary),
-            )
-        }
     }
 
     companion object {

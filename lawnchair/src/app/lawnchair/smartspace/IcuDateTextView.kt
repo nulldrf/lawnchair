@@ -8,6 +8,7 @@ import android.icu.text.DisplayContext
 import android.os.SystemClock
 import android.text.format.DateFormat.is24HourFormat
 import android.util.AttributeSet
+import android.view.View
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.smartspace.model.SmartspaceCalendar
 import app.lawnchair.smartspace.model.SmartspaceTimeFormat
@@ -54,6 +55,17 @@ class IcuDateTextView @JvmOverloads constructor(
     }
 
     private fun onTimeChanged(updateFormatter: Boolean) {
+        // When both date and time are disabled, hide entirely so the weather row
+        // moves to the top of the RelativeLayout (layout_below of a GONE view = top).
+        if (!dateTimeOptions.showDate && !dateTimeOptions.showTime) {
+            visibility = View.GONE
+            text = ""
+            formatterFunction = null
+            return
+        }
+
+        visibility = View.VISIBLE
+
         if (isShown) {
             val timeText = getTimeText(updateFormatter)
             if (text != timeText) {
@@ -93,18 +105,27 @@ class IcuDateTextView @JvmOverloads constructor(
     }
 
     private fun createLunarFormatter(): FormatterFunction {
-        var format: String
+        val format: String
         if (dateTimeOptions.showTime) {
-            format = context.getString(
+            val timePattern = context.getString(
                 when {
-                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwelveHourFormat -> R.string.smartspace_icu_date_pattern_gregorian_time_12h
-                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwentyFourHourFormat -> R.string.smartspace_icu_date_pattern_gregorian_time
-                    is24HourFormat(context) -> R.string.smartspace_icu_date_pattern_gregorian_time
-                    else -> R.string.smartspace_icu_date_pattern_gregorian_time_12h
+                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwelveHourFormat ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time_12h
+                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwentyFourHourFormat ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time
+                    is24HourFormat(context) ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time
+                    else ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time_12h
                 },
             )
-            if (dateTimeOptions.showDate) format += context.getString(R.string.smartspace_icu_date_pattern_gregorian_date)
+            format = if (dateTimeOptions.showDate) {
+                timePattern + context.getString(R.string.smartspace_icu_date_pattern_gregorian_date)
+            } else {
+                timePattern
+            }
         } else {
+            // showTime = false, showDate = true (both-off case handled in onTimeChanged)
             format = context.getString(R.string.smartspace_icu_date_pattern_gregorian_wday_month_day_no_year)
         }
 
@@ -112,49 +133,65 @@ class IcuDateTextView @JvmOverloads constructor(
             .setLocale(Locale.CHINESE)
             .setUnicodeLocaleKeyword("ca", "chinese")
             .build()
-
         val formatter = DateFormat.getInstanceForSkeleton(format, chineseLocale)
         formatter.setContext(DisplayContext.CAPITALIZATION_FOR_STANDALONE)
         return { formatter.format(it) }
     }
 
     private fun createPersianFormatter(): FormatterFunction {
-        var format: String
+        val format: String
         if (dateTimeOptions.showTime) {
-            format = context.getString(
+            val timePattern = context.getString(
                 when {
-                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwelveHourFormat -> R.string.smartspace_icu_date_pattern_gregorian_time_12h
-                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwentyFourHourFormat -> R.string.smartspace_icu_date_pattern_gregorian_time
-                    is24HourFormat(context) -> R.string.smartspace_icu_date_pattern_gregorian_time
-                    else -> R.string.smartspace_icu_date_pattern_gregorian_time_12h
+                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwelveHourFormat ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time_12h
+                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwentyFourHourFormat ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time
+                    is24HourFormat(context) ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time
+                    else ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time_12h
                 },
             )
-            if (dateTimeOptions.showDate) format = context.getString(R.string.smartspace_icu_date_pattern_gregorian_date) + format
+            format = if (dateTimeOptions.showDate) {
+                context.getString(R.string.smartspace_icu_date_pattern_gregorian_date) + timePattern
+            } else {
+                timePattern
+            }
         } else {
+            // showTime = false, showDate = true
             format = context.getString(R.string.smartspace_icu_date_pattern_gregorian_wday_month_day_no_year)
         }
         val persianLocale = Locale.Builder()
-            .setLanguage("fa") // Mimic old Solar Hijri behaviour using Farsi script
+            .setLanguage("fa")
             .setExtension('u', "ca-persian")
             .build()
-
         val formatter = DateFormat.getInstanceForSkeleton(format, persianLocale)
         return { formatter.format(it) }
     }
 
     private fun createGregorianFormatter(): FormatterFunction {
-        var format: String
+        val format: String
         if (dateTimeOptions.showTime) {
-            format = context.getString(
+            val timePattern = context.getString(
                 when {
-                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwelveHourFormat -> R.string.smartspace_icu_date_pattern_gregorian_time_12h
-                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwentyFourHourFormat -> R.string.smartspace_icu_date_pattern_gregorian_time
-                    is24HourFormat(context) -> R.string.smartspace_icu_date_pattern_gregorian_time
-                    else -> R.string.smartspace_icu_date_pattern_gregorian_time_12h
+                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwelveHourFormat ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time_12h
+                    dateTimeOptions.timeFormat is SmartspaceTimeFormat.TwentyFourHourFormat ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time
+                    is24HourFormat(context) ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time
+                    else ->
+                        R.string.smartspace_icu_date_pattern_gregorian_time_12h
                 },
             )
-            if (dateTimeOptions.showDate) format += context.getString(R.string.smartspace_icu_date_pattern_gregorian_date)
+            format = if (dateTimeOptions.showDate) {
+                timePattern + context.getString(R.string.smartspace_icu_date_pattern_gregorian_date)
+            } else {
+                timePattern
+            }
         } else {
+            // showTime = false, showDate = true (both-off is handled in onTimeChanged)
             format = context.getString(R.string.smartspace_icu_date_pattern_gregorian_wday_month_day_no_year)
         }
         val formatter = DateFormat.getInstanceForSkeleton(format, Locale.getDefault())

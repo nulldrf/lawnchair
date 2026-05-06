@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.theme.isSelectedThemeDark
 import com.android.launcher3.R
 import com.kieronquinn.app.smartspacer.sdk.SmartspacerConstants
+import kotlinx.coroutines.launch
 
 @Composable
 fun SmartspacePreferences(
@@ -77,13 +79,9 @@ fun SmartspacePreferences(
                 label = stringResource(R.string.smartspace_widget_toggle_label),
                 description = stringResource(id = R.string.smartspace_widget_toggle_description).takeIf { modeIsLawnchair },
             ) {
-                if (modeIsLawnchair) {
-                    SmartspacePreview()
-                }
+                if (modeIsLawnchair) SmartspacePreview()
                 PreferenceGroup {
-                    Item {
-                        SmartspaceProviderPreference(adapter = smartspaceModeAdapter)
-                    }
+                    Item { SmartspaceProviderPreference(adapter = smartspaceModeAdapter) }
                 }
                 Crossfade(
                     targetState = selectedMode,
@@ -106,7 +104,7 @@ private fun LawnchairSmartspaceSettings(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        SmartspaceWeatherSettings()
+        SmartspaceWeatherSettings(smartspaceProvider)
         PreferenceGroup(
             heading = stringResource(id = R.string.what_to_show),
             modifier = Modifier.padding(top = 8.dp),
@@ -131,13 +129,18 @@ private fun LawnchairSmartspaceSettings(
 }
 
 @Composable
-private fun SmartspaceWeatherSettings(modifier: Modifier = Modifier) {
+private fun SmartspaceWeatherSettings(
+    smartspaceProvider: SmartspaceProvider,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val prefs = preferenceManager2()
+    val scope = rememberCoroutineScope()
 
     val weatherProviderAdapter = prefs.smartspaceWeatherProvider.getAdapter()
     val selectedProvider = weatherProviderAdapter.state.value
     val iconPackAdapter = prefs.smartspaceWeatherIconPack.getAdapter()
+    val intervalAdapter = prefs.smartspaceWeatherRefreshInterval.getAdapter()
 
     val weatherProviderEntries = remember {
         WeatherProvider.entries.map { provider ->
@@ -149,6 +152,19 @@ private fun SmartspaceWeatherSettings(modifier: Modifier = Modifier) {
         val installed = WeatherIconProvider.getInstalledPacks(context)
         listOf(ListPreferenceEntry("") { stringResource(R.string.smartspace_weather_icon_pack_none) }) +
             installed.map { (pkg, label) -> ListPreferenceEntry(pkg) { label } }
+    }
+
+    val intervalEntries = remember {
+        WeatherDataProvider.REFRESH_INTERVAL_OPTIONS.map { minutes ->
+            ListPreferenceEntry(minutes) {
+                when (minutes) {
+                    15L -> stringResource(R.string.smartspace_weather_interval_15)
+                    30L -> stringResource(R.string.smartspace_weather_interval_30)
+                    60L -> stringResource(R.string.smartspace_weather_interval_60)
+                    else -> stringResource(R.string.smartspace_weather_interval_180)
+                }
+            }
+        }
     }
 
     PreferenceGroup(
@@ -170,6 +186,27 @@ private fun SmartspaceWeatherSettings(modifier: Modifier = Modifier) {
                 adapter = iconPackAdapter,
                 entries = iconPackEntries,
                 label = stringResource(id = R.string.smartspace_weather_icon_pack),
+            )
+        }
+        Item(visible = selectedProvider != WeatherProvider.NONE) {
+            ListPreference(
+                adapter = intervalAdapter,
+                entries = intervalEntries,
+                label = stringResource(id = R.string.smartspace_weather_refresh_interval),
+            )
+        }
+        // Manual refresh — triggers an immediate re-fetch by restarting the provider
+        Item(visible = selectedProvider != WeatherProvider.NONE) {
+            ClickablePreference(
+                label = stringResource(R.string.smartspace_weather_refresh_now),
+                onClick = {
+                    scope.launch {
+                        val weatherProvider = smartspaceProvider.dataSources
+                            .filterIsInstance<WeatherDataProvider>()
+                            .firstOrNull() ?: return@launch
+                        weatherProvider.onSetupDone()
+                    }
+                },
             )
         }
     }
@@ -294,7 +331,6 @@ fun SmartspaceDateAndTimePreferences(modifier: Modifier = Modifier) {
         heading = stringResource(id = R.string.smartspace_date_and_time),
         modifier = modifier.padding(top = 8.dp),
     ) {
-        // Date and Time toggles are always fully enabled — no minimum-content lock
         Item(key = "smartspace_date", visible = supportCustomizationFormat) {
             SwitchPreference(
                 adapter = showDateAdapter,

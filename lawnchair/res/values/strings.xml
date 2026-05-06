@@ -555,6 +555,7 @@
     <!-- Icon pack -->
     <string name="smartspace_weather_icon_pack">Weather Icon Pack</string>
     <string name="smartspace_weather_icon_pack_none">None (no icon)</string>
+	<string name="smartspace_weather_icon_pack_get_more">Get more icon packs</string>
 
     <!-- Refresh interval -->
     <string name="smartspace_weather_refresh_interval">Refresh Interval</string>

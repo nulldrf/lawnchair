@@ -1,6 +1,8 @@
 package app.lawnchair.ui.preferences.destinations
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.view.ContextThemeWrapper
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -52,6 +54,9 @@ import app.lawnchair.ui.theme.isSelectedThemeDark
 import com.android.launcher3.R
 import com.kieronquinn.app.smartspacer.sdk.SmartspacerConstants
 import kotlinx.coroutines.launch
+
+private const val ICON_PACK_REPO_URL =
+    "https://github.com/breezy-weather/breezy-weather-icon-packs/blob/main/README.md"
 
 @Composable
 fun SmartspacePreferences(
@@ -148,10 +153,10 @@ private fun SmartspaceWeatherSettings(
         }
     }
 
-    val iconPackEntries = remember {
-        val installed = WeatherIconProvider.getInstalledPacks(context)
+    val installedPacks = remember { WeatherIconProvider.getInstalledPacks(context) }
+    val iconPackEntries = remember(installedPacks) {
         listOf(ListPreferenceEntry("") { stringResource(R.string.smartspace_weather_icon_pack_none) }) +
-            installed.map { (pkg, label) -> ListPreferenceEntry(pkg) { label } }
+            installedPacks.map { (pkg, label) -> ListPreferenceEntry(pkg) { label } }
     }
 
     val intervalEntries = remember {
@@ -188,6 +193,17 @@ private fun SmartspaceWeatherSettings(
                 label = stringResource(id = R.string.smartspace_weather_icon_pack),
             )
         }
+        // "Get more" — opens the Breezy icon packs repo
+        Item(visible = selectedProvider != WeatherProvider.NONE) {
+            ClickablePreference(
+                label = stringResource(R.string.smartspace_weather_icon_pack_get_more),
+                onClick = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(ICON_PACK_REPO_URL)),
+                    )
+                },
+            )
+        }
         Item(visible = selectedProvider != WeatherProvider.NONE) {
             ListPreference(
                 adapter = intervalAdapter,
@@ -195,16 +211,15 @@ private fun SmartspaceWeatherSettings(
                 label = stringResource(id = R.string.smartspace_weather_refresh_interval),
             )
         }
-        // Manual refresh — triggers an immediate re-fetch by restarting the provider
         Item(visible = selectedProvider != WeatherProvider.NONE) {
             ClickablePreference(
                 label = stringResource(R.string.smartspace_weather_refresh_now),
                 onClick = {
                     scope.launch {
-                        val weatherProvider = smartspaceProvider.dataSources
+                        smartspaceProvider.dataSources
                             .filterIsInstance<WeatherDataProvider>()
-                            .firstOrNull() ?: return@launch
-                        weatherProvider.onSetupDone()
+                            .firstOrNull()
+                            ?.onSetupDone()
                     }
                 },
             )

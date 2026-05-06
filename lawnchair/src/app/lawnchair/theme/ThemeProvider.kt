@@ -66,6 +66,28 @@ class ThemeProvider @Inject constructor(
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
     init {
+        // Startup sync: if the wallpaper changed while Lawnchair was not running,
+        // the live primary will differ from the stored fingerprint.
+        // This is now safe because we compare wallpaperPrimary (fingerprint),
+        // not color (the user's chosen swatch).
+        val storedAccent = accentColor
+        if (storedAccent is ColorOption.WallpaperDerived) {
+            val currentPrimary = wallpaperManager.wallpaperColors?.primaryColor
+            if (currentPrimary != null && currentPrimary != storedAccent.wallpaperPrimary) {
+                // Wallpaper changed while closed — reset to new primary.
+                // Write synchronously via firstBlocking equivalent: launch and
+                // let onEach handle notifyColorSchemeChanged on Main.
+                coroutineScope.launch {
+                    preferenceManager2.accentColor.set(
+                        ColorOption.WallpaperDerived(
+                            color = currentPrimary,
+                            wallpaperPrimary = currentPrimary,
+                        ),
+                    )
+                }
+            }
+        }
+
         if (Utilities.ATLEAST_S) {
             colorSchemeMap[Pair(0, Style.TONAL_SPOT)] = SystemColorScheme(context)
             registerOverlayChangedListener()

@@ -55,16 +55,14 @@ class SmartspaceWidgetReader(context: Context) :
         val widgetFlow = widget?.updates?.map(this::extractWidgetLayout) ?: flowOf(disabledTargets)
 
         // When a custom weather provider is active, strip FEATURE_WEATHER targets so the
-        // GSA widget's temperature doesn't compete with our provider's data.
-        // If stripping leaves an empty list, fall back to disabledTargets so the base class
-        // has something to work with (avoids a fully blank smartspace card).
+        // GSA widget doesn't compete. Return emptyList() (not disabledTargets) so we
+        // contribute zero pager cards rather than a blank dummy card.
         internalTargets = combine(
             widgetFlow,
             prefs.smartspaceWeatherProvider.get(),
         ) { targets, weatherProvider ->
             if (weatherProvider != WeatherProvider.NONE) {
-                val filtered = targets.filter { it.featureType != SmartspaceTarget.FeatureType.FEATURE_WEATHER }
-                filtered.ifEmpty { disabledTargets }
+                targets.filter { it.featureType != SmartspaceTarget.FeatureType.FEATURE_WEATHER }
             } else {
                 targets
             }
@@ -201,11 +199,8 @@ class SmartspaceWidgetReader(context: Context) :
                         ),
                         pendingIntent = intent,
                     )
-                } catch (_: NumberFormatException) {
-                    null
-                } catch (_: IllegalArgumentException) {
-                    null
-                }
+                } catch (_: NumberFormatException) { null }
+                catch (_: IllegalArgumentException) { null }
             } else {
                 null
             }

@@ -46,6 +46,10 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="com.dvtonder.chronus.ICON_PACK" />
         </intent>
+		
+		<intent>
+            <action android:name="org.breezyweather.ICON_PROVIDER_ACTION" />
+        </intent>
     </queries>
 
     <!--override minSdk declared in it-->

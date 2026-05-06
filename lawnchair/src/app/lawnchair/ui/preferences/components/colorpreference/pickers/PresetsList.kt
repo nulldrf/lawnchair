@@ -104,10 +104,12 @@ fun WallpaperColorGrid(
 
                 option is ColorOption.WallpaperDerived &&
                     appliedColor is ColorOption.WallpaperDerived ->
+                    // Match only on chosen color — fingerprint may differ
+                    // between the live entry and the stored preference when
+                    // the list was extracted after a wallpaper change.
                     option.color == appliedColor.color
 
-                // Legacy: if WallpaperPrimary is still stored, highlight the
-                // first wallpaper swatch so the page doesn't look unselected.
+                // Legacy: WallpaperPrimary → highlight first wallpaper swatch.
                 option is ColorOption.WallpaperDerived &&
                     appliedColor is ColorOption.WallpaperPrimary ->
                     extractedEntries
@@ -141,8 +143,17 @@ private fun buildPresetEntries(
     // Slots 1..N: Wallpaper-derived colours
     val wallpaperSlots = MAX_SWATCHES - 1 - (if (includeDefault) 1 else 0)
     val wallpaperColors = extractWallpaperColors(context, wallpaperSlots)
+
+    // The first extracted color is always the wallpaper primary — store it as
+    // the fingerprint in every WallpaperDerived entry so ThemeProvider can
+    // detect a wallpaper change by comparing against this value.
+    val wallpaperPrimary = wallpaperColors.firstOrNull() ?: 0
+
     wallpaperColors.forEach { colorInt ->
-        val option = ColorOption.WallpaperDerived(colorInt)
+        val option = ColorOption.WallpaperDerived(
+            color = colorInt,
+            wallpaperPrimary = wallpaperPrimary,
+        )
         entries += ColorPreferenceEntry<ColorOption>(
             value = option,
             label = { stringResource(R.string.wallpaper) },

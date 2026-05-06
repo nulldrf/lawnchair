@@ -72,11 +72,26 @@ class ThemeProvider @Inject constructor(
         }
         wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
             override fun onColorsChanged() {
-                // WallpaperPrimary: notify so colorScheme re-reads the live primary.
-                // WallpaperDerived: handled by the direct system WallpaperManager
-                // listener below which receives the new colors as a parameter.
-                if (accentColor is ColorOption.WallpaperPrimary) {
-                    notifyColorSchemeChanged()
+                when (val current = accentColor) {
+                    is ColorOption.WallpaperPrimary -> notifyColorSchemeChanged()
+                    is ColorOption.WallpaperDerived -> {
+                        val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
+                            ?: return
+                        // Only update if the wallpaper actually changed.
+                        // Compare against the stored fingerprint, not the chosen
+                        // swatch color, so non-primary swatch picks are preserved.
+                        if (newPrimary != current.wallpaperPrimary) {
+                            coroutineScope.launch {
+                                preferenceManager2.accentColor.set(
+                                    ColorOption.WallpaperDerived(
+                                        color = newPrimary,
+                                        wallpaperPrimary = newPrimary,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    else -> Unit
                 }
             }
         })
@@ -97,14 +112,19 @@ class ThemeProvider @Inject constructor(
             android.app.WallpaperManager.getInstance(context)
                 .addOnColorsChangedListener(
                     { colors, which ->
+                        val current = accentColor
                         if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0 &&
-                            accentColor is ColorOption.WallpaperDerived
+                            current is ColorOption.WallpaperDerived
                         ) {
                             val newPrimary = colors?.primaryColor?.toArgb()
-                            if (newPrimary != null) {
+                            // Only update if the wallpaper fingerprint changed.
+                            if (newPrimary != null && newPrimary != current.wallpaperPrimary) {
                                 coroutineScope.launch {
                                     preferenceManager2.accentColor.set(
-                                        ColorOption.WallpaperDerived(newPrimary),
+                                        ColorOption.WallpaperDerived(
+                                            color = newPrimary,
+                                            wallpaperPrimary = newPrimary,
+                                        ),
                                     )
                                 }
                             }

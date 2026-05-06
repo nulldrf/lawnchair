@@ -18,6 +18,7 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import app.lawnchair.launcher
 import app.lawnchair.search.adapter.SearchTargetCompat
+import app.lawnchair.theme.color.tokens.ColorTokens
 import app.lawnchair.util.runOnMainThread
 import com.android.launcher3.BubbleTextView
 import com.android.launcher3.LauncherAppState
@@ -36,7 +37,6 @@ import com.android.launcher3.touch.ItemClickHandler
 import com.android.launcher3.touch.ItemLongClickListener
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.Executors
-import app.lawnchair.theme.color.tokens.ColorTokens
 
 class SearchResultIcon(context: Context, attrs: AttributeSet?) :
     BubbleTextView(context, attrs),
@@ -287,10 +287,14 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
 
         // For multi-layer provider icons (e.g. Google G), apply the same sweep gradient
         // used in the QSB so the icon looks identical in both surfaces.
+        // For simple vector icons (file, APK, document…), apply TextColorSecondary tint
+        // so they adapt to light/dark theme instead of staying baked-in gray.
         val finalDrawable: Drawable = if (drawable is LayerDrawable) {
             buildGoogleSweepDrawable(drawable)
         } else {
-            drawable
+            drawable.mutate().also {
+                it.setTint(ColorTokens.TextColorSecondary.resolveColor(context))
+            }
         }
 
         // Draw the icon centered with 20% padding on each side.

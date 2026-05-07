@@ -46,10 +46,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="com.dvtonder.chronus.ICON_PACK" />
         </intent>
-		
-		<intent>
+        <intent>
             <action android:name="org.breezyweather.ICON_PROVIDER" />
-			<category android:name="android.intent.category.DEFAULT" />
+        </intent>
+        <intent>
+            <action android:name="com.wangdaye.geometricweather.ICON_PROVIDER" />
         </intent>
     </queries>
 

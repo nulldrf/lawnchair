@@ -31,6 +31,7 @@ import com.android.launcher3.widget.LocalColorExtractor;
 import java.util.Map;
 
 import app.lawnchair.theme.ThemeProvider;
+import app.lawnchair.theme.ThemeProviderKt;
 import app.lawnchair.theme.color.AndroidColor;
 import dev.kdrag0n.colorkt.Color;
 import dev.kdrag0n.monet.theme.ColorScheme;
@@ -170,8 +171,14 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
             int shade = entry.getKey();
             int resId = resMap.get(shade, -1);
             if (resId != -1) {
-                AndroidColor color = (AndroidColor) entry.getValue();
-                array.put(resId, color.getColor());
+                Color color = entry.getValue();
+                // MonetColorSchemeCompat and SystemColorScheme store AndroidColor
+                // directly. KdragMonetColorScheme stores kdrag0n color types
+                // (Srgb, Zcam, etc.) which must be converted via toAndroidColor().
+                int colorInt = (color instanceof AndroidColor)
+                        ? ((AndroidColor) color).getColor()
+                        : ThemeProviderKt.toAndroidColor(color);
+                array.put(resId, colorInt);
             }
         }
     }

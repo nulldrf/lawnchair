@@ -229,8 +229,11 @@ class ThemeProvider @Inject constructor(
     }
 
     private val systemColorScheme get() = when {
-        Utilities.ATLEAST_S -> getColorScheme(0, colorStyle)
-        else -> getColorScheme(context.getSystemAccent(darkTheme = false), colorStyle)
+        // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
+        // SystemAccent must use the real system scheme or TonalSpot — never
+        // KdragMonetColorScheme, which AccentColorExtractor cannot cast.
+        Utilities.ATLEAST_S -> getColorScheme(0, if (colorStyle is LegacyKdrag) TonalSpot else colorStyle)
+        else -> getColorScheme(context.getSystemAccent(darkTheme = false), if (colorStyle is LegacyKdrag) TonalSpot else colorStyle)
     }
 
     /**

@@ -25,7 +25,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -45,6 +44,7 @@ import app.lawnchair.search.algorithms.engine.provider.web.WebSearchProvider
 import app.lawnchair.smartspace.model.SmartspaceCalendar
 import app.lawnchair.smartspace.model.SmartspaceMode
 import app.lawnchair.smartspace.model.SmartspaceTimeFormat
+import app.lawnchair.smartspace.provider.weather.TemperatureUnit
 import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.theme.color.ColorOption
@@ -730,9 +730,16 @@ class PreferenceManager2 @Inject constructor(
         save = { it.name },
     )
 
-    val pirateWeatherApiKey = preference(
-        key = stringPreferencesKey("pirate_weather_api_key"),
+    val smartspaceWeatherCity = preference(
+        key = stringPreferencesKey("smartspace_weather_city"),
         defaultValue = "",
+    )
+
+    val smartspaceWeatherUnit = preference(
+        key = stringPreferencesKey("smartspace_weather_unit"),
+        defaultValue = TemperatureUnit.CELSIUS,
+        parse = { TemperatureUnit.fromString(it) },
+        save = { it.name },
     )
 
     val smartspaceWeatherIconPack = preference(
@@ -741,8 +748,25 @@ class PreferenceManager2 @Inject constructor(
     )
 
     val smartspaceWeatherRefreshInterval = preference(
-        key = longPreferencesKey("smartspace_weather_refresh_interval"),
+        key = stringPreferencesKey("smartspace_weather_refresh_interval"),
         defaultValue = 30L,
+        parse = { it.toLongOrNull() ?: 30L },
+        save = { it.toString() },
+    )
+
+    val pirateWeatherApiKey = preference(
+        key = stringPreferencesKey("pirate_weather_api_key"),
+        defaultValue = "",
+    )
+
+    val openWeatherMapApiKey = preference(
+        key = stringPreferencesKey("open_weather_map_api_key"),
+        defaultValue = "",
+    )
+
+    val accuWeatherApiKey = preference(
+        key = stringPreferencesKey("accu_weather_api_key"),
+        defaultValue = "",
     )
 
     val smartspaceShowDate = preference(

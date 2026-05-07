@@ -14,7 +14,19 @@ data class OpenMeteoWeatherResult(
 data class OpenMeteoWeatherCurrent(
     @SerialName("temperature_2m") val temperature: Double?,
     @SerialName("weather_code") val weatherCode: Int?,
-    /** 1 = daytime, 0 = night — used for icon day/night variant selection. */
     @SerialName("is_day") val isDay: Int?,
     val time: Long,
+)
+
+@Serializable
+data class OpenMeteoGeocodingResult(
+    val results: List<OpenMeteoGeocodingLocation>? = null,
+)
+
+@Serializable
+data class OpenMeteoGeocodingLocation(
+    val latitude: Double,
+    val longitude: Double,
+    val name: String? = null,
+    val country: String? = null,
 )

@@ -24,10 +24,16 @@ import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.smartspace.model.SmartspaceAction
 import app.lawnchair.smartspace.model.SmartspaceScores
 import app.lawnchair.smartspace.model.SmartspaceTarget
+import app.lawnchair.smartspace.provider.accuweather.AccuWeatherApi
+import app.lawnchair.smartspace.provider.accuweather.json.AccuCurrentResult
 import app.lawnchair.smartspace.provider.openmeteo.OpenMeteoApi
+import app.lawnchair.smartspace.provider.openmeteo.OpenMeteoGeocodingApi
 import app.lawnchair.smartspace.provider.openmeteo.json.OpenMeteoWeatherCurrent
+import app.lawnchair.smartspace.provider.openweathermap.OpenWeatherMapApi
+import app.lawnchair.smartspace.provider.openweathermap.json.OpenWeatherCurrentResult
 import app.lawnchair.smartspace.provider.pirateweather.PirateWeatherApi
 import app.lawnchair.smartspace.provider.pirateweather.json.PirateWeatherCurrently
+import app.lawnchair.smartspace.provider.weather.TemperatureUnit
 import app.lawnchair.smartspace.provider.weather.WeatherCondition
 import app.lawnchair.smartspace.provider.weather.WeatherIconProvider
 import app.lawnchair.smartspace.provider.weather.WeatherProvider
@@ -53,21 +59,26 @@ import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+private data class WeatherConfigPartial(
+    val provider: WeatherProvider,
+    val iconPack: String,
+    val unit: TemperatureUnit,
+    val city: String,
+    val pirateApiKey: String,
+)
+
 private data class WeatherConfig(
     val provider: WeatherProvider,
     val iconPack: String?,
+    val unit: TemperatureUnit,
+    val city: String,
     val pirateApiKey: String,
+    val owmApiKey: String,
+    val accuApiKey: String,
     val refreshInterval: Long,
 )
 
-/** Minimal weather state we persist to survive restarts and connectivity loss. */
-private data class CachedWeather(
-    val tempInt: Int,
-    val conditionName: String,
-    val isDay: Boolean,
-    val summary: String?,
-    val timestamp: Long,
-)
+private data class Coords(val lat: Double, val lon: Double)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WeatherDataProvider(context: Context) : SmartspaceDataSource(
@@ -77,209 +88,94 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 ) {
     private val prefs = PreferenceManager2.getInstance(context)
     private val iconProvider = WeatherIconProvider(context)
-    private val openMeteoApi = buildRetrofit(OPEN_METEO_BASE_URL).create(OpenMeteoApi::class.java)
-    private val pirateApi = buildRetrofit(PIRATE_BASE_URL).create(PirateWeatherApi::class.java)
     private val sp: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    override val internalTargets = combine(
+    private val openMeteoApi = buildRetrofit(OPEN_METEO_BASE_URL).create(OpenMeteoApi::class.java)
+    private val openMeteoGeoApi = buildRetrofit(OPEN_METEO_GEO_URL).create(OpenMeteoGeocodingApi::class.java)
+    private val pirateApi = buildRetrofit(PIRATE_BASE_URL).create(PirateWeatherApi::class.java)
+    private val owmApi = buildRetrofit(OWM_BASE_URL).create(OpenWeatherMapApi::class.java)
+    private val accuApi = buildRetrofit(ACCU_BASE_URL).create(AccuWeatherApi::class.java)
+
+    private val configFlow = combine(
         prefs.smartspaceWeatherProvider.get(),
         prefs.smartspaceWeatherIconPack.get(),
+        prefs.smartspaceWeatherUnit.get(),
+        prefs.smartspaceWeatherCity.get(),
         prefs.pirateWeatherApiKey.get(),
-        prefs.smartspaceWeatherRefreshInterval.get(),
-    ) { provider, iconPack, apiKey, interval ->
+    ) { provider, iconPack, unit, city, pirateKey ->
+        WeatherConfigPartial(provider, iconPack, unit, city, pirateKey)
+    }.combine(
+        combine(
+            prefs.openWeatherMapApiKey.get(),
+            prefs.accuWeatherApiKey.get(),
+            prefs.smartspaceWeatherRefreshInterval.get(),
+        ) { owmKey, accuKey, interval -> Triple(owmKey, accuKey, interval) },
+    ) { partial, (owmKey, accuKey, interval) ->
         WeatherConfig(
-            provider = provider,
-            iconPack = iconPack.ifBlank { null },
-            pirateApiKey = apiKey,
+            provider = partial.provider,
+            iconPack = partial.iconPack.ifBlank { null },
+            unit = partial.unit,
+            city = partial.city,
+            pirateApiKey = partial.pirateApiKey,
+            owmApiKey = owmKey,
+            accuApiKey = accuKey,
             refreshInterval = interval,
         )
-    }.flatMapLatest { config ->
+    }
+
+    override val internalTargets = configFlow.flatMapLatest { config ->
         when (config.provider) {
             WeatherProvider.NONE -> flowOf(emptyList())
             WeatherProvider.OPEN_METEO ->
-                weatherFlow(config) { fetchOpenMeteo(config.iconPack) }
+                weatherFlow(config.refreshInterval) { fetchOpenMeteo(config) }
             WeatherProvider.PIRATE_WEATHER ->
-                weatherFlow(config) { fetchPirateWeather(config.iconPack, config.pirateApiKey) }
+                weatherFlow(config.refreshInterval) { fetchPirateWeather(config) }
+            WeatherProvider.OPEN_WEATHER_MAP ->
+                weatherFlow(config.refreshInterval) { fetchOpenWeatherMap(config) }
+            WeatherProvider.ACCU_WEATHER ->
+                weatherFlow(config.refreshInterval) { fetchAccuWeather(config) }
         }
     }.flowOn(Dispatchers.IO)
-
-    /**
-     * Polling flow that:
-     * 1. Immediately emits cached data (if available) so the card is never blank on startup.
-     * 2. Fetches fresh data; on success updates cache and emits; on failure re-emits cache.
-     * 3. Waits [WeatherConfig.refreshInterval] minutes, then repeats.
-     */
-    private fun weatherFlow(
-        config: WeatherConfig,
-        fetch: suspend () -> List<SmartspaceTarget>,
-    ) = flow {
-        // Emit cached data immediately so the UI is never blank while fetching
-        val cached = buildCachedTargets(config.iconPack)
-        if (cached.isNotEmpty()) emit(cached)
-
-        while (true) {
-            val fresh = fetch()
-            if (fresh.isNotEmpty()) {
-                emit(fresh)
-            } else {
-                // Fetch failed — re-emit cache so the card doesn't disappear
-                val fallback = buildCachedTargets(config.iconPack)
-                if (fallback.isNotEmpty()) emit(fallback)
-            }
-            delay(config.refreshInterval.minutes)
-        }
-    }
-
-    // ── Cache ─────────────────────────────────────────────────────────────────
-
-    private fun saveCache(tempInt: Int, condition: WeatherCondition, isDay: Boolean, summary: String?) {
-        sp.edit()
-            .putInt(KEY_TEMP, tempInt)
-            .putString(KEY_CONDITION, condition.name)
-            .putBoolean(KEY_IS_DAY, isDay)
-            .putString(KEY_SUMMARY, summary)
-            .putLong(KEY_TIMESTAMP, System.currentTimeMillis())
-            .apply()
-    }
-
-    private fun loadCache(): CachedWeather? {
-        val temp = sp.getInt(KEY_TEMP, Int.MIN_VALUE)
-        if (temp == Int.MIN_VALUE) return null
-        val conditionName = sp.getString(KEY_CONDITION, null) ?: return null
-        return CachedWeather(
-            tempInt = temp,
-            conditionName = conditionName,
-            isDay = sp.getBoolean(KEY_IS_DAY, true),
-            summary = sp.getString(KEY_SUMMARY, null),
-            timestamp = sp.getLong(KEY_TIMESTAMP, 0L),
-        )
-    }
-
-    private fun buildCachedTargets(iconPack: String?): List<SmartspaceTarget> {
-        val cache = loadCache() ?: return emptyList()
-        val condition = runCatching { WeatherCondition.valueOf(cache.conditionName) }
-            .getOrDefault(WeatherCondition.NA)
-        return listOf(
-            SmartspaceTarget(
-                id = "weatherCached",
-                headerAction = SmartspaceAction(
-                    id = "weatherCachedAction",
-                    icon = iconProvider.getIcon(condition, cache.isDay, iconPack),
-                    title = "",
-                    subtitle = "${cache.tempInt}°C",
-                    contentDescription = cache.summary ?: condition.toDisplayString(),
-                ),
-                score = SmartspaceScores.SCORE_WEATHER,
-                featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
-            ),
-        )
-    }
-
-    // ── Open-Meteo ────────────────────────────────────────────────────────────
-
-    private suspend fun fetchOpenMeteo(iconPack: String?): List<SmartspaceTarget> {
-        return try {
-            val loc = getLocation()
-                ?: return emptyList<SmartspaceTarget>().also { Log.w(TAG, "No location for Open-Meteo") }
-            Log.d(TAG, "Open-Meteo fetching for ${loc.latitude}, ${loc.longitude}")
-            val result = openMeteoApi.getWeather(loc.latitude, loc.longitude, OPEN_METEO_CURRENT_FIELDS)
-            if (result.error == true) { Log.w(TAG, "Open-Meteo error: ${result.reason}"); return emptyList() }
-            val current = result.current ?: return emptyList()
-            buildOpenMeteoTarget(current, iconPack)?.let { target ->
-                // Persist to cache
-                val temp = current.temperature?.toInt() ?: return emptyList()
-                val isDay = current.isDay != 0
-                val condition = WeatherCondition.fromWmoCode(current.weatherCode, isDay)
-                saveCache(temp, condition, isDay, null)
-                listOf(target)
-            } ?: emptyList()
-        } catch (e: Exception) {
-            Log.e(TAG, "Open-Meteo fetch failed", e)
-            emptyList()
-        }
-    }
-
-    private fun buildOpenMeteoTarget(current: OpenMeteoWeatherCurrent, iconPack: String?): SmartspaceTarget? {
-        val temp = current.temperature ?: return null
-        val isDay = current.isDay != 0
-        val condition = WeatherCondition.fromWmoCode(current.weatherCode, isDay)
-        return SmartspaceTarget(
-            id = "openMeteoWeather",
-            headerAction = SmartspaceAction(
-                id = "openMeteoWeatherAction",
-                icon = iconProvider.getIcon(condition, isDay, iconPack),
-                title = "",
-                subtitle = "${temp.toInt()}°C",
-                contentDescription = condition.toDisplayString(),
-            ),
-            score = SmartspaceScores.SCORE_WEATHER,
-            featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
-        )
-    }
-
-    // ── PirateWeather ─────────────────────────────────────────────────────────
-
-    private suspend fun fetchPirateWeather(iconPack: String?, apiKey: String): List<SmartspaceTarget> {
-        return try {
-            if (apiKey.isBlank()) { Log.w(TAG, "PirateWeather: blank API key"); return emptyList() }
-            val loc = getLocation()
-                ?: return emptyList<SmartspaceTarget>().also { Log.w(TAG, "No location for PirateWeather") }
-            Log.d(TAG, "PirateWeather fetching for ${loc.latitude}, ${loc.longitude}")
-            val result = pirateApi.getForecast(apiKey, loc.latitude, loc.longitude)
-            val currently = result.currently ?: return emptyList()
-            buildPirateTarget(currently, iconPack)?.let { target ->
-                val temp = currently.temperature?.toInt() ?: return emptyList()
-                val isDay = currently.icon?.endsWith("-night") == false
-                val condition = WeatherCondition.fromPirateIcon(currently.icon)
-                saveCache(temp, condition, isDay, currently.summary)
-                listOf(target)
-            } ?: emptyList()
-        } catch (e: Exception) {
-            Log.e(TAG, "PirateWeather fetch failed", e)
-            emptyList()
-        }
-    }
-
-    private fun buildPirateTarget(currently: PirateWeatherCurrently, iconPack: String?): SmartspaceTarget? {
-        val temp = currently.temperature ?: return null
-        val isDay = currently.icon?.endsWith("-night") == false
-        val condition = WeatherCondition.fromPirateIcon(currently.icon)
-        return SmartspaceTarget(
-            id = "pirateWeather",
-            headerAction = SmartspaceAction(
-                id = "pirateWeatherAction",
-                icon = iconProvider.getIcon(condition, isDay, iconPack),
-                title = "",
-                subtitle = "${temp.toInt()}°C",
-                contentDescription = currently.summary ?: condition.toDisplayString(),
-            ),
-            score = SmartspaceScores.SCORE_WEATHER,
-            featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
-        )
-    }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     override suspend fun requiresSetup(): Boolean {
-        return when (prefs.smartspaceWeatherProvider.get().first()) {
+        val provider = prefs.smartspaceWeatherProvider.get().first()
+        val city = prefs.smartspaceWeatherCity.get().first()
+        val needsLocation = city.isBlank() && !hasLocationPermission()
+        return when (provider) {
             WeatherProvider.NONE -> false
-            WeatherProvider.OPEN_METEO -> !hasLocationPermission()
+            WeatherProvider.OPEN_METEO -> needsLocation
             WeatherProvider.PIRATE_WEATHER ->
-                !hasLocationPermission() || prefs.pirateWeatherApiKey.get().first().isBlank()
+                needsLocation || prefs.pirateWeatherApiKey.get().first().isBlank()
+            WeatherProvider.OPEN_WEATHER_MAP ->
+                needsLocation || prefs.openWeatherMapApiKey.get().first().isBlank()
+            WeatherProvider.ACCU_WEATHER ->
+                prefs.accuWeatherApiKey.get().first().isBlank()
         }
     }
 
     override suspend fun startSetup(activity: Activity) {
         val provider = prefs.smartspaceWeatherProvider.get().first()
+        val city = prefs.smartspaceWeatherCity.get().first()
         val (title, desc) = when {
             provider == WeatherProvider.PIRATE_WEATHER &&
                 prefs.pirateWeatherApiKey.get().first().isBlank() ->
                 activity.getString(R.string.smartspace_pirate_weather_api_key_title) to
                     activity.getString(R.string.smartspace_pirate_weather_api_key_description)
-            else ->
+            provider == WeatherProvider.OPEN_WEATHER_MAP &&
+                prefs.openWeatherMapApiKey.get().first().isBlank() ->
+                activity.getString(R.string.smartspace_owm_api_key_title) to
+                    activity.getString(R.string.smartspace_owm_api_key_description)
+            provider == WeatherProvider.ACCU_WEATHER &&
+                prefs.accuWeatherApiKey.get().first().isBlank() ->
+                activity.getString(R.string.smartspace_accu_api_key_title) to
+                    activity.getString(R.string.smartspace_accu_api_key_description)
+            city.isBlank() && !hasLocationPermission() ->
                 activity.getString(R.string.smartspace_weather_location_permission_title) to
                     activity.getString(R.string.smartspace_weather_location_permission_description)
+            else -> return
         }
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", context.packageName, null)
@@ -290,18 +186,235 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         )
     }
 
-    // ── Location ──────────────────────────────────────────────────────────────
+    // ── Polling flow with cache ───────────────────────────────────────────────
+
+    private fun weatherFlow(
+        intervalMinutes: Long,
+        fetch: suspend () -> List<SmartspaceTarget>,
+    ) = flow {
+        // Emit cached data immediately to avoid blank card on restart
+        val cached = buildCachedTargets()
+        if (cached.isNotEmpty()) emit(cached)
+
+        while (true) {
+            val fresh = fetch()
+            emit(if (fresh.isNotEmpty()) fresh else buildCachedTargets().ifEmpty { fresh })
+            delay(intervalMinutes.minutes)
+        }
+    }
+
+    // ── Cache ─────────────────────────────────────────────────────────────────
+
+    private fun saveCache(tempCelsius: Double, condition: WeatherCondition, isDay: Boolean, summary: String?) {
+        sp.edit()
+            .putFloat(KEY_TEMP, tempCelsius.toFloat())
+            .putString(KEY_CONDITION, condition.name)
+            .putBoolean(KEY_IS_DAY, isDay)
+            .putString(KEY_SUMMARY, summary)
+            .apply()
+    }
+
+    private fun buildCachedTargets(): List<SmartspaceTarget> {
+        val temp = sp.getFloat(KEY_TEMP, Float.MIN_VALUE)
+        if (temp == Float.MIN_VALUE) return emptyList()
+        val conditionName = sp.getString(KEY_CONDITION, null) ?: return emptyList()
+        val condition = runCatching { WeatherCondition.valueOf(conditionName) }
+            .getOrDefault(WeatherCondition.NA)
+        val isDay = sp.getBoolean(KEY_IS_DAY, true)
+        val summary = sp.getString(KEY_SUMMARY, null)
+        val iconPack = prefs.smartspaceWeatherIconPack.get().let {
+            try { kotlinx.coroutines.runBlocking { it.first() }.ifBlank { null } } catch (e: Exception) { null }
+        }
+        val unit = try {
+            kotlinx.coroutines.runBlocking { prefs.smartspaceWeatherUnit.get().first() }
+        } catch (e: Exception) { TemperatureUnit.CELSIUS }
+        return listOf(buildTarget("weatherCached", condition, isDay, temp.toDouble(), summary, iconPack, unit))
+    }
+
+    // ── Open-Meteo ────────────────────────────────────────────────────────────
+
+    private suspend fun fetchOpenMeteo(config: WeatherConfig): List<SmartspaceTarget> {
+        return try {
+            val coords = resolveCoords(config) ?: return emptyList()
+            val result = openMeteoApi.getWeather(coords.lat, coords.lon, OPEN_METEO_CURRENT_FIELDS)
+            if (result.error == true) { Log.w(TAG, "Open-Meteo error: ${result.reason}"); return emptyList() }
+            val current = result.current ?: return emptyList()
+            val temp = current.temperature ?: return emptyList()
+            val isDay = current.isDay != 0
+            val condition = WeatherCondition.fromWmoCode(current.weatherCode, isDay)
+            saveCache(temp, condition, isDay, null)
+            listOf(buildTarget("openMeteoWeather", condition, isDay, temp, null, config.iconPack, config.unit))
+        } catch (e: Exception) { Log.e(TAG, "Open-Meteo fetch failed", e); emptyList() }
+    }
+
+    // ── PirateWeather ─────────────────────────────────────────────────────────
+
+    private suspend fun fetchPirateWeather(config: WeatherConfig): List<SmartspaceTarget> {
+        return try {
+            if (config.pirateApiKey.isBlank()) return emptyList()
+            val coords = resolveCoords(config) ?: return emptyList()
+            val result = pirateApi.getForecast(config.pirateApiKey, coords.lat, coords.lon)
+            val currently = result.currently ?: return emptyList()
+            val temp = currently.temperature ?: return emptyList()
+            val isDay = currently.icon?.endsWith("-night") == false
+            val condition = WeatherCondition.fromPirateIcon(currently.icon)
+            saveCache(temp, condition, isDay, currently.summary)
+            listOf(buildTarget("pirateWeather", condition, isDay, temp, currently.summary, config.iconPack, config.unit))
+        } catch (e: Exception) { Log.e(TAG, "PirateWeather fetch failed", e); emptyList() }
+    }
+
+    // ── OpenWeatherMap ────────────────────────────────────────────────────────
+
+    private suspend fun fetchOpenWeatherMap(config: WeatherConfig): List<SmartspaceTarget> {
+        return try {
+            if (config.owmApiKey.isBlank()) return emptyList()
+            val coords = resolveCoords(config) ?: return emptyList()
+            // Always fetch in metric — we convert to user's unit at display time
+            val result = owmApi.getCurrent(config.owmApiKey, coords.lat, coords.lon, units = "metric")
+            val temp = result.main?.temp ?: return emptyList()
+            val weatherId = result.weather?.firstOrNull()?.id
+            val icon = result.weather?.firstOrNull()?.icon ?: ""
+            val isDay = !icon.endsWith("n")
+            val condition = owmCodeToCondition(weatherId)
+            val description = result.weather?.firstOrNull()?.description
+            saveCache(temp, condition, isDay, description)
+            listOf(buildTarget("owmWeather", condition, isDay, temp, description, config.iconPack, config.unit))
+        } catch (e: Exception) { Log.e(TAG, "OWM fetch failed", e); emptyList() }
+    }
+
+    /** Maps OWM weather IDs to WeatherCondition — ported from Breezy's OpenWeatherService */
+    private fun owmCodeToCondition(id: Int?): WeatherCondition = when (id) {
+        in 200..202, 221, in 230..232 -> WeatherCondition.THUNDERSTORM
+        in 210..212 -> WeatherCondition.THUNDERSTORM
+        in 300..321 -> WeatherCondition.DRIZZLE
+        in 500..504 -> WeatherCondition.RAIN
+        511 -> WeatherCondition.SLEET
+        in 600..602, in 620..622 -> WeatherCondition.SNOW
+        in 611..616 -> WeatherCondition.SLEET
+        741 -> WeatherCondition.FOG
+        in 700..781 -> WeatherCondition.CLOUDY
+        800 -> WeatherCondition.CLEAR
+        801, 802 -> WeatherCondition.PARTLY_CLOUDY
+        803, 804 -> WeatherCondition.CLOUDY
+        else -> WeatherCondition.NA
+    }
+
+    // ── AccuWeather ───────────────────────────────────────────────────────────
+
+    private suspend fun fetchAccuWeather(config: WeatherConfig): List<SmartspaceTarget> {
+        return try {
+            if (config.accuApiKey.isBlank()) return emptyList()
+
+            // AccuWeather requires a location key first — resolve from city name or coords
+            val locationKey = resolveAccuLocationKey(config) ?: return emptyList()
+
+            val results = accuApi.getCurrent(locationKey, config.accuApiKey)
+            val current = results.firstOrNull() ?: return emptyList()
+            // AccuWeather always returns metric in .Metric field
+            val temp = current.Temperature?.Metric?.Value ?: return emptyList()
+            val condition = accuIconToCondition(current.WeatherIcon)
+            // AccuWeather icons 1-5 are daytime clear/partly-cloudy, 33-44 are night
+            val isDay = (current.WeatherIcon ?: 0) <= 32
+            val description = current.WeatherText
+            saveCache(temp, condition, isDay, description)
+            listOf(buildTarget("accuWeather", condition, isDay, temp, description, config.iconPack, config.unit))
+        } catch (e: Exception) { Log.e(TAG, "AccuWeather fetch failed", e); emptyList() }
+    }
+
+    /**
+     * Resolves an AccuWeather location key.
+     * - If city is set: uses AccuWeather's own text search
+     * - If no city: uses GPS coordinates via geoposition search
+     *   (note: geoposition endpoint needs separate implementation — for now falls back to city search)
+     */
+    private suspend fun resolveAccuLocationKey(config: WeatherConfig): String? {
+        return try {
+            if (config.city.isNotBlank()) {
+                accuApi.searchLocation(config.accuApiKey, config.city)
+                    .firstOrNull()?.Key
+            } else {
+                // Cache the location key to avoid repeated API calls (it counts against quota)
+                val cached = sp.getString(KEY_ACCU_LOCATION_KEY, null)
+                if (cached != null) return cached
+                // No city set, no cached key — can't proceed without geoposition endpoint
+                // (geoposition requires a separate paid/enterprise API call in AccuWeather)
+                Log.w(TAG, "AccuWeather: set a city name to avoid repeated location lookups")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "AccuWeather location lookup failed", e)
+            null
+        }
+    }
+
+    /** Maps AccuWeather icon codes to WeatherCondition — ported from Breezy's AccuService */
+    private fun accuIconToCondition(icon: Int?): WeatherCondition = when (icon) {
+        1, 2, 30, 33, 34 -> WeatherCondition.CLEAR
+        3, 4, 6, 35, 36, 38 -> WeatherCondition.PARTLY_CLOUDY
+        5, 37 -> WeatherCondition.CLOUDY
+        7, 8 -> WeatherCondition.CLOUDY
+        11 -> WeatherCondition.FOG
+        12, 13, 14, 18, 39, 40 -> WeatherCondition.RAIN
+        15, 16, 17, 41, 42 -> WeatherCondition.THUNDERSTORM
+        19, 20, 21, 22, 23, 24, 31, 43, 44 -> WeatherCondition.SNOW
+        25 -> WeatherCondition.HAIL
+        26, 29 -> WeatherCondition.SLEET
+        32 -> WeatherCondition.WINDY
+        else -> WeatherCondition.NA
+    }
+
+    // ── Location / city resolution ────────────────────────────────────────────
+
+    /**
+     * Resolves coordinates either from the user's manually entered city name
+     * (via the provider's own geocoder) or from the device's LocationManager.
+     */
+    private suspend fun resolveCoords(config: WeatherConfig): Coords? {
+        if (config.city.isNotBlank()) {
+            return geocodeCity(config.city, config.provider, config.owmApiKey)
+        }
+        return getDeviceLocation()?.let { Coords(it.latitude, it.longitude) }
+    }
+
+    private suspend fun geocodeCity(
+        city: String,
+        provider: WeatherProvider,
+        owmApiKey: String,
+    ): Coords? {
+        return try {
+            when (provider) {
+                WeatherProvider.OPEN_METEO, WeatherProvider.PIRATE_WEATHER -> {
+                    // Open-Meteo geocoding — free, no key needed
+                    val result = openMeteoGeoApi.search(city)
+                    result.results?.firstOrNull()?.let { Coords(it.latitude, it.longitude) }
+                }
+                WeatherProvider.OPEN_WEATHER_MAP -> {
+                    if (owmApiKey.isBlank()) return null
+                    val results = owmApi.geocode(owmApiKey, city)
+                    results.firstOrNull()?.let { r ->
+                        val lat = r.lat ?: return null
+                        val lon = r.lon ?: return null
+                        Coords(lat, lon)
+                    }
+                }
+                WeatherProvider.ACCU_WEATHER -> null // AccuWeather uses its own location key, not coords
+                WeatherProvider.NONE -> null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Geocoding failed for '$city'", e)
+            null
+        }
+    }
 
     @Suppress("MissingPermission")
-    private suspend fun getLocation(): Location? {
-        if (!hasLocationPermission()) { Log.w(TAG, "Location permission not granted"); return null }
+    private suspend fun getDeviceLocation(): Location? {
+        if (!hasLocationPermission()) return null
         val lm = context.getSystemService<LocationManager>() ?: return null
         val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
         for (p in providers) {
             val cached = lm.getLastKnownLocation(p)
-            if (cached != null) { Log.d(TAG, "Cached location from $p"); return cached }
+            if (cached != null) return cached
         }
-        Log.d(TAG, "No cached location — requesting fresh fix")
         for (provider in providers.filter { lm.isProviderEnabled(it) }) {
             val loc = requestFreshLocation(lm, provider)
             if (loc != null) return loc
@@ -330,6 +443,29 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
             }
         }
 
+    // ── Target builder ────────────────────────────────────────────────────────
+
+    private fun buildTarget(
+        id: String,
+        condition: WeatherCondition,
+        isDay: Boolean,
+        tempCelsius: Double,
+        summary: String?,
+        iconPack: String?,
+        unit: TemperatureUnit,
+    ) = SmartspaceTarget(
+        id = id,
+        headerAction = SmartspaceAction(
+            id = "${id}Action",
+            icon = iconProvider.getIcon(condition, isDay, iconPack),
+            title = "",
+            subtitle = unit.format(tempCelsius),
+            contentDescription = summary ?: condition.toDisplayString(),
+        ),
+        score = SmartspaceScores.SCORE_WEATHER,
+        featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
+    )
+
     private fun hasLocationPermission() =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
@@ -337,17 +473,19 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
     companion object {
         private const val TAG = "WeatherDataProvider"
         private const val OPEN_METEO_BASE_URL = "https://api.open-meteo.com/"
+        private const val OPEN_METEO_GEO_URL = "https://geocoding-api.open-meteo.com/"
         private const val PIRATE_BASE_URL = "https://api.pirateweather.net/"
+        private const val OWM_BASE_URL = "https://api.openweathermap.org/"
+        private const val ACCU_BASE_URL = "https://dataservice.accuweather.com/"
         private const val OPEN_METEO_CURRENT_FIELDS = "temperature_2m,weather_code,is_day"
         private val LOCATION_TIMEOUT = 15.seconds
 
-        // SharedPreferences cache keys
         private const val PREFS_NAME = "weather_data_provider_cache"
         private const val KEY_TEMP = "temp"
         private const val KEY_CONDITION = "condition"
         private const val KEY_IS_DAY = "is_day"
         private const val KEY_SUMMARY = "summary"
-        private const val KEY_TIMESTAMP = "timestamp"
+        private const val KEY_ACCU_LOCATION_KEY = "accu_location_key"
 
         val REFRESH_INTERVAL_OPTIONS = listOf(15L, 30L, 60L, 180L)
 

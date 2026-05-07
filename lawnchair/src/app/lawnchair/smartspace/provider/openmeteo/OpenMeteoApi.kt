@@ -1,13 +1,10 @@
 package app.lawnchair.smartspace.provider.openmeteo
 
+import app.lawnchair.smartspace.provider.openmeteo.json.OpenMeteoGeocodingResult
 import app.lawnchair.smartspace.provider.openmeteo.json.OpenMeteoWeatherResult
 import retrofit2.http.GET
 import retrofit2.http.Query
 
-/**
- * Open-Meteo free weather API — no API key required.
- * Docs: https://open-meteo.com/en/docs
- */
 interface OpenMeteoApi {
 
     @GET("v1/forecast?timezone=auto&timeformat=unixtime")
@@ -16,4 +13,14 @@ interface OpenMeteoApi {
         @Query("longitude") longitude: Double,
         @Query("current") current: String,
     ): OpenMeteoWeatherResult
+}
+
+/** Separate interface — different base URL (geocoding.open-meteo.com) */
+interface OpenMeteoGeocodingApi {
+
+    @GET("v1/search")
+    suspend fun search(
+        @Query("name") name: String,
+        @Query("count") count: Int = 1,
+    ): OpenMeteoGeocodingResult
 }

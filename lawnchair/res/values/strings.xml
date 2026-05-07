@@ -546,18 +546,31 @@
     <string name="smartspace_mode_google_search">Google Search</string>
     <string name="smartspace_mode_smartspacer" translatable="false">Smartspacer</string>
 	
-	<!-- Weather source -->
+	<!-- Weather sources -->
     <string name="smartspace_weather_source">Weather Source</string>
     <string name="smartspace_weather_provider_none">None</string>
     <string name="smartspace_open_meteo_weather">Open-Meteo</string>
     <string name="smartspace_pirate_weather">PirateWeather</string>
+    <string name="smartspace_open_weather_map">OpenWeatherMap</string>
+    <string name="smartspace_accu_weather">AccuWeather</string>
 
-    <!-- Icon pack -->
+    <!-- City -->
+    <string name="smartspace_weather_city">City</string>
+    <string name="smartspace_weather_city_hint">e.g. London</string>
+    <string name="smartspace_weather_city_auto">Auto (GPS)</string>
+
+    <!-- Temperature unit -->
+    <string name="smartspace_weather_unit">Temperature Unit</string>
+    <string name="smartspace_weather_unit_celsius">Celsius (°C)</string>
+    <string name="smartspace_weather_unit_fahrenheit">Fahrenheit (°F)</string>
+    <string name="smartspace_weather_unit_kelvin">Kelvin (K)</string>
+
+   <!-- Icon pack -->
     <string name="smartspace_weather_icon_pack">Weather Icon Pack</string>
     <string name="smartspace_weather_icon_pack_none">None (no icon)</string>
-	<string name="smartspace_weather_icon_pack_get_more">Get more icon packs</string>
+    <string name="smartspace_weather_icon_pack_get_more">Get more</string>
 
-    <!-- Refresh interval -->
+    <!-- Refresh -->
     <string name="smartspace_weather_refresh_interval">Refresh Interval</string>
     <string name="smartspace_weather_interval_15">Every 15 minutes</string>
     <string name="smartspace_weather_interval_30">Every 30 minutes</string>
@@ -565,16 +578,30 @@
     <string name="smartspace_weather_interval_180">Every 3 hours</string>
     <string name="smartspace_weather_refresh_now">Refresh Now</string>
 
-    <!-- PirateWeather API key -->
-    <string name="smartspace_pirate_weather_api_key">API Key</string>
-    <string name="smartspace_pirate_weather_api_key_hint">Enter your PirateWeather API key</string>
-    <string name="smartspace_pirate_weather_api_key_not_set">Not set</string>
-    <string name="smartspace_pirate_weather_api_key_title">API key required</string>
-    <string name="smartspace_pirate_weather_api_key_description">PirateWeather requires a free API key from pirateweather.net. Enter it in the weather settings.</string>
+    <!-- API keys — shared not-set label -->
+    <string name="smartspace_api_key_not_set">Not set</string>
 
-    <!-- Location permission dialog -->
+    <!-- PirateWeather -->
+    <string name="smartspace_pirate_weather_api_key">API Key</string>
+    <string name="smartspace_pirate_weather_api_key_hint">Enter PirateWeather API key</string>
+    <string name="smartspace_pirate_weather_api_key_title">API key required</string>
+    <string name="smartspace_pirate_weather_api_key_description">PirateWeather requires a free API key from pirateweather.net.</string>
+
+    <!-- OpenWeatherMap -->
+    <string name="smartspace_owm_api_key">API Key</string>
+    <string name="smartspace_owm_api_key_hint">Enter OpenWeatherMap API key</string>
+    <string name="smartspace_owm_api_key_title">API key required</string>
+    <string name="smartspace_owm_api_key_description">OpenWeatherMap requires a free API key from openweathermap.org.</string>
+
+    <!-- AccuWeather -->
+    <string name="smartspace_accu_api_key">API Key</string>
+    <string name="smartspace_accu_api_key_hint">Enter AccuWeather API key</string>
+    <string name="smartspace_accu_api_key_title">API key required</string>
+    <string name="smartspace_accu_api_key_description">AccuWeather requires a free API key from developer.accuweather.com.</string>
+
+    <!-- Location permission -->
     <string name="smartspace_weather_location_permission_title">Location permission needed</string>
-    <string name="smartspace_weather_location_permission_description">The weather provider needs your location. Please grant the location permission in Settings.</string>
+    <string name="smartspace_weather_location_permission_description">Set a city name or grant location permission for automatic weather.</string>
 
     <!-- Miscellaneous Smartspace strings -->
     <string name="smartspace_media_info_separator">" — "</string>

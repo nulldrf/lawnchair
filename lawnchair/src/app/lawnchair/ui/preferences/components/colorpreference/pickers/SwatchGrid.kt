@@ -90,6 +90,14 @@ fun <T> SwatchGrid(
                                 onClick = { onSwatchClick(entry.value) },
                                 selected = isSwatchSelected(entry.value),
                                 colorStyle = colorStyle,
+                                // SystemAccent swatch always renders with TonalSpot
+                                // regardless of the active color style — LegacyKdrag
+                                // does not apply to the system accent visually.
+                                forceStyle = if (entry.value is app.lawnchair.theme.color.ColorOption.SystemAccent) {
+                                    app.lawnchair.theme.color.TonalSpot
+                                } else {
+                                    null
+                                },
                                 modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
                             )
                         }
@@ -108,6 +116,9 @@ fun <T> ColorSwatch(
     selected: Boolean,
     modifier: Modifier = Modifier,
     colorStyle: ColorStyle? = null,
+    // Override the colorStyle for this specific swatch, ignoring the grid-level style.
+    // Used to force TonalSpot for SystemAccent regardless of active color style.
+    forceStyle: ColorStyle? = null,
 ) {
     val context = LocalContext.current
     val isDark = isSelectedThemeDark
@@ -117,8 +128,9 @@ fun <T> ColorSwatch(
     // When colorStyle is provided (Presets page) use it so swatches visually
     // reflect the active style (e.g. Monochromatic looks desaturated).
     // When null (Custom page) always use TONAL_SPOT for consistent static colours.
-    val scheme: ColorScheme = remember(baseColorInt, colorStyle) {
-        buildScheme(baseColorInt, colorStyle)
+    val effectiveStyle = forceStyle ?: colorStyle
+    val scheme: ColorScheme = remember(baseColorInt, effectiveStyle) {
+        buildScheme(baseColorInt, effectiveStyle)
     }
 
     // accent1[100] → top half of outer circle   (light primary pastel)

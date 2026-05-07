@@ -29,6 +29,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.StrictMode;
 import android.util.Log;
 
@@ -37,7 +38,7 @@ import com.android.launcher3.graphics.BitmapCreationCheck;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.util.ResourceBasedOverride;
 
-import org.chickenhook.restrictionbypass.Unseal;
+import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
 import app.lawnchair.preferences.PreferenceManager;
 
@@ -51,12 +52,13 @@ public class MainProcessInitializer implements ResourceBasedOverride {
     private static final boolean DEBUG_STRICT_MODE = false;
 
     public static void initialize(Context context) {
-        try {
-            Unseal.unseal();
-            Log.i(TAG, "Unseal success!");
-        } catch (Exception e) {
-            Log.e(TAG, "Unseal fail!");
-            e.printStackTrace();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                HiddenApiBypass.addHiddenApiExemptions("");
+                Log.i(TAG, "HiddenApiBypass success!");
+            } catch (Exception e) {
+                Log.e(TAG, "HiddenApiBypass fail!", e);
+            }
         }
         PreferenceManager.getInstance(context);
         Overrides.getObject(

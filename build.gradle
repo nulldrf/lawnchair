@@ -423,7 +423,7 @@ dependencies {
     implementation libs.javax.inject
     implementation libs.kotlinx.coroutines.android
     implementation libs.kotlinx.serialization.json
-    implementation libs.chickenhook.restrictionbypass
+    implementation libs.hiddenapi.bypass
     implementation libs.rikka.refine.runtime
 
     implementation libs.androidx.activity.compose

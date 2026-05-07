@@ -57,5 +57,4 @@
 
 -keep class com.google.protobuf.Timestamp { *; }
 
-# TODO: Remove this after the change in https://github.com/ChickenHook/RestrictionBypass/pull/9 has been released.
--keep class org.chickenhook.restrictionbypass.** { *; }
+-keep class org.lsposed.hiddenapibypass.** { *; }

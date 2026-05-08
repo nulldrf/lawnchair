@@ -16,11 +16,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -96,11 +99,15 @@ import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.patrykmichalik.opto.core.firstBlocking
 
-// ── Searchable entry — represents any preference that can appear in search ──
+// ── Individual deep searchable entry ─────────────────────────────────────────
+// label     = displayed as result title (the actual setting name)
+// keywords  = hidden search terms, never shown
+// breadcrumb= section name shown as subtitle, e.g. "General"
+// route     = top-level section to navigate to when tapped
 private data class SearchableEntry(
     val label: String,
-    val description: String,
-    val breadcrumb: String,           // e.g. "General > Colors"
+    val keywords: String = "",
+    val breadcrumb: String,
     val iconResource: Int,
     val route: PreferenceRootRoute,
 )
@@ -116,7 +123,7 @@ fun PreferencesDashboard(
     val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
-    // ── Announcement state ────────────────────────────────────────────────
+    // ── Announcement / default-launcher state ─────────────────────────────
     val liveInformationManager = liveInformationManager()
     val enabled by liveInformationManager.enabled.asState()
     val showAnnouncements by liveInformationManager.showAnnouncements.asState()
@@ -156,57 +163,199 @@ fun PreferencesDashboard(
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // ── Resolve all item strings ──────────────────────────────────────────
-    val labelGeneral     = stringResource(R.string.general_label)
-    val descGeneral      = stringResource(R.string.general_description)
-    val labelHomeScreen  = stringResource(R.string.home_screen_label)
-    val descHomeScreen   = stringResource(R.string.home_screen_description)
-    val labelSmartspace  = stringResource(id = R.string.smartspace_widget)
-    val descSmartspace   = stringResource(R.string.smartspace_widget_description)
-    val labelDock        = stringResource(R.string.dock_label)
-    val descDock         = stringResource(R.string.dock_description)
-    val labelAppDrawer   = stringResource(R.string.app_drawer_label)
-    val descAppDrawer    = stringResource(R.string.app_drawer_description)
-    val labelSearchBar   = stringResource(R.string.search_bar_label)
-    val descSearchBar    = stringResource(R.string.drawer_search_description)
-    val labelFolders     = stringResource(R.string.folders_label)
-    val descFolders      = stringResource(R.string.folders_description)
-    val labelGestures    = stringResource(id = R.string.gestures_label)
-    val descGestures     = stringResource(R.string.gestures_description)
-    val labelQuickstep   = stringResource(id = R.string.quickstep_label)
-    val descQuickstep    = stringResource(id = R.string.quickstep_description)
-    val labelBackup      = stringResource(R.string.backup_and_restore_label)
-    val descBackup       = stringResource(R.string.backup_and_restore_description)
-    val labelExtras      = stringResource(R.string.extras_label)
-    val descExtras       = stringResource(R.string.extras_description)
-    val labelAbout       = stringResource(R.string.about_label)
+    // ── Top-level label/desc strings ──────────────────────────────────────
+    val labelGeneral    = stringResource(R.string.general_label)
+    val descGeneral     = stringResource(R.string.general_description)
+    val labelHomeScreen = stringResource(R.string.home_screen_label)
+    val descHomeScreen  = stringResource(R.string.home_screen_description)
+    val labelSmartspace = stringResource(id = R.string.smartspace_widget)
+    val descSmartspace  = stringResource(R.string.smartspace_widget_description)
+    val labelDock       = stringResource(R.string.dock_label)
+    val descDock        = stringResource(R.string.dock_description)
+    val labelAppDrawer  = stringResource(R.string.app_drawer_label)
+    val descAppDrawer   = stringResource(R.string.app_drawer_description)
+    val labelSearchBar  = stringResource(R.string.search_bar_label)
+    val descSearchBar   = stringResource(R.string.drawer_search_description)
+    val labelFolders    = stringResource(R.string.folders_label)
+    val descFolders     = stringResource(R.string.folders_description)
+    val labelGestures   = stringResource(id = R.string.gestures_label)
+    val descGestures    = stringResource(R.string.gestures_description)
+    val labelQuickstep  = stringResource(id = R.string.quickstep_label)
+    val descQuickstep   = stringResource(id = R.string.quickstep_description)
+    val labelBackup     = stringResource(R.string.backup_and_restore_label)
+    val descBackup      = stringResource(R.string.backup_and_restore_description)
+    val labelExtras     = stringResource(R.string.extras_label)
+    val descExtras      = stringResource(R.string.extras_description)
+    val labelAbout      = stringResource(R.string.about_label)
 
     val deckLayout = prefs2.deckLayout.getAdapter()
     val isSmartspaceEnabled = prefs2.enableSmartspace.firstBlocking()
 
-    // ── Full searchable entry list ────────────────────────────────────────
-    // Each entry carries its top-level route so tapping it navigates directly.
-    // Sub-setting labels (from strings.xml) are included as extra search terms
-    // via the description field so e.g. "icon pack" finds General.
-    val allEntries = remember(labelGeneral, deckLayout.state.value) {
-        buildList {
-            add(SearchableEntry(labelGeneral, descGeneral + " • icon packs • colors • notification dots • themes • fonts • accent color", "Settings", R.drawable.ic_general, General))
-            add(SearchableEntry(labelHomeScreen, descHomeScreen + " • grid • feed • widgets • wallpaper • status bar • infinite scrolling • rotation", "Settings", R.drawable.ic_home_screen, HomeScreen))
-            add(SearchableEntry(labelSmartspace, descSmartspace + " • at a glance • weather • battery • clock • date • calendar", "Settings", if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off, Smartspace))
-            add(SearchableEntry(labelDock, descDock + " • hotseat • bottom bar • icon count • search bar", "Settings", R.drawable.ic_dock, Dock))
-            if (!deckLayout.state.value) {
-                add(SearchableEntry(labelAppDrawer, descAppDrawer + " • hidden apps • columns • scrollbar • bulk loading", "Settings", R.drawable.ic_apps, AppDrawer))
-            }
-            add(SearchableEntry(labelSearchBar, descSearchBar + " • fuzzy search • suggestions • web search • google • device search", "Settings", R.drawable.ic_search, Search()))
-            add(SearchableEntry(labelFolders, descFolders + " • folder rows • folder columns • folder background", "Settings", R.drawable.ic_folder, Folders))
-            add(SearchableEntry(labelGestures, descGestures + " • double tap • swipe up • swipe down • back • home • sleep • lock", "Settings", R.drawable.ic_gestures, Gestures))
-            if (LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
-                add(SearchableEntry(labelQuickstep, descQuickstep + " • recents • clear all • corner radius • taskbar • overview", "Settings", R.drawable.ic_quickstep, Quickstep))
-            }
-            add(SearchableEntry(labelBackup, descBackup + " • export • import • restore • save layout", "Settings", R.drawable.backup_restore, BackupAndRestore))
-            add(SearchableEntry(labelExtras, descExtras + " • experimental • debug • restart • font • deck layout", "Settings", R.drawable.ic_extras, Extras))
-            add(SearchableEntry(labelAbout, aboutDescription + " • version • contributors • github • telegram • discord • donate • changelog", "Settings", R.drawable.ic_about, About))
+    // ── Deep searchable entry list ────────────────────────────────────────
+    val allEntries = buildList {
+        // ── General ───────────────────────────────────────────────────
+        fun g(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelGeneral, R.drawable.ic_general, General))
+        g(stringResource(R.string.icon_pack), "icon packs apply theme")
+        g(stringResource(R.string.themed_icon_pack), "themed icon source lawnicons monochrome")
+        g(stringResource(R.string.icon_shape_label), "circle square rounded squircle octagon teardrop shape")
+        g(stringResource(R.string.icon_sizes), "icon size large small scale")
+        g(stringResource(R.string.show_labels), "label text app name show hide")
+        g(stringResource(R.string.label_size), "label size text size")
+        g(stringResource(R.string.notification_dots), "badge notification count dot")
+        g(stringResource(R.string.show_notification_count), "badge counter number notification")
+        g(stringResource(R.string.theme_label), "light dark mode amoled black theme")
+        g(stringResource(R.string.accent_color), "color picker tint accent custom")
+        g(stringResource(R.string.color_style_label), "tonal spot vibrant expressive material you dynamic")
+        g(stringResource(R.string.colorized_backgrounds_label), "smart icon background color analyze pixel")
+        g(stringResource(R.string.auto_adaptive_icons_label), "adaptive icons non-adaptive wrap background")
+        g(stringResource(R.string.transparent_background_icons_label), "transparent themed icon background clear")
+        g(stringResource(R.string.shadow_bg_icons_label), "shadow behind icons drop shadow")
+        g(stringResource(R.string.force_monochrome_label), "monochrome tint force greyscale")
+        g(stringResource(R.string.font_label), "font customization typography typeface heading body")
+
+        // ── Home screen ───────────────────────────────────────────────
+        fun h(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelHomeScreen, R.drawable.ic_home_screen, HomeScreen))
+        h(stringResource(R.string.home_screen_grid), "grid columns rows layout size change")
+        h(stringResource(R.string.minus_one), "feed google discover news swipe left page")
+        h(stringResource(R.string.status_bar_label), "status bar clock show hide dark light")
+        h(stringResource(R.string.infinite_scrolling_label), "loop pages wrap around infinite")
+        h(stringResource(R.string.home_screen_rotation_label), "rotate landscape portrait rotation")
+        h(stringResource(R.string.wallpaper_scrolling_label), "scroll wallpaper parallax pan")
+        h(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted")
+        h(stringResource(R.string.wallpaper_depth_effect_label), "depth parallax zoom wallpaper effect")
+        h(stringResource(R.string.home_screen_lock), "lock home screen prevent changes layout edit")
+        h(stringResource(R.string.auto_add_shortcuts_label), "add new apps home screen auto install")
+        h(stringResource(R.string.popup_menu), "popup menu long press shortcuts actions edit")
+        h(stringResource(R.string.force_rounded_widgets), "rounded widgets corner radius")
+        h(stringResource(R.string.wallpaper_quick_picker), "wallpaper picker quick change select")
+        h(stringResource(R.string.allow_widget_overlap), "widget overlap allow")
+        h(stringResource(R.string.force_widget_resize_label), "widget resize enforce resizable")
+        h(stringResource(R.string.show_sys_ui_scrim), "top shadow status bar scrim gradient")
+
+        // ── Smartspace / At a Glance ──────────────────────────────────
+        val smartIcon = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off
+        fun s(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelSmartspace, smartIcon, Smartspace))
+        s(stringResource(R.string.smartspace_widget_toggle_label), "show at a glance home screen enable toggle")
+        s(stringResource(R.string.smartspace_mode_label), "provider google smartspacer lawnchair mode")
+        s(stringResource(R.string.smartspace_weather), "weather temperature forecast rain sun")
+        s(stringResource(R.string.smartspace_weather_source), "weather source provider open-meteo pirate openweathermap accuweather")
+        s(stringResource(R.string.smartspace_battery_status), "battery charging status level indicator")
+        s(stringResource(R.string.smartspace_now_playing), "now playing music media track song")
+        s(stringResource(R.string.smartspace_date_and_time), "date time clock format 12h 24h")
+        s(stringResource(R.string.smartspace_calendar), "calendar gregorian persian lunar system")
+        s(stringResource(R.string.smartspace_weather_city), "city location weather gps auto")
+        s(stringResource(R.string.smartspace_weather_unit), "temperature unit celsius fahrenheit kelvin")
+
+        // ── Dock ──────────────────────────────────────────────────────
+        fun d(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelDock, R.drawable.ic_dock, Dock))
+        d(stringResource(R.string.show_hotseat_title), "show hide dock hotseat enable")
+        d(stringResource(R.string.hotseat_mode_label), "search bar widget google lawnchair disabled dock")
+        d(stringResource(R.string.search_bar_settings), "search bar dock corner radius background settings")
+        d(stringResource(R.string.dock_icons), "dock icon count columns hotseat number")
+        d(stringResource(R.string.hotseat_bottom_space_label), "bottom padding spacing dock margin")
+        d(stringResource(R.string.page_indicator_height), "page indicator dots height size")
+        d(stringResource(R.string.corner_radius_label), "corner radius search bar rounded")
+        d(stringResource(R.string.qsb_hotseat_background_transparency), "search bar background opacity transparent")
+
+        // ── App drawer ────────────────────────────────────────────────
+        if (!deckLayout.state.value) {
+            fun a(label: String, kw: String = "") =
+                add(SearchableEntry(label, kw, labelAppDrawer, R.drawable.ic_apps, AppDrawer))
+            a(stringResource(R.string.hidden_apps_label), "hide apps from drawer hidden list")
+            a(stringResource(R.string.app_drawer_columns), "columns grid app drawer layout count")
+            a(stringResource(R.string.row_height_label), "row height size spacing compact")
+            a(stringResource(R.string.pref_all_apps_show_scrollbar_title), "scrollbar show hide fast scroll")
+            a(stringResource(R.string.pref_all_apps_remember_position_title), "remember position scroll app drawer keep")
+            a(stringResource(R.string.pref_all_apps_bulk_icon_loading_title), "bulk load icons performance speed")
+            a(stringResource(R.string.app_drawer_haptic_feedback_label), "haptic vibration feedback touch")
+            a(stringResource(R.string.app_drawer_indent_label), "padding horizontal indent margin spacing")
         }
+
+        // ── Search bar ────────────────────────────────────────────────
+        fun sb(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search()))
+        sb(stringResource(R.string.fuzzy_search_title), "fuzzy approximate matching search typo")
+        sb(stringResource(R.string.suggestion_pref_screen_title), "search suggestions apps top recommended")
+        sb(stringResource(R.string.perform_wide_search_title), "device search contacts files settings phone")
+        sb(stringResource(R.string.app_search_algorithm), "algorithm global search on-device ASI app search")
+        sb(stringResource(R.string.clear_history), "clear search history delete")
+        sb(stringResource(R.string.allapps_web_suggestion_provider_label), "web suggestion provider google bing duckduckgo")
+        sb(stringResource(R.string.search_provider), "search engine google duckduckgo bing startpage custom")
+        sb(stringResource(R.string.show_app_search_bar), "show search bar drawer enable")
+        sb(stringResource(R.string.pref_search_auto_show_keyboard), "auto keyboard search show automatically")
+        sb(stringResource(R.string.show_hidden_apps_in_search_results), "show hidden apps search results")
+
+        // ── Folders ───────────────────────────────────────────────────
+        fun f(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelFolders, R.drawable.ic_folder, Folders))
+        f(stringResource(R.string.max_folder_columns), "folder columns maximum grid count")
+        f(stringResource(R.string.max_folder_rows), "folder rows maximum grid count")
+        f(stringResource(R.string.folder_bg_opacity_label), "folder background opacity transparency")
+        f(stringResource(R.string.folder_preview_bg_opacity_label), "folder icon preview background opacity")
+        f(stringResource(R.string.folder_shape_label), "folder shape icon shape style")
+
+        // ── Gestures ──────────────────────────────────────────────────
+        fun ge(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelGestures, R.drawable.ic_gestures, Gestures))
+        ge(stringResource(R.string.gesture_double_tap), "double tap action sleep lock screen")
+        ge(stringResource(R.string.gesture_swipe_up), "swipe up drawer recents app")
+        ge(stringResource(R.string.gesture_swipe_down), "swipe down notifications quick settings panel")
+        ge(stringResource(R.string.gesture_two_finger_swipe_down), "two finger swipe down notifications")
+        ge(stringResource(R.string.gesture_two_finger_swipe_up), "two finger swipe up recents")
+        ge(stringResource(R.string.gesture_home_tap), "home button tap gesture action")
+        ge(stringResource(R.string.gesture_back_tap), "back button tap gesture action")
+        ge(stringResource(R.string.sleep_mode_label), "sleep mode lock screen accessibility root admin")
+
+        // ── Quickstep / Recents ───────────────────────────────────────
+        if (LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
+            fun q(label: String, kw: String = "") =
+                add(SearchableEntry(label, kw, labelQuickstep, R.drawable.ic_quickstep, Quickstep))
+            q(stringResource(R.string.recents_clear_all), "clear all recents close apps button")
+            q(stringResource(R.string.window_corner_radius_label), "screen corner radius recents card")
+            q(stringResource(R.string.taskbar_label), "taskbar show experimental enable")
+            q(stringResource(R.string.translucent_background), "translucent background recents opacity blur")
+            q(stringResource(R.string.recents_lock_unlock), "lock unlock recents prevent close clear all")
+        }
+
+        // ── Backup and restore ────────────────────────────────────────
+        fun b(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelBackup, R.drawable.backup_restore, BackupAndRestore))
+        b(stringResource(R.string.create_backup), "export backup save layout settings create")
+        b(stringResource(R.string.restore_backup), "import restore backup load file")
+
+        // ── Extras ────────────────────────────────────────────────────
+        fun e(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelExtras, R.drawable.ic_extras, Extras))
+        e(stringResource(R.string.experimental_features_label), "experimental beta unstable features labs")
+        e(stringResource(R.string.debug_menu_label), "debug menu developer options")
+        e(stringResource(R.string.debug_restart_launcher), "restart lawnchair launcher reboot")
+        e(stringResource(R.string.font_picker_label), "font customization typography typeface heading body weight")
+        e(stringResource(R.string.show_deck_layout), "deck layout drawerless no app drawer all apps home")
+        e(stringResource(R.string.material_expressive_label), "material 3 expressive workspace m3e")
+        e(stringResource(R.string.icon_swipe_gestures), "icon swipe left right gesture shortcut")
+        e(stringResource(R.string.app_closing_animation), "app closing animation overlay fade suck in")
+        e(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink fade pie")
+        e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation")
+        e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace")
+        e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack")
+        e(stringResource(R.string.smartspace_calendar_label), "at a glance calendar non-gregorian persian lunar")
+
+        // ── About ─────────────────────────────────────────────────────
+        fun ab(label: String, kw: String = "") =
+            add(SearchableEntry(label, kw, labelAbout, R.drawable.ic_about, About))
+        ab(stringResource(R.string.auto_updater_label), "auto updater check update nightly automatic")
+        ab(stringResource(R.string.updater), "update download install version changelog")
+        ab(stringResource(R.string.github), "github source code repo open source contribute")
+        ab(stringResource(R.string.telegram), "telegram community chat news channel")
+        ab(stringResource(R.string.discord), "discord community server chat")
+        ab(stringResource(R.string.donate), "donate support fund contribute money")
+        ab(stringResource(R.string.privacy_policy), "privacy policy data collection")
+        ab(stringResource(R.string.acknowledgements), "acknowledgements credits libraries third party")
+        ab("Contributors", "team developers contributors design art")
     }
 
     // ── Debug badge ───────────────────────────────────────────────────────
@@ -228,22 +377,31 @@ fun PreferencesDashboard(
         )
     }
 
-    // ── Search overlay ────────────────────────────────────────────────────
-    // When active, a full-screen overlay replaces the normal settings list.
-    // BackHandler pops back to the normal view.
+    // ── Back handler ──────────────────────────────────────────────────────
     BackHandler(enabled = searchActive) {
         searchActive = false
         searchQuery = ""
     }
 
+    // ── Root: animated switch between settings list and search overlay ────
+    // Opening: search overlay slides UP from 1/3 height (where the bar sits)
+    // + fades in. Closing: slides back down + fades out. The settings list
+    // itself just fades — no expand/shrink so nothing jumps or clips.
     AnimatedContent(
         targetState = searchActive,
         transitionSpec = {
-            (fadeIn(tween(220)) + expandVertically(tween(280))).togetherWith(
-                fadeOut(tween(180)) + shrinkVertically(tween(220)),
-            )
+            if (targetState) {
+                // → entering search
+                (slideInVertically(tween(320)) { it / 3 } + fadeIn(tween(240)))
+                    .togetherWith(fadeOut(tween(180)))
+            } else {
+                // ← leaving search
+                fadeIn(tween(200))
+                    .togetherWith(slideOutVertically(tween(280)) { it / 3 } + fadeOut(tween(200)))
+            }
         },
-        label = "search_overlay",
+        label = "settings_search_transition",
+        modifier = modifier,
     ) { isSearching ->
         if (isSearching) {
             SearchOverlay(
@@ -257,12 +415,10 @@ fun PreferencesDashboard(
                 onNavigate = onNavigate,
             )
         } else {
-            // ── Normal settings layout ────────────────────────────────────
             PreferenceLayout(
                 label = settingsLabel,
                 expandedLabel = expandedLabel,
                 onExpandedTitleClick = onExpandedTitleClick,
-                modifier = modifier,
                 verticalArrangement = Arrangement.Top,
                 backArrowVisible = false,
                 actions = {
@@ -274,8 +430,8 @@ fun PreferencesDashboard(
                 // ── Announcement card ─────────────────────────────────────
                 AnimatedVisibility(
                     visible = announcementShowing,
-                    enter = expandVertically(animationSpec = tween(350)) + fadeIn(animationSpec = tween(350)),
-                    exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(animationSpec = tween(250)),
+                    enter = expandVertically(tween(350)) + fadeIn(tween(350)),
+                    exit = shrinkVertically(tween(250)) + fadeOut(tween(250)),
                 ) {
                     AnnouncementPreference()
                 }
@@ -283,26 +439,20 @@ fun PreferencesDashboard(
                 // ── Set default card ──────────────────────────────────────
                 AnimatedVisibility(
                     visible = isNotDefaultLauncher && !announcementShowing,
-                    enter = slideInVertically(
-                        animationSpec = tween(350),
-                        initialOffsetY = { it },
-                    ) + fadeIn(tween(350)),
+                    enter = slideInVertically(tween(350)) { it } + fadeIn(tween(350)),
                     exit = shrinkVertically(tween(250)) + fadeOut(tween(250)),
                 ) {
                     PreferencesSetDefaultLauncherCard()
                 }
 
-                // ── Search bar ────────────────────────────────────────────
+                // ── Search bar — extra spacing below the cards ────────────
                 Spacer(modifier = Modifier.height(8.dp))
                 SettingsSearchBar(
                     onActivate = { searchActive = true },
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
 
-                // ── Debug warning (badge only, no card) ───────────────────
-                // Debug warning is shown as a DebugBadge in the toolbar.
-
-                // ── Preference items ──────────────────────────────────────
+                // ── Preference list ───────────────────────────────────────
                 PreferenceGroup {
                     Item(visible = true) {
                         PreferenceCategory(
@@ -442,9 +592,7 @@ fun PreferencesDashboard(
     }
 }
 
-// ── Search overlay ────────────────────────────────────────────────────────────
-// Full-screen composable shown when the search bar is activated.
-// Styled after the old Lawnchair search screen.
+// ── Full-screen search overlay ────────────────────────────────────────────────
 @Composable
 private fun SearchOverlay(
     query: String,
@@ -459,13 +607,15 @@ private fun SearchOverlay(
         focusRequester.requestFocus()
     }
 
+    // Match label + keywords; breadcrumb is excluded so typing a section name
+    // does not flood results with every item inside it.
     val filtered = remember(query, entries) {
-        if (query.isBlank()) entries
+        if (query.isBlank()) emptyList()
         else {
             val q = query.trim().lowercase()
             entries.filter {
                 it.label.lowercase().contains(q) ||
-                    it.description.lowercase().contains(q)
+                    it.keywords.lowercase().contains(q)
             }
         }
     }
@@ -479,7 +629,6 @@ private fun SearchOverlay(
                 .fillMaxSize()
                 .statusBarsPadding(),
         ) {
-            // ── Search field ──────────────────────────────────────────────
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
@@ -526,22 +675,39 @@ private fun SearchOverlay(
                 ),
             )
 
-            // ── Results ───────────────────────────────────────────────────
-            LazyColumn {
-                items(filtered.size) { idx ->
-                    val entry = filtered[idx]
-                    PreferenceCategory(
-                        label = entry.label,
-                        description = entry.breadcrumb,
-                        iconResource = entry.iconResource,
-                        onNavigate = {
-                            onClose()
-                            onNavigate(entry.route)
-                        },
-                        isSelected = false,
-                        isFirst = idx == 0,
-                        isLast = idx == filtered.lastIndex,
+            when {
+                query.isBlank() -> {
+                    // Empty state — nothing yet
+                }
+                filtered.isEmpty() -> {
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(
+                        text = "No results for \"$query\"",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     )
+                }
+                else -> {
+                    LazyColumn {
+                        items(filtered.size) { idx ->
+                            val entry = filtered[idx]
+                            PreferenceCategory(
+                                label = entry.label,
+                                description = entry.breadcrumb,
+                                iconResource = entry.iconResource,
+                                onNavigate = {
+                                    onClose()
+                                    onNavigate(entry.route)
+                                },
+                                isSelected = false,
+                                isFirst = idx == 0,
+                                isLast = idx == filtered.lastIndex,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -549,8 +715,6 @@ private fun SearchOverlay(
 }
 
 // ── Tap-to-activate search bar ────────────────────────────────────────────────
-// Not interactive as a text field — tapping it fires onActivate so the
-// full-screen SearchOverlay opens with the animated transition.
 @Composable
 private fun SettingsSearchBar(
     onActivate: () -> Unit,
@@ -562,9 +726,9 @@ private fun SettingsSearchBar(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        androidx.compose.foundation.layout.Row(
+        Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_search),

@@ -19,8 +19,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -28,14 +32,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import app.lawnchair.LawnchairApp
@@ -129,7 +138,41 @@ fun PreferencesDashboard(
         }
     } else null
 
-    // ── Debug badge dialog ────────────────────────────────────────────────
+    // ── Search ────────────────────────────────────────────────────────────
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Resolve all item strings up-front so we can filter against them.
+    val labelGeneral         = stringResource(R.string.general_label)
+    val descGeneral          = stringResource(R.string.general_description)
+    val labelHomeScreen      = stringResource(R.string.home_screen_label)
+    val descHomeScreen       = stringResource(R.string.home_screen_description)
+    val labelSmartspace      = stringResource(id = R.string.smartspace_widget)
+    val descSmartspace       = stringResource(R.string.smartspace_widget_description)
+    val labelDock            = stringResource(R.string.dock_label)
+    val descDock             = stringResource(R.string.dock_description)
+    val labelAppDrawer       = stringResource(R.string.app_drawer_label)
+    val descAppDrawer        = stringResource(R.string.app_drawer_description)
+    val labelSearchBar       = stringResource(R.string.search_bar_label)
+    val descSearchBar        = stringResource(R.string.drawer_search_description)
+    val labelFolders         = stringResource(R.string.folders_label)
+    val descFolders          = stringResource(R.string.folders_description)
+    val labelGestures        = stringResource(id = R.string.gestures_label)
+    val descGestures         = stringResource(R.string.gestures_description)
+    val labelQuickstep       = stringResource(id = R.string.quickstep_label)
+    val descQuickstep        = stringResource(id = R.string.quickstep_description)
+    val labelBackup          = stringResource(R.string.backup_and_restore_label)
+    val descBackup           = stringResource(R.string.backup_and_restore_description)
+    val labelExtras          = stringResource(R.string.extras_label)
+    val descExtras           = stringResource(R.string.extras_description)
+    val labelAbout           = stringResource(R.string.about_label)
+
+    fun matches(vararg strings: String): Boolean {
+        if (searchQuery.isBlank()) return true
+        val q = searchQuery.trim().lowercase()
+        return strings.any { it.lowercase().contains(q) }
+    }
+
+
     val isDebugBuild = BuildConfig.APPLICATION_ID.contains("nightly") || BuildConfig.DEBUG
     var showDebugDialog by remember { mutableStateOf(false) }
 
@@ -188,16 +231,24 @@ fun PreferencesDashboard(
             PreferencesSetDefaultLauncherCard()
         }
 
+        // ── Search bar ────────────────────────────────────────────────────
+        SettingsSearchBar(
+            query = searchQuery,
+            onQueryChange = { searchQuery = it },
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+
         // ── Dev / debug warnings ──────────────────────────────────────────
         // Debug warning is now shown as a badge in the toolbar — see DebugBadge
         // and the AlertDialog above. Nothing to render here.
 
         val deckLayout = prefs2.deckLayout.getAdapter()
+        val isSmartspaceEnabled = prefs2.enableSmartspace.firstBlocking()
         PreferenceGroup {
-            Item {
+            Item(visible = matches(labelGeneral, descGeneral)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.general_label),
-                    description = stringResource(R.string.general_description),
+                    label = labelGeneral,
+                    description = descGeneral,
                     iconResource = R.drawable.ic_general,
                     onNavigate = { onNavigate(General) },
                     isSelected = currentRoute is General,
@@ -206,10 +257,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelHomeScreen, descHomeScreen)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.home_screen_label),
-                    description = stringResource(R.string.home_screen_description),
+                    label = labelHomeScreen,
+                    description = descHomeScreen,
                     iconResource = R.drawable.ic_home_screen,
                     onNavigate = { onNavigate(HomeScreen) },
                     isSelected = currentRoute is HomeScreen,
@@ -218,11 +269,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            val isSmartspaceEnabled = prefs2.enableSmartspace.firstBlocking()
-            Item {
+            Item(visible = matches(labelSmartspace, descSmartspace)) {
                 PreferenceCategory(
-                    label = stringResource(id = R.string.smartspace_widget),
-                    description = stringResource(R.string.smartspace_widget_description),
+                    label = labelSmartspace,
+                    description = descSmartspace,
                     iconResource = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off,
                     onNavigate = { onNavigate(Smartspace) },
                     isSelected = currentRoute is Smartspace,
@@ -231,10 +281,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelDock, descDock)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.dock_label),
-                    description = stringResource(R.string.dock_description),
+                    label = labelDock,
+                    description = descDock,
                     iconResource = R.drawable.ic_dock,
                     onNavigate = { onNavigate(Dock) },
                     isSelected = currentRoute is Dock,
@@ -245,11 +295,11 @@ fun PreferencesDashboard(
 
             Item(
                 key = "app_drawer",
-                visible = !deckLayout.state.value,
+                visible = !deckLayout.state.value && matches(labelAppDrawer, descAppDrawer),
             ) {
                 PreferenceCategory(
-                    label = stringResource(R.string.app_drawer_label),
-                    description = stringResource(R.string.app_drawer_description),
+                    label = labelAppDrawer,
+                    description = descAppDrawer,
                     iconResource = R.drawable.ic_apps,
                     onNavigate = { onNavigate(AppDrawer) },
                     isSelected = currentRoute is AppDrawer,
@@ -258,10 +308,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelSearchBar, descSearchBar)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.search_bar_label),
-                    description = stringResource(R.string.drawer_search_description),
+                    label = labelSearchBar,
+                    description = descSearchBar,
                     iconResource = R.drawable.ic_search,
                     onNavigate = { onNavigate(Search()) },
                     isSelected = currentRoute is Search,
@@ -270,10 +320,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelFolders, descFolders)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.folders_label),
-                    description = stringResource(R.string.folders_description),
+                    label = labelFolders,
+                    description = descFolders,
                     iconResource = R.drawable.ic_folder,
                     onNavigate = { onNavigate(Folders) },
                     isSelected = currentRoute is Folders,
@@ -282,10 +332,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelGestures, descGestures)) {
                 PreferenceCategory(
-                    label = stringResource(id = R.string.gestures_label),
-                    description = stringResource(R.string.gestures_description),
+                    label = labelGestures,
+                    description = descGestures,
                     iconResource = R.drawable.ic_gestures,
                     onNavigate = { onNavigate(Gestures) },
                     isSelected = currentRoute is Gestures,
@@ -295,12 +345,12 @@ fun PreferencesDashboard(
             }
 
             Item(
-                "quickstep",
-                LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG,
+                key = "quickstep",
+                visible = (LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) && matches(labelQuickstep, descQuickstep),
             ) {
                 PreferenceCategory(
-                    label = stringResource(id = R.string.quickstep_label),
-                    description = stringResource(id = R.string.quickstep_description),
+                    label = labelQuickstep,
+                    description = descQuickstep,
                     iconResource = R.drawable.ic_quickstep,
                     onNavigate = { onNavigate(Quickstep) },
                     isSelected = currentRoute is Quickstep,
@@ -309,10 +359,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelBackup, descBackup)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.backup_and_restore_label),
-                    description = stringResource(R.string.backup_and_restore_description),
+                    label = labelBackup,
+                    description = descBackup,
                     iconResource = R.drawable.backup_restore,
                     onNavigate = { onNavigate(BackupAndRestore) },
                     isSelected = currentRoute is BackupAndRestore,
@@ -321,10 +371,10 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelExtras, descExtras)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.extras_label),
-                    description = stringResource(R.string.extras_description),
+                    label = labelExtras,
+                    description = descExtras,
                     iconResource = R.drawable.ic_extras,
                     onNavigate = { onNavigate(Extras) },
                     isSelected = currentRoute is Extras,
@@ -333,9 +383,9 @@ fun PreferencesDashboard(
                 )
             }
 
-            Item {
+            Item(visible = matches(labelAbout, aboutDescription)) {
                 PreferenceCategory(
-                    label = stringResource(R.string.about_label),
+                    label = labelAbout,
                     description = aboutDescription,
                     iconResource = R.drawable.ic_about,
                     onNavigate = { onNavigate(About) },
@@ -349,7 +399,53 @@ fun PreferencesDashboard(
 }
 
 /**
+ * A full-width pill-shaped search field styled after the Android Settings search bar.
+ * Filters are applied live as the user types.
+ */
+@Composable
+private fun SettingsSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = LocalFocusManager.current
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        placeholder = {
+            Text(
+                text = stringResource(R.string.search_settings),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(28.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+        ),
+    )
+}
+
+
+/**
  * A small pill-shaped badge rendered in the toolbar actions area.
+ * Styled after LibChecker's "CI" badge — bordered chip, no fill.
  * Tapping it shows the debug warning dialog. Only shown in debug/nightly builds.
  */
 @Composable

@@ -169,6 +169,8 @@
 
     -->
     <string name="settings">Settings</string>
+	
+	<string name="search_settings">Search settings</string>
 
     <string name="general_label">General</string>
     <string name="general_description">Colors, icon packs, notification dots</string>

@@ -123,7 +123,7 @@ object LauncherOptionsPopup {
             "home_settings" to OptionItem(
                 launcher,
                 R.string.settings_button_text,
-                R.drawable.ic_home_screen,
+                R.drawable.ic_home_settings,
                 LauncherEvent.LAUNCHER_SETTINGS_BUTTON_TAP_OR_LONGPRESS,
                 onStartHomeSettings,
             ),
@@ -203,7 +203,7 @@ object LauncherOptionsPopup {
 
             "home_settings" -> LauncherOptionMetadata(
                 label = R.string.settings_button_text,
-                icon = R.drawable.ic_home_screen,
+                icon = R.drawable.ic_home_settings,
             )
 
             "default_page" -> LauncherOptionMetadata(

@@ -32,6 +32,11 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorMode
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.AppOpenAnimationPreference
 import app.lawnchair.ui.preferences.components.FeedPreference
@@ -73,6 +78,7 @@ fun HomeScreenPreferences(
         modifier = modifier,
     ) {
         val lockHomeScreenAdapter = prefs2.lockHomeScreen.getAdapter()
+    val scrollState = rememberPreferenceScrollState()
         val showDeckLayout = prefs2.showDeckLayout.getAdapter().state.value
 
         if (showDeckLayout) {
@@ -86,6 +92,7 @@ fun HomeScreenPreferences(
                 "add_icon_to_home",
                 !isDeckLayoutAdapter.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.AUTO_ADD_SHORTCUTS, scrollState) {
                 SwitchPreference(
                     checked = (!lockHomeScreenAdapter.state.value && addIconToHomeAdapter.state.value) || isDeckLayoutAdapter.state.value,
                     onCheckedChange = addIconToHomeAdapter::onChange,
@@ -93,6 +100,7 @@ fun HomeScreenPreferences(
                     description = if (lockHomeScreenAdapter.state.value) stringResource(id = R.string.home_screen_locked) else null,
                     enabled = lockHomeScreenAdapter.state.value.not(),
                 )
+                }
             }
             Item {
                 GestureHandlerPreference(

@@ -39,6 +39,11 @@ import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.AppDrawerHapticFeedbackPreference
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
@@ -72,6 +77,7 @@ fun AppDrawerPreferences(
         modifier = modifier,
     ) {
         val drawerListAdapter = prefs.drawerList.getAdapter()
+    val scrollState = rememberPreferenceScrollState()
         Column {
             DrawerLayoutPreference(drawerListAdapter)
             ExpandAndShrink(visible = drawerListAdapter.state.value) {
@@ -81,11 +87,13 @@ fun AppDrawerPreferences(
         val hiddenApps = prefs2.hiddenApps.getAdapter().state.value
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
             Item {
+                ScrollAnchor(ScrollKeys.HIDDEN_APPS, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.hidden_apps_label),
                     destination = AppDrawerHiddenApps,
                     subtitle = resources.getQuantityString(R.plurals.apps_count, hiddenApps.size, hiddenApps.size),
                 )
+                }
             }
             Item { SearchBarPreference(SearchRoute.DRAWER_SEARCH, showLabel = false) }
             SuggestionsPreference()
@@ -118,14 +126,17 @@ fun AppDrawerPreferences(
         }
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {
             Item {
+                ScrollAnchor(ScrollKeys.DRAWER_COLUMNS, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.app_drawer_columns),
                     adapter = prefs2.drawerColumns.getAdapter(),
                     step = 1,
                     valueRange = 3..10,
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.DRAWER_ROW_HEIGHT, scrollState) {
                 SliderPreference(
                     adapter = prefs2.drawerCellHeightFactor.getAdapter(),
                     label = stringResource(id = R.string.row_height_label),
@@ -133,6 +144,7 @@ fun AppDrawerPreferences(
                     step = 0.1F,
                     showAsPercentage = true,
                 )
+                }
             }
             Item {
                 SliderPreference(
@@ -185,17 +197,21 @@ fun AppDrawerPreferences(
         }
         PreferenceGroup(heading = stringResource(id = R.string.advanced)) {
             Item {
+                ScrollAnchor(ScrollKeys.DRAWER_REMEMBER, scrollState) {
                 SwitchPreference(
                     label = stringResource(id = R.string.pref_all_apps_remember_position_title),
                     description = stringResource(id = R.string.pref_all_apps_remember_position_description),
                     adapter = prefs2.rememberPosition.getAdapter(),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.DRAWER_SCROLLBAR, scrollState) {
                 SwitchPreference(
                     label = stringResource(id = R.string.pref_all_apps_show_scrollbar_title),
                     adapter = prefs2.showScrollbar.getAdapter(),
                 )
+                }
             }
         }
     }

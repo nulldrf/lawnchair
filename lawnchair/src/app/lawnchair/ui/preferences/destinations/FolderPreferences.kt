@@ -23,6 +23,11 @@ import androidx.compose.ui.res.stringResource
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
@@ -43,6 +48,7 @@ fun FolderPreferences(
         modifier = modifier,
     ) {
         val context = LocalContext.current
+    val scrollState = rememberPreferenceScrollState()
         val prefs = preferenceManager()
         val prefs2 = preferenceManager2()
         val folderIconShapeAdapter = prefs2.folderShape.getAdapter()
@@ -52,6 +58,7 @@ fun FolderPreferences(
             ?: stringResource(id = R.string.custom)
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
             Item {
+                ScrollAnchor(ScrollKeys.FOLDER_SHAPE, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.folder_shape_label),
                     destination = GeneralIconShape(ShapeRoute.FOLDER_SHAPE),
@@ -60,9 +67,11 @@ fun FolderPreferences(
                         IconShapePreview(iconShape = folderIconShapeAdapter.state.value)
                     },
                 )
+                }
             }
             Item { ColorPreference(preference = prefs2.folderColor) }
             Item {
+                ScrollAnchor(ScrollKeys.FOLDER_PREVIEW_OPACITY, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.folder_preview_bg_opacity_label),
                     adapter = prefs2.folderPreviewBackgroundOpacity.getAdapter(),
@@ -70,8 +79,10 @@ fun FolderPreferences(
                     valueRange = 0F..1F,
                     showAsPercentage = true,
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.FOLDER_BG_OPACITY, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.folder_bg_opacity_label),
                     adapter = prefs2.folderBackgroundOpacity.getAdapter(),

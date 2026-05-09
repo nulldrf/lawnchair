@@ -29,6 +29,11 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
@@ -79,6 +84,7 @@ fun GeneralPreferences() {
         currentIconPackName
     }
     val iconShapeSubtitle = iconShapeEntries(context)
+    val scrollState = rememberPreferenceScrollState()
         .firstOrNull { it.value == iconShapeAdapter.state.value }
         ?.label?.invoke()
         ?: stringResource(id = R.string.custom)
@@ -160,11 +166,13 @@ fun GeneralPreferences() {
             showDescription = wrapAdaptiveIcons.state.value,
         ) {
             Item {
+                ScrollAnchor(ScrollKeys.ICON_STYLE, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.icon_style_label),
                     destination = GeneralIconPack,
                     subtitle = iconStyleSubtitle,
                 )
+                }
             }
             Item(
                 "themed_icon",
@@ -177,6 +185,7 @@ fun GeneralPreferences() {
                 )
             }
             Item {
+                ScrollAnchor(ScrollKeys.ICON_SHAPE, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.icon_shape_label),
                     destination = GeneralIconShape(ShapeRoute.APP_SHAPE),
@@ -185,19 +194,24 @@ fun GeneralPreferences() {
                         IconShapePreview(iconShape = iconShapeAdapter.state.value)
                     },
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.AUTO_ADAPTIVE, scrollState) {
                 SwitchPreference(
                     adapter = wrapAdaptiveIcons,
                     label = stringResource(id = R.string.auto_adaptive_icons_label),
                     description = stringResource(id = R.string.auto_adaptive_icons_description),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.SHADOW_ICONS, scrollState) {
                 SwitchPreference(
                     adapter = prefs.shadowBGIcons.getAdapter(),
                     label = stringResource(id = R.string.shadow_bg_icons_label),
                 )
+                }
             }
             Item(
                 "wrap_adaptive_icons",
@@ -258,16 +272,18 @@ fun GeneralPreferences() {
         val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
-            Item { ColorPreference(preference = prefs2.accentColor) }
+            Item { ScrollAnchor(ScrollKeys.ACCENT_COLOR, scrollState) { ColorPreference(preference = prefs2.accentColor) } }
             Item(
                 "color_style",
                 showColorStyle,
             ) {
+                ScrollAnchor(ScrollKeys.COLOR_STYLE, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.color_style_label),
                     destination = GeneralColorStyle(showLegacyKdrag = isWallpaperAccent),
                     subtitle = colorStyleSubtitle,
                 )
+                }
             }
         }
 
@@ -280,7 +296,7 @@ fun GeneralPreferences() {
         val dotTextColor = prefs2.notificationDotTextColor.asState().value
 
         PreferenceGroup(heading = stringResource(id = R.string.notification_dots)) {
-            Item { NotificationDotsPreference(enabled = notificationEnabled, serviceEnabled = serviceEnabled) }
+            Item { ScrollAnchor(ScrollKeys.NOTIFICATION_DOTS, scrollState) { NotificationDotsPreference(enabled = notificationEnabled, serviceEnabled = serviceEnabled) } }
             val canDisplayNotificationDot = notificationEnabled && serviceEnabled
             Item(
                 "notification_dot_color",

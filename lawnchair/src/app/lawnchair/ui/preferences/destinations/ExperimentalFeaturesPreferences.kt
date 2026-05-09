@@ -23,6 +23,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
@@ -46,6 +51,7 @@ fun ExperimentalFeaturesPreferences(
     modifier: Modifier = Modifier,
 ) {
     val prefs = preferenceManager()
+    val scrollState = rememberPreferenceScrollState()
     val prefs2 = preferenceManager2()
 
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
@@ -73,32 +79,40 @@ fun ExperimentalFeaturesPreferences(
             stringResource(R.string.workspace_label),
         ) {
             Item {
+                ScrollAnchor(ScrollKeys.FONT_PICKER, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.enableFontSelection.getAdapter(),
                     label = stringResource(id = R.string.font_picker_label),
                     description = stringResource(id = R.string.font_picker_description),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.MAX_GRID_SIZE, scrollState) {
                 SwitchPreference(
                     adapter = prefs.workspaceIncreaseMaxGridSize.getAdapter(),
                     label = stringResource(id = R.string.workspace_increase_max_grid_size_label),
                     description = stringResource(id = R.string.workspace_increase_max_grid_size_description),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.ICON_SWIPE, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.iconSwipeGestures.getAdapter(),
                     label = stringResource(R.string.icon_swipe_gestures),
                     description = stringResource(R.string.icon_swipe_gestures_description),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.DECK_LAYOUT, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.showDeckLayout.getAdapter(),
                     label = stringResource(R.string.show_deck_layout),
                     description = stringResource(R.string.show_deck_layout_description),
                 )
+                }
             }
             Item {
                 SwitchPreference(
@@ -163,11 +177,13 @@ fun ExperimentalFeaturesPreferences(
             stringResource(R.string.internal_description),
         ) {
             Item {
+                ScrollAnchor(ScrollKeys.ALWAYS_RELOAD_ICONS, scrollState) {
                 SwitchPreference(
                     adapter = alwaysReloadIconsAdapter,
                     label = stringResource(id = R.string.always_reload_icons_label),
                     description = stringResource(id = R.string.always_reload_icons_description),
                 )
+                }
             }
             Item(
                 "always_reload_icons_warning",
@@ -177,12 +193,14 @@ fun ExperimentalFeaturesPreferences(
             }
 
             Item {
+                ScrollAnchor(ScrollKeys.GNC, scrollState) {
                 SwitchPreference(
                     adapter = enableGncAdapter,
                     label = stringResource(id = R.string.gesturenavcontract_label),
                     description = stringResource(id = R.string.gesturenavcontract_description),
                     enabled = Utilities.ATLEAST_Q,
                 )
+                }
             }
             Item(
                 "gesturenavcontract_warning",

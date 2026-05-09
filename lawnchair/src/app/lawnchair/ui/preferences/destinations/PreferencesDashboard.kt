@@ -94,6 +94,8 @@ import app.lawnchair.ui.preferences.navigation.PreferenceRootRoute
 import app.lawnchair.ui.preferences.navigation.Quickstep
 import app.lawnchair.ui.preferences.navigation.Search
 import app.lawnchair.ui.preferences.navigation.Smartspace
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.ScrollTargetManager
 import app.lawnchair.util.isDefaultLauncher
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
@@ -110,6 +112,7 @@ private data class SearchableEntry(
     val breadcrumb: String,
     val iconResource: Int,
     val route: PreferenceRootRoute,
+    val scrollKey: String? = null,
 )
 
 @Composable
@@ -194,40 +197,40 @@ fun PreferencesDashboard(
     // ── Deep searchable entry list ────────────────────────────────────────
     val allEntries = buildList {
         // ── General ───────────────────────────────────────────────────
-        fun g(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelGeneral, R.drawable.ic_general, General))
-        g(stringResource(R.string.icon_pack), "icon packs apply theme")
+        fun g(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelGeneral, R.drawable.ic_general, General, sk))
+        g(stringResource(R.string.icon_pack), "icon packs apply theme", ScrollKeys.ICON_STYLE)
         g(stringResource(R.string.themed_icon_pack), "themed icon source lawnicons monochrome")
-        g(stringResource(R.string.icon_shape_label), "circle square rounded squircle octagon teardrop shape")
+        g(stringResource(R.string.icon_shape_label), "circle square rounded squircle octagon teardrop shape", ScrollKeys.ICON_SHAPE)
         g(stringResource(R.string.icon_sizes), "icon size large small scale")
         g(stringResource(R.string.show_labels), "label text app name show hide")
         g(stringResource(R.string.label_size), "label size text size")
-        g(stringResource(R.string.notification_dots), "badge notification count dot")
+        g(stringResource(R.string.notification_dots), "badge notification count dot", ScrollKeys.NOTIFICATION_DOTS)
         g(stringResource(R.string.show_notification_count), "badge counter number notification")
         g(stringResource(R.string.theme_label), "light dark mode amoled black theme")
-        g(stringResource(R.string.accent_color), "color picker tint accent custom")
-        g(stringResource(R.string.color_style_label), "tonal spot vibrant expressive material you dynamic")
-        g(stringResource(R.string.colorized_backgrounds_label), "smart icon background color analyze pixel")
-        g(stringResource(R.string.auto_adaptive_icons_label), "adaptive icons non-adaptive wrap background")
+        g(stringResource(R.string.accent_color), "color picker tint accent custom", ScrollKeys.ACCENT_COLOR)
+        g(stringResource(R.string.color_style_label), "tonal spot vibrant expressive material you dynamic", ScrollKeys.COLOR_STYLE)
+        g(stringResource(R.string.colorized_backgrounds_label), "smart icon background color analyze pixel", ScrollKeys.COLORIZED_BG)
+        g(stringResource(R.string.auto_adaptive_icons_label), "adaptive icons non-adaptive wrap background", ScrollKeys.AUTO_ADAPTIVE)
         g(stringResource(R.string.transparent_background_icons_label), "transparent themed icon background clear")
-        g(stringResource(R.string.shadow_bg_icons_label), "shadow behind icons drop shadow")
+        g(stringResource(R.string.shadow_bg_icons_label), "shadow behind icons drop shadow", ScrollKeys.SHADOW_ICONS)
         g(stringResource(R.string.force_monochrome_label), "monochrome tint force greyscale")
-        g(stringResource(R.string.font_label), "font customization typography typeface heading body")
+        g(stringResource(R.string.font_label), "font customization typography typeface heading body", ScrollKeys.FONT)
 
         // ── Home screen ───────────────────────────────────────────────
-        fun h(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelHomeScreen, R.drawable.ic_home_screen, HomeScreen))
-        h(stringResource(R.string.home_screen_grid), "grid columns rows layout size change")
+        fun h(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelHomeScreen, R.drawable.ic_home_screen, HomeScreen, sk))
+        h(stringResource(R.string.home_screen_grid), "grid columns rows layout size change", ScrollKeys.HOME_GRID)
         h(stringResource(R.string.minus_one), "feed google discover news swipe left page")
-        h(stringResource(R.string.status_bar_label), "status bar clock show hide dark light")
-        h(stringResource(R.string.infinite_scrolling_label), "loop pages wrap around infinite")
+        h(stringResource(R.string.status_bar_label), "status bar clock show hide dark light", ScrollKeys.STATUS_BAR)
+        h(stringResource(R.string.infinite_scrolling_label), "loop pages wrap around infinite", ScrollKeys.INFINITE_SCROLLING)
         h(stringResource(R.string.home_screen_rotation_label), "rotate landscape portrait rotation")
-        h(stringResource(R.string.wallpaper_scrolling_label), "scroll wallpaper parallax pan")
-        h(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted")
-        h(stringResource(R.string.wallpaper_depth_effect_label), "depth parallax zoom wallpaper effect")
-        h(stringResource(R.string.home_screen_lock), "lock home screen prevent changes layout edit")
-        h(stringResource(R.string.auto_add_shortcuts_label), "add new apps home screen auto install")
-        h(stringResource(R.string.popup_menu), "popup menu long press shortcuts actions edit")
+        h(stringResource(R.string.wallpaper_scrolling_label), "scroll wallpaper parallax pan", ScrollKeys.WALLPAPER_SCROLL)
+        h(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted", ScrollKeys.WALLPAPER_BLUR)
+        h(stringResource(R.string.wallpaper_depth_effect_label), "depth parallax zoom wallpaper effect", ScrollKeys.WALLPAPER_DEPTH)
+        h(stringResource(R.string.home_screen_lock), "lock home screen prevent changes layout edit", ScrollKeys.LOCK_HOME)
+        h(stringResource(R.string.auto_add_shortcuts_label), "add new apps home screen auto install", ScrollKeys.AUTO_ADD_SHORTCUTS)
+        h(stringResource(R.string.popup_menu), "popup menu long press shortcuts actions edit", ScrollKeys.POPUP_MENU)
         h(stringResource(R.string.force_rounded_widgets), "rounded widgets corner radius")
         h(stringResource(R.string.wallpaper_quick_picker), "wallpaper picker quick change select")
         h(stringResource(R.string.allow_widget_overlap), "widget overlap allow")
@@ -236,8 +239,8 @@ fun PreferencesDashboard(
 
         // ── Smartspace / At a Glance ──────────────────────────────────
         val smartIcon = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off
-        fun s(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelSmartspace, smartIcon, Smartspace))
+        fun s(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelSmartspace, smartIcon, Smartspace, sk))
         s(stringResource(R.string.smartspace_widget_toggle_label), "show at a glance home screen enable toggle")
         s(stringResource(R.string.smartspace_mode_label), "provider google smartspacer lawnchair mode")
         s(stringResource(R.string.smartspace_weather), "weather temperature forecast rain sun")
@@ -250,34 +253,34 @@ fun PreferencesDashboard(
         s(stringResource(R.string.smartspace_weather_unit), "temperature unit celsius fahrenheit kelvin")
 
         // ── Dock ──────────────────────────────────────────────────────
-        fun d(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelDock, R.drawable.ic_dock, Dock))
-        d(stringResource(R.string.show_hotseat_title), "show hide dock hotseat enable")
+        fun d(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelDock, R.drawable.ic_dock, Dock, sk))
+        d(stringResource(R.string.show_hotseat_title), "show hide dock hotseat enable", ScrollKeys.SHOW_DOCK)
         d(stringResource(R.string.hotseat_mode_label), "search bar widget google lawnchair disabled dock")
         d(stringResource(R.string.search_bar_settings), "search bar dock corner radius background settings")
-        d(stringResource(R.string.dock_icons), "dock icon count columns hotseat number")
-        d(stringResource(R.string.hotseat_bottom_space_label), "bottom padding spacing dock margin")
-        d(stringResource(R.string.page_indicator_height), "page indicator dots height size")
+        d(stringResource(R.string.dock_icons), "dock icon count columns hotseat number", ScrollKeys.DOCK_ICONS)
+        d(stringResource(R.string.hotseat_bottom_space_label), "bottom padding spacing dock margin", ScrollKeys.DOCK_BOTTOM_SPACE)
+        d(stringResource(R.string.page_indicator_height), "page indicator dots height size", ScrollKeys.DOCK_PAGE_INDICATOR)
         d(stringResource(R.string.corner_radius_label), "corner radius search bar rounded")
         d(stringResource(R.string.qsb_hotseat_background_transparency), "search bar background opacity transparent")
 
         // ── App drawer ────────────────────────────────────────────────
         if (!deckLayout.state.value) {
-            fun a(label: String, kw: String = "") =
-                add(SearchableEntry(label, kw, labelAppDrawer, R.drawable.ic_apps, AppDrawer))
-            a(stringResource(R.string.hidden_apps_label), "hide apps from drawer hidden list")
-            a(stringResource(R.string.app_drawer_columns), "columns grid app drawer layout count")
-            a(stringResource(R.string.row_height_label), "row height size spacing compact")
-            a(stringResource(R.string.pref_all_apps_show_scrollbar_title), "scrollbar show hide fast scroll")
-            a(stringResource(R.string.pref_all_apps_remember_position_title), "remember position scroll app drawer keep")
+            fun a(label: String, kw: String = "", sk: String? = null) =
+                add(SearchableEntry(label, kw, labelAppDrawer, R.drawable.ic_apps, AppDrawer, sk))
+            a(stringResource(R.string.hidden_apps_label), "hide apps from drawer hidden list", ScrollKeys.HIDDEN_APPS)
+            a(stringResource(R.string.app_drawer_columns), "columns grid app drawer layout count", ScrollKeys.DRAWER_COLUMNS)
+            a(stringResource(R.string.row_height_label), "row height size spacing compact", ScrollKeys.DRAWER_ROW_HEIGHT)
+            a(stringResource(R.string.pref_all_apps_show_scrollbar_title), "scrollbar show hide fast scroll", ScrollKeys.DRAWER_SCROLLBAR)
+            a(stringResource(R.string.pref_all_apps_remember_position_title), "remember position scroll app drawer keep", ScrollKeys.DRAWER_REMEMBER)
             a(stringResource(R.string.pref_all_apps_bulk_icon_loading_title), "bulk load icons performance speed")
             a(stringResource(R.string.app_drawer_haptic_feedback_label), "haptic vibration feedback touch")
             a(stringResource(R.string.app_drawer_indent_label), "padding horizontal indent margin spacing")
         }
 
         // ── Search bar ────────────────────────────────────────────────
-        fun sb(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search()))
+        fun sb(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search(), sk))
         sb(stringResource(R.string.fuzzy_search_title), "fuzzy approximate matching search typo")
         sb(stringResource(R.string.suggestion_pref_screen_title), "search suggestions apps top recommended")
         sb(stringResource(R.string.perform_wide_search_title), "device search contacts files settings phone")
@@ -290,63 +293,63 @@ fun PreferencesDashboard(
         sb(stringResource(R.string.show_hidden_apps_in_search_results), "show hidden apps search results")
 
         // ── Folders ───────────────────────────────────────────────────
-        fun f(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelFolders, R.drawable.ic_folder, Folders))
-        f(stringResource(R.string.max_folder_columns), "folder columns maximum grid count")
-        f(stringResource(R.string.max_folder_rows), "folder rows maximum grid count")
-        f(stringResource(R.string.folder_bg_opacity_label), "folder background opacity transparency")
-        f(stringResource(R.string.folder_preview_bg_opacity_label), "folder icon preview background opacity")
-        f(stringResource(R.string.folder_shape_label), "folder shape icon shape style")
+        fun f(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelFolders, R.drawable.ic_folder, Folders, sk))
+        f(stringResource(R.string.max_folder_columns), "folder columns maximum grid count", ScrollKeys.FOLDER_MAX_COLUMNS)
+        f(stringResource(R.string.max_folder_rows), "folder rows maximum grid count", ScrollKeys.FOLDER_MAX_ROWS)
+        f(stringResource(R.string.folder_bg_opacity_label), "folder background opacity transparency", ScrollKeys.FOLDER_BG_OPACITY)
+        f(stringResource(R.string.folder_preview_bg_opacity_label), "folder icon preview background opacity", ScrollKeys.FOLDER_PREVIEW_OPACITY)
+        f(stringResource(R.string.folder_shape_label), "folder shape icon shape style", ScrollKeys.FOLDER_SHAPE)
 
         // ── Gestures ──────────────────────────────────────────────────
-        fun ge(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelGestures, R.drawable.ic_gestures, Gestures))
-        ge(stringResource(R.string.gesture_double_tap), "double tap action sleep lock screen")
-        ge(stringResource(R.string.gesture_swipe_up), "swipe up drawer recents app")
-        ge(stringResource(R.string.gesture_swipe_down), "swipe down notifications quick settings panel")
-        ge(stringResource(R.string.gesture_two_finger_swipe_down), "two finger swipe down notifications")
-        ge(stringResource(R.string.gesture_two_finger_swipe_up), "two finger swipe up recents")
-        ge(stringResource(R.string.gesture_home_tap), "home button tap gesture action")
-        ge(stringResource(R.string.gesture_back_tap), "back button tap gesture action")
-        ge(stringResource(R.string.sleep_mode_label), "sleep mode lock screen accessibility root admin")
+        fun ge(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelGestures, R.drawable.ic_gestures, Gestures, sk))
+        ge(stringResource(R.string.gesture_double_tap), "double tap action sleep lock screen", ScrollKeys.GESTURE_DOUBLE_TAP)
+        ge(stringResource(R.string.gesture_swipe_up), "swipe up drawer recents app", ScrollKeys.GESTURE_SWIPE_UP)
+        ge(stringResource(R.string.gesture_swipe_down), "swipe down notifications quick settings panel", ScrollKeys.GESTURE_SWIPE_DOWN)
+        ge(stringResource(R.string.gesture_two_finger_swipe_down), "two finger swipe down notifications", ScrollKeys.GESTURE_2F_DOWN)
+        ge(stringResource(R.string.gesture_two_finger_swipe_up), "two finger swipe up recents", ScrollKeys.GESTURE_2F_UP)
+        ge(stringResource(R.string.gesture_home_tap), "home button tap gesture action", ScrollKeys.GESTURE_HOME)
+        ge(stringResource(R.string.gesture_back_tap), "back button tap gesture action", ScrollKeys.GESTURE_BACK)
+        ge(stringResource(R.string.sleep_mode_label), "sleep mode lock screen accessibility root admin", ScrollKeys.GESTURE_SLEEP_MODE)
 
         // ── Quickstep / Recents ───────────────────────────────────────
         if (LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
-            fun q(label: String, kw: String = "") =
-                add(SearchableEntry(label, kw, labelQuickstep, R.drawable.ic_quickstep, Quickstep))
+            fun q(label: String, kw: String = "", sk: String? = null) =
+                add(SearchableEntry(label, kw, labelQuickstep, R.drawable.ic_quickstep, Quickstep, sk))
             q(stringResource(R.string.recents_clear_all), "clear all recents close apps button")
-            q(stringResource(R.string.window_corner_radius_label), "screen corner radius recents card")
-            q(stringResource(R.string.taskbar_label), "taskbar show experimental enable")
-            q(stringResource(R.string.translucent_background), "translucent background recents opacity blur")
+            q(stringResource(R.string.window_corner_radius_label), "screen corner radius recents card", ScrollKeys.QS_CORNER_RADIUS)
+            q(stringResource(R.string.taskbar_label), "taskbar show experimental enable", ScrollKeys.QS_TASKBAR)
+            q(stringResource(R.string.translucent_background), "translucent background recents opacity blur", ScrollKeys.QS_TRANSLUCENT)
             q(stringResource(R.string.recents_lock_unlock), "lock unlock recents prevent close clear all")
         }
 
         // ── Backup and restore ────────────────────────────────────────
-        fun b(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelBackup, R.drawable.backup_restore, BackupAndRestore))
-        b(stringResource(R.string.create_backup), "export backup save layout settings create")
-        b(stringResource(R.string.restore_backup), "import restore backup load file")
+        fun b(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelBackup, R.drawable.backup_restore, BackupAndRestore, sk))
+        b(stringResource(R.string.create_backup), "export backup save layout settings create", ScrollKeys.CREATE_BACKUP)
+        b(stringResource(R.string.restore_backup), "import restore backup load file", ScrollKeys.RESTORE_BACKUP)
 
         // ── Extras ────────────────────────────────────────────────────
-        fun e(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelExtras, R.drawable.ic_extras, Extras))
-        e(stringResource(R.string.experimental_features_label), "experimental beta unstable features labs")
-        e(stringResource(R.string.debug_menu_label), "debug menu developer options")
-        e(stringResource(R.string.debug_restart_launcher), "restart lawnchair launcher reboot")
-        e(stringResource(R.string.font_picker_label), "font customization typography typeface heading body weight")
-        e(stringResource(R.string.show_deck_layout), "deck layout drawerless no app drawer all apps home")
+        fun e(label: String, kw: String = "", sk: String? = null, route: PreferenceRootRoute = Extras) =
+            add(SearchableEntry(label, kw, labelExtras, R.drawable.ic_extras, route, sk))
+        e(stringResource(R.string.experimental_features_label), "experimental beta unstable features labs", ScrollKeys.EXPERIMENTAL)
+        e(stringResource(R.string.debug_menu_label), "debug menu developer options", ScrollKeys.DEBUG_MENU)
+        e(stringResource(R.string.debug_restart_launcher), "restart lawnchair launcher reboot", ScrollKeys.RESTART)
+        e(stringResource(R.string.font_picker_label), "font customization typography typeface heading body weight", ScrollKeys.FONT_PICKER, route = ExperimentalFeatures)
+        e(stringResource(R.string.show_deck_layout), "deck layout drawerless no app drawer all apps home", ScrollKeys.DECK_LAYOUT, route = ExperimentalFeatures)
         e(stringResource(R.string.material_expressive_label), "material 3 expressive workspace m3e")
-        e(stringResource(R.string.icon_swipe_gestures), "icon swipe left right gesture shortcut")
+        e(stringResource(R.string.icon_swipe_gestures), "icon swipe left right gesture shortcut", ScrollKeys.ICON_SWIPE, route = ExperimentalFeatures)
         e(stringResource(R.string.app_closing_animation), "app closing animation overlay fade suck in")
         e(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink fade pie")
-        e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation")
-        e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace")
-        e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack")
+        e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation", ScrollKeys.GNC, route = ExperimentalFeatures)
+        e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace", ScrollKeys.MAX_GRID_SIZE, route = ExperimentalFeatures)
+        e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack", ScrollKeys.ALWAYS_RELOAD_ICONS, route = ExperimentalFeatures)
         e(stringResource(R.string.smartspace_calendar_label), "at a glance calendar non-gregorian persian lunar")
 
         // ── About ─────────────────────────────────────────────────────
-        fun ab(label: String, kw: String = "") =
-            add(SearchableEntry(label, kw, labelAbout, R.drawable.ic_about, About))
+        fun ab(label: String, kw: String = "", sk: String? = null) =
+            add(SearchableEntry(label, kw, labelAbout, R.drawable.ic_about, About, sk))
         ab(stringResource(R.string.auto_updater_label), "auto updater check update nightly automatic")
         ab(stringResource(R.string.updater), "update download install version changelog")
         ab(stringResource(R.string.github), "github source code repo open source contribute")
@@ -700,6 +703,7 @@ private fun SearchOverlay(
                                 iconResource = entry.iconResource,
                                 onNavigate = {
                                     onClose()
+                                    entry.scrollKey?.let { ScrollTargetManager.set(it) }
                                     onNavigate(entry.route)
                                 },
                                 isSelected = false,

@@ -34,6 +34,11 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.preferenceManager2
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.DummyLauncherBox
 import app.lawnchair.ui.preferences.components.DummyLauncherLayout
@@ -62,7 +67,9 @@ fun DockPreferences(modifier: Modifier = Modifier) {
         modifier = modifier,
     ) {
         val hotseatBgAdapter = prefs.hotseatBG.getAdapter()
+    val scrollState = rememberPreferenceScrollState()
 
+        ScrollAnchor(ScrollKeys.SHOW_DOCK, scrollState) {
         MainSwitchPreference(adapter = prefs2.isHotseatEnabled.getAdapter(), label = stringResource(id = R.string.show_hotseat_title)) {
             DockPreferencesPreview()
             PreferenceGroup(heading = stringResource(id = R.string.style)) {
@@ -89,6 +96,7 @@ fun DockPreferences(modifier: Modifier = Modifier) {
                     )
                 }
             }
+        }
         }
     }
 }
@@ -139,14 +147,17 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
 fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2) {
     PreferenceGroup(heading = stringResource(id = R.string.grid)) {
         Item {
+            ScrollAnchor(ScrollKeys.DOCK_ICONS, scrollState) {
             SliderPreference(
                 label = stringResource(id = R.string.dock_icons),
                 adapter = prefs.hotseatColumns.getAdapter(),
                 step = 1,
                 valueRange = 3..10,
             )
+            }
         }
         Item {
+            ScrollAnchor(ScrollKeys.DOCK_BOTTOM_SPACE, scrollState) {
             SliderPreference(
                 adapter = prefs2.hotseatBottomFactor.getAdapter(),
                 label = stringResource(id = R.string.hotseat_bottom_space_label),
@@ -154,8 +165,10 @@ fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2) {
                 step = 0.1F,
                 showAsPercentage = true,
             )
+            }
         }
         Item {
+            ScrollAnchor(ScrollKeys.DOCK_PAGE_INDICATOR, scrollState) {
             SliderPreference(
                 adapter = prefs2.pageIndicatorHeightFactor.getAdapter(),
                 label = stringResource(id = R.string.page_indicator_height),
@@ -163,6 +176,7 @@ fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2) {
                 step = 0.1F,
                 showAsPercentage = true,
             )
+            }
         }
     }
 }

@@ -14,6 +14,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import app.lawnchair.preferences.observeAsState
 import app.lawnchair.preferences.preferenceManager
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
@@ -30,6 +35,7 @@ fun ExtrasPreferences(
 ) {
     val prefs = preferenceManager()
     val enableDebug by prefs.enableDebugMenu.observeAsState()
+    val scrollState = rememberPreferenceScrollState()
     val context = LocalContext.current
 
     PreferenceLayout(
@@ -39,18 +45,23 @@ fun ExtrasPreferences(
     ) {
         PreferenceGroup {
             Item {
+                ScrollAnchor(ScrollKeys.EXPERIMENTAL, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.experimental_features_label),
                     destination = ExperimentalFeatures,
                 )
+                }
             }
             Item("debug_menu", enableDebug) {
+                ScrollAnchor(ScrollKeys.DEBUG_MENU, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.debug_menu_label),
                     destination = DebugMenu,
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.RESTART, scrollState) {
                 PreferenceTemplate(
                     modifier = Modifier.clickable { restartLauncher(context) },
                     title = { Text(text = stringResource(id = R.string.debug_restart_launcher)) },
@@ -62,6 +73,7 @@ fun ExtrasPreferences(
                         )
                     },
                 )
+                }
             }
             Item {
                 PreferenceTemplate(

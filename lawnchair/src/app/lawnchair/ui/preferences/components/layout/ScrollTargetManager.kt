@@ -33,6 +33,7 @@ object ScrollKeys {
     const val WALLPAPER_DEPTH      = "home.wallpaper_depth"
     const val POPUP_MENU           = "home.popup_menu"
     const val STATUS_BAR           = "home.status_bar"
+    const val HOME_ICON_SIZE       = "home.icon_size"
     // Dock
     const val SHOW_DOCK            = "dock.show"
     const val DOCK_SEARCH          = "dock.search"
@@ -161,7 +162,14 @@ fun ScrollAnchor(
                         var p: android.view.ViewParent? = view.parent
                         while (p != null) {
                             if (p is NestedScrollView) {
-                                p.smoothScrollTo(0, maxOf(0, y - gap))
+                                val child = p.getChildAt(0)
+                                if (child != null) {
+                                    // Clamp to the actual scrollable range so items near
+                                    // the bottom don't get silently ignored.
+                                    val maxScroll = maxOf(0, child.height - p.height)
+                                    val target = maxOf(0, minOf(y - gap, maxScroll))
+                                    p.smoothScrollTo(0, target)
+                                }
                                 break
                             }
                             p = p.parent

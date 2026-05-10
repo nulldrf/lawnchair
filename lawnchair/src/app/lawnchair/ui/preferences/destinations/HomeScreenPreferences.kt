@@ -109,11 +109,13 @@ fun HomeScreenPreferences(
                 )
             }
             Item {
+                ScrollAnchor(ScrollKeys.INFINITE_SCROLLING, scrollState) {
                 SwitchPreference(
                     prefs.infiniteScrolling.getAdapter(),
                     label = stringResource(id = R.string.infinite_scrolling_label),
                     description = stringResource(id = R.string.infinite_scrolling_description),
                 )
+                }
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.home_screen_actions)) {
@@ -166,20 +168,24 @@ fun HomeScreenPreferences(
         }
         PreferenceGroup(heading = stringResource(id = R.string.wallpaper)) {
             Item {
+                ScrollAnchor(ScrollKeys.WALLPAPER_SCROLL, scrollState) {
                 SwitchPreference(
                     prefs.wallpaperScrolling.getAdapter(),
                     label = stringResource(id = R.string.wallpaper_scrolling_label),
                 )
+                }
             }
             Item(
                 "wallpaper_depth_effect",
                 Utilities.ATLEAST_R,
             ) {
+                ScrollAnchor(ScrollKeys.WALLPAPER_DEPTH, scrollState) {
                 SwitchPreference(
                     prefs2.wallpaperDepthEffect.getAdapter(),
                     label = stringResource(id = R.string.wallpaper_depth_effect_label),
                     description = stringResource(id = R.string.wallpaper_depth_effect_description),
                 )
+                }
             }
             Item {
                 SwitchPreference(
@@ -192,30 +198,36 @@ fun HomeScreenPreferences(
         val rows by prefs.workspaceRows.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.layout)) {
             Item {
+                ScrollAnchor(ScrollKeys.HOME_GRID, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.home_screen_grid),
                     destination = HomeScreenGrid,
                     subtitle = stringResource(id = R.string.x_by_y, columns, rows),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.LOCK_HOME, scrollState) {
                 SwitchPreference(
                     adapter = lockHomeScreenAdapter,
                     label = stringResource(id = R.string.home_screen_lock),
                     description = stringResource(id = R.string.home_screen_lock_description),
                 )
+                }
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.popup_menu)) {
-            Item { LauncherPopupPreferenceItem() }
+            Item { ScrollAnchor(ScrollKeys.POPUP_MENU, scrollState) { LauncherPopupPreferenceItem() } }
         }
         val showStatusBarAdapter = prefs2.showStatusBar.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.status_bar_label)) {
             Item {
+                ScrollAnchor(ScrollKeys.STATUS_BAR, scrollState) {
                 SwitchPreference(
                     adapter = showStatusBarAdapter,
                     label = stringResource(id = R.string.show_status_bar),
                 )
+                }
             }
             Item(
                 "dark_status_bar",
@@ -240,6 +252,7 @@ fun HomeScreenPreferences(
         val homeScreenLabelsAdapter = prefs2.showIconLabelsOnHomeScreen.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.icons)) {
             Item {
+                ScrollAnchor(ScrollKeys.HOME_ICON_SIZE, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.icon_sizes),
                     adapter = prefs2.homeIconSizeFactor.getAdapter(),
@@ -247,6 +260,7 @@ fun HomeScreenPreferences(
                     valueRange = 0.5F..1.5F,
                     showAsPercentage = true,
                 )
+                }
             }
             Item {
                 SwitchPreference(

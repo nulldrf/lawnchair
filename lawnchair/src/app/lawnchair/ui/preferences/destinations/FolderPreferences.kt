@@ -95,20 +95,24 @@ fun FolderPreferences(
         }
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {
             Item {
+                ScrollAnchor(ScrollKeys.FOLDER_MAX_COLUMNS, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.max_folder_columns),
                     adapter = prefs2.folderColumns.getAdapter(),
                     step = 1,
                     valueRange = 2..5,
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.FOLDER_MAX_ROWS, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.max_folder_rows),
                     adapter = prefs.folderRows.getAdapter(),
                     step = 1,
                     valueRange = 2..5,
                 )
+                }
             }
         }
 

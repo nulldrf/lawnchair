@@ -199,23 +199,19 @@ fun PreferencesDashboard(
         // ── General ───────────────────────────────────────────────────
         fun g(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelGeneral, R.drawable.ic_general, General, sk))
-        g(stringResource(R.string.icon_pack), "icon packs apply theme", ScrollKeys.ICON_STYLE)
+        g(stringResource(R.string.icon_style_label), "icon packs apply theme", ScrollKeys.ICON_STYLE)
         g(stringResource(R.string.themed_icon_pack), "themed icon source lawnicons monochrome")
         g(stringResource(R.string.icon_shape_label), "circle square rounded squircle octagon teardrop shape", ScrollKeys.ICON_SHAPE)
-        g(stringResource(R.string.icon_sizes), "icon size large small scale")
-        g(stringResource(R.string.show_labels), "label text app name show hide")
-        g(stringResource(R.string.label_size), "label size text size")
         g(stringResource(R.string.notification_dots), "badge notification count dot", ScrollKeys.NOTIFICATION_DOTS)
         g(stringResource(R.string.show_notification_count), "badge counter number notification")
         g(stringResource(R.string.theme_label), "light dark mode amoled black theme")
         g(stringResource(R.string.accent_color), "color picker tint accent custom", ScrollKeys.ACCENT_COLOR)
         g(stringResource(R.string.color_style_label), "tonal spot vibrant expressive material you dynamic", ScrollKeys.COLOR_STYLE)
-        g(stringResource(R.string.colorized_backgrounds_label), "smart icon background color analyze pixel", ScrollKeys.COLORIZED_BG)
+        g(stringResource(R.string.colorized_backgrounds_label), "smart icon background color analyze pixel")
         g(stringResource(R.string.auto_adaptive_icons_label), "adaptive icons non-adaptive wrap background", ScrollKeys.AUTO_ADAPTIVE)
         g(stringResource(R.string.transparent_background_icons_label), "transparent themed icon background clear")
         g(stringResource(R.string.shadow_bg_icons_label), "shadow behind icons drop shadow", ScrollKeys.SHADOW_ICONS)
-        g(stringResource(R.string.force_monochrome_label), "monochrome tint force greyscale")
-        g(stringResource(R.string.font_label), "font customization typography typeface heading body", ScrollKeys.FONT)
+        g(stringResource(R.string.font_label), "font customization typography typeface heading body")
 
         // ── Home screen ───────────────────────────────────────────────
         fun h(label: String, kw: String = "", sk: String? = null) =
@@ -224,9 +220,7 @@ fun PreferencesDashboard(
         h(stringResource(R.string.minus_one), "feed google discover news swipe left page")
         h(stringResource(R.string.status_bar_label), "status bar clock show hide dark light", ScrollKeys.STATUS_BAR)
         h(stringResource(R.string.infinite_scrolling_label), "loop pages wrap around infinite", ScrollKeys.INFINITE_SCROLLING)
-        h(stringResource(R.string.home_screen_rotation_label), "rotate landscape portrait rotation")
         h(stringResource(R.string.wallpaper_scrolling_label), "scroll wallpaper parallax pan", ScrollKeys.WALLPAPER_SCROLL)
-        h(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted", ScrollKeys.WALLPAPER_BLUR)
         h(stringResource(R.string.wallpaper_depth_effect_label), "depth parallax zoom wallpaper effect", ScrollKeys.WALLPAPER_DEPTH)
         h(stringResource(R.string.home_screen_lock), "lock home screen prevent changes layout edit", ScrollKeys.LOCK_HOME)
         h(stringResource(R.string.auto_add_shortcuts_label), "add new apps home screen auto install", ScrollKeys.AUTO_ADD_SHORTCUTS)
@@ -236,6 +230,10 @@ fun PreferencesDashboard(
         h(stringResource(R.string.allow_widget_overlap), "widget overlap allow")
         h(stringResource(R.string.force_widget_resize_label), "widget resize enforce resizable")
         h(stringResource(R.string.show_sys_ui_scrim), "top shadow status bar scrim gradient")
+        h(stringResource(R.string.icon_sizes), "icon size scale home screen icons", ScrollKeys.HOME_ICON_SIZE)
+        h(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink")
+        h(stringResource(R.string.app_closing_animation), "app closing animation overlay fade suck in")
+        h(stringResource(R.string.home_screen_rotation_label), "rotate landscape portrait rotation")
 
         // ── Smartspace / At a Glance ──────────────────────────────────
         val smartIcon = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off
@@ -336,16 +334,13 @@ fun PreferencesDashboard(
         e(stringResource(R.string.experimental_features_label), "experimental beta unstable features labs", ScrollKeys.EXPERIMENTAL)
         e(stringResource(R.string.debug_menu_label), "debug menu developer options", ScrollKeys.DEBUG_MENU)
         e(stringResource(R.string.debug_restart_launcher), "restart lawnchair launcher reboot", ScrollKeys.RESTART)
+        e(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted experimental", route = ExperimentalFeatures)
         e(stringResource(R.string.font_picker_label), "font customization typography typeface heading body weight", ScrollKeys.FONT_PICKER, route = ExperimentalFeatures)
         e(stringResource(R.string.show_deck_layout), "deck layout drawerless no app drawer all apps home", ScrollKeys.DECK_LAYOUT, route = ExperimentalFeatures)
-        e(stringResource(R.string.material_expressive_label), "material 3 expressive workspace m3e")
         e(stringResource(R.string.icon_swipe_gestures), "icon swipe left right gesture shortcut", ScrollKeys.ICON_SWIPE, route = ExperimentalFeatures)
-        e(stringResource(R.string.app_closing_animation), "app closing animation overlay fade suck in")
-        e(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink fade pie")
         e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation", ScrollKeys.GNC, route = ExperimentalFeatures)
         e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace", ScrollKeys.MAX_GRID_SIZE, route = ExperimentalFeatures)
         e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack", ScrollKeys.ALWAYS_RELOAD_ICONS, route = ExperimentalFeatures)
-        e(stringResource(R.string.smartspace_calendar_label), "at a glance calendar non-gregorian persian lunar")
 
         // ── About ─────────────────────────────────────────────────────
         fun ab(label: String, kw: String = "", sk: String? = null) =

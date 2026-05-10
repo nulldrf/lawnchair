@@ -132,6 +132,7 @@ fun PreferenceScaffold(
             // Apply Lawnchair dynamic colors
             appBarLayout.setBackgroundColor(surfaceColor)
             collapsingToolbar.setContentScrimColor(surfaceContainerColor)
+            collapsingToolbar.setStatusBarScrimColor(surfaceContainerColor)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
             collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
             toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -289,6 +290,7 @@ fun PreferenceScaffold(
             scrollView.setBackgroundColor(surfaceColor)
             appBarLayout.setBackgroundColor(surfaceColor)
             collapsingToolbar.setContentScrimColor(surfaceContainerColor)
+            collapsingToolbar.setStatusBarScrimColor(surfaceContainerColor)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
             collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
 

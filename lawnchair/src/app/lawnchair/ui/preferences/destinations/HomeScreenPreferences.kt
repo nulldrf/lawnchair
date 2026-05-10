@@ -72,6 +72,7 @@ fun HomeScreenPreferences(
     val prefs2 = preferenceManager2()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val scrollState = rememberPreferenceScrollState()
     PreferenceLayout(
         label = stringResource(id = R.string.home_screen_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
@@ -135,12 +136,14 @@ fun HomeScreenPreferences(
         val enableFeedAdapter = prefs2.enableFeed.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.minus_one)) {
             Item {
+                ScrollAnchor(ScrollKeys.HOME_FEED, scrollState) {
                 SwitchPreference(
                     adapter = enableFeedAdapter,
                     label = stringResource(id = R.string.minus_one_enable),
                     description = if (feedAvailable) null else stringResource(id = R.string.minus_one_unavailable),
                     enabled = feedAvailable,
                 )
+                }
             }
             Item(
                 key = "feed_pref",
@@ -150,20 +153,24 @@ fun HomeScreenPreferences(
             }
         }
         PreferenceGroup(heading = stringResource(R.string.style)) {
-            Item { HomeScreenTextColorPreference() }
+            Item { ScrollAnchor(ScrollKeys.HOME_TEXT_COLOR, scrollState) { HomeScreenTextColorPreference() } }
             // ── App-open animation (backported from Lawnchair 2) ──────────────
             Item {
+                ScrollAnchor(ScrollKeys.HOME_APP_OPEN_ANIM, scrollState) {
                 AppOpenAnimationPreference(
                     adapter = prefs2.appOpenAnimation.getAdapter(),
                     label = stringResource(id = R.string.app_opening_animation),
                 )
+                }
             }
             // ── GNC / app-close overlay ───────────────────────────────────────
             Item {
+                ScrollAnchor(ScrollKeys.HOME_APP_CLOSE_ANIM, scrollState) {
                 OverlayHandlerPreference(
                     adapter = prefs2.closingAppOverlay.getAdapter(),
                     label = stringResource(id = R.string.app_closing_animation),
                 )
+                }
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.wallpaper)) {
@@ -233,20 +240,24 @@ fun HomeScreenPreferences(
                 "dark_status_bar",
                 showStatusBarAdapter.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.HOME_DARK_STATUS_BAR, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.darkStatusBar.getAdapter(),
                     label = stringResource(id = R.string.dark_status_bar_label),
                 )
+                }
             }
             Item(
                 "status_bar_clock",
                 showStatusBarAdapter.state.value && LawnchairApp.isRecentsEnabled,
             ) {
+                ScrollAnchor(ScrollKeys.HOME_STATUS_BAR_CLOCK, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.statusBarClock.getAdapter(),
                     label = stringResource(id = R.string.status_bar_clock_label),
                     description = stringResource(id = R.string.status_bar_clock_description),
                 )
+                }
             }
         }
         val homeScreenLabelsAdapter = prefs2.showIconLabelsOnHomeScreen.getAdapter()
@@ -263,15 +274,18 @@ fun HomeScreenPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_SHOW_LABELS, scrollState) {
                 SwitchPreference(
                     adapter = homeScreenLabelsAdapter,
                     label = stringResource(id = R.string.show_labels),
                 )
+                }
             }
             Item(
                 "workspace_label_size",
                 homeScreenLabelsAdapter.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.HOME_LABEL_SIZE, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.label_size),
                     adapter = prefs2.homeIconLabelSizeFactor.getAdapter(),
@@ -279,6 +293,7 @@ fun HomeScreenPreferences(
                     valueRange = 0.5F..1.5F,
                     showAsPercentage = true,
                 )
+                }
             }
         }
         val overrideRepo = IconOverrideRepository.INSTANCE.get(LocalContext.current)
@@ -296,16 +311,20 @@ fun HomeScreenPreferences(
         }
         PreferenceGroup(heading = stringResource(id = R.string.widget_button_text)) {
             Item {
+                ScrollAnchor(ScrollKeys.HOME_ROUNDED_WIDGETS, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.roundedWidgets.getAdapter(),
                     label = stringResource(id = R.string.force_rounded_widgets),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_WIDGET_OVERLAP, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.allowWidgetOverlap.getAdapter(),
                     label = stringResource(id = R.string.allow_widget_overlap),
                 )
+                }
             }
             Item {
                 SwitchPreference(

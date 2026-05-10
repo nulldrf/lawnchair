@@ -218,7 +218,7 @@ fun PreferencesDashboard(
             add(SearchableEntry(label, kw, labelHomeScreen, R.drawable.ic_home_screen, HomeScreen, sk))
         h(stringResource(R.string.home_screen_grid), "grid columns rows layout size change", ScrollKeys.HOME_GRID)
         h(stringResource(R.string.minus_one), "feed google discover news swipe left page")
-        h(stringResource(R.string.status_bar_label), "status bar clock show hide dark light", ScrollKeys.STATUS_BAR)
+        h(stringResource(R.string.status_bar_label), "status bar clock show hide dark light")
         h(stringResource(R.string.infinite_scrolling_label), "loop pages wrap around infinite", ScrollKeys.INFINITE_SCROLLING)
         h(stringResource(R.string.wallpaper_scrolling_label), "scroll wallpaper parallax pan", ScrollKeys.WALLPAPER_SCROLL)
         h(stringResource(R.string.wallpaper_depth_effect_label), "depth parallax zoom wallpaper effect", ScrollKeys.WALLPAPER_DEPTH)
@@ -231,9 +231,17 @@ fun PreferencesDashboard(
         h(stringResource(R.string.force_widget_resize_label), "widget resize enforce resizable")
         h(stringResource(R.string.show_sys_ui_scrim), "top shadow status bar scrim gradient")
         h(stringResource(R.string.icon_sizes), "icon size scale home screen icons", ScrollKeys.HOME_ICON_SIZE)
-        h(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink")
-        h(stringResource(R.string.app_closing_animation), "app closing animation overlay fade suck in")
-        h(stringResource(R.string.home_screen_rotation_label), "rotate landscape portrait rotation")
+        h(stringResource(R.string.home_screen_text_color), "text color light dark workspace", ScrollKeys.HOME_TEXT_COLOR)
+        h(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink fade", ScrollKeys.HOME_APP_OPEN_ANIM)
+        h(stringResource(R.string.app_closing_animation), "app closing animation overlay fade suck in", ScrollKeys.HOME_APP_CLOSE_ANIM)
+        h(stringResource(R.string.show_status_bar), "status bar show hide", ScrollKeys.STATUS_BAR)
+        h(stringResource(R.string.dark_status_bar_label), "dark status bar light dark", ScrollKeys.HOME_DARK_STATUS_BAR)
+        h(stringResource(R.string.status_bar_clock_label), "status bar clock hide dynamic", ScrollKeys.HOME_STATUS_BAR_CLOCK)
+        h(stringResource(R.string.minus_one_enable), "feed google discover news enable", ScrollKeys.HOME_FEED)
+        h(stringResource(R.string.show_labels), "show labels app name home screen", ScrollKeys.HOME_SHOW_LABELS)
+        h(stringResource(R.string.label_size), "label size text size home screen", ScrollKeys.HOME_LABEL_SIZE)
+        h(stringResource(R.string.force_rounded_widgets), "rounded widgets corner radius", ScrollKeys.HOME_ROUNDED_WIDGETS)
+        h(stringResource(R.string.allow_widget_overlap), "widget overlap allow", ScrollKeys.HOME_WIDGET_OVERLAP)
 
         // ── Smartspace / At a Glance ──────────────────────────────────
         val smartIcon = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off
@@ -249,11 +257,18 @@ fun PreferencesDashboard(
         s(stringResource(R.string.smartspace_calendar), "calendar gregorian persian lunar system")
         s(stringResource(R.string.smartspace_weather_city), "city location weather gps auto")
         s(stringResource(R.string.smartspace_weather_unit), "temperature unit celsius fahrenheit kelvin")
+        s(stringResource(R.string.smartspace_date), "date show hide at a glance")
+        s(stringResource(R.string.smartspace_time), "time show hide clock at a glance")
+        s(stringResource(R.string.smartspace_time_format), "time format 12h 24h")
+        s(stringResource(R.string.smartspace_now_playing), "now playing music media")
+        s(stringResource(R.string.smartspace_battery_status), "battery status charging level")
 
         // ── Dock ──────────────────────────────────────────────────────
         fun d(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelDock, R.drawable.ic_dock, Dock, sk))
         d(stringResource(R.string.show_hotseat_title), "show hide dock hotseat enable", ScrollKeys.SHOW_DOCK)
+        d(stringResource(R.string.hotseat_background), "dock background show hide", ScrollKeys.DOCK_BG)
+        d(stringResource(R.string.show_labels), "dock labels show hide", ScrollKeys.DOCK_SHOW_LABELS)
         d(stringResource(R.string.hotseat_mode_label), "search bar widget google lawnchair disabled dock")
         d(stringResource(R.string.search_bar_settings), "search bar dock corner radius background settings")
         d(stringResource(R.string.dock_icons), "dock icon count columns hotseat number", ScrollKeys.DOCK_ICONS)
@@ -289,6 +304,9 @@ fun PreferencesDashboard(
         sb(stringResource(R.string.show_app_search_bar), "show search bar drawer enable")
         sb(stringResource(R.string.pref_search_auto_show_keyboard), "auto keyboard search show automatically")
         sb(stringResource(R.string.show_hidden_apps_in_search_results), "show hidden apps search results")
+        sb(stringResource(R.string.perform_wide_search_title), "device search contacts files settings phone")
+        sb(stringResource(R.string.pref_search_auto_show_keyboard), "auto keyboard search show automatically")
+        sb(stringResource(R.string.allapps_match_qsb_style_label), "match dock search bar actions style")
 
         // ── Folders ───────────────────────────────────────────────────
         fun f(label: String, kw: String = "", sk: String? = null) =

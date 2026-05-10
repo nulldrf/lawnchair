@@ -61,6 +61,7 @@ fun DockPreferences(modifier: Modifier = Modifier) {
     val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
+    val scrollState = rememberPreferenceScrollState()
     PreferenceLayout(
         label = stringResource(id = R.string.dock_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
@@ -70,14 +71,17 @@ fun DockPreferences(modifier: Modifier = Modifier) {
     val scrollState = rememberPreferenceScrollState()
 
         ScrollAnchor(ScrollKeys.SHOW_DOCK, scrollState) {
+        ScrollAnchor(ScrollKeys.SHOW_DOCK, scrollState) {
         MainSwitchPreference(adapter = prefs2.isHotseatEnabled.getAdapter(), label = stringResource(id = R.string.show_hotseat_title)) {
             DockPreferencesPreview()
             PreferenceGroup(heading = stringResource(id = R.string.style)) {
                 Item {
+                    ScrollAnchor(ScrollKeys.DOCK_BG, scrollState) {
                     SwitchPreference(
                         adapter = hotseatBgAdapter,
                         label = stringResource(id = R.string.hotseat_background),
                     )
+                    }
                 }
                 Item(
                     key = "feed_pref",
@@ -90,12 +94,15 @@ fun DockPreferences(modifier: Modifier = Modifier) {
             GridSettings(prefs, prefs2, scrollState)
             PreferenceGroup(heading = stringResource(id = R.string.icons)) {
                 Item {
+                    ScrollAnchor(ScrollKeys.DOCK_SHOW_LABELS, scrollState) {
                     SwitchPreference(
                         adapter = prefs2.enableLabelInDock.getAdapter(),
                         label = stringResource(id = R.string.show_labels),
                     )
+                    }
                 }
             }
+        }
         }
         }
     }

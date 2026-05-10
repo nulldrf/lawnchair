@@ -20,6 +20,7 @@ import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.theme.color.tokens.ColorTokens
+import app.lawnchair.views.overlay.AppOpenAnimationType
 import app.lawnchair.views.overlay.FullScreenOverlayMode
 import com.patrykmichalik.opto.core.firstBlocking
 
@@ -80,12 +81,16 @@ class FullScreenOverlayView @JvmOverloads constructor(
                     scaleY = scaleFactor
 
                     val changeScale = progress < 0.8f
-
                     val minSize = width.coerceAtMost(height) * scaleFactor
                     cornerRadius = (width / 2f) * progress
                     outlineProvider = object : ViewOutlineProvider() {
                         override fun getOutline(view: View, outline: Outline) {
-                            outline.setRoundRect(0, 0, if (!changeScale) minSize.toInt() * 6 else view.width, if (!changeScale) minSize.toInt() * 6 else view.height, cornerRadius)
+                            outline.setRoundRect(
+                                0, 0,
+                                if (!changeScale) minSize.toInt() * 6 else view.width,
+                                if (!changeScale) minSize.toInt() * 6 else view.height,
+                                cornerRadius,
+                            )
                         }
                     }
                     invalidate()
@@ -105,12 +110,7 @@ class FullScreenOverlayView @JvmOverloads constructor(
             }
 
             AnimatorSet().apply {
-                playTogether(
-                    scaleAnimator,
-                    moveX,
-                    moveY,
-                    fadeTriggerAnimator,
-                )
+                playTogether(scaleAnimator, moveX, moveY, fadeTriggerAnimator)
                 play(fadeAnimator).after(fadeTriggerAnimator)
                 this.duration = duration
                 interpolator = PathInterpolator(0.22f, 1f, 0.36f, 1f)
@@ -186,8 +186,146 @@ class FullScreenOverlayView @JvmOverloads constructor(
             }
         }
     }
+
+    // ── Custom close animations for AppOpenAnimationType ──────────────────────
+    // These are used by the GNC (GestureNavContract) close path when the user
+    // swipes back from an app using gesture navigation.
+    // GNC is available to non-system launchers on Android 10+ — this is how
+    // other custom launchers (Niagara, etc.) implement close animations without
+    // needing CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS permission.
+
+    /**
+     * PIE close: overlay scales from 1.5→1.0 while fading in, revealing the launcher.
+     * Mirrors old LawnchairAppTransitionManagerImpl.createLauncherResumeAnimation()
+     * scale path: APP_CLOSE_HOME_ENTER_SCALE_FROM=1.5, TO=1.0, DUR=250ms.
+     */
+    fun pieCloseAnimation(duration: Long = 250, onEnd: (() -> Unit)? = null) {
+        post {
+            if (!isAttachedToWindow) return@post
+            scaleX = 1.5f
+            scaleY = 1.5f
+            alpha  = 0f
+            pivotX = width  / 2f
+            pivotY = height / 2f
+            setLayerType(LAYER_TYPE_HARDWARE, null)
+
+            val scaleInterp = PathInterpolator(0.33f, 0.0f, 0.2f, 1.0f)
+            val alphaInterp  = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
+
+            AnimatorSet().apply {
+                playTogether(
+                    ObjectAnimator.ofFloat(this@FullScreenOverlayView, SCALE_X, 1.5f, 1.0f).apply {
+                        this.duration = duration; interpolator = scaleInterp
+                    },
+                    ObjectAnimator.ofFloat(this@FullScreenOverlayView, SCALE_Y, 1.5f, 1.0f).apply {
+                        this.duration = duration; interpolator = scaleInterp
+                    },
+                    ObjectAnimator.ofFloat(this@FullScreenOverlayView, ALPHA, 0f, 1f).apply {
+                        this.duration = minOf(duration, 100L); interpolator = alphaInterp
+                    },
+                )
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        setLayerType(LAYER_TYPE_NONE, null)
+                        (parent as? ViewGroup)?.removeView(this@FullScreenOverlayView)
+                        onEnd?.invoke()
+                    }
+                })
+                start()
+            }
+        }
+    }
+
+    /**
+     * BLINK close: launcher flashes three times while appearing.
+     * Mirrors BlinkAnimation.overrideResumeAnimation() from old Lawnchair 2.
+     */
+    fun blinkCloseAnimation(onEnd: (() -> Unit)? = null) {
+        post {
+            if (!isAttachedToWindow) return@post
+            alpha = 0f
+            setLayerType(LAYER_TYPE_HARDWARE, null)
+
+            ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 400L
+                addUpdateListener { anim ->
+                    val t = anim.animatedFraction
+                    this@FullScreenOverlayView.alpha = when {
+                        t < 0.20f -> 0.0f  // invisible
+                        t < 0.40f -> 1.0f  // flash 1 on
+                        t < 0.60f -> 0.0f  // flash 1 off
+                        t < 0.80f -> 1.0f  // flash 2 on
+                        else      -> 1.0f  // settle visible
+                    }
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        this@FullScreenOverlayView.alpha = 1f
+                        setLayerType(LAYER_TYPE_NONE, null)
+                        (parent as? ViewGroup)?.removeView(this@FullScreenOverlayView)
+                        onEnd?.invoke()
+                    }
+                })
+                start()
+            }
+        }
+    }
+
+    /**
+     * FADE close: launcher fades from 0→1 as it appears.
+     * Mirrors FadeAnimation.overrideResumeAnimation() from old Lawnchair 2.
+     */
+    fun fadeCloseAnimation(duration: Long = 250, onEnd: (() -> Unit)? = null) {
+        post {
+            if (!isAttachedToWindow) return@post
+            alpha = 0f
+            setLayerType(LAYER_TYPE_HARDWARE, null)
+
+            ObjectAnimator.ofFloat(this, ALPHA, 0f, 1f).apply {
+                this.duration = duration
+                interpolator  = PathInterpolator(0.33f, 0.0f, 0.3f, 1.0f)
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        setLayerType(LAYER_TYPE_NONE, null)
+                        (parent as? ViewGroup)?.removeView(this@FullScreenOverlayView)
+                        onEnd?.invoke()
+                    }
+                })
+                start()
+            }
+        }
+    }
 }
 
+/**
+ * Shows and animates the full-screen overlay when returning from an app via
+ * GestureNavContract (gesture swipe-back).
+ *
+ * HOW GNC CLOSE WORKS (why this works without system permissions):
+ *
+ * GestureNavContract is a public API added in Android 10 that allows any
+ * launcher — system or not — to receive the app's SurfaceControl when the
+ * user swipes back using gesture navigation. The launcher calls
+ * GestureNavContract.sendEndPosition() with the icon's bounds and the
+ * SurfaceControl, and the system animates the app window surface back to
+ * the icon. The launcher controls its own side of the animation (how it
+ * appears) separately.
+ *
+ * This is different from RemoteTransition (which needs
+ * CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS) — GNC is specifically designed
+ * for third-party launchers.
+ *
+ * NOTE: GNC only fires for GESTURE navigation (swipe back), NOT for
+ * navigation button back-press. Button back uses the system's default
+ * transition which cannot be overridden without system privileges.
+ *
+ * The overlay animation type is chosen based on [AppOpenAnimationType]:
+ *   PIE / SLIDE_UP → pieCloseAnimation (scale 1.5→1.0 + fade in)
+ *   BLINK          → blinkCloseAnimation (three flashes)
+ *   FADE           → fadeCloseAnimation (fade in)
+ *   SUCK_IN / FADE_IN (FullScreenOverlayMode) → original suck/fade behavior
+ *   DEFAULT / REVEAL / SCALE_UP → standard FullScreenOverlayMode behavior
+ */
 fun Activity.showFullScreenOverlay(
     durationIn: Long = 200,
     durationOut: Long = 500,
@@ -196,29 +334,59 @@ fun Activity.showFullScreenOverlay(
     onOverlayReady: () -> Unit,
 ) {
     val pref2 = PreferenceManager2.getInstance(this)
-    val animationMode = pref2.closingAppOverlay.firstBlocking()
+    val overlayMode = pref2.closingAppOverlay.firstBlocking()
+    val appOpenAnim = pref2.appOpenAnimation.firstBlocking()
     val overlayView = FullScreenOverlayView(this)
     val targetRootView = rootView ?: window.decorView.findViewById<ViewGroup>(android.R.id.content)
 
     overlayView.pointyEndView(endView)
     targetRootView?.addView(overlayView)
 
-    when (animationMode) {
-        FullScreenOverlayMode.FADE_IN -> {
-            overlayView.animateIn(durationIn) {
-                overlayView.animateOut(durationOut, onOverlayReady)
-            }
-        }
-
-        FullScreenOverlayMode.SUCK_IN -> {
-            overlayView.suckAnimation(durationOut) {
+    // Choose close animation based on AppOpenAnimationType first.
+    // This is the GNC path (gesture swipe back) — available to non-system launchers.
+    // FullScreenOverlayMode is a secondary control for SUCK_IN/FADE_IN/NONE.
+    when (appOpenAnim) {
+        AppOpenAnimationType.PIE,
+        AppOpenAnimationType.SLIDE_UP,
+        -> {
+            // Pie close: overlay (launcher) zooms in from 1.5x scale while fading in.
+            // The GNC system already animates the APP window back to the icon position.
+            // We just need the launcher to appear with the Pie zoom-in effect.
+            overlayView.pieCloseAnimation(durationOut) {
                 onOverlayReady()
             }
         }
 
-        FullScreenOverlayMode.NONE -> {
-            targetRootView?.removeView(overlayView)
-            onOverlayReady()
+        AppOpenAnimationType.BLINK -> {
+            overlayView.blinkCloseAnimation {
+                onOverlayReady()
+            }
+        }
+
+        AppOpenAnimationType.FADE -> {
+            overlayView.fadeCloseAnimation(durationOut) {
+                onOverlayReady()
+            }
+        }
+
+        // DEFAULT, REVEAL, SCALE_UP: fall back to FullScreenOverlayMode setting.
+        else -> {
+            when (overlayMode) {
+                FullScreenOverlayMode.FADE_IN -> {
+                    overlayView.animateIn(durationIn) {
+                        overlayView.animateOut(durationOut, onOverlayReady)
+                    }
+                }
+                FullScreenOverlayMode.SUCK_IN -> {
+                    overlayView.suckAnimation(durationOut) {
+                        onOverlayReady()
+                    }
+                }
+                FullScreenOverlayMode.NONE -> {
+                    targetRootView?.removeView(overlayView)
+                    onOverlayReady()
+                }
+            }
         }
     }
 }

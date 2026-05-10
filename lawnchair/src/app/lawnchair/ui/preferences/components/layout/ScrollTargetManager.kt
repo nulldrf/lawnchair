@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -15,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.widget.NestedScrollView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 
 // ── Stable scroll key constants ───────────────────────────────────────────────
 object ScrollKeys {
@@ -101,9 +102,20 @@ class PreferenceScrollState(
 )
 
 /**
- * Call at the top of each destination composable to get a [PreferenceScrollState].
- * Consumes any pending key from [ScrollTargetManager], then scrolls the outer
- * [NestedScrollView] to the target item once its position has been measured.
+ * Call at the top of each destination composable.
+ *
+ * Consumes any pending key from [ScrollTargetManager], then waits for the
+ * target item to record its Y position via [preferenceScrollTarget].
+ * Once the position is known it scrolls the outer [NestedScrollView]
+ * to that item using [NestedScrollView.smoothScrollTo].
+ *
+ * Key design decisions:
+ * - [snapshotFlow] properly observes [SnapshotStateMap] changes so we react
+ *   to the exact frame when [onGloballyPositioned] fires rather than polling.
+ * - [first] automatically cancels the flow after one emission, so the scroll
+ *   happens exactly once and never repeats.
+ * - The 250ms delay lets the navigation shared-axis transition finish before
+ *   the scroll animation starts, so they don't compete.
  */
 @Composable
 fun rememberPreferenceScrollState(): PreferenceScrollState {
@@ -114,27 +126,34 @@ fun rememberPreferenceScrollState(): PreferenceScrollState {
 
     if (scrollKey != null) {
         LaunchedEffect(scrollKey) {
-            // Poll offsets until the target item has been laid out.
-            flow {
-                while (true) {
-                    emit(offsets[scrollKey])
-                    delay(16)
-                }
-            }
+            // snapshotFlow re-emits whenever offsets[scrollKey] changes in a
+            // Compose snapshot transaction (i.e. when onGloballyPositioned writes it).
+            // .first() cancels the upstream flow after the first non-null value,
+            // so we scroll exactly once.
+            val y = snapshotFlow { offsets[scrollKey] }
                 .filterNotNull()
-                .collect { y ->
-                    // Let the navigation enter transition finish first.
-                    delay(100)
-                    val gap = with(density) { 24.dp.toPx().toInt() }
-                    var p = view.parent
-                    while (p != null) {
-                        if (p is NestedScrollView) {
-                            p.smoothScrollTo(0, maxOf(0, y - gap))
-                            return@collect
-                        }
-                        p = (p as? android.view.ViewParent)?.parent
-                    }
+                .first()
+
+            // Give the navigation enter transition time to finish so the scroll
+            // animation doesn't compete with the shared-axis slide.
+            delay(250)
+
+            val gap = with(density) { 24.dp.toPx().toInt() }
+
+            // Walk the Android view parent chain from the ComposeView up to the
+            // StretchNestedScrollView (which extends NestedScrollView).
+            // positionInRoot() returns Y in the ComposeView's coordinate space,
+            // which maps 1-to-1 to the NestedScrollView content space because
+            // the ComposeView is a direct child of contentFrame inside the scroll view.
+            var p = view.parent
+            while (p != null) {
+                if (p is NestedScrollView) {
+                    p.smoothScrollTo(0, maxOf(0, y - gap))
+                    break
                 }
+                @Suppress("DEPRECATION")
+                p = (p as? android.view.ViewParent)?.parent
+            }
         }
     }
 
@@ -142,8 +161,11 @@ fun rememberPreferenceScrollState(): PreferenceScrollState {
 }
 
 /**
- * Wrap a preference item with this to register its Y position for scroll-to targeting.
- * Zero overhead when no scroll is pending.
+ * Attach to any composable that should be scrolled to when its [key] matches
+ * the pending scroll target. Records the item's Y position in root coordinates
+ * (= NestedScrollView content space) whenever a layout pass runs.
+ *
+ * Zero overhead when no scroll is pending ([state.scrollKey] is null or different).
  */
 fun Modifier.preferenceScrollTarget(key: String, state: PreferenceScrollState): Modifier =
     if (state.scrollKey != key) this
@@ -152,7 +174,9 @@ fun Modifier.preferenceScrollTarget(key: String, state: PreferenceScrollState): 
     }
 
 /**
- * Convenience composable that marks its content as a scroll target for [key].
+ * Convenience composable: marks its content as a scroll target for [key].
+ * Wraps content in a [Box] so [preferenceScrollTarget] has a concrete layout
+ * node to measure.
  */
 @Composable
 fun ScrollAnchor(

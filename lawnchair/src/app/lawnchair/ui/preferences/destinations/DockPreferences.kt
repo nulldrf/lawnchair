@@ -87,7 +87,7 @@ fun DockPreferences(modifier: Modifier = Modifier) {
                 }
             }
             SearchBarPreference(SearchRoute.DOCK_SEARCH)
-            GridSettings(prefs, prefs2)
+            GridSettings(prefs, prefs2, scrollState)
             PreferenceGroup(heading = stringResource(id = R.string.icons)) {
                 Item {
                     SwitchPreference(
@@ -144,7 +144,7 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
 }
 
 @Composable
-fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2) {
+fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2, scrollState: app.lawnchair.ui.preferences.components.layout.PreferenceScrollState) {
     PreferenceGroup(heading = stringResource(id = R.string.grid)) {
         Item {
             ScrollAnchor(ScrollKeys.DOCK_ICONS, scrollState) {

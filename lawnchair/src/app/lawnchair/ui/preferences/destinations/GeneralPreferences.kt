@@ -84,10 +84,10 @@ fun GeneralPreferences() {
         currentIconPackName
     }
     val iconShapeSubtitle = iconShapeEntries(context)
-    val scrollState = rememberPreferenceScrollState()
         .firstOrNull { it.value == iconShapeAdapter.state.value }
         ?.label?.invoke()
         ?: stringResource(id = R.string.custom)
+    val scrollState = rememberPreferenceScrollState()
 
     PreferenceLayout(
         backArrowVisible = !LocalIsExpandedScreen.current,

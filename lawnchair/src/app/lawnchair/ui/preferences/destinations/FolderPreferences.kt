@@ -90,6 +90,7 @@ fun FolderPreferences(
                     valueRange = 0F..1F,
                     showAsPercentage = true,
                 )
+                }
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {

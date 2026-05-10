@@ -21,8 +21,8 @@ import com.android.launcher3.R
 fun BackupAndRestorePreference(
     modifier: Modifier = Modifier,
 ) {
-    PreferenceLayout(
     val scrollState = rememberPreferenceScrollState()
+    PreferenceLayout(
         label = stringResource(R.string.backup_and_restore_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
         modifier = modifier,

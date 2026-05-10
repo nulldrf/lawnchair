@@ -61,27 +61,16 @@ class LawnchairAppWidgetHostView @JvmOverloads constructor(
     companion object {
 
         private val customLayouts = mapOf(
-            SmartspaceAppWidgetProvider.componentName to R.layout.smartspace_widget,
+            // smartspace_enhanced contains BcSmartspaceView with full ViewPager + weather support.
+            // smartspace_widget is a date-only placeholder layout without BcSmartspaceView.
+            SmartspaceAppWidgetProvider.componentName to R.layout.smartspace_enhanced,
         )
 
         @JvmStatic
         fun inflateCustomView(context: Context, info: AppWidgetProviderInfo, previewMode: Boolean): ViewGroup? {
             val layoutId = customLayouts[info.provider] ?: return null
 
-            // For the smartspace widget, we must use the launcher's themed context so that
-            // theme attributes like workspaceTextColor resolve correctly. Without this,
-            // CardPagerAdapter.currentTextColor resolves to 0 (transparent) and text is invisible.
-            // For preview mode, use the widget preview context as before.
-            val inflationContext = when {
-                previewMode -> Themes.createWidgetPreviewContext(context)
-                info.provider == SmartspaceAppWidgetProvider.componentName -> {
-                    // Use the launcher activity itself as context — it has the full workspace
-                    // theme applied, so workspaceTextColor resolves correctly in CardPagerAdapter.
-                    LawnchairLauncher.instance?.launcherNullable ?: context
-                }
-                else -> context
-            }
-
+            val inflationContext = if (previewMode) Themes.createWidgetPreviewContext(context) else context
             return LayoutInflater.from(inflationContext)
                 .inflate(layoutId, null, false) as ViewGroup
         }

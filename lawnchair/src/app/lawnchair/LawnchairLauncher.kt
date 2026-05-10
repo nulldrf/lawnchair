@@ -724,7 +724,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         val dY = centreInLayerY - rect.top.toFloat()  - rect.height().toFloat() / 2f
 
         val useUpward = rect.top.toFloat() > centreInLayerY ||
-            kotlin.math.abs(dY) < dp.cellHeightPx.toFloat()
+            kotlin.math.abs(dY) < deviceProfile.cellHeightPx.toFloat()
 
         // ── 3. Floating icon view (mFloatingView equivalent) ───────────────
         // Added with MATCH_PARENT then positioned via layout() — avoids the

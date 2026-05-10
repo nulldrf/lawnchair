@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.RemoteViews
 import app.lawnchair.smartspace.SmartspaceAppWidgetProvider
-import app.lawnchair.smartspace.SmartspaceViewContainer
 import com.android.launcher3.R
 import com.android.launcher3.util.Themes
 import com.android.launcher3.widget.LauncherAppWidgetHostView
@@ -62,28 +61,29 @@ class LawnchairAppWidgetHostView @JvmOverloads constructor(
     companion object {
 
         private val customLayouts = mapOf(
-            // Use smartspace_container (SmartspaceViewContainer) so the widget goes through
-            // the same rendering path as the home screen smartspace — ensuring WeatherDataProvider
-            // targets are received and displayed correctly.
-            SmartspaceAppWidgetProvider.componentName to R.layout.smartspace_container,
+            SmartspaceAppWidgetProvider.componentName to R.layout.smartspace_widget,
         )
 
         @JvmStatic
         fun inflateCustomView(context: Context, info: AppWidgetProviderInfo, previewMode: Boolean): ViewGroup? {
             val layoutId = customLayouts[info.provider] ?: return null
 
-            val inflationContext = if (previewMode) Themes.createWidgetPreviewContext(context) else context
-            val view = LayoutInflater.from(inflationContext)
-                .inflate(layoutId, null, false) as ViewGroup
-
-            // Set previewMode on SmartspaceViewContainer if applicable
-            if (view is SmartspaceViewContainer) {
-                // SmartspaceViewContainer reads previewMode from its constructor attr,
-                // but since we inflate from XML it defaults to false which is correct
-                // for a placed widget. Nothing to do here.
+            // For the smartspace widget, we must use the launcher's themed context so that
+            // theme attributes like workspaceTextColor resolve correctly. Without this,
+            // CardPagerAdapter.currentTextColor resolves to 0 (transparent) and text is invisible.
+            // For preview mode, use the widget preview context as before.
+            val inflationContext = when {
+                previewMode -> Themes.createWidgetPreviewContext(context)
+                info.provider == SmartspaceAppWidgetProvider.componentName -> {
+                    // Use the launcher activity itself as context — it has the full workspace
+                    // theme applied, so workspaceTextColor resolves correctly in CardPagerAdapter.
+                    LawnchairLauncher.instance?.launcherNullable ?: context
+                }
+                else -> context
             }
 
-            return view
+            return LayoutInflater.from(inflationContext)
+                .inflate(layoutId, null, false) as ViewGroup
         }
     }
 }

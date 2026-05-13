@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.util.Log
-import android.util.Xml
 import androidx.core.graphics.drawable.toBitmap
 import org.xmlpull.v1.XmlPullParser
 
@@ -24,6 +23,27 @@ import org.xmlpull.v1.XmlPullParser
  */
 class WeatherIconProvider(private val context: Context) {
 
+    /**
+     * Cache of [Context] objects created per icon pack package name.
+     *
+     * [Context.createPackageContext] with [Context.CONTEXT_INCLUDE_CODE] is expensive:
+     * it loads the full class loader for the target package and memory-maps its APK.
+     * Weather icons are requested on every smartspace update (screen-on, periodic refresh,
+     * etc.), so without caching this created a new [Context] — and a new APK mmap entry —
+     * on every single call. The number of weather packs a user has installed is small
+     * (typically one), so an unbounded map is appropriate here.
+     */
+    private val packContextCache = mutableMapOf<String, Context>()
+
+    /**
+     * Cache of drawable-filter maps keyed by "$packageName/$metaKey".
+     *
+     * Previously [readDrawableFilter] re-opened and re-parsed the filter XML on every
+     * [getIcon] call. The filter XML never changes while the pack is installed, so we
+     * parse it once and cache the resulting map for the lifetime of this provider.
+     */
+    private val filterCache = mutableMapOf<String, Map<String, String>>()
+
     fun getIcon(condition: WeatherCondition, isDay: Boolean, packPackageName: String?): Icon? {
         if (packPackageName.isNullOrBlank()) return null
         return try {
@@ -31,22 +51,19 @@ class WeatherIconProvider(private val context: Context) {
                 Log.w(TAG, "Unknown pack type for $packPackageName")
                 return null
             }
-            val packContext = context.createPackageContext(
-                packPackageName,
-                Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY,
-            )
+
+            val packContext = getOrCreatePackContext(packPackageName) ?: return null
             val res = packContext.resources
 
             val resName = when (type) {
                 PackType.CHRONUS -> chronusResName(condition, isDay)
                 PackType.BREEZY, PackType.GEOMETRIC -> {
                     val logicalName = breezyResName(condition, isDay)
-                    // Read the drawable filter to map logical → obfuscated name
                     val filterMetaKey = when (type) {
                         PackType.BREEZY -> META_DRAWABLE_FILTER_BREEZY
                         else -> META_DRAWABLE_FILTER_GEOMETRIC
                     }
-                    val filter = readDrawableFilter(packContext, packPackageName, filterMetaKey)
+                    val filter = getOrLoadDrawableFilter(packContext, packPackageName, filterMetaKey)
                     filter[logicalName] ?: logicalName
                 }
             }
@@ -61,6 +78,46 @@ class WeatherIconProvider(private val context: Context) {
             Log.w(TAG, "Failed to load icon from $packPackageName", e)
             null
         }
+    }
+
+    /**
+     * Returns a cached [Context] for [packPackageName], creating one on first access.
+     *
+     * Returns null if the package context cannot be created (e.g. pack was uninstalled).
+     * On failure the bad entry is not cached, so the next call will retry — which allows
+     * recovery if the pack is reinstalled without recreating the provider.
+     */
+    private fun getOrCreatePackContext(packPackageName: String): Context? {
+        packContextCache[packPackageName]?.let { return it }
+        return try {
+            context.createPackageContext(
+                packPackageName,
+                Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY,
+            ).also { packContextCache[packPackageName] = it }
+        } catch (e: PackageManager.NameNotFoundException) {
+            Log.w(TAG, "Pack not found when creating context: $packPackageName", e)
+            null
+        }
+    }
+
+    /**
+     * Returns the drawable filter map for [packPackageName]/[metaKey], loading and
+     * caching it on first access.
+     *
+     * The cache key combines both [packPackageName] and [metaKey] because Breezy and
+     * Geometric packs use different metadata keys pointing to different filter XMLs,
+     * and the same pack package could theoretically support both formats.
+     */
+    private fun getOrLoadDrawableFilter(
+        packContext: Context,
+        packPackageName: String,
+        metaKey: String,
+    ): Map<String, String> {
+        val cacheKey = "$packPackageName/$metaKey"
+        filterCache[cacheKey]?.let { return it }
+        val loaded = readDrawableFilter(packContext, packPackageName, metaKey)
+        filterCache[cacheKey] = loaded
+        return loaded
     }
 
     /**

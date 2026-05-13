@@ -180,18 +180,24 @@ class CustomIconPack(context: Context, packPackageName: String) : IconPack(conte
         packResources.getIdentifier(name, "drawable", packPackageName)
     }
 
+    /**
+     * Returns an [XmlPullParser] for the named XML resource inside the icon pack.
+     *
+     * Previously this method redundantly called [PackageManager.getResourcesForApplication]
+     * on every invocation, creating a new [Resources] object (and therefore a new APK mmap
+     * entry) each time — even though [packResources] was already available as a field.
+     * It now uses [packResources] directly, so no additional APK mapping is created.
+     */
     private fun getXml(name: String): XmlPullParser? {
-        val res: Resources
         try {
-            res = context.packageManager.getResourcesForApplication(packPackageName)
             @SuppressLint("DiscouragedApi")
-            val resourceId = res.getIdentifier(name, "xml", packPackageName)
-            return if (0 != resourceId) {
+            val resourceId = packResources.getIdentifier(name, "xml", packPackageName)
+            return if (resourceId != 0) {
                 context.packageManager.getXml(packPackageName, resourceId, null)
             } else {
                 val factory = XmlPullParserFactory.newInstance()
                 val parser = factory.newPullParser()
-                parser.setInput(res.assets.open("$name.xml"), Xml.Encoding.UTF_8.toString())
+                parser.setInput(packResources.assets.open("$name.xml"), Xml.Encoding.UTF_8.toString())
                 parser
             }
         } catch (_: PackageManager.NameNotFoundException) {

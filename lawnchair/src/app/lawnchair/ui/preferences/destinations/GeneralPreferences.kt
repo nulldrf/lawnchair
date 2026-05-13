@@ -29,11 +29,6 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
-import app.lawnchair.ui.preferences.components.layout.ScrollKeys
-import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
@@ -48,6 +43,9 @@ import app.lawnchair.ui.preferences.components.controls.WarningPreference
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.components.notificationDotsEnabled
 import app.lawnchair.ui.preferences.components.notificationServiceEnabled
 import app.lawnchair.ui.preferences.navigation.GeneralColorStyle
@@ -167,11 +165,11 @@ fun GeneralPreferences() {
         ) {
             Item {
                 ScrollAnchor(ScrollKeys.ICON_STYLE, scrollState) {
-                NavigationActionPreference(
-                    label = stringResource(id = R.string.icon_style_label),
-                    destination = GeneralIconPack,
-                    subtitle = iconStyleSubtitle,
-                )
+                    NavigationActionPreference(
+                        label = stringResource(id = R.string.icon_style_label),
+                        destination = GeneralIconPack,
+                        subtitle = iconStyleSubtitle,
+                    )
                 }
             }
             Item(
@@ -186,31 +184,31 @@ fun GeneralPreferences() {
             }
             Item {
                 ScrollAnchor(ScrollKeys.ICON_SHAPE, scrollState) {
-                NavigationActionPreference(
-                    label = stringResource(id = R.string.icon_shape_label),
-                    destination = GeneralIconShape(ShapeRoute.APP_SHAPE),
-                    subtitle = iconShapeSubtitle,
-                    endWidget = {
-                        IconShapePreview(iconShape = iconShapeAdapter.state.value)
-                    },
-                )
+                    NavigationActionPreference(
+                        label = stringResource(id = R.string.icon_shape_label),
+                        destination = GeneralIconShape(ShapeRoute.APP_SHAPE),
+                        subtitle = iconShapeSubtitle,
+                        endWidget = {
+                            IconShapePreview(iconShape = iconShapeAdapter.state.value)
+                        },
+                    )
                 }
             }
             Item {
                 ScrollAnchor(ScrollKeys.AUTO_ADAPTIVE, scrollState) {
-                SwitchPreference(
-                    adapter = wrapAdaptiveIcons,
-                    label = stringResource(id = R.string.auto_adaptive_icons_label),
-                    description = stringResource(id = R.string.auto_adaptive_icons_description),
-                )
+                    SwitchPreference(
+                        adapter = wrapAdaptiveIcons,
+                        label = stringResource(id = R.string.auto_adaptive_icons_label),
+                        description = stringResource(id = R.string.auto_adaptive_icons_description),
+                    )
                 }
             }
             Item {
                 ScrollAnchor(ScrollKeys.SHADOW_ICONS, scrollState) {
-                SwitchPreference(
-                    adapter = prefs.shadowBGIcons.getAdapter(),
-                    label = stringResource(id = R.string.shadow_bg_icons_label),
-                )
+                    SwitchPreference(
+                        adapter = prefs.shadowBGIcons.getAdapter(),
+                        label = stringResource(id = R.string.shadow_bg_icons_label),
+                    )
                 }
             }
             Item(
@@ -253,17 +251,10 @@ fun GeneralPreferences() {
         val showColorStyle = !(Utilities.ATLEAST_S && accentColorValue == ColorOption.SystemAccent) ||
             !Utilities.ATLEAST_S
 
-        // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
-        // WallpaperDerived is a specific extracted wallpaper colour — it should
-        // behave identically to WallpaperPrimary for the purposes of showing
-        // the LegacyKdrag engine option and the full style picker.
         val isWallpaperAccent = accentColorValue is ColorOption.WallpaperPrimary ||
             accentColorValue is ColorOption.WallpaperDerived
 
         val currentColorStyle = prefs2.colorStyle.asState().value
-        // When LegacyKdrag is active but the accent is not wallpaper-based,
-        // the engine has no effect — show TonalSpot as the effective style so
-        // the subtitle doesn't mislead the user.
         val effectiveColorStyle = if (!isWallpaperAccent && currentColorStyle is LegacyKdrag) {
             TonalSpot
         } else {
@@ -278,11 +269,11 @@ fun GeneralPreferences() {
                 showColorStyle,
             ) {
                 ScrollAnchor(ScrollKeys.COLOR_STYLE, scrollState) {
-                NavigationActionPreference(
-                    label = stringResource(id = R.string.color_style_label),
-                    destination = GeneralColorStyle(showLegacyKdrag = isWallpaperAccent),
-                    subtitle = colorStyleSubtitle,
-                )
+                    NavigationActionPreference(
+                        label = stringResource(id = R.string.color_style_label),
+                        destination = GeneralColorStyle(showLegacyKdrag = isWallpaperAccent),
+                        subtitle = colorStyleSubtitle,
+                    )
                 }
             }
         }
@@ -322,6 +313,35 @@ fun GeneralPreferences() {
                 NotificationDotColorContrastWarnings(
                     dotColor = dotColor,
                     dotTextColor = dotTextColor,
+                )
+            }
+        }
+
+        // ── Settings background blur ───────────────────────────────────────────
+        // Matches old Lawnchair's Theme → Blur + Blur Intensity pair.
+        // The toggle enables the blurred wallpaper background across all settings
+        // screens; the slider controls intensity (10 = subtle frost, 150 = heavy fog).
+        // Both prefs are read inside PreferenceLayout → SettingsBlurContainer so the
+        // effect is instant on the entire settings stack — no recreate needed.
+        val settingsBlurAdapter = prefs.settingsBlurBackground.getAdapter()
+
+        PreferenceGroup(heading = stringResource(id = R.string.settings_background_label)) {
+            Item {
+                SwitchPreference(
+                    adapter = settingsBlurAdapter,
+                    label = stringResource(id = R.string.settings_blur_label),
+                    description = stringResource(id = R.string.settings_blur_description),
+                )
+            }
+            Item(
+                "settings_blur_intensity",
+                settingsBlurAdapter.state.value,
+            ) {
+                SliderPreference(
+                    label = stringResource(id = R.string.settings_blur_intensity_label),
+                    adapter = prefs.settingsBlurIntensity.getAdapter(),
+                    valueRange = 10F..150F,
+                    step = 10f,
                 )
             }
         }

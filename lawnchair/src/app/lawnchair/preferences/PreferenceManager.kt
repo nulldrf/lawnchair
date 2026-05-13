@@ -148,6 +148,16 @@ class PreferenceManager @Inject constructor(
     val wallpaperBlur = IntPref("pref_wallpaperBlur", 25, recreate)
     val wallpaperBlurFactorThreshold = FloatPref("pref_wallpaperBlurFactor", 3.0F, recreate)
 
+    // -----------------------------------------------------------------------
+    // Settings background blur
+    //
+    // No callback needed — the blurred wallpaper is rendered directly in the
+    // Compose tree inside PreferenceLayout, so changing these prefs causes an
+    // immediate recomposition without any launcher or activity recreate.
+    // -----------------------------------------------------------------------
+    val settingsBlurBackground = BoolPref("pref_settingsBlurBackground", false)
+    val settingsBlurIntensity = FloatPref("pref_settingsBlurIntensity", 75f)
+
     val drawerListOrder = StringPref("pref_drawerListOrder", "", reloadGrid)
     val drawerList = BoolPref("pref_drawerList", true, recreate)
     val folderApps = BoolPref("pref_hideFolderApps", true, reloadGrid)

@@ -298,6 +298,12 @@
     <string name="show_labels">Show labels</string>
     <string name="label_size">Label size</string>
     <string name="twoline_label">Use multiple lines</string>
+	
+	<!-- Settings background blur -->
+    <string name="settings_background_label">Settings Background</string>
+    <string name="settings_blur_label">Blur</string>
+    <string name="settings_blur_description">Use wallpaper as the settings background.</string>
+    <string name="settings_blur_intensity_label">Blur Intensity</string>
 
     <!-- Icon-related settings -->
     <string name="transparent_background_icons_label">Transparent themed icons</string>

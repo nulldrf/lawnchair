@@ -16,23 +16,44 @@
 
 package app.lawnchair.ui.preferences.components.layout
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.lawnchair.preferences.getAdapter
+import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
+import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Represents the layout of all Preference screens.
  * Uses a combination of [PreferenceScaffold] and [PreferenceColumn] to represent the layout.
+ *
+ * When the user has enabled the settings background blur in GeneralPreferences, every
+ * preference screen will show the blurred wallpaper behind its content.  The blur is
+ * rendered entirely in Compose — toggling the preference recomposes immediately without
+ * requiring an activity recreate.
  *
  * @param label the text shown in the *collapsed* toolbar and used as the default
  *   expanded title (e.g. "Settings")
@@ -70,23 +91,25 @@ fun PreferenceLayout(
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    PreferenceScaffold(
-        modifier = modifier,
-        backArrowVisible = backArrowVisible,
-        label = label,
-        expandedLabel = expandedLabel,
-        onExpandedTitleClick = onExpandedTitleClick,
-        isExpandedScreen = isExpandedScreen,
-        actions = actions,
-        bottomBar = bottomBar,
-    ) {
-        PreferenceColumn(
-            contentPadding = it,
-            verticalArrangement = verticalArrangement,
-            horizontalAlignment = horizontalAlignment,
-            scrollState = scrollState,
-            content = content,
-        )
+    SettingsBlurContainer(modifier = modifier) { blurModifier ->
+        PreferenceScaffold(
+            modifier = blurModifier,
+            backArrowVisible = backArrowVisible,
+            label = label,
+            expandedLabel = expandedLabel,
+            onExpandedTitleClick = onExpandedTitleClick,
+            isExpandedScreen = isExpandedScreen,
+            actions = actions,
+            bottomBar = bottomBar,
+        ) {
+            PreferenceColumn(
+                contentPadding = it,
+                verticalArrangement = verticalArrangement,
+                horizontalAlignment = horizontalAlignment,
+                scrollState = scrollState,
+                content = content,
+            )
+        }
     }
 }
 
@@ -117,18 +140,91 @@ fun PreferenceLayoutLazyColumn(
     actions: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
-    PreferenceScaffold(
-        backArrowVisible = backArrowVisible,
-        label = label,
-        isExpandedScreen = isExpandedScreen,
-        actions = actions,
+    SettingsBlurContainer { blurModifier ->
+        PreferenceScaffold(
+            backArrowVisible = backArrowVisible,
+            label = label,
+            isExpandedScreen = isExpandedScreen,
+            actions = actions,
+        ) {
+            PreferenceLazyColumn(
+                contentPadding = it,
+                modifier = modifier.then(blurModifier),
+                enabled = enabled,
+                state = state,
+                content = content,
+            )
+        }
+    }
+}
+
+// ─── Internal blur container ──────────────────────────────────────────────────
+
+/**
+ * Wraps [content] with a blurred wallpaper background when the user has
+ * enabled [app.lawnchair.preferences.PreferenceManager.settingsBlurBackground].
+ *
+ * When blur is enabled:
+ *  - The wallpaper is captured and blurred on [Dispatchers.IO] via [SettingsWallpaperBlurHelper].
+ *  - The blurred bitmap is drawn full-screen behind [content].
+ *  - A 43 % black scrim is composited on top for contrast.
+ *  - [MaterialTheme.colorScheme.background] is locally overridden to [Color.Transparent]
+ *    so that the scaffold surface does not paint over the wallpaper layer.
+ *
+ * Toggling the preference causes an immediate recomposition — no recreate needed.
+ */
+@Composable
+private fun SettingsBlurContainer(
+    modifier: Modifier = Modifier,
+    content: @Composable (innerModifier: Modifier) -> Unit,
+) {
+    val context = LocalContext.current
+    val prefs = preferenceManager()
+    val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
+    val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
+
+    // Re-runs whenever blurEnabled or blurIntensity changes.
+    val blurredBitmap by produceState(
+        initialValue = null as android.graphics.Bitmap?,
+        key1 = blurEnabled,
+        key2 = blurIntensity,
     ) {
-        PreferenceLazyColumn(
-            contentPadding = it,
-            modifier = modifier,
-            enabled = enabled,
-            state = state,
-            content = content,
-        )
+        value = if (blurEnabled) {
+            withContext(Dispatchers.IO) {
+                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
+            }
+        } else {
+            null
+        }
+    }
+
+    if (!blurEnabled || blurredBitmap == null) {
+        // Blur off or bitmap not ready yet — render content with default theming.
+        content(modifier)
+        return
+    }
+
+    // Override the Material3 background token to transparent so the Scaffold
+    // surface does not paint an opaque colour over the wallpaper layer.
+    val transparentScheme = MaterialTheme.colorScheme.copy(background = Color.Transparent)
+
+    MaterialTheme(colorScheme = transparentScheme) {
+        Box(modifier = modifier.fillMaxSize()) {
+            // Layer 1 — blurred wallpaper
+            Image(
+                bitmap = blurredBitmap!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            // Layer 2 — dark scrim (~43 % opacity) for legibility
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.43f)),
+            )
+            // Layer 3 — actual preference content (transparent scaffold surface)
+            content(Modifier)
+        }
     }
 }

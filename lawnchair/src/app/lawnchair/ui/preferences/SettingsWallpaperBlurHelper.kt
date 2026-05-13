@@ -11,13 +11,12 @@ import android.view.WindowManager
 import com.hoko.blur.HokoBlur
 import kotlin.math.min
 
-
-
 /**
  * Pure utility — captures the current wallpaper and returns a blurred [Bitmap].
  *
  * Rendering is handled entirely in Compose inside [PreferenceLayout], so there
- * is no window-background manipulation here. Call [getBlurredBitmap] from a
+ * is no window-background manipulation here.
+ * Call [getBlurredBitmap] from a
  * coroutine on [kotlinx.coroutines.Dispatchers.IO] — HokoBlur's native call
  * is CPU-heavy.
  *
@@ -28,14 +27,14 @@ object SettingsWallpaperBlurHelper {
     /**
      * @param blurIntensity  User-facing intensity in [10, 150].
      *
-     *   HokoBlur's radius is capped at 25 internally, so we cover the full
-     *   slider range by also scaling the downsample factor:
+     * HokoBlur's radius is capped at 25 internally, so we cover the full
+     * slider range by also scaling the downsample factor:
      *
-     *     radius       = min(intensity, 25)        → 10 … 25
-     *     sampleFactor = max(1f, intensity / 25f)  → 1x … 6x
+     * radius       = min(intensity, 25)        → 10 … 25
+     * sampleFactor = max(1f, intensity / 25f)  → 1x … 6x
      *
-     *   Intensity 10  → subtle frost.
-     *   Intensity 150 → heavy fog (max radius + 6× downsample).
+     * Intensity 10  → subtle frost.
+     * Intensity 150 → heavy fog (max radius + 6× downsample).
      */
     @SuppressLint("MissingPermission")
     fun getBlurredBitmap(context: Context, blurIntensity: Int): Bitmap? {
@@ -58,14 +57,14 @@ object SettingsWallpaperBlurHelper {
         val hokoRadius = min(clamped, 25)
         val sampleFactor = (clamped / 25f).coerceAtLeast(1f)
 
-        val blurred: Bitmap? = runCatching {
+        // Added explicit type <Bitmap?> to fix type inference issue
+        val blurred: Bitmap? = runCatching<Bitmap?> {
             HokoBlur.with(context)
                 .scheme(HokoBlur.SCHEME_NATIVE) // Native C++ implementation
                 .mode(HokoBlur.MODE_STACK)      // Stack ≈ Gaussian quality, better perf
                 .radius(hokoRadius)
                 .sampleFactor(sampleFactor)
-                .forceCopy(false)
-                .needUpscale(true)
+                .forceCopy(false)               // needUpscale(true) removed for v1.5.5 compatibility
                 .processor()                    // build the processor first
                 .blur(src)                      // then blur
         }.getOrNull()
@@ -74,6 +73,7 @@ object SettingsWallpaperBlurHelper {
             src.recycle()
             return null
         }
+        
         // HokoBlur may mutate src in-place when forceCopy=false.
         // Only recycle src when a distinct bitmap was returned.
         if (blurred !== src) src.recycle()

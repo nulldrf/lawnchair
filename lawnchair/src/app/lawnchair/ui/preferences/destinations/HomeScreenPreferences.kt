@@ -79,7 +79,6 @@ fun HomeScreenPreferences(
         modifier = modifier,
     ) {
         val lockHomeScreenAdapter = prefs2.lockHomeScreen.getAdapter()
-    val scrollState = rememberPreferenceScrollState()
         val showDeckLayout = prefs2.showDeckLayout.getAdapter().state.value
 
         if (showDeckLayout) {

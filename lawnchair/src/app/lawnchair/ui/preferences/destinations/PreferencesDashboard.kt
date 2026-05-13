@@ -295,19 +295,20 @@ fun PreferencesDashboard(
         // ── Search bar ────────────────────────────────────────────────
         fun sb(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search(), sk))
-        sb(stringResource(R.string.fuzzy_search_title), "fuzzy approximate matching search typo")
-        sb(stringResource(R.string.suggestion_pref_screen_title), "search suggestions apps top recommended")
-        sb(stringResource(R.string.perform_wide_search_title), "device search contacts files settings phone")
-        sb(stringResource(R.string.app_search_algorithm), "algorithm global search on-device ASI app search")
-        sb(stringResource(R.string.clear_history), "clear search history delete")
-        sb(stringResource(R.string.allapps_web_suggestion_provider_label), "web suggestion provider google bing duckduckgo")
-        sb(stringResource(R.string.search_provider), "search engine google duckduckgo bing startpage custom")
-        sb(stringResource(R.string.show_app_search_bar), "show search bar drawer enable")
-        sb(stringResource(R.string.pref_search_auto_show_keyboard), "auto keyboard search show automatically")
-        sb(stringResource(R.string.show_hidden_apps_in_search_results), "show hidden apps search results")
-        sb(stringResource(R.string.perform_wide_search_title), "device search contacts files settings phone")
-        sb(stringResource(R.string.pref_search_auto_show_keyboard), "auto keyboard search show automatically")
-        sb(stringResource(R.string.allapps_match_qsb_style_label), "match dock search bar actions style")
+        sb(stringResource(R.string.show_app_search_bar), "show search bar drawer enable disable", ScrollKeys.DS_SHOW_SEARCH_BAR)
+        sb(stringResource(R.string.pref_search_auto_show_keyboard), "auto keyboard search show automatically", ScrollKeys.DS_AUTO_KEYBOARD)
+        sb(stringResource(R.string.app_search_algorithm), "algorithm global search on-device ASI app search", ScrollKeys.DS_ALGORITHM)
+        sb(stringResource(R.string.allapps_match_qsb_style_label), "match dock search bar actions style", ScrollKeys.DS_MATCH_QSB)
+        sb(stringResource(R.string.search_pref_result_web_title), "web suggestions search results")
+        sb(stringResource(R.string.search_pref_result_people_title), "contacts people search results")
+        sb(stringResource(R.string.search_pref_result_files_title), "files search results")
+        sb(stringResource(R.string.search_pref_result_history_title), "search history results")
+        sb(stringResource(R.string.all_apps_search_result_calculator), "calculator search")
+        sb(stringResource(R.string.hotseat_mode_label), "search bar widget google lawnchair disabled dock mode", ScrollKeys.DOCK_SEARCH_MODE)
+        sb(stringResource(R.string.search_provider), "search engine google duckduckgo bing startpage dock", ScrollKeys.DOCK_SEARCH_PROVIDER)
+        sb(stringResource(R.string.apply_accent_color_label), "accent color tint dock search bar", ScrollKeys.DOCK_SEARCH_ACCENT)
+        sb(stringResource(R.string.corner_radius_label), "corner radius dock search bar rounded", ScrollKeys.DOCK_SEARCH_RADIUS)
+        sb(stringResource(R.string.qsb_hotseat_background_transparency), "search bar background opacity transparent", ScrollKeys.DOCK_SEARCH_OPACITY)
 
         // ── Folders ───────────────────────────────────────────────────
         fun f(label: String, kw: String = "", sk: String? = null) =

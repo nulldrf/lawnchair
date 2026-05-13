@@ -16,6 +16,11 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.search.algorithms.LawnchairSearchAlgorithm
 import app.lawnchair.search.algorithms.engine.provider.web.CustomWebSearchProvider
 import app.lawnchair.ui.preferences.LocalNavController
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.components.HiddenAppsInSearchPreference
 import app.lawnchair.ui.preferences.components.controls.ListPreference
 import app.lawnchair.ui.preferences.components.controls.ListPreferenceEntry
@@ -41,32 +46,40 @@ fun DrawerSearchPreference(
     val showDrawerSearchBar = !prefs2.hideAppDrawerSearchBar.getAdapter()
     val hiddenApps = prefs2.hiddenApps.getAdapter().state.value
 
+    val scrollState = rememberPreferenceScrollState()
     MainSwitchPreference(
         adapter = showDrawerSearchBar,
         label = stringResource(id = R.string.show_app_search_bar),
         modifier = modifier,
     ) {
+        ScrollAnchor(ScrollKeys.DS_SHOW_SEARCH_BAR, scrollState) { HiddenAppsInSearchPreference() }
         PreferenceGroup(heading = stringResource(R.string.general_label)) {
             if (hiddenApps.isNotEmpty()) {
                 Item { HiddenAppsInSearchPreference() }
             }
             Item {
+                ScrollAnchor(ScrollKeys.DS_AUTO_KEYBOARD, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.autoShowKeyboardInDrawer.getAdapter(),
                     label = stringResource(id = R.string.pref_search_auto_show_keyboard),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.DS_ALGORITHM, scrollState) {
                 SearchProvider(
                     context = context,
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.DS_MATCH_QSB, scrollState) {
                 SwitchPreference(
                     label = stringResource(R.string.allapps_match_qsb_style_label),
                     description = stringResource(R.string.allapps_match_qsb_style_description),
                     adapter = prefs2.matchHotseatQsbStyle.getAdapter(),
                 )
+                }
             }
         }
 

@@ -23,6 +23,11 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.qsb.providers.QsbSearchProvider
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
 import app.lawnchair.ui.preferences.components.controls.ListPreference
@@ -50,15 +55,18 @@ fun DockSearchPreference(
     val qsbAlphaAdapter = prefs.hotseatQsbAlpha.getAdapter()
     val qsbHotseatStrokeWidth = prefs.hotseatQsbStrokeWidth.getAdapter()
 
+    val scrollState = rememberPreferenceScrollState()
     Crossfade(isHotseatEnabled.state.value, label = "transition", modifier = modifier) { hotseatEnabled ->
         val isLawnchairHotseat = hotseatModeAdapter.state.value == LawnchairHotseat
         if (hotseatEnabled) {
             Column {
                 PreferenceGroup {
                     Item {
+                        ScrollAnchor(ScrollKeys.DOCK_SEARCH_MODE, scrollState) {
                         HotseatModePreference(
                             adapter = hotseatModeAdapter,
                         )
+                        }
                     }
                 }
                 ExpandAndShrink(visible = hotseatModeAdapter.state.value != DisabledHotseat) {
@@ -73,6 +81,7 @@ fun DockSearchPreference(
                             heading = stringResource(R.string.search_bar_settings),
                         ) {
                             Item {
+                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_PROVIDER, scrollState) {
                                 NavigationActionPreference(
                                     label = stringResource(R.string.search_provider),
                                     destination = DockSearchProvider,
@@ -82,18 +91,22 @@ fun DockSearchPreference(
                                             .name,
                                     ),
                                 )
+                                }
                             }
                         }
                         PreferenceGroup(
                             heading = stringResource(R.string.style),
                         ) {
                             Item {
+                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_ACCENT, scrollState) {
                                 SwitchPreference(
                                     adapter = themeQsbAdapter,
                                     label = stringResource(id = R.string.apply_accent_color_label),
                                 )
+                                }
                             }
                             Item {
+                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_RADIUS, scrollState) {
                                 SliderPreference(
                                     label = stringResource(id = R.string.corner_radius_label),
                                     adapter = qsbCornerAdapter,
@@ -101,8 +114,10 @@ fun DockSearchPreference(
                                     valueRange = 0F..1F,
                                     showAsPercentage = true,
                                 )
+                                }
                             }
                             Item {
+                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_OPACITY, scrollState) {
                                 SliderPreference(
                                     label = stringResource(id = R.string.qsb_hotseat_background_transparency),
                                     adapter = qsbAlphaAdapter,
@@ -110,6 +125,7 @@ fun DockSearchPreference(
                                     valueRange = 0..100,
                                     showUnit = "%",
                                 )
+                                }
                             }
                             Item {
                                 SliderPreference(

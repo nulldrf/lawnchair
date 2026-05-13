@@ -50,13 +50,12 @@ import kotlinx.coroutines.withContext
  * Uses a combination of [PreferenceScaffold] and [PreferenceColumn] to represent the layout.
  *
  * When the user has enabled the settings background blur, every preference screen shows the
- * blurred wallpaper behind its content. The blur is rendered in Compose — toggling the
- * preference recomposes immediately without requiring an activity recreate.
+ * blurred wallpaper behind its content. The blur bitmap is cached in
+ * [SettingsWallpaperBlurHelper] so navigation between screens is instant with no flash.
  *
  * @param label the text shown in the *collapsed* toolbar and used as the default
  *   expanded title (e.g. "Settings")
- * @param expandedLabel the text shown in the *expanded* toolbar when scrolled to the
- *   top.  Defaults to [label] so existing callers need no changes.
+ * @param expandedLabel the text shown in the *expanded* toolbar when scrolled to the top.
  * @param onExpandedTitleClick optional click handler for the expanded title area.
  * @param backArrowVisible whether to show the back arrow or not
  * @param verticalArrangement the vertical arrangement of the layout's children
@@ -156,19 +155,17 @@ fun PreferenceLayoutLazyColumn(
  * [app.lawnchair.preferences.PreferenceManager.settingsBlurBackground].
  *
  * The [content] lambda receives:
- *  - [Modifier] — pass-through modifier (always [Modifier])
+ *  - [Modifier] — pass-through (always [Modifier])
  *  - [Color] — [Color.Transparent] when blur is active, [Color.Unspecified] otherwise.
  *    Pass this to [PreferenceScaffold] as `containerColor` so its View-level
- *    `setBackgroundColor` calls use transparent rather than opaque surface color,
- *    allowing the bitmap layers below to show through.
+ *    `setBackgroundColor` calls (root, scrollView, appBarLayout, collapsingToolbar)
+ *    are all transparent, letting the bitmap layers below show through.
  *
- * When blur is enabled:
- *  - Wallpaper is captured and blurred on [Dispatchers.IO] via [SettingsWallpaperBlurHelper].
- *  - The blurred bitmap is drawn full-screen behind [content].
- *  - A 43% black scrim is composited on top for contrast.
- *  - [PreferenceScaffold] receives [Color.Transparent] so its Views don't paint over it.
+ * The bitmap is cached in [SettingsWallpaperBlurHelper] and passed as the
+ * `initialValue` of `produceState`, so navigation between screens is instant —
+ * the cached bitmap is already available on the first frame with no flash.
  *
- * Toggling the preference causes an immediate recomposition — no recreate needed.
+ * When the toggle is turned off, the cache is cleared and memory is freed.
  */
 @Composable
 private fun SettingsBlurContainer(
@@ -180,9 +177,10 @@ private fun SettingsBlurContainer(
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
 
-    // Re-runs whenever blurEnabled or blurIntensity changes.
+    // initialValue is the cached bitmap (non-null on revisited screens) so the
+    // first frame renders the wallpaper immediately without waiting for IO.
     val blurredBitmap by produceState(
-        initialValue = null as android.graphics.Bitmap?,
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
         key1 = blurEnabled,
         key2 = blurIntensity,
     ) {
@@ -191,13 +189,14 @@ private fun SettingsBlurContainer(
                 SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
             }
         } else {
+            SettingsWallpaperBlurHelper.clearCache()
             null
         }
     }
 
     if (!blurEnabled || blurredBitmap == null) {
-        // Blur off or bitmap not ready yet — render with normal opaque surface.
-        // Color.Unspecified tells PreferenceScaffold to use its own default (surface).
+        // Blur off or not yet computed — normal opaque surface.
+        // Color.Unspecified tells PreferenceScaffold to use its own default.
         content(modifier, Color.Unspecified)
         return
     }

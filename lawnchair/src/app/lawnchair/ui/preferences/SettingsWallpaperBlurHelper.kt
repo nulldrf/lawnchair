@@ -14,30 +14,58 @@ import kotlin.math.min
 /**
  * Pure utility — captures the current wallpaper and returns a blurred [Bitmap].
  *
- * Rendering is handled entirely in Compose inside [PreferenceLayout], so there
- * is no window-background manipulation here.
- * Call [getBlurredBitmap] from a
- * coroutine on [kotlinx.coroutines.Dispatchers.IO] — HokoBlur's native call
- * is CPU-heavy.
+ * Results are cached by intensity so that navigating between preference screens
+ * returns the bitmap synchronously (no IO, no flash). The cache holds a single
+ * entry; changing intensity or toggling blur off invalidates it.
  *
- * Returns null if the wallpaper is unavailable or if blurring fails.
+ * Call [getCachedBitmap] to get the current cached value synchronously (use as
+ * the `initialValue` of `produceState` so the first frame already has the bitmap).
+ * Call [getBlurredBitmap] on [kotlinx.coroutines.Dispatchers.IO] to compute or
+ * return the cached bitmap for a given intensity.
  */
 object SettingsWallpaperBlurHelper {
 
+    @Volatile private var cachedBitmap: Bitmap? = null
+    @Volatile private var cachedIntensity: Int = -1
+
     /**
+     * Returns the cached bitmap synchronously if [blurEnabled] is true and
+     * [blurIntensity] matches the last computed intensity, otherwise null.
+     *
+     * Use this as the `initialValue` in `produceState` so screens that are
+     * revisited render the bitmap on the very first frame with no flicker.
+     */
+    fun getCachedBitmap(blurEnabled: Boolean, blurIntensity: Int): Bitmap? {
+        if (!blurEnabled) return null
+        val bmp = cachedBitmap
+        return if (blurIntensity == cachedIntensity && bmp != null && !bmp.isRecycled) bmp else null
+    }
+
+    /**
+     * Returns a blurred bitmap for the wallpaper at [blurIntensity].
+     *
+     * Returns the cache immediately when intensity is unchanged. Recomputes
+     * (on the calling thread — run on [kotlinx.coroutines.Dispatchers.IO])
+     * when intensity differs or the cache is empty.
+     *
+     * Returns null if the wallpaper is unavailable or blurring fails.
+     *
      * @param blurIntensity  User-facing intensity in [10, 150].
      *
-     * HokoBlur's radius is capped at 25 internally, so we cover the full
-     * slider range by also scaling the downsample factor:
+     *   HokoBlur's radius is capped at 25 internally, so we cover the full
+     *   slider range by also scaling the downsample factor:
      *
-     * radius       = min(intensity, 25)        → 10 … 25
-     * sampleFactor = max(1f, intensity / 25f)  → 1x … 6x
+     *     radius       = min(intensity, 25)        → 10 … 25
+     *     sampleFactor = max(1f, intensity / 25f)  → 1x … 6x
      *
-     * Intensity 10  → subtle frost.
-     * Intensity 150 → heavy fog (max radius + 6× downsample).
+     *   Intensity 10  → subtle frost.
+     *   Intensity 150 → heavy fog (max radius + 6× downsample).
      */
     @SuppressLint("MissingPermission")
     fun getBlurredBitmap(context: Context, blurIntensity: Int): Bitmap? {
+        // Return cache immediately if nothing has changed.
+        getCachedBitmap(blurEnabled = true, blurIntensity)?.let { return it }
+
         val wallpaperDrawable = runCatching {
             android.app.WallpaperManager.getInstance(context).drawable
         }.getOrNull() ?: return null
@@ -57,27 +85,35 @@ object SettingsWallpaperBlurHelper {
         val hokoRadius = min(clamped, 25)
         val sampleFactor = (clamped / 25f).coerceAtLeast(1f)
 
-        // Added explicit type <Bitmap?> to fix type inference issue
         val blurred: Bitmap? = runCatching<Bitmap?> {
             HokoBlur.with(context)
-                .scheme(HokoBlur.SCHEME_NATIVE) // Native C++ implementation
-                .mode(HokoBlur.MODE_STACK)      // Stack ≈ Gaussian quality, better perf
+                .scheme(HokoBlur.SCHEME_NATIVE)
+                .mode(HokoBlur.MODE_STACK)
                 .radius(hokoRadius)
                 .sampleFactor(sampleFactor)
-                .forceCopy(false)               // needUpscale(true) removed for v1.5.5 compatibility
-                .processor()                    // build the processor first
-                .blur(src)                      // then blur
+                .forceCopy(false)
+                .processor()
+                .blur(src)
         }.getOrNull()
 
         if (blurred == null) {
             src.recycle()
             return null
         }
-        
         // HokoBlur may mutate src in-place when forceCopy=false.
-        // Only recycle src when a distinct bitmap was returned.
         if (blurred !== src) src.recycle()
+
+        // Update cache. Don't explicitly recycle the old bitmap here — Compose's
+        // ImageBitmap may still be referencing it for one more frame.
+        cachedBitmap = blurred
+        cachedIntensity = blurIntensity
         return blurred
+    }
+
+    /** Clears the bitmap cache. Called when blur is toggled off to free memory. */
+    fun clearCache() {
+        cachedBitmap = null
+        cachedIntensity = -1
     }
 
     @Suppress("DEPRECATION")

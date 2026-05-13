@@ -78,36 +78,39 @@ fun PreferenceScaffold(
     expandedLabel: String = label,
     /**
      * Optional click handler for the expanded toolbar title area.
-     * Pass a non-null lambda to make the expanded title tappable (e.g. to open
-     * a system settings screen). Pass null (the default) to disable tapping.
-     * The click is suppressed automatically when the toolbar is collapsed.
      */
     onExpandedTitleClick: (() -> Unit)? = null,
     backArrowVisible: Boolean = true,
     /**
-     * Background color applied to the root view, scroll view, and app bar.
+     * Background color applied to root, scrollView, appBarLayout, and collapsingToolbar.
      *
-     * Defaults to [MaterialTheme.colorScheme.surface] (the normal opaque surface).
-     * Pass [Color.Transparent] when a blurred wallpaper is rendered behind this
-     * scaffold in Compose — all View-level backgrounds will be set to transparent
-     * so the bitmap layer underneath shows through.
+     * Defaults to [Color.Unspecified] which falls back to [MaterialTheme.colorScheme.surface]
+     * (the normal opaque surface). Pass [Color.Transparent] when a blurred wallpaper bitmap
+     * is rendered behind this scaffold in Compose — all View-level backgrounds will be set to
+     * transparent so the bitmap layer underneath shows through.
      *
-     * When transparent, the collapsing toolbar content scrim is replaced with a
-     * semi-transparent dark scrim so the collapsed toolbar title remains legible.
+     * When transparent, the collapsing toolbar content scrim switches to a semi-transparent
+     * dark overlay so the collapsed toolbar title remains legible over the wallpaper.
      */
-    containerColor: Color = MaterialTheme.colorScheme.surface,
+    containerColor: Color = Color.Unspecified,
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
-    val containerArgb = containerColor.toArgb()
-    // When containerColor is transparent we want the toolbar scrim to be a dark
-    // translucent overlay so the collapsed title stays legible over the wallpaper.
-    // When opaque, use the normal surfaceContainer token.
-    val isTransparent = containerColor == Color.Transparent
-    val surfaceContainerColor = if (isTransparent) {
+    // Resolve the effective container color: Unspecified → use surface token.
+    val resolvedContainer = if (containerColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        containerColor
+    }
+    val isTransparent = resolvedContainer == Color.Transparent
+    val containerArgb = resolvedContainer.toArgb()
+
+    // When transparent, swap the toolbar scrim to a dark overlay so the collapsed
+    // title stays legible over the wallpaper. When opaque, use the normal token.
+    val scrimArgb = if (isTransparent) {
         android.graphics.Color.argb(204, 0, 0, 0) // ~80% black
     } else {
         MaterialTheme.colorScheme.surfaceContainer.toArgb()
@@ -141,13 +144,20 @@ fun PreferenceScaffold(
                 insets
             }
 
-            // Apply containerColor to all View surfaces. When transparent, every
-            // layer shows nothing — the Compose bitmap layer underneath shows through.
+            // Apply containerArgb to every View surface in the hierarchy.
+            // When transparent, the Compose bitmap layers behind this AndroidView show through.
+            // When opaque (normal mode), this paints the correct surface color on the first
+            // frame before Compose content is ready, preventing a transparent flash during
+            // the enter animation.
             root.setBackgroundColor(containerArgb)
             scrollView.setBackgroundColor(containerArgb)
             appBarLayout.setBackgroundColor(containerArgb)
-            collapsingToolbar.setContentScrimColor(surfaceContainerColor)
-            collapsingToolbar.setStatusBarScrimColor(surfaceContainerColor)
+            // CollapsingToolbarLayout has its own background separate from AppBarLayout —
+            // must be set explicitly or it keeps the Material theme default (opaque surface),
+            // which was causing the black topbar when blur was enabled.
+            collapsingToolbar.setBackgroundColor(containerArgb)
+            collapsingToolbar.setContentScrimColor(scrimArgb)
+            collapsingToolbar.setStatusBarScrimColor(scrimArgb)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
             collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
             toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -235,8 +245,7 @@ fun PreferenceScaffold(
             }
             contentFrame.addView(composeView)
 
-            // bottomBar is pinned outside StretchNestedScrollView so it stays
-            // fixed at the bottom of the screen rather than scrolling with content.
+            // bottomBar pinned at the bottom of the CoordinatorLayout
             val bottomBarFrame = FrameLayout(ctx).apply {
                 layoutParams = CoordinatorLayout.LayoutParams(
                     CoordinatorLayout.LayoutParams.MATCH_PARENT,
@@ -281,8 +290,9 @@ fun PreferenceScaffold(
             root.setBackgroundColor(containerArgb)
             scrollView.setBackgroundColor(containerArgb)
             appBarLayout.setBackgroundColor(containerArgb)
-            collapsingToolbar.setContentScrimColor(surfaceContainerColor)
-            collapsingToolbar.setStatusBarScrimColor(surfaceContainerColor)
+            collapsingToolbar.setBackgroundColor(containerArgb)
+            collapsingToolbar.setContentScrimColor(scrimArgb)
+            collapsingToolbar.setStatusBarScrimColor(scrimArgb)
             collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
             collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
 

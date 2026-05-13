@@ -199,6 +199,10 @@ android {
         "META-INF/LGPL2.1",
     ]
 
+    packagingOptions.jniLibs.excludes += [
+        "**/libandroidx.graphics.path.so"
+    ]
+	
     // Load all proguard configs from AOSP
     def proguardFilesFromAosp = allprojects
         .collect { it.file("proguard.flags") }

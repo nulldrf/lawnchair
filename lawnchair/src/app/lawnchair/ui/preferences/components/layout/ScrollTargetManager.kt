@@ -98,6 +98,27 @@ object ScrollKeys {
     const val DECK_LAYOUT            = "exp.deck_layout"
     const val ALWAYS_RELOAD_ICONS    = "exp.reload_icons"
     const val GNC                    = "exp.gnc"
+    // Smartspace
+    const val SS_MODE                = "ss.mode"
+    const val SS_WEATHER_SOURCE      = "ss.weather_source"
+    const val SS_WEATHER_CITY        = "ss.weather_city"
+    const val SS_WEATHER_UNIT        = "ss.weather_unit"
+    const val SS_WEATHER_INTERVAL    = "ss.weather_interval"
+    const val SS_DATE                = "ss.date"
+    const val SS_TIME                = "ss.time"
+    const val SS_CALENDAR            = "ss.calendar"
+    const val SS_TIME_FORMAT         = "ss.time_format"
+    // Drawer search
+    const val DS_SHOW_SEARCH_BAR     = "dsearch.show_bar"
+    const val DS_AUTO_KEYBOARD       = "dsearch.auto_keyboard"
+    const val DS_ALGORITHM           = "dsearch.algorithm"
+    const val DS_MATCH_QSB           = "dsearch.match_qsb"
+    // Dock search
+    const val DOCK_SEARCH_MODE       = "docksearch.mode"
+    const val DOCK_SEARCH_PROVIDER   = "docksearch.provider"
+    const val DOCK_SEARCH_ACCENT     = "docksearch.accent"
+    const val DOCK_SEARCH_RADIUS     = "docksearch.radius"
+    const val DOCK_SEARCH_OPACITY    = "docksearch.opacity"
 }
 
 // ── Singleton key handoff ─────────────────────────────────────────────────────

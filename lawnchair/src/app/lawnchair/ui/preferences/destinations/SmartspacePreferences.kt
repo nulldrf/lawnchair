@@ -50,6 +50,11 @@ import app.lawnchair.smartspace.provider.WeatherDataProvider
 import app.lawnchair.smartspace.provider.weather.TemperatureUnit
 import app.lawnchair.smartspace.provider.weather.WeatherIconProvider
 import app.lawnchair.smartspace.provider.weather.WeatherProvider
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
 import app.lawnchair.ui.preferences.components.controls.ListPreference
@@ -79,6 +84,7 @@ fun SmartspacePreferences(
     val selectedMode = smartspaceModeAdapter.state.value
     val modeIsLawnchair = selectedMode == LawnchairSmartspace
 
+    val scrollState = rememberPreferenceScrollState()
     PreferenceLayout(
         label = stringResource(id = R.string.smartspace_widget),
         backArrowVisible = !LocalIsExpandedScreen.current && !fromWidget,
@@ -86,7 +92,7 @@ fun SmartspacePreferences(
     ) {
         if (fromWidget) {
             SmartspacePreview()
-            LawnchairSmartspaceSettings(smartspaceProvider)
+            LawnchairSmartspaceSettings(smartspaceProvider, scrollState = scrollState)
         } else {
             MainSwitchPreference(
                 adapter = smartspaceAdapter,
@@ -95,11 +101,11 @@ fun SmartspacePreferences(
             ) {
                 if (modeIsLawnchair) SmartspacePreview()
                 PreferenceGroup {
-                    Item { SmartspaceProviderPreference(adapter = smartspaceModeAdapter) }
+                    Item { ScrollAnchor(ScrollKeys.SS_MODE, scrollState) { SmartspaceProviderPreference(adapter = smartspaceModeAdapter) } }
                 }
                 Crossfade(targetState = selectedMode, label = "Smartspace setting transition") { targetState ->
                     when (targetState) {
-                        LawnchairSmartspace -> LawnchairSmartspaceSettings(smartspaceProvider)
+                        LawnchairSmartspace -> LawnchairSmartspaceSettings(smartspaceProvider, scrollState = scrollState)
                         Smartspacer -> SmartspacerSettings()
                         else -> {}
                     }
@@ -113,9 +119,10 @@ fun SmartspacePreferences(
 private fun LawnchairSmartspaceSettings(
     smartspaceProvider: SmartspaceProvider,
     modifier: Modifier = Modifier,
+    scrollState: app.lawnchair.ui.preferences.components.layout.PreferenceScrollState = rememberPreferenceScrollState(),
 ) {
     Column(modifier = modifier) {
-        SmartspaceWeatherSettings(smartspaceProvider)
+        SmartspaceWeatherSettings(smartspaceProvider, scrollState = scrollState)
         PreferenceGroup(
             heading = stringResource(id = R.string.what_to_show),
             modifier = Modifier.padding(top = 8.dp),
@@ -135,7 +142,7 @@ private fun LawnchairSmartspaceSettings(
                     }
                 }
         }
-        SmartspaceDateAndTimePreferences()
+        SmartspaceDateAndTimePreferences(scrollState = scrollState)
     }
 }
 
@@ -143,6 +150,7 @@ private fun LawnchairSmartspaceSettings(
 private fun SmartspaceWeatherSettings(
     smartspaceProvider: SmartspaceProvider,
     modifier: Modifier = Modifier,
+    scrollState: app.lawnchair.ui.preferences.components.layout.PreferenceScrollState = rememberPreferenceScrollState(),
 ) {
     val context = LocalContext.current
     val prefs = preferenceManager2()
@@ -184,11 +192,13 @@ private fun SmartspaceWeatherSettings(
         modifier = modifier.padding(top = 8.dp),
     ) {
         Item {
+            ScrollAnchor(ScrollKeys.SS_WEATHER_SOURCE, scrollState) {
             ListPreference(
                 adapter = weatherProviderAdapter,
                 entries = weatherProviderEntries,
                 label = stringResource(id = R.string.smartspace_weather_source),
             )
+            }
         }
 
         // API keys — shown per-provider
@@ -216,16 +226,20 @@ private fun SmartspaceWeatherSettings(
 
         // City — shown for all providers when source is active
         Item(visible = hasSource) {
+            ScrollAnchor(ScrollKeys.SS_WEATHER_CITY, scrollState) {
             CityPreference(adapter = prefs.smartspaceWeatherCity.getAdapter())
+            }
         }
 
         // Temperature unit
         Item(visible = hasSource) {
+            ScrollAnchor(ScrollKeys.SS_WEATHER_UNIT, scrollState) {
             ListPreference(
                 adapter = prefs.smartspaceWeatherUnit.getAdapter(),
                 entries = unitEntries,
                 label = stringResource(R.string.smartspace_weather_unit),
             )
+            }
         }
 
         // Icon pack
@@ -238,11 +252,13 @@ private fun SmartspaceWeatherSettings(
 
         // Refresh interval
         Item(visible = hasSource) {
+            ScrollAnchor(ScrollKeys.SS_WEATHER_INTERVAL, scrollState) {
             ListPreference(
                 adapter = prefs.smartspaceWeatherRefreshInterval.getAdapter(),
                 entries = intervalEntries,
                 label = stringResource(id = R.string.smartspace_weather_refresh_interval),
             )
+            }
         }
 
         // Manual refresh
@@ -442,7 +458,7 @@ fun SmartspacePreview(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SmartspaceDateAndTimePreferences(modifier: Modifier = Modifier) {
+fun SmartspaceDateAndTimePreferences(modifier: Modifier = Modifier, scrollState: app.lawnchair.ui.preferences.components.layout.PreferenceScrollState = rememberPreferenceScrollState()) {
     val preferenceManager2 = preferenceManager2()
     val calendarAdapter = preferenceManager2.smartspaceCalendar.getAdapter()
     val showDateAdapter = preferenceManager2.smartspaceShowDate.getAdapter()
@@ -452,13 +468,17 @@ fun SmartspaceDateAndTimePreferences(modifier: Modifier = Modifier) {
 
     PreferenceGroup(heading = stringResource(id = R.string.smartspace_date_and_time), modifier = modifier.padding(top = 8.dp)) {
         Item(key = "smartspace_date", visible = supportCustomizationFormat) {
+            ScrollAnchor(ScrollKeys.SS_DATE, scrollState) {
             SwitchPreference(adapter = showDateAdapter, label = stringResource(id = R.string.smartspace_date))
+            }
         }
-        Item("smartspace_calendar", supportCustomizationFormat && showDateAdapter.state.value) { SmartspaceCalendarPreference() }
+        Item("smartspace_calendar", supportCustomizationFormat && showDateAdapter.state.value) { ScrollAnchor(ScrollKeys.SS_CALENDAR, scrollState) { SmartspaceCalendarPreference() } }
         Item("smartspace_time", supportCustomizationFormat) {
+            ScrollAnchor(ScrollKeys.SS_TIME, scrollState) {
             SwitchPreference(adapter = showTimeAdapter, label = stringResource(id = R.string.smartspace_time))
+            }
         }
-        Item("smartspace_time_format", supportCustomizationFormat && showTimeAdapter.state.value) { SmartspaceTimeFormatPreference() }
+        Item("smartspace_time_format", supportCustomizationFormat && showTimeAdapter.state.value) { ScrollAnchor(ScrollKeys.SS_TIME_FORMAT, scrollState) { SmartspaceTimeFormatPreference() } }
     }
 }
 

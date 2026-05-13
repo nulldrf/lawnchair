@@ -75,19 +75,46 @@ class LawnchairIconProvider @Inject constructor(
 
     val themeMap: Map<String, ThemeData>
         get() {
-            if (!themedIconsEnabled) {
-                _themeMap = DISABLED_MAP
-            }
-            if (_themeMap == null) {
+            // Guard first — return without mutating _themeMap or themeMapName so that
+            // re-enabling themed icons later causes a clean rebuild rather than serving
+            // whatever stale state was left behind.
+            //
+            // Previously this set _themeMap = DISABLED_MAP and fell through, which meant
+            // the three subsequent if-blocks could still fire and overwrite it — so
+            // DISABLED_MAP was silently discarded whenever a themedIconSource was active,
+            // effectively ignoring the themedIconsEnabled=false setting.
+            if (!themedIconsEnabled) return DISABLED_MAP
+
+            // Evaluate themedIconSource exactly once per getter invocation.
+            //
+            // The original code accessed themedIconSource up to four times in a single
+            // call (two null-guard checks + two packPackageName reads), each of which
+            // resolves the icon pack and calls loadBlocking() on it.
+            val source = themedIconSource
+            val sourceName = source?.packPackageName ?: ""
+
+            // Rebuild the map only when it is uninitialized or the themed icon source
+            // package has changed (including when it is removed, i.e. sourceName → "").
+            //
+            // The original code used four independent if-blocks that could all fire in
+            // the same getter call:
+            //
+            //   Block 1 (_themeMap == null): calls getThemedIconMap() with themeMapName=""
+            //            → builds Lawnchair-only map.  Result immediately discarded ↓
+            //   Block 2 (themeMapName==""): calls super.getThemedIconMap()
+            //            → overwrites block 1 result.  Result immediately discarded ↓
+            //   Block 3 (themeMapName != sourceName): updates themeMapName, calls
+            //            getThemedIconMap() again with the correct name
+            //            → overwrites block 2 result.  This is the only one that matters.
+            //
+            // Block 2's result was always discarded because block 3 always fired
+            // immediately after (themeMapName was still "" when block 3 evaluated it).
+            // Blocks 1 and 2 were therefore pure waste on every first access.
+            if (_themeMap == null || themeMapName != sourceName) {
+                themeMapName = sourceName
                 _themeMap = getThemedIconMap()
             }
-            if (themedIconSource != null && themeMapName == "") {
-                _themeMap = super.getThemedIconMap()
-            }
-            if (themedIconSource != null && themeMapName != themedIconSource!!.packPackageName) {
-                themeMapName = themedIconSource!!.packPackageName
-                _themeMap = getThemedIconMap()
-            }
+
             return _themeMap!!
         }
 
@@ -190,6 +217,7 @@ class LawnchairIconProvider @Inject constructor(
         var iconPackEntry = iconEntry
 
         val themeData = getThemeDataForPackage(packageName)
+
         var themedIcon: Drawable? = null
 
         val themedColors = ThemedIconDrawable.getColors(context)

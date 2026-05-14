@@ -11,32 +11,17 @@ import android.view.WindowManager
 import com.hoko.blur.HokoBlur
 import kotlin.math.min
 
-/**
- * Captures the current wallpaper and returns a blurred [Bitmap].
- *
- * Results are cached by intensity so that navigating between preference screens
- * returns the bitmap synchronously on the first frame with no flash.
- */
 object SettingsWallpaperBlurHelper {
 
     @Volatile private var cachedBitmap: Bitmap? = null
     @Volatile private var cachedIntensity: Int = -1
 
-    /**
-     * Returns the cached bitmap synchronously if [blurEnabled] is true and
-     * [blurIntensity] matches the last computed intensity, otherwise null.
-     * Use this as the `initialValue` of `produceState`.
-     */
     fun getCachedBitmap(blurEnabled: Boolean, blurIntensity: Int): Bitmap? {
         if (!blurEnabled) return null
         val bmp = cachedBitmap
         return if (blurIntensity == cachedIntensity && bmp != null && !bmp.isRecycled) bmp else null
     }
 
-    /**
-     * Returns a blurred bitmap at [blurIntensity]. Serves from cache when
-     * intensity is unchanged. Run on [kotlinx.coroutines.Dispatchers.IO].
-     */
     @SuppressLint("MissingPermission")
     fun getBlurredBitmap(context: Context, blurIntensity: Int): Bitmap? {
         getCachedBitmap(blurEnabled = true, blurIntensity)?.let { return it }
@@ -70,10 +55,7 @@ object SettingsWallpaperBlurHelper {
                 .blur(src)
         }.getOrNull()
 
-        if (blurred == null) {
-            src.recycle()
-            return null
-        }
+        if (blurred == null) { src.recycle(); return null }
         if (blurred !== src) src.recycle()
 
         cachedBitmap = blurred

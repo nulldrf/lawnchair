@@ -6,10 +6,33 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!--
+        android:background is set explicitly on both AppBarLayout and
+        CollapsingToolbarLayout so Material3 never inflates a
+        MaterialShapeDrawable for them. Without this, the theme injects a
+        MaterialShapeDrawable that AppBarLayout's lift/scroll behavior
+        recreates on every scroll event, overriding any runtime
+        setBackgroundColor / .background = ... calls we make in code.
+
+        When blur is OFF, PreferenceScaffold sets the root CoordinatorLayout
+        background to the surface color and these stay transparent (they sit
+        on top of the root which provides the color).
+
+        When blur is ON, PreferenceScaffold sets the root CoordinatorLayout
+        background to the blurred bitmap LayerDrawable. Because AppBarLayout
+        and CollapsingToolbarLayout are transparent, the bitmap shows through
+        the full height of the screen including the top bar area.
+
+        app:contentScrim controls the scrim painted over the CollapsingToolbar
+        when it collapses. Set dynamically in PreferenceScaffold based on
+        whether blur is active (dark overlay) or not (surfaceContainer token).
+    -->
+
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/preference_appbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
         android:fitsSystemWindows="true"
         android:stateListAnimator="@null">
 
@@ -17,8 +40,10 @@
             android:id="@+id/preference_collapsing_toolbar"
             android:layout_width="match_parent"
             android:layout_height="152dp"
+            android:background="@android:color/transparent"
             app:collapsedTitleTextAppearance="?textAppearanceTitleLarge"
             app:collapsedTitleTextColor="?attr/colorOnSurface"
+            app:contentScrim="?attr/colorSurfaceContainer"
             app:expandedTitleMarginBottom="24dp"
             app:expandedTitleMarginStart="24dp"
             app:expandedTitleTextAppearance="?textAppearanceHeadlineLarge"
@@ -31,6 +56,7 @@
                 android:id="@+id/preference_toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
                 android:elevation="0dp"
                 android:paddingStart="4dp"
                 android:paddingEnd="8dp"
@@ -53,6 +79,7 @@
         android:id="@+id/preference_scroll_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@android:color/transparent"
         android:clipToPadding="false"
         android:overScrollMode="always"
         app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">

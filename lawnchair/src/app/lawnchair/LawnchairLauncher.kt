@@ -869,11 +869,18 @@ class LawnchairLauncher : QuickstepLauncher() {
             },
         )
 
-        // 5c. Hardware layer on dragLayer for smooth compositing.
-        // We do NOT animate dragLayer scale/alpha — the old no-permission PIE
-        // path disables useScaleAnim and uses only the base-class workspace
-        // content scale (barely perceptible). We skip that here for simplicity.
+        // 5c. dragLayer fade: alpha 1 → 0 over APP_LAUNCH_DURATION.
+        // Frame-by-frame analysis of old Lawnchair 2 recording confirms:
+        //   - dragLayer FADES OUT (alpha only, NO scale/zoom at all)
+        //   - Launcher gradually becomes transparent revealing wallpaper
+        //   - Scale stays 1.0 throughout the opening animation
         layer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        anim.playTogether(
+            ObjectAnimator.ofFloat(layer, View.ALPHA, 1.0f, 0.0f).apply {
+                duration     = APP_LAUNCH_DURATION
+                interpolator = APP_OPEN_HOME_EXIT_ALPHA_INTERP
+            },
+        )
 
         // ── 6. Cleanup ─────────────────────────────────────────────────────
         anim.addListener(object : AnimatorListenerAdapter() {
@@ -885,6 +892,7 @@ class LawnchairLauncher : QuickstepLauncher() {
                     com.android.launcher3.views.FloatingIconViewCompanion
                         .setPropertiesVisible(it, true)
                 }
+                layer.alpha = 1.0f
                 layer.setLayerType(View.LAYER_TYPE_NONE, null)
             }
         })
@@ -901,25 +909,14 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     /** Fallback PIE when no icon view is available — scale/fade from screen centre. */
     private fun playSimplePieLaunchAnimation(layer: View) {
-        layer.pivotX = layer.width / 2f
-        layer.pivotY = layer.height / 2f
+        // Fallback: no icon view available. Fade launcher only.
         layer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        AnimatorSet().apply {
-            playTogether(
-                ObjectAnimator.ofFloat(layer, View.SCALE_X, 1.0f, APP_OPEN_HOME_EXIT_SCALE_TO).apply {
-                    duration = APP_OPEN_HOME_EXIT_SCALE_DUR; interpolator = APP_OPEN_HOME_EXIT_SCALE_INTERP
-                },
-                ObjectAnimator.ofFloat(layer, View.SCALE_Y, 1.0f, APP_OPEN_HOME_EXIT_SCALE_TO).apply {
-                    duration = APP_OPEN_HOME_EXIT_SCALE_DUR; interpolator = APP_OPEN_HOME_EXIT_SCALE_INTERP
-                },
-                ObjectAnimator.ofFloat(layer, View.ALPHA, 1.0f, APP_OPEN_HOME_EXIT_ALPHA_TO).apply {
-                    duration = APP_OPEN_HOME_EXIT_ALPHA_DUR; interpolator = APP_OPEN_HOME_EXIT_ALPHA_INTERP
-                },
-            )
+        ObjectAnimator.ofFloat(layer, View.ALPHA, 1.0f, 0.0f).apply {
+            duration     = APP_LAUNCH_DURATION
+            interpolator = APP_OPEN_HOME_EXIT_ALPHA_INTERP
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    layer.scaleX = 1f;  layer.scaleY = 1f;  layer.alpha = 1f
-                    layer.pivotX = layer.width / 2f;  layer.pivotY = layer.height / 2f
+                    layer.alpha = 1.0f
                     layer.setLayerType(View.LAYER_TYPE_NONE, null)
                 }
             })
@@ -1174,6 +1171,11 @@ class LawnchairLauncher : QuickstepLauncher() {
     override fun onDestroy() {
         super.onDestroy()
         SmartspacerClient.close()
+        // Cancel any pending idle timer so a stale runnable on a dead activity cannot
+        // fire after onDestroy() and wrongly clear the companion's iconPackSwitchPending
+        // flag, which would prevent the new activity (after recreate()) from showing
+        // its own overlay in onResume().
+        dragLayer.removeCallbacks(iconPackIdleRunnable)
     }
 
     override fun getDefaultOverlay(): LauncherOverlayManager = defaultOverlay
@@ -1192,7 +1194,21 @@ class LawnchairLauncher : QuickstepLauncher() {
         // Guard: dragLayer must be attached and visible before we can add views.
         // If the launcher is paused/stopped, skip — onResume() will show it later.
         if (!dragLayer.isAttachedToWindow) return
-        if (iconPackOverlay != null) return
+
+        val existing = iconPackOverlay
+        if (existing != null) {
+            // The overlay is already in dragLayer — it may be fully visible or
+            // mid-fade-out from a previous dismissIconPackSwitchOverlay() call.
+            // Cancel the fade-out and restore full opacity so it stays visible
+            // for the new icon pack switch cycle.
+            // Without this, a new switch arriving during the 300ms fade-out would
+            // see iconPackOverlay == null (already nulled at dismiss start) and add
+            // a second scrim on top of the fading one — leaving an orphaned View in
+            // dragLayer with no reference to ever dismiss it cleanly.
+            existing.animate().cancel()
+            existing.alpha = 1f
+            return
+        }
 
         val density = resources.displayMetrics.density
         val indicatorSize = (72 * density).toInt()
@@ -1252,13 +1268,31 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     fun dismissIconPackSwitchOverlay() {
         dragLayer.removeCallbacks(iconPackIdleRunnable)
-        iconPackSwitchPending = false
+
+        // Only clear the static companion flag if this activity is still alive.
+        // If this runnable fires after onDestroy() — e.g. the activity was recreated
+        // by a theme change while the 600ms timer was counting down — clearing the
+        // flag here would prevent the new activity from seeing iconPackSwitchPending=true
+        // in onResume() and skipping its overlay entirely.
+        if (!isDestroyed) iconPackSwitchPending = false
+
         val overlay = iconPackOverlay ?: return
-        iconPackOverlay = null
+
+        // Do NOT null iconPackOverlay here. Setting it to null before the 300ms
+        // fade animation ends creates a race: a new icon pack switch arriving during
+        // that window calls showIconPackSwitchOverlay(), sees null, and adds a fresh
+        // scrim on top of the still-fading first one. The first scrim then becomes
+        // orphaned — it has no reference and its withEndAction() still removes it
+        // from dragLayer, but now the replacement overlay also gets removed.
+        // Instead, null it inside withEndAction() once the view is truly gone, and
+        // only if it hasn't been replaced by a concurrent showIconPackSwitchOverlay().
         overlay.animate()
             .alpha(0f)
             .setDuration(300)
-            .withEndAction { dragLayer.removeView(overlay) }
+            .withEndAction {
+                if (iconPackOverlay === overlay) iconPackOverlay = null
+                dragLayer.removeView(overlay)
+            }
             .start()
     }
 

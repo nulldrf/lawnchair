@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
@@ -34,8 +33,11 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.preferenceManager2
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
@@ -193,6 +195,8 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
     if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT) {
         val prefs = preferenceManager()
         val prefs2 = preferenceManager2()
+        val primary = MaterialTheme.colorScheme.primary
+        val shape = RoundedCornerShape(20.dp)
 
         val adapters = listOf(
             prefs2.hotseatMode.getAdapter(),
@@ -214,29 +218,39 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
             prefs.hotseatBGAlpha.getAdapter(),
         )
 
-        PreferenceGroupHeading(
-            heading = stringResource(id = R.string.preview_label),
-        )
-        DividerColumn(
-            modifier = modifier.padding(horizontal = 16.dp),
+        PreferenceGroupHeading(heading = stringResource(id = R.string.preview_label))
+
+        // Styled container: thin tinted border + rounded clip, no full phone frame.
+        // Only the bottom dock strip is shown via clipToBottomPercentage(0.3f).
+        // fillMaxWidth() replaces the old weight(1f) which collapsed to zero height
+        // inside StretchNestedScrollView's unbounded Column.
+        // Column is required as the direct parent of WithWallpaper (ColumnScope extension).
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .border(width = 1.dp, color = primary.copy(alpha = 0.25f), shape = shape)
+                .clip(shape),
         ) {
-            WithWallpaper { wallpaper ->
-                DummyLauncherBox(
-                    modifier = Modifier
-                        .weight(1f)
-                        .align(Alignment.CenterHorizontally)
-                        .clip(MaterialTheme.shapes.large)
-                        .clipToBottomPercentage(0.3f),
-                ) {
-                    WallpaperPreview(
-                        wallpaper = wallpaper,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    key(adapters.map { it.state.value }.toTypedArray()) {
-                        DummyLauncherLayout(
-                            idp = createPreviewIdp { copy(numHotseatColumns = prefs.hotseatColumns.get()) },
+            Column(modifier = Modifier.fillMaxWidth()) {
+                WithWallpaper(displayWallpaperButton = false) { wallpaper ->
+                    DummyLauncherBox(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBottomPercentage(0.3f),
+                    ) {
+                        WallpaperPreview(
+                            wallpaper = wallpaper,
                             modifier = Modifier.fillMaxSize(),
                         )
+                        key(adapters.map { it.state.value }.toTypedArray()) {
+                            DummyLauncherLayout(
+                                idp = createPreviewIdp {
+                                    copy(numHotseatColumns = prefs.hotseatColumns.get())
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }

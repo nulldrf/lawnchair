@@ -19,11 +19,13 @@ package app.lawnchair.ui.preferences.components.layout
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.LayerDrawable
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.widget.FrameLayout
-import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,37 +34,37 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnLayout
 import androidx.core.view.updatePadding
+import app.lawnchair.preferences.getAdapter
+import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
 import com.android.launcher3.R
 import com.google.android.material.R as MaterialR
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-/**
- * Holds the two title strings, the most-recent AppBarLayout scroll offset,
- * and an optional click handler for the expanded title area.
- * Regular class (not data class) because functions don't have structural equality.
- * Stored as [android.view.View.tag] on the scaffold root view.
- */
 private class TitleState(
     var collapsedTitle: String,
     var expandedTitle: String,
     var lastOffset: Int = 0,
-    /** Invoked when the user taps the CollapsingToolbar while expanded. Null = not tappable. */
     var onExpandedClick: (() -> Unit)? = null,
-    /** Running crossfade animator for the expanded title — cancelled on each new change. */
     var titleAnimator: ValueAnimator? = null,
 )
 
@@ -71,98 +73,81 @@ fun PreferenceScaffold(
     label: String,
     isExpandedScreen: Boolean,
     modifier: Modifier = Modifier,
-    /**
-     * Text shown in the *expanded* toolbar when scrolled to the top.
-     * Defaults to [label] so all existing callers are unaffected.
-     */
     expandedLabel: String = label,
-    /**
-     * Optional click handler for the expanded toolbar title area.
-     */
     onExpandedTitleClick: (() -> Unit)? = null,
     backArrowVisible: Boolean = true,
-    /**
-     * Background color applied to root, scrollView, appBarLayout, and collapsingToolbar.
-     *
-     * Defaults to [Color.Unspecified] which falls back to [MaterialTheme.colorScheme.surface]
-     * (the normal opaque surface). Pass [Color.Transparent] when a blurred wallpaper bitmap
-     * is rendered behind this scaffold in Compose — all View-level backgrounds will be set to
-     * transparent so the bitmap layer underneath shows through.
-     *
-     * When transparent, the collapsing toolbar content scrim switches to a semi-transparent
-     * dark overlay so the collapsed toolbar title remains legible over the wallpaper.
-     */
-    containerColor: Color = Color.Unspecified,
     actions: @Composable RowScope.() -> Unit = {},
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
-    // Resolve the effective container color: Unspecified → use surface token.
-    val resolvedContainer = if (containerColor == Color.Unspecified) {
-        MaterialTheme.colorScheme.surface
-    } else {
-        containerColor
-    }
-    val isTransparent = resolvedContainer == Color.Transparent
-    val containerArgb = resolvedContainer.toArgb()
+    // ── Blur state (read in Composable scope, passed into AndroidView via update) ──
+    val context = LocalContext.current
+    val prefs = preferenceManager()
+    val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
+    val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
 
-    // When transparent, swap the toolbar scrim to a dark overlay so the collapsed
-    // title stays legible over the wallpaper. When opaque, use the normal token.
-    val scrimArgb = if (isTransparent) {
-        android.graphics.Color.argb(204, 0, 0, 0) // ~80% black
-    } else {
-        MaterialTheme.colorScheme.surfaceContainer.toArgb()
+    val blurredBitmap by produceState(
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
+        key1 = blurEnabled,
+        key2 = blurIntensity,
+    ) {
+        value = if (blurEnabled) {
+            withContext(Dispatchers.IO) {
+                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
+            }
+        } else {
+            SettingsWallpaperBlurHelper.clearCache()
+            null
+        }
     }
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
+
+    // ── Colors (read in Composable scope for use in update lambda) ───────────
+    val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
+    val surfaceContainerArgb = MaterialTheme.colorScheme.surfaceContainer.toArgb()
+    val onSurfaceArgb = MaterialTheme.colorScheme.onSurface.toArgb()
+
+    // When blur is active, swap the toolbar collapse scrim to a dark overlay.
+    val scrimArgb = if (blurEnabled && blurredBitmap != null) {
+        android.graphics.Color.argb(204, 0, 0, 0) // ~80 % black
+    } else {
+        surfaceContainerArgb
+    }
 
     val parentCompositionContext = rememberCompositionContext()
 
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { ctx ->
-            val themedCtx = ContextThemeWrapper(
-                ctx,
-                MaterialR.style.Theme_Material3_DayNight_NoActionBar,
-            )
-
+            val themedCtx = ContextThemeWrapper(ctx, MaterialR.style.Theme_Material3_DayNight_NoActionBar)
             val root = LayoutInflater.from(themedCtx)
                 .inflate(R.layout.lawnchair_preference_scaffold, null, false)
 
-            val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
+            val appBarLayout    = root.findViewById<AppBarLayout>(R.id.preference_appbar)
             val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
-            val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
-            val contentFrame = root.findViewById<FrameLayout>(R.id.preference_content)
-            val actionsFrame = root.findViewById<FrameLayout>(R.id.preference_toolbar_actions)
-            val scrollView = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
+            val toolbar         = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
+            val contentFrame    = root.findViewById<FrameLayout>(R.id.preference_content)
+            val actionsFrame    = root.findViewById<FrameLayout>(R.id.preference_toolbar_actions)
+            val scrollView      = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
 
-            // Bottom inset for nav bar
             ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
                 val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                 view.updatePadding(bottom = systemBars.bottom)
                 insets
             }
 
-            // Apply containerArgb to every View surface in the hierarchy.
-            // When transparent, the Compose bitmap layers behind this AndroidView show through.
-            // When opaque (normal mode), this paints the correct surface color on the first
-            // frame before Compose content is ready, preventing a transparent flash during
-            // the enter animation.
-            root.setBackgroundColor(containerArgb)
-            scrollView.setBackgroundColor(containerArgb)
-            appBarLayout.setBackgroundColor(containerArgb)
-            // CollapsingToolbarLayout has its own background separate from AppBarLayout —
-            // must be set explicitly or it keeps the Material theme default (opaque surface),
-            // which was causing the black topbar when blur was enabled.
-            collapsingToolbar.setBackgroundColor(containerArgb)
-            collapsingToolbar.setContentScrimColor(scrimArgb)
-            collapsingToolbar.setStatusBarScrimColor(scrimArgb)
-            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
-            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
+            // Initial normal (non-blur) colors — update() will repaint when blur kicks in.
+            root.setBackgroundColor(surfaceArgb)
+            scrollView.setBackgroundColor(surfaceArgb)
+            appBarLayout.background     = ColorDrawable(surfaceArgb)
+            collapsingToolbar.background = ColorDrawable(surfaceArgb)
             toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            collapsingToolbar.setContentScrimColor(surfaceContainerArgb)
+            collapsingToolbar.setStatusBarScrimColor(surfaceContainerArgb)
+            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceArgb)
+            collapsingToolbar.setExpandedTitleColor(onSurfaceArgb)
 
-            // ── Dynamic title ─────────────────────────────────────────────
             val titleState = TitleState(
                 collapsedTitle = label,
                 expandedTitle = expandedLabel,
@@ -174,9 +159,7 @@ fun PreferenceScaffold(
             collapsingToolbar.setOnClickListener {
                 val state = root.tag as? TitleState ?: return@setOnClickListener
                 val threshold = appBarLayout.totalScrollRange * 0.85f
-                if (abs(state.lastOffset) < threshold) {
-                    state.onExpandedClick?.invoke()
-                }
+                if (abs(state.lastOffset) < threshold) state.onExpandedClick?.invoke()
             }
 
             appBarLayout.addOnOffsetChangedListener(
@@ -184,37 +167,28 @@ fun PreferenceScaffold(
                     val state = root.tag as? TitleState ?: return@OnOffsetChangedListener
                     state.lastOffset = verticalOffset
                     val threshold = bar.totalScrollRange * 0.85f
-                    val isEffectivelyCollapsed = bar.totalScrollRange > 0 &&
-                        abs(verticalOffset) >= threshold
-                    val target = if (isEffectivelyCollapsed) state.collapsedTitle else state.expandedTitle
+                    val isCollapsed = bar.totalScrollRange > 0 && abs(verticalOffset) >= threshold
+                    val target = if (isCollapsed) state.collapsedTitle else state.expandedTitle
                     if (collapsingToolbar.title != target) collapsingToolbar.title = target
                 },
             )
 
             if (backArrowVisible) {
                 toolbar.setNavigationIcon(R.drawable.ic_back)
-                toolbar.setNavigationOnClickListener {
-                    backDispatcher?.onBackPressed()
-                }
+                toolbar.setNavigationOnClickListener { backDispatcher?.onBackPressed() }
             } else {
                 toolbar.navigationIcon = null
             }
 
-            // Actions ComposeView
             val actionsComposeView = ComposeView(ctx).apply {
                 setParentCompositionContext(parentCompositionContext)
-                setViewCompositionStrategy(
-                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
-                )
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 )
                 setContent {
-                    MaterialTheme(
-                        colorScheme = MaterialTheme.colorScheme,
-                        typography = MaterialTheme.typography,
-                    ) {
+                    MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = MaterialTheme.typography) {
                         Row { actions() }
                     }
                 }
@@ -223,21 +197,14 @@ fun PreferenceScaffold(
 
             val composeView = ComposeView(ctx).apply {
                 setParentCompositionContext(parentCompositionContext)
-                setViewCompositionStrategy(
-                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
-                )
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 )
                 setContent {
-                    CompositionLocalProvider(
-                        LocalInsideNestedScrollView provides true,
-                    ) {
-                        MaterialTheme(
-                            colorScheme = MaterialTheme.colorScheme,
-                            typography = MaterialTheme.typography,
-                        ) {
+                    CompositionLocalProvider(LocalInsideNestedScrollView provides true) {
+                        MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = MaterialTheme.typography) {
                             content(PaddingValues())
                         }
                     }
@@ -245,7 +212,6 @@ fun PreferenceScaffold(
             }
             contentFrame.addView(composeView)
 
-            // bottomBar pinned at the bottom of the CoordinatorLayout
             val bottomBarFrame = FrameLayout(ctx).apply {
                 layoutParams = CoordinatorLayout.LayoutParams(
                     CoordinatorLayout.LayoutParams.MATCH_PARENT,
@@ -254,25 +220,19 @@ fun PreferenceScaffold(
             }
             val bottomBarComposeView = ComposeView(ctx).apply {
                 setParentCompositionContext(parentCompositionContext)
-                setViewCompositionStrategy(
-                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed,
-                )
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                 )
                 setContent {
-                    MaterialTheme(
-                        colorScheme = MaterialTheme.colorScheme,
-                        typography = MaterialTheme.typography,
-                    ) {
+                    MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = MaterialTheme.typography) {
                         bottomBar()
                     }
                 }
             }
             bottomBarFrame.addView(bottomBarComposeView)
             (root as CoordinatorLayout).addView(bottomBarFrame)
-
             bottomBarFrame.doOnLayout { bar ->
                 scrollView.updatePadding(bottom = scrollView.paddingBottom + bar.height)
             }
@@ -280,21 +240,44 @@ fun PreferenceScaffold(
             root
         },
         update = { root ->
+            val appBarLayout      = root.findViewById<AppBarLayout>(R.id.preference_appbar)
             val collapsingToolbar = root.findViewById<CollapsingToolbarLayout>(R.id.preference_collapsing_toolbar)
-            val appBarLayout = root.findViewById<AppBarLayout>(R.id.preference_appbar)
-            val toolbar = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
-            val scrollView = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
+            val toolbar           = root.findViewById<MaterialToolbar>(R.id.preference_toolbar)
+            val scrollView        = root.findViewById<StretchNestedScrollView>(R.id.preference_scroll_view)
 
-            // Mirror every setBackgroundColor from factory so theme switches
-            // (light↔dark) and blur toggle changes repaint all surfaces correctly.
-            root.setBackgroundColor(containerArgb)
-            scrollView.setBackgroundColor(containerArgb)
-            appBarLayout.setBackgroundColor(containerArgb)
-            collapsingToolbar.setBackgroundColor(containerArgb)
+            val bitmap = blurredBitmap
+
+            if (bitmap != null && !bitmap.isRecycled) {
+                // ── Blur ON ────────────────────────────────────────────────
+                // Set the blurred wallpaper + dark scrim as a LayerDrawable on the
+                // root CoordinatorLayout. This is the ONLY background that matters —
+                // everything else must be fully transparent so this layer shows through.
+                val layers = LayerDrawable(
+                    arrayOf(
+                        BitmapDrawable(root.resources, bitmap),
+                        ColorDrawable(android.graphics.Color.argb(110, 0, 0, 0)),
+                    ),
+                )
+                root.background = layers
+
+                // Replace the MaterialShapeDrawable backgrounds on AppBar children
+                // with explicit transparent ColorDrawable. Using .background = instead
+                // of setBackgroundColor() bypasses MaterialShapeDrawable.
+                scrollView.background      = ColorDrawable(android.graphics.Color.TRANSPARENT)
+                appBarLayout.background    = ColorDrawable(android.graphics.Color.TRANSPARENT)
+                collapsingToolbar.background = ColorDrawable(android.graphics.Color.TRANSPARENT)
+            } else {
+                // ── Blur OFF ───────────────────────────────────────────────
+                root.setBackgroundColor(surfaceArgb)
+                scrollView.setBackgroundColor(surfaceArgb)
+                appBarLayout.background      = ColorDrawable(surfaceArgb)
+                collapsingToolbar.background  = ColorDrawable(surfaceArgb)
+            }
+
             collapsingToolbar.setContentScrimColor(scrimArgb)
             collapsingToolbar.setStatusBarScrimColor(scrimArgb)
-            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceColor)
-            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
+            collapsingToolbar.setCollapsedTitleTextColor(onSurfaceArgb)
+            collapsingToolbar.setExpandedTitleColor(onSurfaceArgb)
 
             val state = root.tag as? TitleState
             if (state != null) {
@@ -302,15 +285,14 @@ fun PreferenceScaffold(
                 state.onExpandedClick = onExpandedTitleClick
 
                 val threshold = appBarLayout.totalScrollRange * 0.85f
-                val isEffectivelyCollapsed = appBarLayout.totalScrollRange > 0 &&
+                val isCollapsed = appBarLayout.totalScrollRange > 0 &&
                     abs(state.lastOffset) >= threshold
 
                 if (state.expandedTitle != expandedLabel) {
                     val incomingTitle = expandedLabel
-                    val rgbMask = onSurfaceColor and 0x00FFFFFF
+                    val rgbMask = onSurfaceArgb and 0x00FFFFFF
 
                     state.titleAnimator?.cancel()
-
                     state.titleAnimator = ValueAnimator.ofFloat(1f, 0f).apply {
                         duration = 130
                         addUpdateListener { anim ->
@@ -320,10 +302,8 @@ fun PreferenceScaffold(
                         addListener(object : AnimatorListenerAdapter() {
                             override fun onAnimationEnd(animation: Animator) {
                                 state.expandedTitle = incomingTitle
-                                val visibleTitle = if (isEffectivelyCollapsed) label else incomingTitle
-                                if (collapsingToolbar.title != visibleTitle) {
-                                    collapsingToolbar.title = visibleTitle
-                                }
+                                val visible = if (isCollapsed) label else incomingTitle
+                                if (collapsingToolbar.title != visible) collapsingToolbar.title = visible
                                 state.titleAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
                                     duration = 130
                                     addUpdateListener { anim ->
@@ -332,7 +312,7 @@ fun PreferenceScaffold(
                                     }
                                     addListener(object : AnimatorListenerAdapter() {
                                         override fun onAnimationEnd(animation: Animator) {
-                                            collapsingToolbar.setExpandedTitleColor(onSurfaceColor)
+                                            collapsingToolbar.setExpandedTitleColor(onSurfaceArgb)
                                         }
                                     })
                                     start()
@@ -342,14 +322,14 @@ fun PreferenceScaffold(
                         start()
                     }
                 } else {
-                    val target = if (isEffectivelyCollapsed) label else expandedLabel
+                    val target = if (isCollapsed) label else expandedLabel
                     if (collapsingToolbar.title != target) collapsingToolbar.title = target
                 }
             } else {
                 collapsingToolbar.title = label
             }
 
-            toolbar.navigationIcon?.setTint(onSurfaceColor)
+            toolbar.navigationIcon?.setTint(onSurfaceArgb)
         },
     )
 }

@@ -12,16 +12,10 @@ import com.hoko.blur.HokoBlur
 import kotlin.math.min
 
 /**
- * Pure utility — captures the current wallpaper and returns a blurred [Bitmap].
+ * Captures the current wallpaper and returns a blurred [Bitmap].
  *
  * Results are cached by intensity so that navigating between preference screens
- * returns the bitmap synchronously (no IO, no flash). The cache holds a single
- * entry; changing intensity or toggling blur off invalidates it.
- *
- * Call [getCachedBitmap] to get the current cached value synchronously (use as
- * the `initialValue` of `produceState` so the first frame already has the bitmap).
- * Call [getBlurredBitmap] on [kotlinx.coroutines.Dispatchers.IO] to compute or
- * return the cached bitmap for a given intensity.
+ * returns the bitmap synchronously on the first frame with no flash.
  */
 object SettingsWallpaperBlurHelper {
 
@@ -31,9 +25,7 @@ object SettingsWallpaperBlurHelper {
     /**
      * Returns the cached bitmap synchronously if [blurEnabled] is true and
      * [blurIntensity] matches the last computed intensity, otherwise null.
-     *
-     * Use this as the `initialValue` in `produceState` so screens that are
-     * revisited render the bitmap on the very first frame with no flicker.
+     * Use this as the `initialValue` of `produceState`.
      */
     fun getCachedBitmap(blurEnabled: Boolean, blurIntensity: Int): Bitmap? {
         if (!blurEnabled) return null
@@ -42,28 +34,11 @@ object SettingsWallpaperBlurHelper {
     }
 
     /**
-     * Returns a blurred bitmap for the wallpaper at [blurIntensity].
-     *
-     * Returns the cache immediately when intensity is unchanged. Recomputes
-     * (on the calling thread — run on [kotlinx.coroutines.Dispatchers.IO])
-     * when intensity differs or the cache is empty.
-     *
-     * Returns null if the wallpaper is unavailable or blurring fails.
-     *
-     * @param blurIntensity  User-facing intensity in [10, 150].
-     *
-     *   HokoBlur's radius is capped at 25 internally, so we cover the full
-     *   slider range by also scaling the downsample factor:
-     *
-     *     radius       = min(intensity, 25)        → 10 … 25
-     *     sampleFactor = max(1f, intensity / 25f)  → 1x … 6x
-     *
-     *   Intensity 10  → subtle frost.
-     *   Intensity 150 → heavy fog (max radius + 6× downsample).
+     * Returns a blurred bitmap at [blurIntensity]. Serves from cache when
+     * intensity is unchanged. Run on [kotlinx.coroutines.Dispatchers.IO].
      */
     @SuppressLint("MissingPermission")
     fun getBlurredBitmap(context: Context, blurIntensity: Int): Bitmap? {
-        // Return cache immediately if nothing has changed.
         getCachedBitmap(blurEnabled = true, blurIntensity)?.let { return it }
 
         val wallpaperDrawable = runCatching {
@@ -74,7 +49,6 @@ object SettingsWallpaperBlurHelper {
         val w = bounds.width().takeIf { it > 0 } ?: return null
         val h = bounds.height().takeIf { it > 0 } ?: return null
 
-        // Rasterise the wallpaper at full screen resolution.
         val src = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         Canvas(src).also { canvas ->
             wallpaperDrawable.setBounds(0, 0, w, h)
@@ -100,17 +74,13 @@ object SettingsWallpaperBlurHelper {
             src.recycle()
             return null
         }
-        // HokoBlur may mutate src in-place when forceCopy=false.
         if (blurred !== src) src.recycle()
 
-        // Update cache. Don't explicitly recycle the old bitmap here — Compose's
-        // ImageBitmap may still be referencing it for one more frame.
         cachedBitmap = blurred
         cachedIntensity = blurIntensity
         return blurred
     }
 
-    /** Clears the bitmap cache. Called when blur is toggled off to free memory. */
     fun clearCache() {
         cachedBitmap = null
         cachedIntensity = -1

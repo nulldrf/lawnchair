@@ -375,6 +375,11 @@ class LawnchairIconProvider @Inject constructor(
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
+                // Release all cached per-app Resources objects before the reload begins.
+                // Without this, the old pack's Resources stay alive while the new pack's
+                // Resources are loaded, doubling the .apk mmap footprint during the
+                // transition window (visible as a spike in Assets count and .apk mmap).
+                ThemedIconCompat.clearResourcesCache()
                 LauncherIcons.clearPool(context)
                 appState.model.reloadIfActive()
                 // Signal idle timer to start. If the launcher is active (foreground),
@@ -400,6 +405,7 @@ class LawnchairIconProvider @Inject constructor(
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
                 appState.iconCache.clearMemoryCache()
+                ThemedIconCompat.clearResourcesCache()
                 LauncherIcons.clearPool(context)
                 appState.model.reloadIfActive()
                 Executors.MAIN_EXECUTOR.execute {

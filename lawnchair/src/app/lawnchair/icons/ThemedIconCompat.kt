@@ -34,6 +34,21 @@ object ThemedIconCompat {
      */
     private val resourcesCache = LruCache<String, Resources>(100)
 
+    /**
+     * Evicts all cached [Resources] entries, releasing references to the underlying
+     * [android.content.res.AssetManager] objects and making the APK mmaps they hold
+     * eligible for GC and OS reclamation.
+     *
+     * Call this:
+     * - During an icon pack change (before reloading icons), so old-pack Resources
+     *   don't co-exist with new-pack Resources and double the .apk mmap footprint.
+     * - In [android.app.Application.onTrimMemory] at TRIM_MEMORY_MODERATE or higher,
+     *   so the OS can reclaim the mapped APK pages under memory pressure.
+     */
+    fun clearResourcesCache() {
+        resourcesCache.evictAll()
+    }
+
     fun getThemedIcon(
         context: Context,
         componentName: ComponentName,

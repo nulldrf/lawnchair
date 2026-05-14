@@ -18,6 +18,7 @@ package app.lawnchair
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ComponentCallbacks2
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -26,6 +27,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import app.lawnchair.icons.ThemedIconCompat
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.material3.Button
@@ -70,6 +72,26 @@ class LawnchairApp : LauncherApplication() {
         QuickStepContract.sRecentsDisabled = !recentsEnabled
         Flowerpot.Manager.getInstance(this)
         registerActivityLifecycleCallbacks(activityHandler)
+    }
+
+    /**
+     * Releases memory caches when the system requests it.
+     *
+     * [ThemedIconCompat] holds up to 100 [android.content.res.Resources] objects, each
+     * of which memory-maps the target app's APK. Under memory pressure these pages are
+     * safe to release — icons reload from the disk cache ([BaseIconCache]'s SQLite DB)
+     * on next access with only a minor latency cost.
+     *
+     * [TRIM_MEMORY_MODERATE] is chosen as the threshold rather than [TRIM_MEMORY_BACKGROUND]
+     * because a launcher is always "running" from the user's perspective; we want to stay
+     * responsive at low-memory states but still release significant caches before the system
+     * is forced to kill the process.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE) {
+            ThemedIconCompat.clearResourcesCache()
+        }
     }
 
     fun hideClockInStatusBar() {

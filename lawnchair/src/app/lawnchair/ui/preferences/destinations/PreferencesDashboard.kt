@@ -240,8 +240,6 @@ fun PreferencesDashboard(
         h(stringResource(R.string.minus_one_enable), "feed google discover news enable", ScrollKeys.HOME_FEED)
         h(stringResource(R.string.show_labels), "show labels app name home screen", ScrollKeys.HOME_SHOW_LABELS)
         h(stringResource(R.string.label_size), "label size text size home screen", ScrollKeys.HOME_LABEL_SIZE)
-        h(stringResource(R.string.force_rounded_widgets), "rounded widgets corner radius", ScrollKeys.HOME_ROUNDED_WIDGETS)
-        h(stringResource(R.string.allow_widget_overlap), "widget overlap allow", ScrollKeys.HOME_WIDGET_OVERLAP)
 
         // ── Smartspace / At a Glance ──────────────────────────────────
         val smartIcon = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off
@@ -258,8 +256,6 @@ fun PreferencesDashboard(
         s(stringResource(R.string.smartspace_date), "date show hide", ScrollKeys.SS_DATE)
         s(stringResource(R.string.smartspace_time), "time show hide clock", ScrollKeys.SS_TIME)
         s(stringResource(R.string.smartspace_time_format), "time format 12h 24h", ScrollKeys.SS_TIME_FORMAT)
-        s(stringResource(R.string.smartspace_now_playing), "now playing music media song")
-        s(stringResource(R.string.smartspace_battery_status), "battery status charging level")
         s(stringResource(R.string.smartspace_weather_refresh_interval), "weather refresh interval", ScrollKeys.SS_WEATHER_INTERVAL)
         s(stringResource(R.string.smartspace_weather_city), "city location weather gps auto", ScrollKeys.SS_WEATHER_CITY)
         s(stringResource(R.string.smartspace_weather_unit), "temperature unit celsius fahrenheit kelvin", ScrollKeys.SS_WEATHER_UNIT)

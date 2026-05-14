@@ -659,8 +659,9 @@ class LawnchairLauncher : QuickstepLauncher() {
     private fun playPieLaunchAnimation(iconView: View?) {
         val layer = dragLayer ?: return
         val rootView = layer.parent as? ViewGroup ?: return
+        val dp = deviceProfile
 
-        // ── 1. Resolve icon bounds in dragLayer coordinate space ───────────
+        // ── 1. Icon bounds in dragLayer coordinate space ───────────────────
         val rect = android.graphics.Rect()
         val resolvedView: View? = iconView
 
@@ -676,72 +677,54 @@ class LawnchairLauncher : QuickstepLauncher() {
                     val iconBounds = android.graphics.Rect()
                     resolvedView.getIconBounds(iconBounds)
                     rect.set(
-                        pos.left + iconBounds.left,
-                        pos.top  + iconBounds.top,
-                        pos.left + iconBounds.right,
-                        pos.top  + iconBounds.bottom,
+                        pos.left + iconBounds.left, pos.top  + iconBounds.top,
+                        pos.left + iconBounds.right, pos.top + iconBounds.bottom,
                     )
                 }
                 else -> layer.getDescendantRectRelativeToSelf(resolvedView, rect)
             }
         }
 
-        if (rect.isEmpty) {
-            playSimplePieLaunchAnimation(layer)
-            return
-        }
+        if (rect.isEmpty) { playSimplePieLaunchAnimation(layer); return }
 
-        // ── 2. Coordinate conversion: dragLayer-relative → rootView-relative ─
-        // dragLayer and rootView share the same screen space but rootView may
-        // start above the status bar while dragLayer starts below it.
-        // Using view.layout() requires rootView-relative coordinates.
-        val dragLayerScreenLoc = IntArray(2)
-        layer.getLocationOnScreen(dragLayerScreenLoc)
-
-        val rootViewScreenLoc = IntArray(2)
-        rootView.getLocationOnScreen(rootViewScreenLoc)
-
-        val offsetX = dragLayerScreenLoc[0] - rootViewScreenLoc[0]
-        val offsetY = dragLayerScreenLoc[1] - rootViewScreenLoc[1]
+        // ── 2. Coordinate systems ──────────────────────────────────────────
+        val dragLayerLoc = IntArray(2)
+        layer.getLocationOnScreen(dragLayerLoc)
+        val rootViewLoc = IntArray(2)
+        rootView.getLocationOnScreen(rootViewLoc)
+        val offsetX = dragLayerLoc[0] - rootViewLoc[0]
+        val offsetY = dragLayerLoc[1] - rootViewLoc[1]
 
         // Icon bounds in rootView coordinate system
         val iconInRoot = android.graphics.Rect(
-            rect.left   + offsetX,
-            rect.top    + offsetY,
-            rect.right  + offsetX,
-            rect.bottom + offsetY,
+            rect.left   + offsetX, rect.top    + offsetY,
+            rect.right  + offsetX, rect.bottom + offsetY,
         )
-        // Full screen bounds in rootView coordinate system
-        val screenInRoot = android.graphics.Rect(0, 0, rootView.width, rootView.height)
 
-        // Screen centre in dragLayer coordinates (for pivot + float translate)
-        val screenW = layer.width
-        val screenH = layer.height
-        val centreInLayerX = screenW / 2f - dragLayerScreenLoc[0].toFloat()
-        val centreInLayerY = screenH / 2f - dragLayerScreenLoc[1].toFloat()
+        val screenW = rootView.width.toFloat()
+        val screenH = rootView.height.toFloat()
 
-        val dX = centreInLayerX - rect.left.toFloat() - rect.width().toFloat()  / 2f
-        val dY = centreInLayerY - rect.top.toFloat()  - rect.height().toFloat() / 2f
+        // Translation to bring floating icon centre to screen centre
+        val dX = screenW / 2f - iconInRoot.left.toFloat() - rect.width()  / 2f
+        val dY = screenH / 2f - iconInRoot.top.toFloat()  - rect.height() / 2f
 
-        val useUpward = rect.top.toFloat() > centreInLayerY ||
-            kotlin.math.abs(dY) < deviceProfile.cellHeightPx.toFloat()
+        val useUpward = iconInRoot.top.toFloat() > screenH / 2f ||
+            kotlin.math.abs(dY) < dp.cellHeightPx.toFloat()
 
         // ── 3. Floating icon view (mFloatingView equivalent) ───────────────
-        // Added with MATCH_PARENT then positioned via layout() — avoids the
-        // LayoutParams-margin bug where the view appears at (0,0) when the
-        // parent is not a plain FrameLayout.
+        // layout() positions via left/top so TRANSLATION_X/Y start at 0 and
+        // ObjectAnimators can animate cleanly relative to the layout position.
         val floatingView = View(this).apply {
             background = if (resolvedView != null)
                 captureIconBitmapAsDrawable(resolvedView, rect) else null
         }
         rootView.addView(
             floatingView,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
+            android.view.ViewGroup.LayoutParams(rect.width(), rect.height()),
         )
-        floatingView.layout(iconInRoot.left, iconInRoot.top, iconInRoot.right, iconInRoot.bottom)
+        floatingView.layout(
+            iconInRoot.left, iconInRoot.top, iconInRoot.right, iconInRoot.bottom,
+        )
         floatingView.pivotX = rect.width()  / 2f
         floatingView.pivotY = rect.height() / 2f
 
@@ -750,48 +733,71 @@ class LawnchairLauncher : QuickstepLauncher() {
         }
 
         // ── 4. SplashLayout equivalent ─────────────────────────────────────
-        // Old SplashLayout.animateIn() animates the actual pixel BOUNDS of the
-        // view from icon bounds → full screen using view.layout() each frame.
-        // This produces asymmetric expansion: an icon on the left edge makes the
-        // window grow more to the right — the Android P hallmark behaviour.
-        // Scale-based animation cannot replicate this.
+        // Ported from old SplashLayout + getOpeningWindowAnimators():
+        //
+        // splashView is added at FULL SCREEN SIZE with alpha=0, pivotX/Y=0.
+        // It starts SCALED DOWN to icon size (scaleX/Y = iconW/screenW) and
+        // TRANSLATED to overlap the floating icon.
+        //
+        // Each frame the ValueAnimator reads floatingView.getLocationOnScreen()
+        // and recomputes scale+translation so the splash perfectly tracks the
+        // flying icon from any screen position (edge, corner, or centre).
+        //
+        // Crop: ViewOutlineProvider clips the view to a rect that starts as a
+        // CENTERED SQUARE (screenW x screenW) and expands to the full rectangle
+        // (screenW x screenH) — replicating SplashLayout.setCrop().
         val splashColor = run {
             val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorBackground))
             val c  = ta.getColor(0, android.graphics.Color.BLACK)
             ta.recycle()
             c
         }
-        val startRadius = rect.width() * 0.25f
         val splashBg = android.graphics.drawable.GradientDrawable().apply {
-            shape        = android.graphics.drawable.GradientDrawable.RECTANGLE
-            cornerRadius = startRadius
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = 0f
             setColor(splashColor)
         }
+        val initialCropTop = (screenH - screenW) / 2f
+        val cropBounds = floatArrayOf(initialCropTop, initialCropTop + screenW)
+
         val splashView = View(this).apply {
-            background = splashBg
+            background    = splashBg
+            alpha         = 0f
+            pivotX        = 0f
+            pivotY        = 0f
+            clipToOutline = true
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRect(0, cropBounds[0].toInt(), view.width, cropBounds[1].toInt())
+                }
+            }
         }
         rootView.addView(
             splashView,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
+            android.view.ViewGroup.LayoutParams(rootView.width, rootView.height),
         )
-        splashView.layout(iconInRoot.left, iconInRoot.top, iconInRoot.right, iconInRoot.bottom)
+        splashView.layout(0, 0, rootView.width, rootView.height)
 
-        // ── 5. Build AnimatorSet ───────────────────────────────────────────
+        // Initial state: scaled to icon size, translated over the icon
+        val initScale  = kotlin.math.min(
+            rect.width().toFloat()  / screenW,
+            rect.height().toFloat() / screenH,
+        )
+        splashView.scaleX       = initScale
+        splashView.scaleY       = initScale
+        splashView.translationX = iconInRoot.left.toFloat() - (screenW * initScale - rect.width())  / 2f
+        splashView.translationY = iconInRoot.top.toFloat()  - (screenH * initScale - rect.height()) / 2f
+
+        // ── 5. Animators ───────────────────────────────────────────────────
         val anim = AnimatorSet()
 
-        // 5a. Icon fly: translate to screen centre, scale to full screen, alpha off
-        val xDur = if (useUpward) APP_LAUNCH_CURVED_DURATION
-                   else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_DURATION).toLong()
-        val yDur = if (useUpward) APP_LAUNCH_DURATION
-                   else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_CURVED_DURATION).toLong()
-        val maxScale = kotlin.math.max(
-            screenW.toFloat() / rect.width().toFloat(),
-            screenH.toFloat() / rect.height().toFloat(),
-        )
+        // 5a. Floating icon fly
+        val xDur       = if (useUpward) APP_LAUNCH_CURVED_DURATION
+                         else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_DURATION).toLong()
+        val yDur       = if (useUpward) APP_LAUNCH_DURATION
+                         else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_CURVED_DURATION).toLong()
+        val maxScale   = kotlin.math.max(screenW / rect.width(), screenH / rect.height())
         val alphaDelay = if (useUpward) APP_LAUNCH_ALPHA_START_DELAY
                          else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_ALPHA_START_DELAY).toLong()
         val alphaDur   = if (useUpward) APP_LAUNCH_ALPHA_DURATION
@@ -816,40 +822,58 @@ class LawnchairLauncher : QuickstepLauncher() {
             },
         )
 
-        // 5b. Splash bounds: iconInRoot → screenInRoot via view.layout() each frame
+        // 5b. Splash tracks floating icon position each frame
+        val floatingScreenLoc = IntArray(2)
         anim.playTogether(
             ValueAnimator.ofFloat(0f, 1f).apply {
                 duration     = APP_LAUNCH_DURATION
-                interpolator = EXAGGERATED_EASE
+                interpolator = android.view.animation.LinearInterpolator()
                 addUpdateListener { va ->
-                    val t = va.animatedFraction
-                    splashView.layout(
-                        lerpInt(iconInRoot.left,   screenInRoot.left,   t),
-                        lerpInt(iconInRoot.top,    screenInRoot.top,    t),
-                        lerpInt(iconInRoot.right,  screenInRoot.right,  t),
-                        lerpInt(iconInRoot.bottom, screenInRoot.bottom, t),
+                    val percent     = va.animatedFraction
+                    val easePercent = AGGRESSIVE_EASE.getInterpolation(percent)
+
+                    // Read current animated position of the floating icon
+                    floatingView.getLocationOnScreen(floatingScreenLoc)
+                    val floatX = floatingScreenLoc[0].toFloat() - rootViewLoc[0]
+                    val floatY = floatingScreenLoc[1].toFloat() - rootViewLoc[1]
+
+                    // Current icon dimensions after scale animation
+                    val iconW = rect.width()  * floatingView.scaleX
+                    val iconH = rect.height() * floatingView.scaleY
+
+                    // Scale splash to match icon's current screen size
+                    val scale  = kotlin.math.min(1f,
+                        kotlin.math.min(iconW / screenW, iconH / screenH))
+                    val scaledW = screenW * scale
+                    val scaledH = screenH * scale
+
+                    // Centre splash on the icon
+                    val offX = (scaledW - iconW) / 2f
+                    val offY = (scaledH - iconH) / 2f
+                    splashView.scaleX       = scale
+                    splashView.scaleY       = scale
+                    splashView.translationX = floatX - offX
+                    splashView.translationY = floatY - offY
+
+                    // Alpha 0 → 1 over first ~60 ms (matches old mAlpha FloatProp timing)
+                    splashView.alpha = kotlin.math.min(
+                        1f, percent * (APP_LAUNCH_DURATION.toFloat() / 60f),
                     )
-                    splashBg.cornerRadius = lerpFloat(startRadius, 0f, t)
+
+                    // Crop: centered square → full rectangle (square-to-window morph)
+                    val cropH     = screenH * easePercent + screenW * (1f - easePercent)
+                    cropBounds[0] = initialCropTop * (1f - easePercent)
+                    cropBounds[1] = cropBounds[0] + cropH
+                    splashView.invalidateOutline()
                 }
             },
         )
 
-        // 5c. dragLayer exit: scale 1→1.5, alpha 1→0, pivot at icon centre
-        layer.pivotX = rect.exactCenterX()
-        layer.pivotY = rect.exactCenterY()
+        // 5c. Hardware layer on dragLayer for smooth compositing.
+        // We do NOT animate dragLayer scale/alpha — the old no-permission PIE
+        // path disables useScaleAnim and uses only the base-class workspace
+        // content scale (barely perceptible). We skip that here for simplicity.
         layer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-
-        anim.playTogether(
-            ObjectAnimator.ofFloat(layer, View.SCALE_X, 1.0f, APP_OPEN_HOME_EXIT_SCALE_TO).apply {
-                duration = APP_OPEN_HOME_EXIT_SCALE_DUR; interpolator = APP_OPEN_HOME_EXIT_SCALE_INTERP
-            },
-            ObjectAnimator.ofFloat(layer, View.SCALE_Y, 1.0f, APP_OPEN_HOME_EXIT_SCALE_TO).apply {
-                duration = APP_OPEN_HOME_EXIT_SCALE_DUR; interpolator = APP_OPEN_HOME_EXIT_SCALE_INTERP
-            },
-            ObjectAnimator.ofFloat(layer, View.ALPHA, 1.0f, APP_OPEN_HOME_EXIT_ALPHA_TO).apply {
-                duration = APP_OPEN_HOME_EXIT_ALPHA_DUR; interpolator = APP_OPEN_HOME_EXIT_ALPHA_INTERP
-            },
-        )
 
         // ── 6. Cleanup ─────────────────────────────────────────────────────
         anim.addListener(object : AnimatorListenerAdapter() {
@@ -861,8 +885,6 @@ class LawnchairLauncher : QuickstepLauncher() {
                     com.android.launcher3.views.FloatingIconViewCompanion
                         .setPropertiesVisible(it, true)
                 }
-                layer.scaleX = 1f;  layer.scaleY = 1f;  layer.alpha = 1f
-                layer.pivotX = layer.width / 2f;  layer.pivotY = layer.height / 2f
                 layer.setLayerType(View.LAYER_TYPE_NONE, null)
             }
         })

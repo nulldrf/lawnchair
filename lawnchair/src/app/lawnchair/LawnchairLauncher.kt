@@ -375,16 +375,35 @@ class LawnchairLauncher : QuickstepLauncher() {
         ),
     )
 
+    /**
+     * Debounce runnable for [recreate] calls triggered by [updateTheme].
+     *
+     * [prefs.launcherTheme] can emit multiple rapid changes from a single icon pack
+     * switch — the theme provider recalculates once for icon pack color extraction,
+     * then again for wallpaper-based adjustment. Each emission calls [updateTheme],
+     * and if both land before the Android framework sets [isFinishing] to true after
+     * the first [recreate], two new launcher instances are created back-to-back.
+     * Over 3–4 icon pack changes this accumulates to 8+ activities.
+     *
+     * By posting [recreate] on a short delay and cancelling any pending post, all
+     * theme-change events within [RECREATE_DEBOUNCE_MS] collapse into one recreate.
+     */
+    private val recreateDebounceRunnable = Runnable {
+        if (!isFinishing && !isDestroyed && themeProvider.colorScheme != colorScheme) {
+            recreate()
+        }
+    }
+
     fun updateTheme() {
-        // Guard before calling recreate(). If this activity is already finishing
-        // (i.e. recreate() was already called for a previous icon pack / theme change
-        // that hasn't completed yet), calling recreate() again would create a third
-        // launcher instance on top of the two already in flight — each adding ~8 MB
-        // of EGL surface and a ViewRootImpl that won't be released until onDestroy().
         if (isFinishing || isDestroyed) return
         if (themeProvider.colorScheme != colorScheme) {
-            recreate()
+            // Debounce: cancel any pending recreate and schedule a fresh one.
+            // Multiple rapid theme emissions (e.g. from a single icon pack change)
+            // collapse into one recreate rather than stacking instances.
+            dragLayer.removeCallbacks(recreateDebounceRunnable)
+            dragLayer.postDelayed(recreateDebounceRunnable, RECREATE_DEBOUNCE_MS)
         } else {
+            dragLayer.removeCallbacks(recreateDebounceRunnable)
             mWallpaperThemeManager.updateTheme()
         }
     }
@@ -1195,6 +1214,10 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     override fun onStop() {
         super.onStop()
+        // Cancel any pending debounced recreate — this activity is stopping, so
+        // there is no point recreating it. If the theme change is still relevant,
+        // the new active instance will receive it via its own subscription.
+        dragLayer.removeCallbacks(recreateDebounceRunnable)
         // Force-remove the icon pack switch overlay immediately when stopping.
         //
         // When recreate() replaces this activity, onStop() is called before onDestroy().
@@ -1221,8 +1244,9 @@ class LawnchairLauncher : QuickstepLauncher() {
     override fun onDestroy() {
         super.onDestroy()
         SmartspacerClient.close()
-        // Belt-and-suspenders: cancel timer and remove any overlay re-added between
-        // onStop() and onDestroy(). Primary cleanup happens in onStop() above.
+        // Belt-and-suspenders: cancel pending recreate and remove any overlay re-added
+        // between onStop() and onDestroy(). Primary cleanup happens in onStop() above.
+        dragLayer.removeCallbacks(recreateDebounceRunnable)
         dragLayer.removeCallbacks(iconPackIdleRunnable)
         iconPackOverlay?.let { overlay ->
             overlay.animate().cancel()
@@ -1364,6 +1388,13 @@ class LawnchairLauncher : QuickstepLauncher() {
     companion object {
         private const val FLAG_RECREATE = 1 shl 0
         private const val FLAG_RESTART  = 1 shl 1
+
+        /**
+         * How long to wait after the last [updateTheme] call before actually calling
+         * [recreate]. Theme providers can emit multiple rapid changes for a single
+         * icon pack switch; this collapses them into one recreate.
+         */
+        private const val RECREATE_DEBOUNCE_MS = 150L
 
         var sRestartFlags = 0
 

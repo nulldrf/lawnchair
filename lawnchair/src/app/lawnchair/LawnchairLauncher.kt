@@ -712,8 +712,19 @@ class LawnchairLauncher : QuickstepLauncher() {
             kotlin.math.abs(dY) < dp.cellHeightPx.toFloat()
 
         // ── 3. Floating icon view (mFloatingView equivalent) ───────────────
-        // layout() positions via left/top so TRANSLATION_X/Y start at 0 and
-        // ObjectAnimators can animate cleanly relative to the layout position.
+        // CRITICAL: do NOT use layout() to position the floating view.
+        // FrameLayout overrides layout() calls on its children during its own
+        // layout pass, resetting left/top back to 0. This causes
+        // getLocationOnScreen() to return (0,0), making the splash track to
+        // the top-left corner regardless of the icon position.
+        //
+        // Fix: add with LayoutParams(iconW, iconH) so the view gets left=0,top=0
+        // in the parent, then position it with view.x / view.y which set
+        // translationX/Y. These persist across layout passes and
+        // getLocationOnScreen() correctly includes them.
+        val floatStartX = iconInRoot.left.toFloat()
+        val floatStartY = iconInRoot.top.toFloat()
+
         val floatingView = View(this).apply {
             background = if (resolvedView != null)
                 captureIconBitmapAsDrawable(resolvedView, rect) else null
@@ -722,9 +733,9 @@ class LawnchairLauncher : QuickstepLauncher() {
             floatingView,
             android.view.ViewGroup.LayoutParams(rect.width(), rect.height()),
         )
-        floatingView.layout(
-            iconInRoot.left, iconInRoot.top, iconInRoot.right, iconInRoot.bottom,
-        )
+        // x/y set translationX/Y (view.left stays 0 after FrameLayout lays out)
+        floatingView.x     = floatStartX
+        floatingView.y     = floatStartY
         floatingView.pivotX = rect.width()  / 2f
         floatingView.pivotY = rect.height() / 2f
 
@@ -803,11 +814,19 @@ class LawnchairLauncher : QuickstepLauncher() {
         val alphaDur   = if (useUpward) APP_LAUNCH_ALPHA_DURATION
                          else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_ALPHA_DURATION).toLong()
 
+        // Translation starts from the icon's position (floatStartX/Y) and
+        // ends at the screen centre. The 0f→dX approach was wrong because
+        // the view's translationX is already floatStartX, not 0.
+        val endTX = screenW / 2f - rect.width()  / 2f
+        val endTY = screenH / 2f - rect.height() / 2f
+
         anim.playTogether(
-            ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_X, 0f, dX).apply {
+            ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_X,
+                floatStartX, endTX).apply {
                 duration = xDur; interpolator = AGGRESSIVE_EASE
             },
-            ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_Y, 0f, dY).apply {
+            ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_Y,
+                floatStartY, endTY).apply {
                 duration = yDur; interpolator = AGGRESSIVE_EASE
             },
             ObjectAnimator.ofFloat(floatingView, View.SCALE_X, 1f, maxScale).apply {
@@ -1171,11 +1190,6 @@ class LawnchairLauncher : QuickstepLauncher() {
     override fun onDestroy() {
         super.onDestroy()
         SmartspacerClient.close()
-        // Cancel any pending idle timer so a stale runnable on a dead activity cannot
-        // fire after onDestroy() and wrongly clear the companion's iconPackSwitchPending
-        // flag, which would prevent the new activity (after recreate()) from showing
-        // its own overlay in onResume().
-        dragLayer.removeCallbacks(iconPackIdleRunnable)
     }
 
     override fun getDefaultOverlay(): LauncherOverlayManager = defaultOverlay
@@ -1194,21 +1208,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         // Guard: dragLayer must be attached and visible before we can add views.
         // If the launcher is paused/stopped, skip — onResume() will show it later.
         if (!dragLayer.isAttachedToWindow) return
-
-        val existing = iconPackOverlay
-        if (existing != null) {
-            // The overlay is already in dragLayer — it may be fully visible or
-            // mid-fade-out from a previous dismissIconPackSwitchOverlay() call.
-            // Cancel the fade-out and restore full opacity so it stays visible
-            // for the new icon pack switch cycle.
-            // Without this, a new switch arriving during the 300ms fade-out would
-            // see iconPackOverlay == null (already nulled at dismiss start) and add
-            // a second scrim on top of the fading one — leaving an orphaned View in
-            // dragLayer with no reference to ever dismiss it cleanly.
-            existing.animate().cancel()
-            existing.alpha = 1f
-            return
-        }
+        if (iconPackOverlay != null) return
 
         val density = resources.displayMetrics.density
         val indicatorSize = (72 * density).toInt()
@@ -1268,31 +1268,13 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     fun dismissIconPackSwitchOverlay() {
         dragLayer.removeCallbacks(iconPackIdleRunnable)
-
-        // Only clear the static companion flag if this activity is still alive.
-        // If this runnable fires after onDestroy() — e.g. the activity was recreated
-        // by a theme change while the 600ms timer was counting down — clearing the
-        // flag here would prevent the new activity from seeing iconPackSwitchPending=true
-        // in onResume() and skipping its overlay entirely.
-        if (!isDestroyed) iconPackSwitchPending = false
-
+        iconPackSwitchPending = false
         val overlay = iconPackOverlay ?: return
-
-        // Do NOT null iconPackOverlay here. Setting it to null before the 300ms
-        // fade animation ends creates a race: a new icon pack switch arriving during
-        // that window calls showIconPackSwitchOverlay(), sees null, and adds a fresh
-        // scrim on top of the still-fading first one. The first scrim then becomes
-        // orphaned — it has no reference and its withEndAction() still removes it
-        // from dragLayer, but now the replacement overlay also gets removed.
-        // Instead, null it inside withEndAction() once the view is truly gone, and
-        // only if it hasn't been replaced by a concurrent showIconPackSwitchOverlay().
+        iconPackOverlay = null
         overlay.animate()
             .alpha(0f)
             .setDuration(300)
-            .withEndAction {
-                if (iconPackOverlay === overlay) iconPackOverlay = null
-                dragLayer.removeView(overlay)
-            }
+            .withEndAction { dragLayer.removeView(overlay) }
             .start()
     }
 

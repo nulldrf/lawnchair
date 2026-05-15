@@ -376,6 +376,12 @@ class LawnchairLauncher : QuickstepLauncher() {
     )
 
     fun updateTheme() {
+        // Guard before calling recreate(). If this activity is already finishing
+        // (i.e. recreate() was already called for a previous icon pack / theme change
+        // that hasn't completed yet), calling recreate() again would create a third
+        // launcher instance on top of the two already in flight — each adding ~8 MB
+        // of EGL surface and a ViewRootImpl that won't be released until onDestroy().
+        if (isFinishing || isDestroyed) return
         if (themeProvider.colorScheme != colorScheme) {
             recreate()
         } else {
@@ -1187,9 +1193,42 @@ class LawnchairLauncher : QuickstepLauncher() {
         )
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Force-remove the icon pack switch overlay immediately when stopping.
+        //
+        // When recreate() replaces this activity, onStop() is called before onDestroy().
+        // The overlay is a FrameLayout(this) — it holds a hard reference to this Activity
+        // as its Context. If the overlay's fade-out animation is still running (300ms),
+        // the animator holds the View alive, which holds the Activity alive, which holds
+        // the Window alive — preventing the ViewRootImpl from being released and the EGL
+        // surface from being freed. With 3–4 rapid pack changes this stacks to 5+
+        // ViewRootImpl instances and 40+ MB of unreleased EGL memory.
+        //
+        // Since the activity is stopping (window no longer visible), animation is moot.
+        // Cancel it and remove the view synchronously.
+        // Do NOT clear iconPackSwitchPending here — the companion flag is owned by the
+        // active launcher; clearing it from a stale stopping activity would prevent the
+        // new launcher from showing its overlay.
+        dragLayer.removeCallbacks(iconPackIdleRunnable)
+        iconPackOverlay?.let { overlay ->
+            overlay.animate().cancel()
+            dragLayer.removeView(overlay)
+            iconPackOverlay = null
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         SmartspacerClient.close()
+        // Belt-and-suspenders: cancel timer and remove any overlay re-added between
+        // onStop() and onDestroy(). Primary cleanup happens in onStop() above.
+        dragLayer.removeCallbacks(iconPackIdleRunnable)
+        iconPackOverlay?.let { overlay ->
+            overlay.animate().cancel()
+            dragLayer.removeView(overlay)
+            iconPackOverlay = null
+        }
     }
 
     override fun getDefaultOverlay(): LauncherOverlayManager = defaultOverlay
@@ -1208,7 +1247,21 @@ class LawnchairLauncher : QuickstepLauncher() {
         // Guard: dragLayer must be attached and visible before we can add views.
         // If the launcher is paused/stopped, skip — onResume() will show it later.
         if (!dragLayer.isAttachedToWindow) return
-        if (iconPackOverlay != null) return
+
+        val existing = iconPackOverlay
+        if (existing != null) {
+            // The overlay is already in dragLayer — it may be fully visible or
+            // mid-fade-out from a previous dismissIconPackSwitchOverlay() call.
+            // Cancel the fade-out and restore full opacity so it stays visible
+            // for the new icon pack switch cycle.
+            // Without this, a new switch arriving during the 300ms fade-out would
+            // see iconPackOverlay == null (already nulled at dismiss start) and add
+            // a second scrim on top of the fading one — leaving an orphaned View in
+            // dragLayer with no reference to ever dismiss it cleanly.
+            existing.animate().cancel()
+            existing.alpha = 1f
+            return
+        }
 
         val density = resources.displayMetrics.density
         val indicatorSize = (72 * density).toInt()
@@ -1268,13 +1321,25 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     fun dismissIconPackSwitchOverlay() {
         dragLayer.removeCallbacks(iconPackIdleRunnable)
-        iconPackSwitchPending = false
+        // Only clear the static companion flag if this activity is still alive.
+        // If this is called from a stale iconPackIdleRunnable that fired after
+        // onDestroy() (e.g. the activity was recreated by a theme change while the
+        // 600ms timer was running), clearing the flag would prevent the new activity
+        // from seeing iconPackSwitchPending=true in onResume() and skipping its overlay.
+        if (!isDestroyed) iconPackSwitchPending = false
         val overlay = iconPackOverlay ?: return
-        iconPackOverlay = null
+        // Do NOT null iconPackOverlay here. Nulling before the animation ends creates
+        // a 300ms window where showIconPackSwitchOverlay() sees null and adds a second
+        // scrim on top of the fading first one — an orphaned View with no reference.
+        // Null it inside withEndAction, guarded by identity to avoid clearing a fresh
+        // overlay added by a concurrent showIconPackSwitchOverlay() call.
         overlay.animate()
             .alpha(0f)
             .setDuration(300)
-            .withEndAction { dragLayer.removeView(overlay) }
+            .withEndAction {
+                if (iconPackOverlay === overlay) iconPackOverlay = null
+                dragLayer.removeView(overlay)
+            }
             .start()
     }
 
@@ -1283,7 +1348,9 @@ class LawnchairLauncher : QuickstepLauncher() {
             sRestartFlags and FLAG_RESTART  != 0 -> lawnchairApp.restart(false)
             sRestartFlags and FLAG_RECREATE != 0 -> {
                 sRestartFlags = 0
-                recreate()
+                // Same guard as updateTheme(): skip if already finishing so rapid
+                // preference changes don't stack multiple recreate() calls in flight.
+                if (!isFinishing && !isDestroyed) recreate()
             }
         }
     }

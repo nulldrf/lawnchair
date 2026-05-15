@@ -178,15 +178,31 @@ class LawnchairApp : LauncherApplication() {
     }
 
     private val activityHandler = object : ActivityLifecycleCallbacks {
-        private val activities = HashSet<Activity>()
+        // LinkedHashSet preserves insertion order so lastOrNull() reliably returns the
+        // most recently created instance. Previously a plain HashSet was used, whose
+        // iteration order is undefined — causing the launcher getter to return an
+        // arbitrary (possibly stale, being-destroyed) LawnchairLauncher when multiple
+        // instances coexist during recreate().
+        private val activities = LinkedHashSet<Activity>()
         var foregroundActivity: Activity? = null
             private set
 
         val launcher: LawnchairLauncher?
-            get() = activities.filterIsInstance<LawnchairLauncher>().firstOrNull()
+            get() =
+                // 1. Prefer the activity that is currently resumed and visible.
+                //    When the user is on the home screen this is the launcher itself.
+                (foregroundActivity as? LawnchairLauncher)
+                // 2. If the launcher is in background (e.g. user is inside Settings),
+                //    foregroundActivity is a settings Activity, not the launcher.
+                //    In that case return the most recently CREATED launcher — with
+                //    LinkedHashSet ordering that is always the new one after recreate(),
+                //    not the old one that is being destroyed.
+                    ?: activities.filterIsInstance<LawnchairLauncher>().lastOrNull()
 
         fun finishAll() {
-            HashSet(activities).forEach { it.finish() }
+            // Snapshot the set before iterating so finish() callbacks don't
+            // mutate it while we're looping.
+            ArrayList(activities).forEach { it.finish() }
         }
 
         override fun onActivityPaused(activity: Activity) {}

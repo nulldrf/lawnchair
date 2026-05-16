@@ -35,14 +35,10 @@ fun LazyListScope.preferenceGroupItems(
     count: Int,
     isFirstChild: Boolean,
     showDividers: Boolean = true,
-    heading:
-    @Composable()
-    (() -> String)? = null,
+    heading: @Composable (() -> String)? = null,
     key: ((index: Int) -> Any)? = null,
     contentType: (index: Int) -> Any? = { null },
-    itemContent:
-    @Composable()
-    (LazyItemScope.(index: Int) -> Unit),
+    itemContent: @Composable (LazyItemScope.(index: Int) -> Unit),
 ) {
     item {
         if (!isFirstChild) {
@@ -53,11 +49,12 @@ fun LazyListScope.preferenceGroupItems(
     items(count, key, contentType) {
         PreferenceGroupItem(cutTop = it > 0, cutBottom = it < count - 1) {
             if (showDividers && it > 0) {
+                // 1dp outlineVariant divider — visible separator that doesn't
+                // fill the gap with an opaque surface color, so the blurred
+                // wallpaper shows through between card sections.
                 HorizontalDivider(
-                    modifier = Modifier,
-//                        .padding(start = dividerStartIndent + 16.dp, end = dividerEndIndent + 16.dp)
-                    thickness = 3.dp,
-                    color = MaterialTheme.colorScheme.surface,
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
             itemContent(it)
@@ -69,14 +66,10 @@ inline fun <T> LazyListScope.preferenceGroupItems(
     items: List<T>,
     isFirstChild: Boolean,
     showDividers: Boolean = true,
-    noinline heading:
-    @Composable()
-    (() -> String)? = null,
+    noinline heading: @Composable (() -> String)? = null,
     noinline key: ((index: Int, item: T) -> Any)? = null,
     noinline contentType: (index: Int) -> Any? = { null },
-    crossinline itemContent:
-    @Composable()
-    (LazyItemScope.(index: Int, item: T) -> Unit),
+    crossinline itemContent: @Composable (LazyItemScope.(index: Int, item: T) -> Unit),
 ) {
     preferenceGroupItems(
         items.size,

@@ -1,8 +1,10 @@
 package app.lawnchair.ui.preferences.components.layout
 
+import android.graphics.Bitmap
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,16 +33,29 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.core.graphics.ColorUtils
+import app.lawnchair.preferences.getAdapter
+import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
 import app.lawnchair.ui.theme.LawnchairTheme
 import app.lawnchair.ui.util.preview.PreviewLawnchair
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun PreferenceSearchScaffold(
@@ -50,23 +66,71 @@ fun PreferenceSearchScaffold(
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val context = LocalContext.current
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            Surface {
-                SearchBar(
-                    value,
-                    onValueChange,
-                    backDispatcher,
-                    placeholder = placeholder,
-                    actions = actions,
-                )
-            }
-        },
-        bottomBar = { BottomSpacer() },
+
+    val prefs = preferenceManager()
+    val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
+    val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
+
+    // Use explicit type and `this.value` to avoid clashing with the `value: String` parameter.
+    val blurredBitmap: Bitmap? by produceState<Bitmap?>(
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
+        key1 = blurEnabled,
+        key2 = blurIntensity,
     ) {
-        content(it)
+        this.value = if (blurEnabled) {
+            withContext(Dispatchers.IO) {
+                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
+            }
+        } else {
+            SettingsWallpaperBlurHelper.clearCache()
+            null
+        }
+    }
+
+    val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
+    val scrimColor = Color(ColorUtils.setAlphaComponent(surfaceArgb, (0.72f * 255).toInt()))
+
+    val bitmap = blurredBitmap
+    val showBlur = blurEnabled && bitmap != null && !bitmap.isRecycled
+
+    Box(modifier = modifier.fillMaxSize()) {
+        if (showBlur) {
+            // Layer 1 — blurred wallpaper
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            // Layer 2 — adaptive surface scrim (dims in dark mode, brightens in light mode)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(scrimColor),
+            )
+        }
+
+        // Layer 3 — Scaffold with transparent container when blur is on
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = if (showBlur) Color.Transparent else MaterialTheme.colorScheme.surface,
+            topBar = {
+                Surface(color = if (showBlur) Color.Transparent else MaterialTheme.colorScheme.surface) {
+                    SearchBar(
+                        value = value,
+                        onValueChange = onValueChange,
+                        backDispatcher = backDispatcher,
+                        placeholder = placeholder,
+                        actions = actions,
+                    )
+                }
+            },
+            bottomBar = { BottomSpacer() },
+        ) {
+            content(it)
+        }
     }
 }
 
@@ -99,8 +163,8 @@ private fun SearchBar(
         )
         Box(modifier = Modifier.weight(1f)) {
             SearchTextField(
-                value,
-                onValueChange,
+                value = value,
+                onValueChange = onValueChange,
             ) {
                 if (placeholder != null) {
                     placeholder()
@@ -136,7 +200,6 @@ private fun SearchTextField(
     placeholder: @Composable (() -> Unit)? = null,
 ) {
     val textStyle: TextStyle = LocalTextStyle.current
-
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
     val mergedTextStyle = textStyle.merge(TextStyle(color = textColor))
 

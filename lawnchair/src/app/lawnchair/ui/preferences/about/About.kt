@@ -56,7 +56,6 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceDivider
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroupHeading
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroupItem
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayoutLazyColumn
-import app.lawnchair.ui.preferences.components.layout.preferenceGroupItems
 import app.lawnchair.ui.preferences.navigation.AboutLicenses
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
@@ -89,9 +88,7 @@ fun About(
                         openBottomSheet = false
                     }
                 },
-                onDownload = {
-                    viewModel.downloadUpdate()
-                },
+                onDownload = { viewModel.downloadUpdate() },
                 sheetState = sheetState,
             )
         }
@@ -102,13 +99,11 @@ fun About(
         modifier = modifier,
         backArrowVisible = !LocalIsExpandedScreen.current,
     ) {
-        item {
-            Spacer(Modifier.padding(top = 8.dp))
-        }
+        item { Spacer(Modifier.padding(top = 8.dp)) }
+
         item {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Image(
@@ -120,9 +115,9 @@ fun About(
                 )
             }
         }
-        item {
-            Spacer(modifier = Modifier.height(12.dp))
-        }
+
+        item { Spacer(modifier = Modifier.height(12.dp)) }
+
         item {
             Text(
                 text = stringResource(id = R.string.derived_app_name),
@@ -131,10 +126,10 @@ fun About(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+
         item {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
             ) {
                 Text(
@@ -146,44 +141,35 @@ fun About(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .combinedClickable(
-                            onClick = {},
-                            onLongClick = {
-                                val commitUrl =
-                                    "https://github.com/LawnchairLauncher/lawnchair/commit/${BuildConfig.COMMIT_HASH}"
-                                context.startActivity(Intent(Intent.ACTION_VIEW, commitUrl.toUri()))
-                            },
-                        ),
+                    modifier = Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            val commitUrl =
+                                "https://github.com/LawnchairLauncher/lawnchair/commit/${BuildConfig.COMMIT_HASH}"
+                            context.startActivity(Intent(Intent.ACTION_VIEW, commitUrl.toUri()))
+                        },
+                    ),
                 )
             }
         }
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+
         item {
             UpdateSection(
                 updateState = uiState.updateState,
-                onInstall = {
-                    viewModel.installUpdate(it)
-                },
-                onForceInstall = {
-                    viewModel.installUpdate(it, forceInstall = true)
-                },
+                onInstall = { viewModel.installUpdate(it) },
+                onForceInstall = { viewModel.installUpdate(it, forceInstall = true) },
                 onViewChanges = {
                     openBottomSheet = true
-                    scope.launch {
-                        sheetState.show()
-                    }
+                    scope.launch { sheetState.show() }
                 },
-                onDismissMajorUpdate = {
-                    viewModel.resetToDownloaded(it)
-                },
+                onDismissMajorUpdate = { viewModel.resetToDownloaded(it) },
             )
         }
-        item {
-            Spacer(modifier = Modifier.requiredHeight(16.dp))
-        }
+
+        item { Spacer(modifier = Modifier.requiredHeight(16.dp)) }
+
         item {
             Row(
                 modifier = Modifier
@@ -200,42 +186,59 @@ fun About(
                 }
             }
         }
-        preferenceGroupItems(
-            items = uiState.coreTeam,
-            isFirstChild = false,
-            heading = { stringResource(id = R.string.product) },
-            key = { _, it -> it.name },
-        ) { _, it ->
-            ContributorRow(
-                member = it,
-            )
-        }
-        preferenceGroupItems(
-            items = uiState.supportAndPr,
-            isFirstChild = false,
-            heading = { stringResource(id = R.string.support_and_pr) },
-            key = { _, it -> it.name },
-        ) { _, it ->
-            ContributorRow(
-                member = it,
-            )
-        }
-        preferenceGroupItems(
-            items = uiState.bottomLinks,
-            isFirstChild = false,
-            heading = { stringResource(id = R.string.community) },
-            key = { _, it -> it.labelResId },
-        ) { _, it ->
-            HorizontalLawnchairLink(
-                iconResId = it.iconResId,
-                label = stringResource(id = it.labelResId),
-                url = it.url,
-            )
-        }
+
+        // ── Product ───────────────────────────────────────────────────────────
+        // Each contributor gets its own separate card with a natural Spacer gap
+        // between them. The gap shows the blurred wallpaper (or normal background)
+        // rather than an opaque surface-colored divider.
         item {
-            PreferenceGroupHeading(
-                stringResource(R.string.legal),
-            )
+            Spacer(modifier = Modifier.requiredHeight(8.dp))
+            PreferenceGroupHeading(stringResource(id = R.string.product))
+        }
+        uiState.coreTeam.forEachIndexed { index, member ->
+            item(key = "core_${member.name}") {
+                if (index > 0) Spacer(modifier = Modifier.height(4.dp))
+                PreferenceGroupItem {
+                    ContributorRow(member = member)
+                }
+            }
+        }
+
+        // ── Support and PR ────────────────────────────────────────────────────
+        item {
+            Spacer(modifier = Modifier.requiredHeight(8.dp))
+            PreferenceGroupHeading(stringResource(id = R.string.support_and_pr))
+        }
+        uiState.supportAndPr.forEachIndexed { index, member ->
+            item(key = "support_${member.name}") {
+                if (index > 0) Spacer(modifier = Modifier.height(4.dp))
+                PreferenceGroupItem {
+                    ContributorRow(member = member)
+                }
+            }
+        }
+
+        // ── Community ─────────────────────────────────────────────────────────
+        item {
+            Spacer(modifier = Modifier.requiredHeight(8.dp))
+            PreferenceGroupHeading(stringResource(id = R.string.community))
+        }
+        uiState.bottomLinks.forEachIndexed { index, link ->
+            item(key = "link_${link.labelResId}") {
+                if (index > 0) Spacer(modifier = Modifier.height(4.dp))
+                PreferenceGroupItem {
+                    HorizontalLawnchairLink(
+                        iconResId = link.iconResId,
+                        label = stringResource(id = link.labelResId),
+                        url = link.url,
+                    )
+                }
+            }
+        }
+
+        // ── Legal ─────────────────────────────────────────────────────────────
+        item {
+            PreferenceGroupHeading(stringResource(R.string.legal))
         }
         item {
             PreferenceGroupItem(
@@ -248,9 +251,7 @@ fun About(
                 )
             }
         }
-        item {
-            Spacer(Modifier.height(3.dp))
-        }
+        item { Spacer(Modifier.height(3.dp)) }
         item {
             PreferenceGroupItem(
                 cutTop = true,

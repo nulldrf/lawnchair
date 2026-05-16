@@ -196,7 +196,7 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
         val prefs = preferenceManager()
         val prefs2 = preferenceManager2()
         val primary = MaterialTheme.colorScheme.primary
-        val shape = RoundedCornerShape(20.dp)
+        val shape = RoundedCornerShape(28.dp)
 
         val adapters = listOf(
             prefs2.hotseatMode.getAdapter(),
@@ -233,7 +233,7 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
                 .clip(shape),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                WithWallpaper(displayWallpaperButton = false) { wallpaper ->
+                WithWallpaper { wallpaper ->
                     DummyLauncherBox(
                         modifier = Modifier
                             .fillMaxWidth()

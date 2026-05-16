@@ -220,20 +220,19 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
 
         PreferenceGroupHeading(heading = stringResource(id = R.string.preview_label))
 
-        // Styled container: thin tinted border + rounded clip, no full phone frame.
-        // Only the bottom dock strip is shown via clipToBottomPercentage(0.3f).
-        // fillMaxWidth() replaces the old weight(1f) which collapsed to zero height
-        // inside StretchNestedScrollView's unbounded Column.
-        // Column is required as the direct parent of WithWallpaper (ColumnScope extension).
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .border(width = 1.dp, color = primary.copy(alpha = 0.25f), shape = shape)
-                .clip(shape),
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                WithWallpaper { wallpaper ->
+        // WithWallpaper wraps the bordered box so its permission button renders
+        // AFTER the box as the next Column child — outside the border.
+        // The bordered Box is the content lambda; the button is a sibling appended
+        // by WithWallpaper itself after content() returns.
+        Column(modifier = modifier.fillMaxWidth()) {
+            WithWallpaper { wallpaper ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .border(width = 1.dp, color = primary.copy(alpha = 0.25f), shape = shape)
+                        .clip(shape),
+                ) {
                     DummyLauncherBox(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -253,6 +252,8 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
                         }
                     }
                 }
+                // WithWallpaper appends the "Show wallpaper" button here as the
+                // next Column child — outside the bordered box.
             }
         }
     }

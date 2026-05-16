@@ -17,13 +17,12 @@
 package app.lawnchair.ui.preferences.components.layout
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -46,18 +45,18 @@ fun LazyListScope.preferenceGroupItems(
         }
         PreferenceGroupHeading(heading?.let { it() })
     }
-    items(count, key, contentType) {
-        PreferenceGroupItem(cutTop = it > 0, cutBottom = it < count - 1) {
-            if (showDividers && it > 0) {
-                // 1dp outlineVariant divider — visible separator that doesn't
-                // fill the gap with an opaque surface color, so the blurred
-                // wallpaper shows through between card sections.
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
-            }
-            itemContent(it)
+    items(count, key, contentType) { index ->
+        // 3dp spacer OUTSIDE the Surface — exactly like the Legal section in About.
+        // Shows the wallpaper (or normal background) through the gap, matching the
+        // Spacer(3.dp) used between the Acknowledgements and Privacy policy cards.
+        if (showDividers && index > 0) {
+            Spacer(modifier = Modifier.height(3.dp))
+        }
+        PreferenceGroupItem(
+            cutTop = index > 0,
+            cutBottom = index < count - 1,
+        ) {
+            itemContent(index)
         }
     }
 }

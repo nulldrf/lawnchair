@@ -179,15 +179,16 @@ fun FontSelection(
                             family = family,
                             onDelete = {
                                 val selected = family.variants.any { it.value == adapter.state.value }
-                                if (selected) {
-                                    fontPref.set(fontPref.defaultValue)
-                                }
+                                if (selected) fontPref.set(fontPref.defaultValue)
                                 (family.default as? FontCache.TTFFont)?.delete()
                             },
                         )
                     }
                 }
             }
+            // showDividers defaults to true — the transparent 3dp gap in
+            // LazyColumnPreferenceGroup visually separates items without drawing
+            // a solid line, working correctly with blur on and off.
             preferenceGroupItems(
                 filteredItems,
                 isFirstChild = false,
@@ -213,8 +214,7 @@ private fun FontSelectionItem(
 ) {
     val selected = family.variants.any { it.value == adapter.state.value }
     PreferenceTemplate(
-        modifier = modifier
-            .clickable { adapter.onChange(family.default) },
+        modifier = modifier.clickable { adapter.onChange(family.default) },
         title = {
             Box(modifier = Modifier.height(52.dp)) {
                 Text(
@@ -230,17 +230,13 @@ private fun FontSelectionItem(
             RadioButton(
                 selected = selected,
                 onClick = null,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         },
         endWidget = when {
             selected && family.variants.size > 1 -> {
-                {
-                    VariantDropdown(adapter = adapter, family = family)
-                }
+                { VariantDropdown(adapter = adapter, family = family) }
             }
-
             onDelete != null -> {
                 {
                     IconButton(
@@ -256,7 +252,6 @@ private fun FontSelectionItem(
                     }
                 }
             }
-
             else -> null
         },
         applyPaddings = false,
@@ -271,12 +266,8 @@ private val VariantButtonContentPadding = PaddingValues(
     bottom = 8.dp,
 )
 
-private fun removeFamilyPrefix(
-    familyName: CharSequence,
-    fontName: CharSequence,
-): String {
-    return fontName.removePrefix(familyName).trim().toString()
-}
+private fun removeFamilyPrefix(familyName: CharSequence, fontName: CharSequence): String =
+    fontName.removePrefix(familyName).trim().toString()
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -294,8 +285,8 @@ private fun VariantDropdown(
     ) {
         val selectedFont = adapter.state.value
         var showVariants by remember { mutableStateOf(false) }
-
         val context = LocalContext.current
+
         DisposableEffect(family) {
             val fontCache = FontCache.INSTANCE.get(context)
             family.variants.forEach { fontCache.preloadFont(it.value) }
@@ -315,10 +306,7 @@ private fun VariantDropdown(
                     it.setFont(selectedFont)
                 },
             )
-            Icon(
-                imageVector = Icons.Rounded.ArrowDropDown,
-                contentDescription = null,
-            )
+            Icon(imageVector = Icons.Rounded.ArrowDropDown, contentDescription = null)
         }
         DropdownMenu(
             expanded = showVariants,

@@ -52,10 +52,10 @@ import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
-import app.lawnchair.ui.preferences.components.layout.PreferenceDivider
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroupHeading
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroupItem
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayoutLazyColumn
+import app.lawnchair.ui.preferences.components.layout.preferenceGroupItems
 import app.lawnchair.ui.preferences.navigation.AboutLicenses
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
@@ -99,8 +99,9 @@ fun About(
         modifier = modifier,
         backArrowVisible = !LocalIsExpandedScreen.current,
     ) {
-        item { Spacer(Modifier.padding(top = 8.dp)) }
-
+        item {
+            Spacer(Modifier.padding(top = 8.dp))
+        }
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -115,9 +116,9 @@ fun About(
                 )
             }
         }
-
-        item { Spacer(modifier = Modifier.height(12.dp)) }
-
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+        }
         item {
             Text(
                 text = stringResource(id = R.string.derived_app_name),
@@ -126,7 +127,6 @@ fun About(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -152,9 +152,9 @@ fun About(
                 )
             }
         }
-
-        item { Spacer(modifier = Modifier.height(8.dp)) }
-
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
         item {
             UpdateSection(
                 updateState = uiState.updateState,
@@ -167,9 +167,9 @@ fun About(
                 onDismissMajorUpdate = { viewModel.resetToDownloaded(it) },
             )
         }
-
-        item { Spacer(modifier = Modifier.requiredHeight(16.dp)) }
-
+        item {
+            Spacer(modifier = Modifier.requiredHeight(16.dp))
+        }
         item {
             Row(
                 modifier = Modifier
@@ -187,53 +187,38 @@ fun About(
             }
         }
 
-        // ── Product ───────────────────────────────────────────────────────────
-        // Each contributor gets its own separate card with a natural Spacer gap
-        // between them. The gap shows the blurred wallpaper (or normal background)
-        // rather than an opaque surface-colored divider.
-        item {
-            Spacer(modifier = Modifier.requiredHeight(8.dp))
-            PreferenceGroupHeading(stringResource(id = R.string.product))
+        // ── Product / Support&PR / Community ─────────────────────────────────
+        // preferenceGroupItems renders all entries as one continuous rounded card
+        // (same style as Legal). The 1dp outlineVariant divider between rows is
+        // drawn inside the card surface, so gaps between sections remain
+        // transparent and show the blurred wallpaper through.
+        preferenceGroupItems(
+            items = uiState.coreTeam,
+            isFirstChild = false,
+            heading = { stringResource(id = R.string.product) },
+            key = { _, it -> it.name },
+        ) { _, it ->
+            ContributorRow(member = it)
         }
-        uiState.coreTeam.forEachIndexed { index, member ->
-            item(key = "core_${member.name}") {
-                if (index > 0) Spacer(modifier = Modifier.height(4.dp))
-                PreferenceGroupItem {
-                    ContributorRow(member = member)
-                }
-            }
+        preferenceGroupItems(
+            items = uiState.supportAndPr,
+            isFirstChild = false,
+            heading = { stringResource(id = R.string.support_and_pr) },
+            key = { _, it -> it.name },
+        ) { _, it ->
+            ContributorRow(member = it)
         }
-
-        // ── Support and PR ────────────────────────────────────────────────────
-        item {
-            Spacer(modifier = Modifier.requiredHeight(8.dp))
-            PreferenceGroupHeading(stringResource(id = R.string.support_and_pr))
-        }
-        uiState.supportAndPr.forEachIndexed { index, member ->
-            item(key = "support_${member.name}") {
-                if (index > 0) Spacer(modifier = Modifier.height(4.dp))
-                PreferenceGroupItem {
-                    ContributorRow(member = member)
-                }
-            }
-        }
-
-        // ── Community ─────────────────────────────────────────────────────────
-        item {
-            Spacer(modifier = Modifier.requiredHeight(8.dp))
-            PreferenceGroupHeading(stringResource(id = R.string.community))
-        }
-        uiState.bottomLinks.forEachIndexed { index, link ->
-            item(key = "link_${link.labelResId}") {
-                if (index > 0) Spacer(modifier = Modifier.height(4.dp))
-                PreferenceGroupItem {
-                    HorizontalLawnchairLink(
-                        iconResId = link.iconResId,
-                        label = stringResource(id = link.labelResId),
-                        url = link.url,
-                    )
-                }
-            }
+        preferenceGroupItems(
+            items = uiState.bottomLinks,
+            isFirstChild = false,
+            heading = { stringResource(id = R.string.community) },
+            key = { _, it -> it.labelResId },
+        ) { _, it ->
+            HorizontalLawnchairLink(
+                iconResId = it.iconResId,
+                label = stringResource(id = it.labelResId),
+                url = it.url,
+            )
         }
 
         // ── Legal ─────────────────────────────────────────────────────────────
@@ -251,7 +236,9 @@ fun About(
                 )
             }
         }
-        item { Spacer(Modifier.height(3.dp)) }
+        item {
+            Spacer(Modifier.height(3.dp))
+        }
         item {
             PreferenceGroupItem(
                 cutTop = true,

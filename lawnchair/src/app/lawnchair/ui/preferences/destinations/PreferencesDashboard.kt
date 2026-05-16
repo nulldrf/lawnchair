@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
+import android.graphics.Bitmap
 import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -19,8 +20,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,12 +62,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
+import androidx.core.graphics.ColorUtils
 import app.lawnchair.LawnchairApp
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.backup.ui.restoreBackupOpener
@@ -72,11 +81,14 @@ import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalNavController
+import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
 import app.lawnchair.ui.preferences.components.AnnouncementPreference
 import app.lawnchair.ui.preferences.components.controls.PreferenceCategory
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.ScrollTargetManager
 import app.lawnchair.ui.preferences.data.liveinfo.SyncLiveInformation
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.navigation.About
@@ -94,18 +106,14 @@ import app.lawnchair.ui.preferences.navigation.PreferenceRootRoute
 import app.lawnchair.ui.preferences.navigation.Quickstep
 import app.lawnchair.ui.preferences.navigation.Search
 import app.lawnchair.ui.preferences.navigation.Smartspace
-import app.lawnchair.ui.preferences.components.layout.ScrollKeys
-import app.lawnchair.ui.preferences.components.layout.ScrollTargetManager
 import app.lawnchair.util.isDefaultLauncher
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.patrykmichalik.opto.core.firstBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // ── Individual deep searchable entry ─────────────────────────────────────────
-// label     = displayed as result title (the actual setting name)
-// keywords  = hidden search terms, never shown
-// breadcrumb= section name shown as subtitle, e.g. "General"
-// route     = top-level section to navigate to when tapped
 private data class SearchableEntry(
     val label: String,
     val keywords: String = "",
@@ -126,7 +134,6 @@ fun PreferencesDashboard(
     val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
-    // ── Announcement / default-launcher state ─────────────────────────────
     val liveInformationManager = liveInformationManager()
     val enabled by liveInformationManager.enabled.asState()
     val showAnnouncements by liveInformationManager.showAnnouncements.asState()
@@ -141,7 +148,6 @@ fun PreferencesDashboard(
     val announcementShowing = enabled && showAnnouncements && activeAnnouncements.isNotEmpty()
     val isNotDefaultLauncher = !context.isDefaultLauncher()
 
-    // ── Dynamic toolbar title ─────────────────────────────────────────────
     val settingsLabel = stringResource(id = R.string.settings)
     val setDefaultLabel = stringResource(id = R.string.set_default_launcher_short)
     val expandedLabel = if (announcementShowing && isNotDefaultLauncher) setDefaultLabel else settingsLabel
@@ -155,18 +161,15 @@ fun PreferencesDashboard(
         }
     } else null
 
-    // ── About description ─────────────────────────────────────────────────
     val aboutDescription = if (prefs.hideVersionInfo.get()) {
         prefs.pseudonymVersion.get()
     } else {
         "${context.getString(R.string.derived_app_name)} ${BuildConfig.MAJOR_VERSION}"
     }
 
-    // ── Search state ──────────────────────────────────────────────────────
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // ── Top-level label/desc strings ──────────────────────────────────────
     val labelGeneral    = stringResource(R.string.general_label)
     val descGeneral     = stringResource(R.string.general_description)
     val labelHomeScreen = stringResource(R.string.home_screen_label)
@@ -194,9 +197,7 @@ fun PreferencesDashboard(
     val deckLayout = prefs2.deckLayout.getAdapter()
     val isSmartspaceEnabled = prefs2.enableSmartspace.firstBlocking()
 
-    // ── Deep searchable entry list ────────────────────────────────────────
     val allEntries = buildList {
-        // ── General ───────────────────────────────────────────────────
         fun g(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelGeneral, R.drawable.ic_general, General, sk))
         g(stringResource(R.string.icon_style_label), "icon packs apply theme", ScrollKeys.ICON_STYLE)
@@ -213,7 +214,6 @@ fun PreferencesDashboard(
         g(stringResource(R.string.shadow_bg_icons_label), "shadow behind icons drop shadow", ScrollKeys.SHADOW_ICONS)
         g(stringResource(R.string.font_label), "font customization typography typeface heading body")
 
-        // ── Home screen ───────────────────────────────────────────────
         fun h(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelHomeScreen, R.drawable.ic_home_screen, HomeScreen, sk))
         h(stringResource(R.string.home_screen_grid), "grid columns rows layout size change", ScrollKeys.HOME_GRID)
@@ -241,7 +241,6 @@ fun PreferencesDashboard(
         h(stringResource(R.string.show_labels), "show labels app name home screen", ScrollKeys.HOME_SHOW_LABELS)
         h(stringResource(R.string.label_size), "label size text size home screen", ScrollKeys.HOME_LABEL_SIZE)
 
-        // ── Smartspace / At a Glance ──────────────────────────────────
         val smartIcon = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off
         fun s(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelSmartspace, smartIcon, Smartspace, sk))
@@ -260,7 +259,6 @@ fun PreferencesDashboard(
         s(stringResource(R.string.smartspace_weather_city), "city location weather gps auto", ScrollKeys.SS_WEATHER_CITY)
         s(stringResource(R.string.smartspace_weather_unit), "temperature unit celsius fahrenheit kelvin", ScrollKeys.SS_WEATHER_UNIT)
 
-        // ── Dock ──────────────────────────────────────────────────────
         fun d(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelDock, R.drawable.ic_dock, Dock, sk))
         d(stringResource(R.string.show_hotseat_title), "show hide dock hotseat enable", ScrollKeys.SHOW_DOCK)
@@ -274,7 +272,6 @@ fun PreferencesDashboard(
         d(stringResource(R.string.corner_radius_label), "corner radius search bar rounded")
         d(stringResource(R.string.qsb_hotseat_background_transparency), "search bar background opacity transparent")
 
-        // ── App drawer ────────────────────────────────────────────────
         if (!deckLayout.state.value) {
             fun a(label: String, kw: String = "", sk: String? = null) =
                 add(SearchableEntry(label, kw, labelAppDrawer, R.drawable.ic_apps, AppDrawer, sk))
@@ -288,7 +285,6 @@ fun PreferencesDashboard(
             a(stringResource(R.string.app_drawer_indent_label), "padding horizontal indent margin spacing")
         }
 
-        // ── Search bar ────────────────────────────────────────────────
         fun sb(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search(), sk))
         sb(stringResource(R.string.show_app_search_bar), "show search bar drawer enable disable", ScrollKeys.DS_SHOW_SEARCH_BAR)
@@ -306,7 +302,6 @@ fun PreferencesDashboard(
         sb(stringResource(R.string.corner_radius_label), "corner radius dock search bar rounded", ScrollKeys.DOCK_SEARCH_RADIUS)
         sb(stringResource(R.string.qsb_hotseat_background_transparency), "search bar background opacity transparent", ScrollKeys.DOCK_SEARCH_OPACITY)
 
-        // ── Folders ───────────────────────────────────────────────────
         fun f(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelFolders, R.drawable.ic_folder, Folders, sk))
         f(stringResource(R.string.max_folder_columns), "folder columns maximum grid count", ScrollKeys.FOLDER_MAX_COLUMNS)
@@ -315,7 +310,6 @@ fun PreferencesDashboard(
         f(stringResource(R.string.folder_preview_bg_opacity_label), "folder icon preview background opacity", ScrollKeys.FOLDER_PREVIEW_OPACITY)
         f(stringResource(R.string.folder_shape_label), "folder shape icon shape style", ScrollKeys.FOLDER_SHAPE)
 
-        // ── Gestures ──────────────────────────────────────────────────
         fun ge(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelGestures, R.drawable.ic_gestures, Gestures, sk))
         ge(stringResource(R.string.gesture_double_tap), "double tap action sleep lock screen", ScrollKeys.GESTURE_DOUBLE_TAP)
@@ -327,7 +321,6 @@ fun PreferencesDashboard(
         ge(stringResource(R.string.gesture_back_tap), "back button tap gesture action", ScrollKeys.GESTURE_BACK)
         ge(stringResource(R.string.sleep_mode_label), "sleep mode lock screen accessibility root admin", ScrollKeys.GESTURE_SLEEP_MODE)
 
-        // ── Quickstep / Recents ───────────────────────────────────────
         if (LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
             fun q(label: String, kw: String = "", sk: String? = null) =
                 add(SearchableEntry(label, kw, labelQuickstep, R.drawable.ic_quickstep, Quickstep, sk))
@@ -338,13 +331,11 @@ fun PreferencesDashboard(
             q(stringResource(R.string.recents_lock_unlock), "lock unlock recents prevent close clear all")
         }
 
-        // ── Backup and restore ────────────────────────────────────────
         fun b(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelBackup, R.drawable.backup_restore, BackupAndRestore, sk))
         b(stringResource(R.string.create_backup), "export backup save layout settings create", ScrollKeys.CREATE_BACKUP)
         b(stringResource(R.string.restore_backup), "import restore backup load file", ScrollKeys.RESTORE_BACKUP)
 
-        // ── Extras ────────────────────────────────────────────────────
         fun e(label: String, kw: String = "", sk: String? = null, route: PreferenceRootRoute = Extras) =
             add(SearchableEntry(label, kw, labelExtras, R.drawable.ic_extras, route, sk))
         e(stringResource(R.string.experimental_features_label), "experimental beta unstable features labs", ScrollKeys.EXPERIMENTAL)
@@ -358,7 +349,6 @@ fun PreferencesDashboard(
         e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace", ScrollKeys.MAX_GRID_SIZE, route = ExperimentalFeatures)
         e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack", ScrollKeys.ALWAYS_RELOAD_ICONS, route = ExperimentalFeatures)
 
-        // ── About ─────────────────────────────────────────────────────
         fun ab(label: String, kw: String = "", sk: String? = null) =
             add(SearchableEntry(label, kw, labelAbout, R.drawable.ic_about, About, sk))
         ab(stringResource(R.string.auto_updater_label), "auto updater check update nightly automatic")
@@ -372,7 +362,6 @@ fun PreferencesDashboard(
         ab("Contributors", "team developers contributors design art")
     }
 
-    // ── Debug badge ───────────────────────────────────────────────────────
     val isDebugBuild = BuildConfig.APPLICATION_ID.contains("nightly") || BuildConfig.DEBUG
     var showDebugDialog by remember { mutableStateOf(false) }
 
@@ -391,25 +380,18 @@ fun PreferencesDashboard(
         )
     }
 
-    // ── Back handler ──────────────────────────────────────────────────────
     BackHandler(enabled = searchActive) {
         searchActive = false
         searchQuery = ""
     }
 
-    // ── Root: animated switch between settings list and search overlay ────
-    // Opening: search overlay slides UP from 1/3 height (where the bar sits)
-    // + fades in. Closing: slides back down + fades out. The settings list
-    // itself just fades — no expand/shrink so nothing jumps or clips.
     AnimatedContent(
         targetState = searchActive,
         transitionSpec = {
             if (targetState) {
-                // → entering search
                 (slideInVertically(tween(320)) { it / 3 } + fadeIn(tween(240)))
                     .togetherWith(fadeOut(tween(180)))
             } else {
-                // ← leaving search
                 fadeIn(tween(200))
                     .togetherWith(slideOutVertically(tween(280)) { it / 3 } + fadeOut(tween(200)))
             }
@@ -441,7 +423,6 @@ fun PreferencesDashboard(
                     }
                 },
             ) {
-                // ── Announcement card ─────────────────────────────────────
                 AnimatedVisibility(
                     visible = announcementShowing,
                     enter = expandVertically(tween(350)) + fadeIn(tween(350)),
@@ -450,7 +431,6 @@ fun PreferencesDashboard(
                     AnnouncementPreference()
                 }
 
-                // ── Set default card ──────────────────────────────────────
                 AnimatedVisibility(
                     visible = isNotDefaultLauncher && !announcementShowing,
                     enter = slideInVertically(tween(350)) { it } + fadeIn(tween(350)),
@@ -459,14 +439,12 @@ fun PreferencesDashboard(
                     PreferencesSetDefaultLauncherCard()
                 }
 
-                // ── Search bar — extra spacing below the cards ────────────
                 Spacer(modifier = Modifier.height(8.dp))
                 SettingsSearchBar(
                     onActivate = { searchActive = true },
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
 
-                // ── Preference list ───────────────────────────────────────
                 PreferenceGroup {
                     Item(visible = true) {
                         PreferenceCategory(
@@ -615,29 +593,68 @@ private fun SearchOverlay(
     entries: List<SearchableEntry>,
     onNavigate: (PreferenceRootRoute) -> Unit,
 ) {
+    val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
 
-    // Match label + keywords; breadcrumb is excluded so typing a section name
-    // does not flood results with every item inside it.
     val filtered = remember(query, entries) {
         if (query.isBlank()) emptyList()
         else {
             val q = query.trim().lowercase()
             entries.filter {
-                it.label.lowercase().contains(q) ||
-                    it.keywords.lowercase().contains(q)
+                it.label.lowercase().contains(q) || it.keywords.lowercase().contains(q)
             }
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.surface,
+    // ── Blur background (same pattern as PreferenceScaffold) ──────────────
+    val prefs = preferenceManager()
+    val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
+    val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
+
+    val blurredBitmap: Bitmap? by produceState<Bitmap?>(
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
+        key1 = blurEnabled,
+        key2 = blurIntensity,
     ) {
+        this.value = if (blurEnabled) {
+            withContext(Dispatchers.IO) {
+                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
+            }
+        } else {
+            null
+        }
+    }
+
+    val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
+    val scrimColor = Color(ColorUtils.setAlphaComponent(surfaceArgb, (0.72f * 255).toInt()))
+    val bitmap = blurredBitmap
+    val showBlur = blurEnabled && bitmap != null && !bitmap.isRecycled
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (showBlur) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(scrimColor),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface),
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -690,9 +707,7 @@ private fun SearchOverlay(
             )
 
             when {
-                query.isBlank() -> {
-                    // Empty state — nothing yet
-                }
+                query.isBlank() -> { /* empty state */ }
                 filtered.isEmpty() -> {
                     Spacer(modifier = Modifier.height(32.dp))
                     Text(
@@ -800,15 +815,8 @@ fun PreferencesSetDefaultLauncherCard(
     }
 }
 
-/**
- * A small pill-shaped badge rendered in the toolbar actions area.
- * Styled after LibChecker's "CI" badge — bordered chip, slight primary tint.
- * Tapping it shows the debug warning dialog. Only shown in debug/nightly builds.
- */
 @Composable
-private fun DebugBadge(
-    onClick: () -> Unit,
-) {
+private fun DebugBadge(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(percent = 50),

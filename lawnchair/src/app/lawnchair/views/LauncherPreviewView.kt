@@ -39,6 +39,24 @@ class LauncherPreviewView(
 
     private var rendererView: View? = null
 
+    /**
+     * Retained reference to the [LauncherPreviewRenderer] so [destroy] can explicitly
+     * remove it from [LauncherModel.mCallbacksList].
+     *
+     * [LauncherPreviewRenderer] calls [LauncherModel.addCallbacksAndLoad] on itself inside
+     * its constructor (the last line before returning). [LauncherModel] is a Dagger singleton
+     * that lives for the entire app lifetime; it therefore keeps a strong reference to the
+     * renderer indefinitely unless we explicitly call [LauncherModel.removeCallbacksAndLoad].
+     *
+     * Without this cleanup the destroyed [PreferenceActivity] is reachable via:
+     *   LauncherModel.mCallbacksList
+     *     → LauncherPreviewRenderer          (retaining 4.6 MB in 26 596 objects)
+     *       → BaseContext.mBase (= PreferenceActivity, mDestroyed = true)
+     *
+     * LeakCanary confirmed this leak: retainedDurationMillis = 235 115 ms (~4 minutes).
+     */
+    private var renderer: LauncherPreviewRenderer? = null
+
     private val spinner = CircularProgressIndicator(context).apply {
         val themedContext = ContextThemeWrapper(context, Themes.getActivityThemeRes(context))
         val textColor = Themes.getAttrColor(themedContext, R.attr.workspaceTextColor)
@@ -66,10 +84,22 @@ class LauncherPreviewView(
     @UiThread
     fun destroy() {
         destroyed = true
+
+        // Remove the renderer from LauncherModel.mCallbacksList before clearing our reference.
+        //
+        // The renderer registers itself via model.addCallbacksAndLoad(this) in its constructor.
+        // LauncherModel is a singleton — it will keep the renderer (and through it the Activity
+        // context used to construct the renderer) alive indefinitely unless we unregister here.
+        //
+        // This must happen before removeAllViews() so the renderer's root view is still attached
+        // and any in-flight bind callbacks dispatched during remove have a valid target.
+        renderer?.let { r ->
+            LauncherAppState.getInstance(appContext).model.removeCallbacks(r)
+            renderer = null
+        }
+
         onDestroyCallbacks.executeAllAndDestroy()
         removeAllViews()
-        // Note: The new LauncherPreviewRenderer manages its own lifecycle observer via the Context.
-        // If the Renderer exposes a close/destroy method in the future, call it here to prevent Model callback leaks.
     }
 
     private fun loadAsync() {
@@ -82,7 +112,7 @@ class LauncherPreviewView(
         val workspaceScreenId = 0
         val themeRes = Themes.getActivityThemeRes(context)
 
-        val renderer = LauncherPreviewRenderer(
+        val newRenderer = LauncherPreviewRenderer(
             context,
             workspaceScreenId,
             null, // Wallpaper colors
@@ -90,13 +120,15 @@ class LauncherPreviewView(
             themeRes,
             idp,
         )
+        // Store so destroy() can unregister it from LauncherModel callbacks.
+        renderer = newRenderer
 
         if (dummySmartspace) {
-            renderer.setWorkspaceSearchContainer(R.layout.smartspace_widget_placeholder)
+            newRenderer.setWorkspaceSearchContainer(R.layout.smartspace_widget_placeholder)
         }
 
         // The renderer exposes a CompletableFuture that completes when the model is bound and view is measured
-        renderer.initialRender.thenAcceptAsync({ view ->
+        newRenderer.initialRender.thenAcceptAsync({ view ->
             if (destroyed) return@thenAcceptAsync
 
             if (view != null) {

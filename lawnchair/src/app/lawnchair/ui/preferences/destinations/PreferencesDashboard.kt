@@ -9,8 +9,8 @@ import android.graphics.Bitmap
 import android.os.Process
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -18,7 +18,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -53,6 +52,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -65,6 +65,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -113,7 +115,6 @@ import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// ── Individual deep searchable entry ─────────────────────────────────────────
 private data class SearchableEntry(
     val label: String,
     val keywords: String = "",
@@ -170,6 +171,12 @@ fun PreferencesDashboard(
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
+    // Y position of the search pill in the layout, captured via onGloballyPositioned.
+    // Used as the slide anchor for the search overlay enter/exit animation so it
+    // appears to originate from and return to the pill rather than appearing from
+    // the top of the screen.
+    var searchBarOffsetY by remember { mutableIntStateOf(0) }
+
     val labelGeneral    = stringResource(R.string.general_label)
     val descGeneral     = stringResource(R.string.general_description)
     val labelHomeScreen = stringResource(R.string.home_screen_label)
@@ -225,11 +232,12 @@ fun PreferencesDashboard(
         h(stringResource(R.string.home_screen_lock), "lock home screen prevent changes layout edit", ScrollKeys.LOCK_HOME)
         h(stringResource(R.string.auto_add_shortcuts_label), "add new apps home screen auto install", ScrollKeys.AUTO_ADD_SHORTCUTS)
         h(stringResource(R.string.popup_menu), "popup menu long press shortcuts actions edit", ScrollKeys.POPUP_MENU)
-        h(stringResource(R.string.force_rounded_widgets), "rounded widgets corner radius")
+        h(stringResource(R.string.force_rounded_widgets), "rounded widgets corner radius", ScrollKeys.HOME_ROUNDED_WIDGETS)
         h(stringResource(R.string.wallpaper_quick_picker), "wallpaper picker quick change select")
-        h(stringResource(R.string.allow_widget_overlap), "widget overlap allow")
-        h(stringResource(R.string.force_widget_resize_label), "widget resize enforce resizable")
-        h(stringResource(R.string.show_sys_ui_scrim), "top shadow status bar scrim gradient")
+        h(stringResource(R.string.allow_widget_overlap), "widget overlap allow", ScrollKeys.HOME_WIDGET_OVERLAP)
+        h(stringResource(R.string.widget_unlimited_size_label), "widget unlimited size remove constraints", ScrollKeys.HOME_WIDGET_UNLIMITED)
+        h(stringResource(R.string.force_widget_resize_label), "widget resize enforce resizable", ScrollKeys.HOME_WIDGET_RESIZE)
+        h(stringResource(R.string.show_sys_ui_scrim), "top shadow status bar scrim gradient", ScrollKeys.HOME_TOP_SHADOW)
         h(stringResource(R.string.icon_sizes), "icon size scale home screen icons", ScrollKeys.HOME_ICON_SIZE)
         h(stringResource(R.string.home_screen_text_color), "text color light dark workspace", ScrollKeys.HOME_TEXT_COLOR)
         h(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink fade", ScrollKeys.HOME_APP_OPEN_ANIM)
@@ -385,21 +393,206 @@ fun PreferencesDashboard(
         searchQuery = ""
     }
 
-    AnimatedContent(
-        targetState = searchActive,
-        transitionSpec = {
-            if (targetState) {
-                (slideInVertically(tween(320)) { it / 3 } + fadeIn(tween(240)))
-                    .togetherWith(fadeOut(tween(180)))
-            } else {
-                fadeIn(tween(200))
-                    .togetherWith(slideOutVertically(tween(280)) { it / 3 } + fadeOut(tween(200)))
+    // ── Layout: main content always present, search overlay slides in on top ──
+    // Using a Box + AnimatedVisibility instead of AnimatedContent so the main
+    // PreferenceLayout is never torn down — the search overlay slides from the
+    // pill's measured Y position rather than appearing from the top of the screen.
+    Box(modifier = modifier.fillMaxSize()) {
+        // ── Main settings list (always rendered) ──────────────────────────────
+        PreferenceLayout(
+            label = settingsLabel,
+            expandedLabel = expandedLabel,
+            onExpandedTitleClick = onExpandedTitleClick,
+            verticalArrangement = Arrangement.Top,
+            backArrowVisible = false,
+            actions = {
+                if (isDebugBuild) {
+                    DebugBadge(onClick = { showDebugDialog = true })
+                }
+            },
+        ) {
+            AnimatedVisibility(
+                visible = announcementShowing,
+                enter = expandVertically(tween(350)) + fadeIn(tween(350)),
+                exit = shrinkVertically(tween(250)) + fadeOut(tween(250)),
+            ) {
+                AnnouncementPreference()
             }
-        },
-        label = "settings_search_transition",
-        modifier = modifier,
-    ) { isSearching ->
-        if (isSearching) {
+
+            AnimatedVisibility(
+                visible = isNotDefaultLauncher && !announcementShowing,
+                enter = slideInVertically(tween(350)) { it } + fadeIn(tween(350)),
+                exit = shrinkVertically(tween(250)) + fadeOut(tween(250)),
+            ) {
+                PreferencesSetDefaultLauncherCard()
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Capture the pill's position so the search overlay can animate
+            // from exactly this Y coordinate instead of the top of the screen.
+            SettingsSearchBar(
+                onActivate = { searchActive = true },
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .onGloballyPositioned { coords ->
+                        searchBarOffsetY = coords.positionInRoot().y.toInt()
+                    },
+            )
+
+            PreferenceGroup {
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelGeneral,
+                        description = descGeneral,
+                        iconResource = R.drawable.ic_general,
+                        onNavigate = { onNavigate(General) },
+                        isSelected = currentRoute is General,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelHomeScreen,
+                        description = descHomeScreen,
+                        iconResource = R.drawable.ic_home_screen,
+                        onNavigate = { onNavigate(HomeScreen) },
+                        isSelected = currentRoute is HomeScreen,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelSmartspace,
+                        description = descSmartspace,
+                        iconResource = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off,
+                        onNavigate = { onNavigate(Smartspace) },
+                        isSelected = currentRoute is Smartspace,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelDock,
+                        description = descDock,
+                        iconResource = R.drawable.ic_dock,
+                        onNavigate = { onNavigate(Dock) },
+                        isSelected = currentRoute is Dock,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(key = "app_drawer", visible = !deckLayout.state.value) {
+                    PreferenceCategory(
+                        label = labelAppDrawer,
+                        description = descAppDrawer,
+                        iconResource = R.drawable.ic_apps,
+                        onNavigate = { onNavigate(AppDrawer) },
+                        isSelected = currentRoute is AppDrawer,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelSearchBar,
+                        description = descSearchBar,
+                        iconResource = R.drawable.ic_search,
+                        onNavigate = { onNavigate(Search()) },
+                        isSelected = currentRoute is Search,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelFolders,
+                        description = descFolders,
+                        iconResource = R.drawable.ic_folder,
+                        onNavigate = { onNavigate(Folders) },
+                        isSelected = currentRoute is Folders,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelGestures,
+                        description = descGestures,
+                        iconResource = R.drawable.ic_gestures,
+                        onNavigate = { onNavigate(Gestures) },
+                        isSelected = currentRoute is Gestures,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(key = "quickstep", visible = LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
+                    PreferenceCategory(
+                        label = labelQuickstep,
+                        description = descQuickstep,
+                        iconResource = R.drawable.ic_quickstep,
+                        onNavigate = { onNavigate(Quickstep) },
+                        isSelected = currentRoute is Quickstep,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelBackup,
+                        description = descBackup,
+                        iconResource = R.drawable.backup_restore,
+                        onNavigate = { onNavigate(BackupAndRestore) },
+                        isSelected = currentRoute is BackupAndRestore,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelExtras,
+                        description = descExtras,
+                        iconResource = R.drawable.ic_extras,
+                        onNavigate = { onNavigate(Extras) },
+                        isSelected = currentRoute is Extras,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+                Item(visible = true) {
+                    PreferenceCategory(
+                        label = labelAbout,
+                        description = aboutDescription,
+                        iconResource = R.drawable.ic_about,
+                        onNavigate = { onNavigate(About) },
+                        isSelected = currentRoute is About,
+                        isFirst = it.isFirst,
+                        isLast = it.isLast,
+                    )
+                }
+            }
+        }
+
+        // ── Search overlay (slides from pill position) ────────────────────────
+        // enter: slide up from searchBarOffsetY + fade in
+        // exit:  slide back down to searchBarOffsetY + fade out
+        // The lambda receives fullHeight (height of the overlay = screen height).
+        // Returning searchBarOffsetY means the overlay's top starts at that Y
+        // coordinate and glides up to its resting position (Y=0).
+        AnimatedVisibility(
+            visible = searchActive,
+            enter = slideInVertically(
+                animationSpec = tween(380, easing = FastOutSlowInEasing),
+                initialOffsetY = { searchBarOffsetY },
+            ) + fadeIn(tween(260)),
+            exit = slideOutVertically(
+                animationSpec = tween(320, easing = FastOutSlowInEasing),
+                targetOffsetY = { searchBarOffsetY },
+            ) + fadeOut(tween(220)),
+        ) {
             SearchOverlay(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
@@ -410,176 +603,6 @@ fun PreferencesDashboard(
                 entries = allEntries,
                 onNavigate = onNavigate,
             )
-        } else {
-            PreferenceLayout(
-                label = settingsLabel,
-                expandedLabel = expandedLabel,
-                onExpandedTitleClick = onExpandedTitleClick,
-                verticalArrangement = Arrangement.Top,
-                backArrowVisible = false,
-                actions = {
-                    if (isDebugBuild) {
-                        DebugBadge(onClick = { showDebugDialog = true })
-                    }
-                },
-            ) {
-                AnimatedVisibility(
-                    visible = announcementShowing,
-                    enter = expandVertically(tween(350)) + fadeIn(tween(350)),
-                    exit = shrinkVertically(tween(250)) + fadeOut(tween(250)),
-                ) {
-                    AnnouncementPreference()
-                }
-
-                AnimatedVisibility(
-                    visible = isNotDefaultLauncher && !announcementShowing,
-                    enter = slideInVertically(tween(350)) { it } + fadeIn(tween(350)),
-                    exit = shrinkVertically(tween(250)) + fadeOut(tween(250)),
-                ) {
-                    PreferencesSetDefaultLauncherCard()
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                SettingsSearchBar(
-                    onActivate = { searchActive = true },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-
-                PreferenceGroup {
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelGeneral,
-                            description = descGeneral,
-                            iconResource = R.drawable.ic_general,
-                            onNavigate = { onNavigate(General) },
-                            isSelected = currentRoute is General,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelHomeScreen,
-                            description = descHomeScreen,
-                            iconResource = R.drawable.ic_home_screen,
-                            onNavigate = { onNavigate(HomeScreen) },
-                            isSelected = currentRoute is HomeScreen,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelSmartspace,
-                            description = descSmartspace,
-                            iconResource = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off,
-                            onNavigate = { onNavigate(Smartspace) },
-                            isSelected = currentRoute is Smartspace,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelDock,
-                            description = descDock,
-                            iconResource = R.drawable.ic_dock,
-                            onNavigate = { onNavigate(Dock) },
-                            isSelected = currentRoute is Dock,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(key = "app_drawer", visible = !deckLayout.state.value) {
-                        PreferenceCategory(
-                            label = labelAppDrawer,
-                            description = descAppDrawer,
-                            iconResource = R.drawable.ic_apps,
-                            onNavigate = { onNavigate(AppDrawer) },
-                            isSelected = currentRoute is AppDrawer,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelSearchBar,
-                            description = descSearchBar,
-                            iconResource = R.drawable.ic_search,
-                            onNavigate = { onNavigate(Search()) },
-                            isSelected = currentRoute is Search,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelFolders,
-                            description = descFolders,
-                            iconResource = R.drawable.ic_folder,
-                            onNavigate = { onNavigate(Folders) },
-                            isSelected = currentRoute is Folders,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelGestures,
-                            description = descGestures,
-                            iconResource = R.drawable.ic_gestures,
-                            onNavigate = { onNavigate(Gestures) },
-                            isSelected = currentRoute is Gestures,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(key = "quickstep", visible = LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
-                        PreferenceCategory(
-                            label = labelQuickstep,
-                            description = descQuickstep,
-                            iconResource = R.drawable.ic_quickstep,
-                            onNavigate = { onNavigate(Quickstep) },
-                            isSelected = currentRoute is Quickstep,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelBackup,
-                            description = descBackup,
-                            iconResource = R.drawable.backup_restore,
-                            onNavigate = { onNavigate(BackupAndRestore) },
-                            isSelected = currentRoute is BackupAndRestore,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelExtras,
-                            description = descExtras,
-                            iconResource = R.drawable.ic_extras,
-                            onNavigate = { onNavigate(Extras) },
-                            isSelected = currentRoute is Extras,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                    Item(visible = true) {
-                        PreferenceCategory(
-                            label = labelAbout,
-                            description = aboutDescription,
-                            iconResource = R.drawable.ic_about,
-                            onNavigate = { onNavigate(About) },
-                            isSelected = currentRoute is About,
-                            isFirst = it.isFirst,
-                            isLast = it.isLast,
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -596,9 +619,7 @@ private fun SearchOverlay(
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     val filtered = remember(query, entries) {
         if (query.isBlank()) emptyList()
@@ -610,7 +631,6 @@ private fun SearchOverlay(
         }
     }
 
-    // ── Blur background (same pattern as PreferenceScaffold) ──────────────
     val prefs = preferenceManager()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
@@ -624,9 +644,7 @@ private fun SearchOverlay(
             withContext(Dispatchers.IO) {
                 SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
             }
-        } else {
-            null
-        }
+        } else null
     }
 
     val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
@@ -642,17 +660,9 @@ private fun SearchOverlay(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(scrimColor),
-            )
+            Box(modifier = Modifier.fillMaxSize().background(scrimColor))
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface),
-            )
+            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
         }
 
         Column(
@@ -696,7 +706,7 @@ private fun SearchOverlay(
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { /* keep keyboard open */ }),
+                keyboardActions = KeyboardActions(onSearch = {}),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -707,14 +717,12 @@ private fun SearchOverlay(
             )
 
             when {
-                query.isBlank() -> { /* empty state */ }
+                query.isBlank() -> {}
                 filtered.isEmpty() -> {
                     Spacer(modifier = Modifier.height(32.dp))
                     Text(
                         text = "No results for \"$query\"",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     )
@@ -744,7 +752,7 @@ private fun SearchOverlay(
     }
 }
 
-// ── Tap-to-activate search bar ────────────────────────────────────────────────
+// ── Tap-to-activate search bar pill ──────────────────────────────────────────
 @Composable
 private fun SettingsSearchBar(
     onActivate: () -> Unit,
@@ -778,9 +786,7 @@ private fun SettingsSearchBar(
 
 // ── Set default launcher card ─────────────────────────────────────────────────
 @Composable
-fun PreferencesSetDefaultLauncherCard(
-    modifier: Modifier = Modifier,
-) {
+fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Surface(
         modifier = modifier.padding(horizontal = 16.dp),
@@ -788,14 +794,12 @@ fun PreferencesSetDefaultLauncherCard(
         color = MaterialTheme.colorScheme.primary,
     ) {
         PreferenceTemplate(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    Intent(Settings.ACTION_HOME_SETTINGS)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        .let { context.startActivity(it) }
-                    (context as? Activity)?.finish()
-                },
+            modifier = Modifier.fillMaxWidth().clickable {
+                Intent(Settings.ACTION_HOME_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .let { context.startActivity(it) }
+                (context as? Activity)?.finish()
+            },
             title = {},
             description = {
                 Text(

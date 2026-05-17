@@ -194,10 +194,12 @@ fun HomeScreenPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_TOP_SHADOW, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.showTopShadow.getAdapter(),
                     label = stringResource(id = R.string.show_sys_ui_scrim),
                 )
+                }
             }
         }
         val columns by prefs.workspaceColumns.getAdapter()
@@ -326,18 +328,22 @@ fun HomeScreenPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_WIDGET_UNLIMITED, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.widgetUnlimitedSize.getAdapter(),
                     label = stringResource(id = R.string.widget_unlimited_size_label),
                     description = stringResource(id = R.string.widget_unlimited_size_description),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_WIDGET_RESIZE, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.forceWidgetResize.getAdapter(),
                     label = stringResource(id = R.string.force_widget_resize_label),
                     description = stringResource(id = R.string.force_widget_resize_description),
                 )
+                }
             }
         }
     }

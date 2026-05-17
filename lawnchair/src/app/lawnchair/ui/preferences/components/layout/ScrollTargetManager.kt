@@ -49,6 +49,9 @@ object ScrollKeys {
     const val HOME_ROUNDED_WIDGETS   = "home.rounded_widgets"
     const val HOME_WIDGET_OVERLAP    = "home.widget_overlap"
     const val HOME_FEED              = "home.feed"
+    const val HOME_TOP_SHADOW        = "home.top_shadow"
+    const val HOME_WIDGET_UNLIMITED  = "home.widget_unlimited"
+    const val HOME_WIDGET_RESIZE     = "home.widget_resize"
     const val HOME_APP_OPEN_ANIM     = "home.app_open_anim"
     const val HOME_APP_CLOSE_ANIM    = "home.app_close_anim"
     // Dock

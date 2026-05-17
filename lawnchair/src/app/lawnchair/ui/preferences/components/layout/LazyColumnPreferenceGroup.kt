@@ -46,11 +46,10 @@ fun LazyListScope.preferenceGroupItems(
         PreferenceGroupHeading(heading?.let { it() })
     }
     items(count, key, contentType) { index ->
-        // 3dp spacer OUTSIDE the Surface — exactly like the Legal section in About.
-        // Shows the wallpaper (or normal background) through the gap, matching the
-        // Spacer(3.dp) used between the Acknowledgements and Privacy policy cards.
+        // 4dp gap between items — matches Arrangement.spacedBy(4.dp) used in
+        // PreferenceGroup so the spacing is consistent across the settings UI.
         if (showDividers && index > 0) {
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(4.dp))
         }
         PreferenceGroupItem(
             cutTop = index > 0,
@@ -89,9 +88,12 @@ fun PreferenceGroupItem(
     cutBottom: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    // Large corner (28dp) on exposed ends, small corner (4dp) on inner joins —
+    // matches preferenceGroupItemShape(largeCorner=24dp, smallCorner=4dp) used
+    // by PreferenceGroup so all card groups look identical.
     val shape = remember(cutTop, cutBottom) {
-        val top = if (cutTop) 0.dp else 28.dp
-        val bottom = if (cutBottom) 0.dp else 28.dp
+        val top = if (cutTop) 4.dp else 28.dp
+        val bottom = if (cutBottom) 4.dp else 28.dp
         RoundedCornerShape(top, top, bottom, bottom)
     }
     Surface(

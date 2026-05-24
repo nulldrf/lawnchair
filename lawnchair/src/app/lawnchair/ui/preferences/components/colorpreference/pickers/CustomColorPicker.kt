@@ -39,6 +39,7 @@ import com.android.launcher3.R
 fun CustomColorPicker(
     selectedColor: Int,
     onSelect: (Int) -> Unit,
+    simple: Boolean = false,
 ) {
     var showCanvasDialog by remember { mutableStateOf(false) }
 
@@ -52,6 +53,7 @@ fun CustomColorPicker(
         // Static color swatch grid (4 columns, split-circle visual)
         SwatchGrid(
             entries = staticColors,
+            simple = simple,
             onSwatchClick = { option ->
                 when (option) {
                     is ColorOption.CustomColor -> onSelect(option.color)

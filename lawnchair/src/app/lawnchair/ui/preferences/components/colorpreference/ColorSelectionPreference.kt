@@ -64,6 +64,7 @@ fun ColorSelection(
     modifier: Modifier = Modifier,
     dynamicEntries: List<ColorPreferenceEntry<ColorOption>> = dynamicColors,
     staticEntries: List<ColorPreferenceEntry<ColorOption>> = staticColors,
+    useSimpleSwatches: Boolean = false,
 ) {
     val adapter = preference.getAdapter()
     val appliedColor = adapter.state.value
@@ -151,6 +152,7 @@ fun ColorSelection(
                             adapter.onChange(newValue = option)
                         },
                         includeDefault = includeDefault,
+                        simple = useSimpleSwatches,
                     )
                     1 -> CustomColorPicker(
                         selectedColor = selectedColor.intValue,
@@ -158,6 +160,7 @@ fun ColorSelection(
                             selectedColor.intValue = newColor
                             pendingCustomColor = newColor
                         },
+                        simple = useSimpleSwatches,
                     )
                 }
             }

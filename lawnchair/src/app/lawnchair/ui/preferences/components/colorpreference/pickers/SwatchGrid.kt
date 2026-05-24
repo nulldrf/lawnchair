@@ -10,6 +10,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -40,10 +42,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.MonetColorSchemeCompat
+import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.toAndroidColor
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.ui.theme.isSelectedThemeDark
@@ -56,9 +60,10 @@ object SwatchGridDefaults {
 }
 
 /**
- * @param colorStyle When non-null each swatch is rendered using this Monet style
- *   so the grid reflects the currently selected colour style (Presets page only).
- *   Pass null to always render with TONAL_SPOT (Custom page).
+ * @param colorStyle  When non-null each swatch is rendered using this Monet style
+ *   (Presets page only). Pass null to always render with TONAL_SPOT (Custom page).
+ * @param simple      When true, renders [SimpleColorSwatch] (solid circle + ring
+ *   selection) instead of the full split-circle Monet swatch design.
  */
 @Composable
 fun <T> SwatchGrid(
@@ -68,6 +73,7 @@ fun <T> SwatchGrid(
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
     colorStyle: ColorStyle? = null,
+    simple: Boolean = false,
 ) {
     val columnCount = SwatchGridDefaults.COLUMN_COUNT
     val rowCount = if (entries.isEmpty()) 0 else (entries.size - 1) / columnCount + 1
@@ -85,21 +91,29 @@ fun <T> SwatchGrid(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (entry != null) {
-                            ColorSwatch(
-                                entry = entry,
-                                onClick = { onSwatchClick(entry.value) },
-                                selected = isSwatchSelected(entry.value),
-                                colorStyle = colorStyle,
-                                // SystemAccent swatch always renders with TonalSpot
-                                // regardless of the active color style — LegacyKdrag
-                                // does not apply to the system accent visually.
-                                forceStyle = if (entry.value is app.lawnchair.theme.color.ColorOption.SystemAccent) {
-                                    app.lawnchair.theme.color.TonalSpot
-                                } else {
-                                    null
-                                },
-                                modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
-                            )
+                            if (simple) {
+                                SimpleColorSwatch(
+                                    entry = entry,
+                                    onClick = { onSwatchClick(entry.value) },
+                                    selected = isSwatchSelected(entry.value),
+                                    modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
+                                )
+                            } else {
+                                ColorSwatch(
+                                    entry = entry,
+                                    onClick = { onSwatchClick(entry.value) },
+                                    selected = isSwatchSelected(entry.value),
+                                    colorStyle = colorStyle,
+                                    // SystemAccent always renders with TonalSpot regardless
+                                    // of active style — LegacyKdrag doesn't apply visually.
+                                    forceStyle = if (entry.value is ColorOption.SystemAccent) {
+                                        TonalSpot
+                                    } else {
+                                        null
+                                    },
+                                    modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
+                                )
+                            }
                         }
                     }
                 }
@@ -109,6 +123,78 @@ fun <T> SwatchGrid(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Simple swatch — solid circle, ring selection indicator
+// ---------------------------------------------------------------------------
+
+/**
+ * A plain filled circle swatch used for non-accent color preferences.
+ * Selected state is shown as a ring/outline around the circle in the swatch's
+ * own color, with an animated size increase — no checkmark, no container.
+ */
+@Composable
+fun <T> SimpleColorSwatch(
+    entry: ColorPreferenceEntry<T>,
+    onClick: () -> Unit,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val isDark = isSelectedThemeDark
+    val colorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
+    val color = if (colorInt != 0) Color(colorInt) else MaterialTheme.colorScheme.surfaceVariant
+
+    // Ring animates thicker/larger on selection
+    val ringWidth by animateDpAsState(
+        targetValue = if (selected) 3.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "ringWidth_$selected",
+    )
+    val ringPadding by animateDpAsState(
+        targetValue = if (selected) 3.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "ringPadding_$selected",
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(1f),
+    ) {
+        // Outer ring — same color as the swatch, animated
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .border(ringWidth, color, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Inner filled circle with padding to create gap between circle and ring
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .padding(ringPadding + ringWidth)
+                    .clip(CircleShape)
+                    .background(color)
+                    .clickable(onClick = onClick),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Full Monet swatch — split-circle, used for accent color only
+// ---------------------------------------------------------------------------
+
 @Composable
 fun <T> ColorSwatch(
     entry: ColorPreferenceEntry<T>,
@@ -116,29 +202,17 @@ fun <T> ColorSwatch(
     selected: Boolean,
     modifier: Modifier = Modifier,
     colorStyle: ColorStyle? = null,
-    // Override the colorStyle for this specific swatch, ignoring the grid-level style.
-    // Used to force TonalSpot for SystemAccent regardless of active color style.
     forceStyle: ColorStyle? = null,
 ) {
     val context = LocalContext.current
     val isDark = isSelectedThemeDark
     val baseColorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
 
-    // Build a Monet palette seeded from this swatch's colour.
-    // When colorStyle is provided (Presets page) use it so swatches visually
-    // reflect the active style (e.g. Monochromatic looks desaturated).
-    // When null (Custom page) always use TONAL_SPOT for consistent static colours.
     val effectiveStyle = forceStyle ?: colorStyle
     val scheme: ColorScheme = remember(baseColorInt, effectiveStyle) {
         buildScheme(baseColorInt, effectiveStyle)
     }
 
-    // accent1[100] → top half of outer circle   (light primary pastel)
-    // accent3[100] → bottom half of outer circle (light tertiary pastel)
-    // accent1[600] → inner circle fill           (bold/vibrant primary)
-    // Container bg:
-    //   light → accent1[50]  (faint tinted surface)
-    //   dark  → accent1[900] (deep tinted surface)
     val topHalf = remember(scheme) {
         Color(scheme.accent1[100]?.toAndroidColor() ?: baseColorInt)
     }
@@ -215,11 +289,6 @@ fun <T> ColorSwatch(
     }
 }
 
-/**
- * Builds a [ColorScheme] for [seedColor] using the given [colorStyle].
- * LegacyKdrag uses the kdrag0n ZCAM engine; everything else uses [MonetColorSchemeCompat].
- * When [colorStyle] is null, defaults to TONAL_SPOT.
- */
 private fun buildScheme(seedColor: Int, colorStyle: ColorStyle?): ColorScheme =
     when (colorStyle) {
         is LegacyKdrag -> KdragMonetColorScheme(seedColor)

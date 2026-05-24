@@ -17,18 +17,24 @@ class ColorPreferenceModelList @Inject constructor(
 
     init {
         val prefs = PreferenceManager2.getInstance(context)
+
+        // Accent color — uses the full split-circle Monet swatch design.
         registerModel(
             ColorPreferenceModel(
                 prefObject = prefs.accentColor,
                 labelRes = R.string.accent_color,
                 dynamicEntries = dynamicColors,
+                useSimpleSwatches = false,
             ),
         )
+
+        // All other color preferences — use simple solid-circle swatches.
         registerModel(
             ColorPreferenceModel(
                 prefObject = prefs.strokeColorStyle,
                 labelRes = R.string.qsb_hotseat_stroke_color,
                 dynamicEntries = dynamicColors,
+                useSimpleSwatches = true,
             ),
         )
         registerModel(
@@ -36,6 +42,7 @@ class ColorPreferenceModelList @Inject constructor(
                 prefObject = prefs.hotseatBackgroundColor,
                 labelRes = R.string.hotseat_bg_color_label,
                 dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
             ),
         )
         registerModel(
@@ -43,6 +50,7 @@ class ColorPreferenceModelList @Inject constructor(
                 prefObject = prefs.appDrawerBackgroundColor,
                 labelRes = R.string.app_drawer_bg_color_label,
                 dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
             ),
         )
         registerModel(
@@ -50,6 +58,7 @@ class ColorPreferenceModelList @Inject constructor(
                 prefObject = prefs.workProfileTabBackgroundColor,
                 labelRes = R.string.work_profile_tab_background_label,
                 dynamicEntries = dynamicColors,
+                useSimpleSwatches = true,
             ),
         )
         registerModel(
@@ -57,6 +66,7 @@ class ColorPreferenceModelList @Inject constructor(
                 prefObject = prefs.notificationDotColor,
                 labelRes = R.string.notification_dots_color,
                 dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
             ),
         )
         registerModel(
@@ -64,6 +74,7 @@ class ColorPreferenceModelList @Inject constructor(
                 prefObject = prefs.notificationDotTextColor,
                 labelRes = R.string.notification_dots_text_color,
                 dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
             ),
         )
         registerModel(
@@ -71,6 +82,7 @@ class ColorPreferenceModelList @Inject constructor(
                 prefObject = prefs.folderColor,
                 labelRes = R.string.folder_preview_bg_color_label,
                 dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
             ),
         )
     }

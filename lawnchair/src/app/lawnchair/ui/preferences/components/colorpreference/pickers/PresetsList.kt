@@ -57,6 +57,7 @@ fun WallpaperColorGrid(
     onApplyOption: (ColorOption) -> Unit,
     includeDefault: Boolean,
     modifier: Modifier = Modifier,
+    simple: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -124,6 +125,7 @@ fun WallpaperColorGrid(
         // Pass the active style so presets swatches reflect e.g. Monochromatic.
         // The banner still shows the raw dot colour, not the processed palette.
         colorStyle = currentColorStyle,
+        simple = simple,
     )
 }
 

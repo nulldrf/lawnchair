@@ -235,6 +235,7 @@ fun PreferenceNavigation(
                 label = stringResource(id = model.labelRes),
                 preference = model.prefObject,
                 dynamicEntries = model.dynamicEntries,
+                useSimpleSwatches = model.useSimpleSwatches,
             )
         }
 

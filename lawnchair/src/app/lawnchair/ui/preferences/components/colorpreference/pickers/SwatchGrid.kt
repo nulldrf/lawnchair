@@ -169,7 +169,8 @@ fun <T> SimpleColorSwatch(
     ) {
         Canvas(
             modifier = Modifier
-                .size(44.dp)
+                .fillMaxWidth()
+                .aspectRatio(1f)
                 .clickable(onClick = onClick),
         ) {
             val circleRadius = (size.minDimension / 2f) - (ringStroke.toPx() + ringGap.toPx())

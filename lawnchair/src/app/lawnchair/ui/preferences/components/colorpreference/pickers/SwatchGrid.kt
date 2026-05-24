@@ -10,7 +10,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -129,8 +127,8 @@ fun <T> SwatchGrid(
 
 /**
  * A plain filled circle swatch used for non-accent color preferences.
- * Selected state is shown as a ring/outline around the circle in the swatch's
- * own color, with an animated size increase — no checkmark, no container.
+ * Selected state is shown as a ring drawn via Canvas — no padding modifier
+ * so spring overshoot can never cause a negative-padding crash.
  */
 @Composable
 fun <T> SimpleColorSwatch(
@@ -144,22 +142,23 @@ fun <T> SimpleColorSwatch(
     val colorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
     val color = if (colorInt != 0) Color(colorInt) else MaterialTheme.colorScheme.surfaceVariant
 
-    // Ring animates thicker/larger on selection
-    val ringWidth by animateDpAsState(
-        targetValue = if (selected) 3.dp else 0.dp,
+    // Ring stroke width — animate with no-bounce spring to avoid negative values
+    val ringStroke by animateDpAsState(
+        targetValue = if (selected) 2.5.dp else 0.dp,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "ringWidth_$selected",
+        label = "ringStroke_$selected",
     )
-    val ringPadding by animateDpAsState(
+    // Gap between circle edge and ring
+    val ringGap by animateDpAsState(
         targetValue = if (selected) 3.dp else 0.dp,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "ringPadding_$selected",
+        label = "ringGap_$selected",
     )
 
     Box(
@@ -168,25 +167,30 @@ fun <T> SimpleColorSwatch(
             .fillMaxWidth()
             .aspectRatio(1f),
     ) {
-        // Outer ring — same color as the swatch, animated
-        Box(
+        Canvas(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(CircleShape)
-                .border(ringWidth, color, CircleShape),
-            contentAlignment = Alignment.Center,
+                .size(44.dp)
+                .clickable(onClick = onClick),
         ) {
-            // Inner filled circle with padding to create gap between circle and ring
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .padding(ringPadding + ringWidth)
-                    .clip(CircleShape)
-                    .background(color)
-                    .clickable(onClick = onClick),
+            val circleRadius = (size.minDimension / 2f) - (ringStroke.toPx() + ringGap.toPx())
+            // Solid filled circle
+            drawCircle(
+                color = color,
+                radius = circleRadius.coerceAtLeast(1f),
+                center = center,
             )
+            // Ring drawn outside the circle
+            if (ringStroke.value > 0f) {
+                drawCircle(
+                    color = color,
+                    radius = (circleRadius + ringGap.toPx() + ringStroke.toPx() / 2f)
+                        .coerceAtLeast(1f),
+                    center = center,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = ringStroke.toPx().coerceAtLeast(0f),
+                    ),
+                )
+            }
         }
     }
 }

@@ -35,6 +35,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
@@ -61,6 +62,7 @@ import android.view.ViewOutlineProvider;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 
 import androidx.annotation.NonNull;
@@ -113,6 +115,7 @@ import java.util.stream.Stream;
 
 import com.patrykmichalik.opto.core.PreferenceExtensionsKt;
 import static com.topjohnwu.superuser.internal.Utils.context;
+import app.lawnchair.allapps.DrawerWallpaperBlurHelper;
 import app.lawnchair.allapps.LawnchairAlphabeticalAppsList;
 import app.lawnchair.font.FontManager;
 import app.lawnchair.preferences.PreferenceManager;
@@ -211,6 +214,17 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     // LC-Note: Allapps cache colour
     private int mCachedBottomSheetBgColor;
+
+    // -----------------------------------------------------------------------
+    // HokoBlur drawer background
+    //
+    // mBlurBackgroundView is inserted at z-index 0 (behind all other children)
+    // so the blurred wallpaper appears as the drawer background.  It is only
+    // shown on phones (non-sheet layout) to avoid covering the ScrimView-drawn
+    // tablet bottom-sheet chrome.  The actual bitmap is computed off-thread
+    // via UI_HELPER_EXECUTOR and then posted back to the UI thread.
+    // -----------------------------------------------------------------------
+    @Nullable private ImageView mBlurBackgroundView;
 
     public ActivityAllAppsContainerView(Context context) {
         this(context, null);
@@ -322,6 +336,23 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mSearchContainer.setFocusedByDefault(true);
         }
         mSearchUiManager = (SearchUiManager) mSearchContainer;
+
+        // -----------------------------------------------------------------------
+        // HokoBlur background view
+        //
+        // Inserted at index 0 so it is drawn first (behind every other child).
+        // MATCH_PARENT sizing ensures it fills the entire AllApps container on
+        // phones.  It is hidden by default and shown conditionally by
+        // applyDrawerHokoBlur() once the preference value is known.
+        // -----------------------------------------------------------------------
+        mBlurBackgroundView = new ImageView(getContext());
+        mBlurBackgroundView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        RelativeLayout.LayoutParams blurParams = new RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.MATCH_PARENT,
+                RelativeLayout.LayoutParams.MATCH_PARENT);
+        mBlurBackgroundView.setLayoutParams(blurParams);
+        mBlurBackgroundView.setVisibility(GONE);
+        addView(mBlurBackgroundView, 0); // index 0 = behind all other views
     }
 
     public List<AllAppsRow> getAdditionalHeaderRows() {
@@ -361,6 +392,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
         updateBackgroundVisibility(mActivityContext.getDeviceProfile());
         mSearchUiManager.initializeSearch(this);
+
+        // Apply HokoBlur drawer background if the preference is enabled.
+        // Runs after all views are ready so the ImageView bitmap can be set safely.
+        applyDrawerHokoBlur();
     }
 
     @Override
@@ -1153,6 +1188,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (needsInvalidate) {
             invalidate();
         }
+
+        // Screen dimensions may have changed (e.g. rotation): clear the cached blur bitmap
+        // so applyDrawerHokoBlur() recomputes at the correct size for the new device profile.
+        DrawerWallpaperBlurHelper.clearCache();
+        applyDrawerHokoBlur();
     }
 
     protected void updateBackgroundVisibility(DeviceProfile deviceProfile) {
@@ -1736,6 +1776,61 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public SearchTransitionController getSearchTransitionController() {
         return mSearchTransitionController;
     }
+
+    // -----------------------------------------------------------------------
+    // HokoBlur drawer background
+    // -----------------------------------------------------------------------
+
+    /**
+     * Shows or hides the HokoBlur blurred-wallpaper background behind the app drawer.
+     *
+     * <p>Only active on phones (non-sheet layout).  On tablets the AllApps sheet
+     * background is drawn by {@link ScrimView} via
+     * {@link #drawOnScrimWithScaleAndBottomOffset}, so inserting a full-MATCH_PARENT
+     * ImageView there would cover the sheet chrome incorrectly.
+     *
+     * <p>Bitmap computation is offloaded to {@code UI_HELPER_EXECUTOR}; the result
+     * is posted back to the UI thread.  Subsequent calls with the same intensity
+     * value return immediately from the in-memory cache without spawning another
+     * background task.
+     */
+    private void applyDrawerHokoBlur() {
+        boolean blurEnabled = PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurBackground());
+
+        // Tablet bottom-sheet mode: keep the ImageView hidden; blur there is
+        // drawn by ScrimView and is not supported via this path yet.
+        if (!blurEnabled || mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
+            if (mBlurBackgroundView != null) {
+                mBlurBackgroundView.setVisibility(GONE);
+            }
+            return;
+        }
+
+        int intensity = Math.round(
+                PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurIntensity()));
+
+        // Capture application context so the background thread does not hold a
+        // reference to the Activity/View hierarchy.
+        final Context appContext = getContext().getApplicationContext();
+
+        UI_HELPER_EXECUTOR.execute(() -> {
+            Bitmap blurred = DrawerWallpaperBlurHelper.getBlurredBitmap(appContext, intensity);
+            post(() -> {
+                if (mBlurBackgroundView == null) return;
+                if (blurred != null) {
+                    mBlurBackgroundView.setImageBitmap(blurred);
+                    mBlurBackgroundView.setVisibility(VISIBLE);
+                } else {
+                    // Wallpaper could not be read (permission missing, etc.); hide view.
+                    mBlurBackgroundView.setVisibility(GONE);
+                }
+            });
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // End of HokoBlur drawer background
+    // -----------------------------------------------------------------------
 
     /** Holds a {@link BaseAllAppsAdapter} and related fields. */
     public class AdapterHolder {

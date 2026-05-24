@@ -791,6 +791,11 @@
     <string name="edit_menu_items">Edit pop-up menu items</string>
 
     <string name="wallpaper_quick_picker">Wallpaper quick picker</string>
+	
+    <string name="drawer_hoko_blur_group_label">App Drawer Blur</string>
+    <string name="drawer_hoko_blur_label">Blur App Drawer Background</string>
+    <string name="drawer_hoko_blur_description">Blurs the wallpaper behind the app drawer</string>
+    <string name="drawer_hoko_blur_intensity_label">Blur Intensity</string>
 
     <string name="status_bar_label">Status bar</string>
     <string name="show_status_bar">Show status bar</string>

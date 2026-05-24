@@ -28,6 +28,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.lawnchair.allapps.DrawerWallpaperBlurHelper
 import app.lawnchair.data.Converters
 import app.lawnchair.font.FontCache
 import app.lawnchair.gestures.config.GestureHandlerConfig
@@ -426,6 +427,36 @@ class PreferenceManager2 @Inject constructor(
         key = booleanPreferencesKey(name = "show_suggested_apps_at_drawer_top"),
         defaultValue = context.resources.getBoolean(R.bool.config_default_show_suggested_apps_at_drawer_top),
         onSet = { reloadHelper.recreate() },
+    )
+
+    // -----------------------------------------------------------------------
+    // App Drawer HokoBlur
+    //
+    // Uses the HokoBlur library to render a blurred wallpaper bitmap behind
+    // the app drawer on phones (non-sheet layout).  Tablet / bottom-sheet
+    // mode is intentionally excluded to avoid visual conflicts with the
+    // ScrimView-managed sheet background.
+    //
+    // drawerBlurIntensity changes clear the DrawerWallpaperBlurHelper cache
+    // in addition to recreating the launcher so the new radius is applied
+    // immediately on the fresh instance.
+    // -----------------------------------------------------------------------
+
+    val drawerBlurBackground = preference(
+        key = booleanPreferencesKey(name = "drawer_hoko_blur_background"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val drawerBlurIntensity = preference(
+        key = floatPreferencesKey(name = "drawer_hoko_blur_intensity"),
+        defaultValue = 75f,
+        onSet = {
+            // Clear cached bitmap so the next applyDrawerHokoBlur() recomputes
+            // with the new intensity value after the launcher is recreated.
+            DrawerWallpaperBlurHelper.clearCache()
+            reloadHelper.recreate()
+        },
     )
 
     val enableFontSelection = preference(

@@ -153,7 +153,6 @@ fun HomeScreenPreferences(
         }
         PreferenceGroup(heading = stringResource(R.string.style)) {
             Item { ScrollAnchor(ScrollKeys.HOME_TEXT_COLOR, scrollState) { HomeScreenTextColorPreference() } }
-            // ── App-open animation (backported from Lawnchair 2) ──────────────
             Item {
                 ScrollAnchor(ScrollKeys.HOME_APP_OPEN_ANIM, scrollState) {
                 AppOpenAnimationPreference(
@@ -162,7 +161,6 @@ fun HomeScreenPreferences(
                 )
                 }
             }
-            // ── GNC / app-close overlay ───────────────────────────────────────
             Item {
                 ScrollAnchor(ScrollKeys.HOME_APP_CLOSE_ANIM, scrollState) {
                 OverlayHandlerPreference(
@@ -202,36 +200,6 @@ fun HomeScreenPreferences(
                 }
             }
         }
-
-        // -----------------------------------------------------------------------
-        // App Drawer Blur (HokoBlur)
-        //
-        // Replaces the system cross-window blur with the HokoBlur library.
-        // Active on phones only; tablet / bottom-sheet mode is not supported
-        // via this path (it would require drawing on the ScrimView canvas).
-        // -----------------------------------------------------------------------
-        val drawerBlurBackgroundAdapter = prefs2.drawerBlurBackground.getAdapter()
-        PreferenceGroup(heading = stringResource(id = R.string.drawer_hoko_blur_group_label)) {
-            Item {
-                SwitchPreference(
-                    adapter = drawerBlurBackgroundAdapter,
-                    label = stringResource(id = R.string.drawer_hoko_blur_label),
-                    description = stringResource(id = R.string.drawer_hoko_blur_description),
-                )
-            }
-            Item(
-                key = "drawer_hoko_blur_intensity",
-                visible = drawerBlurBackgroundAdapter.state.value,
-            ) {
-                SliderPreference(
-                    label = stringResource(id = R.string.drawer_hoko_blur_intensity_label),
-                    adapter = prefs2.drawerBlurIntensity.getAdapter(),
-                    step = 5f,
-                    valueRange = 10f..150f,
-                )
-            }
-        }
-
         val columns by prefs.workspaceColumns.getAdapter()
         val rows by prefs.workspaceRows.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.layout)) {

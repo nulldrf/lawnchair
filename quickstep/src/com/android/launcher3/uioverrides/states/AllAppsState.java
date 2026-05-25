@@ -25,7 +25,6 @@ import android.graphics.Color;
 import app.lawnchair.theme.color.tokens.ColorTokens;
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
@@ -47,7 +46,6 @@ public class AllAppsState extends LauncherState {
             FLAG_WORKSPACE_INACCESSIBLE | FLAG_CLOSE_POPUPS | FLAG_HOTSEAT_INACCESSIBLE;
     private static final long BACK_CUJ_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
 
-
     public AllAppsState(int id) {
         super(id, LAUNCHER_STATE_ALLAPPS, STATE_FLAGS);
     }
@@ -61,8 +59,6 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public void onBackStarted(Launcher launcher) {
-        // Because the back gesture can take longer time depending on when user release the finger,
-        // we pass BACK_CUJ_TIMEOUT_MS as timeout to the jank monitor.
         InteractionJankMonitorWrapper.begin(launcher.getAppsView(),
                 Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK, BACK_CUJ_TIMEOUT_MS);
         super.onBackStarted(launcher);
@@ -70,10 +66,6 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public void onBackInvoked(Launcher launcher) {
-        // In predictive back swipe, onBackInvoked() will be called after onBackStarted().
-        // In 3 button mode, onBackStarted() is not called but onBackInvoked() will be called.
-        // Thus In onBackInvoked(), we should only begin instrumenting if we didn't call
-        // onBackStarted() to start instrumenting CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK.
         if (!InteractionJankMonitorWrapper.isInstrumenting(Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK)) {
             InteractionJankMonitorWrapper.begin(
                     launcher.getAppsView(), Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
@@ -81,7 +73,6 @@ public class AllAppsState extends LauncherState {
         super.onBackInvoked(launcher);
     }
 
-    /** Called when predictive back swipe is cancelled. */
     @Override
     public void onBackCancelled(Launcher launcher) {
         super.onBackCancelled(launcher);
@@ -91,10 +82,8 @@ public class AllAppsState extends LauncherState {
     @Override
     protected void onBackAnimationCompleted(boolean success) {
         if (success) {
-            // Animation was successful.
             InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
         } else {
-            // Animation was canceled.
             InteractionJankMonitorWrapper.cancel(Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
         }
     }
@@ -140,13 +129,9 @@ public class AllAppsState extends LauncherState {
         if (context.getDeviceProfile().shouldShowAllAppsOnSheet()) {
             return context.getDeviceProfile().getBottomSheetProfile().getBottomSheetDepth();
         } else {
-            // The scrim fades in at approximately 50% of the swipe gesture.
             if (enableScalingRevealHomeAnimation()) {
-                // This means that the depth should be twice of what we want, in order to fully zoom
-                // out during the visible portion of the animation.
                 return BaseDepthController.DEPTH_60_PERCENT;
             } else {
-                // This means that the depth should be greater than 1, in order to fully zoom out.
                 return 2f;
             }
         }
@@ -180,7 +165,7 @@ public class AllAppsState extends LauncherState {
     }
 
     private static boolean isWorkspaceVisible(DeviceProfile deviceProfile) {
-        return deviceProfile.getDeviceProperties().isTablet() || (Flags.allAppsSheetForHandheld() && Flags.allAppsBlur());
+        return deviceProfile.getDeviceProperties().isTablet();
     }
 
     @Override
@@ -208,16 +193,19 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScrimColors getWorkspaceScrimColor(Launcher launcher) {
-        int backgroundColor;
+        // LC-Note: System cross-window blur (Flags.allAppsBlur) has been removed in favour of
+        // HokoBlur.  The scrim colour is now always one of two solid-colour paths:
+        //   • No sheet (phones)  → AllAppsScrimColor (opaque dark scrim)
+        //   • Sheet (tablets)    → HokoBlur-aware background colour
+        final int backgroundColor;
         if (!launcher.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            // Always use an opaque scrim if there's no sheet.
+            // Phone: always use the opaque all-apps scrim colour.
             backgroundColor = ColorTokens.AllAppsScrimColor.resolveColor(launcher);
-        } else if (!Flags.allAppsBlur()) {
-            // If there's a sheet but no blur, use the old scrim color.
-            backgroundColor = LawnchairUtilsKt.getAllAppsBackgroundColor(launcher, 
-                ColorTokens.WidgetsPickerScrim.resolveColor(launcher));
         } else {
-            backgroundColor = ColorTokens.AllAppsScrimColor.resolveColor(launcher);
+            // Tablet sheet: use the Lawnchair drawer background colour (honours
+            // the user-chosen background colour + opacity from preferences).
+            backgroundColor = LawnchairUtilsKt.getAllAppsBackgroundColor(
+                    launcher, ColorTokens.WidgetsPickerScrim.resolveColor(launcher));
         }
         return new ScrimColors(backgroundColor, /* foregroundColor */ Color.TRANSPARENT);
     }

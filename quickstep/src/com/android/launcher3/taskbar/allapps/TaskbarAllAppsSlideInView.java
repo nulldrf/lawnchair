@@ -33,10 +33,8 @@ import android.os.Looper;
 import android.os.Trace;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.CrossWindowBlurListeners;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewRootImpl;
 import android.view.animation.Interpolator;
 import android.window.OnBackInvokedDispatcher;
 
@@ -46,7 +44,6 @@ import app.lawnchair.theme.color.tokens.ColorTokens;
 import app.lawnchair.util.LawnchairUtilsKt;
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -54,38 +51,34 @@ import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.taskbar.allapps.TaskbarAllAppsViewController.TaskbarAllAppsCallbacks;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.AbstractSlideInView;
 
 import java.util.function.Consumer;
 
-/** Wrapper for taskbar all apps with slide-in behavior. */
+/** Wrapper for taskbar all apps with slide-in behaviour. */
 public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverlayContext>
         implements Insettable, DeviceProfile.OnDeviceProfileChangeListener {
+
     private static final String TAG = "TaskbarAllAppsSlideInView";
 
     private final Handler mHandler;
-    private final int mMaxBlurRadius;
+    // LC-Note: System blur (mMaxBlurRadius / mBlurRadius / CrossWindowBlurListeners) removed.
+    // The overlay controller is told 0 so the system blur is disabled.
     private final Consumer<Boolean> mWindowBlurListener = blursEnabled -> invalidate();
 
     private TaskbarAllAppsContainerView mAppsView;
     private float mShiftRange;
-    private int mBlurRadius;
     private @Nullable Runnable mShowOnFullyAttachedToWindowRunnable;
 
-    // Initialized in init.
     private TaskbarAllAppsCallbacks mAllAppsCallbacks;
 
     public TaskbarAllAppsSlideInView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public TaskbarAllAppsSlideInView(Context context, AttributeSet attrs,
-            int defStyleAttr) {
+    public TaskbarAllAppsSlideInView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mHandler = new Handler(Looper.myLooper());
-        mMaxBlurRadius = getResources().getDimensionPixelSize(
-                R.dimen.max_depth_blur_radius_enhanced);
     }
 
     void init(TaskbarAllAppsCallbacks callbacks) {
@@ -103,7 +96,6 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
             @Override
             public void onViewAttachedToWindow(View v) {
                 removeOnAttachStateChangeListener(this);
-                // Wait for view and its descendants to be fully attached before starting open.
                 mShowOnFullyAttachedToWindowRunnable = () -> showOnFullyAttachedToWindow(animate);
                 mHandler.post(mShowOnFullyAttachedToWindowRunnable);
             }
@@ -117,21 +109,15 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     }
 
     private void showOnFullyAttachedToWindow(boolean animate) {
-        if (mActivityContext.isAllAppsBackgroundBlurEnabled()) {
-            ViewRootImpl overlayVri = mActivityContext.getRootView().getViewRootImpl();
-            if (overlayVri == null) {
-                Log.w(TAG, "overlayVRI is null, cannot notifyRendererOfExpensiveFrame()");
-            } else {
-                Trace.instantForTrack(TRACE_TAG_APP, TAG, "notifyRendererForGpuLoadUp");
-                overlayVri.notifyRendererForGpuLoadUp("opening taskbar all apps");
-                overlayVri.notifyRendererOfExpensiveFrame();
-            }
-        }
+        // LC-Note: isAllAppsBackgroundBlurEnabled / notifyRendererOfExpensiveFrame block removed;
+        // system cross-window blur has been replaced by HokoBlur.
+
         mAllAppsCallbacks.onAllAppsTransitionStart(true);
         if (!animate) {
             mAllAppsCallbacks.onAllAppsTransitionEnd(true);
             setTranslationShift(TRANSLATION_SHIFT_OPENED);
-            mBlurRadius = mMaxBlurRadius;
+            // System blur disabled; tell overlay controller radius = 0.
+            mActivityContext.getOverlayController().setBackgroundBlurRadius(0);
             return;
         }
 
@@ -156,15 +142,8 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
             animation.setViewAlpha(mAppsView, 1 - mToTranslationShift, allAppsFadeInterpolator);
         }
 
-        if (Flags.allAppsBlur()) {
-            Interpolator blurInterpolator = isOpening ? LINEAR : DECELERATED_EASE;
-            animation.addOnFrameListener(a -> {
-                float blurProgress =
-                        isOpening ? a.getAnimatedFraction() : 1 - a.getAnimatedFraction();
-                mBlurRadius =
-                        (int) (mMaxBlurRadius * blurInterpolator.getInterpolation(blurProgress));
-            });
-        }
+        // LC-Note: Flags.allAppsBlur() blur-radius animation block removed entirely.
+        // System cross-window blur has been replaced by HokoBlur; mBlurRadius stays 0.
 
         mAllAppsCallbacks.onAllAppsAnimationPending(animation, isOpening);
     }
@@ -179,7 +158,6 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
                 : Interpolators.reverse(SCRIM_FADE_MANUAL);
     }
 
-    /** The apps container inside this view. */
     TaskbarAllAppsContainerView getAppsView() {
         return mAppsView;
     }
@@ -221,7 +199,6 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         }
         mContent = mAppsView;
 
-        // Setup header protection for search bar, if enabled.
         mAppsView.setOnInvalidateHeaderListener(this::invalidate);
 
         DeviceProfile dp = mActivityContext.getDeviceProfile();
@@ -240,7 +217,7 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
             dispatcher.registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT, this);
         }
-        CrossWindowBlurListeners.getInstance().addListener(MAIN_EXECUTOR, mWindowBlurListener);
+        // LC-Note: CrossWindowBlurListeners removed; system blur replaced by HokoBlur.
     }
 
     @Override
@@ -254,19 +231,14 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         if (dispatcher != null) {
             dispatcher.unregisterOnBackInvokedCallback(this);
         }
-        CrossWindowBlurListeners.getInstance().removeListener(mWindowBlurListener);
+        // LC-Note: CrossWindowBlurListeners removed; system blur replaced by HokoBlur.
     }
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        // We should call drawOnScrimWithBottomOffset() rather than drawOnScrimWithScale(). Because
-        // for taskbar all apps, the scrim view is a child view of AbstractSlideInView. Thus scaling
-        // down in AbstractSlideInView#onScaleProgressChanged() with SCALE_PROPERTY has already
-        // done the job - there is no need to re-apply scale effect here. But it also means we need
-        // to pass extra bottom offset to background scrim to fill the bottom gap during predictive
-        // back swipe.
         mAppsView.drawOnScrimWithBottomOffset(canvas, getBottomOffsetPx());
-        mActivityContext.getOverlayController().setBackgroundBlurRadius(mBlurRadius);
+        // LC-Note: System blur removed; pass 0 so the overlay controller disables its blur.
+        mActivityContext.getOverlayController().setBackgroundBlurRadius(0);
         super.dispatchDraw(canvas);
     }
 
@@ -276,17 +248,24 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         setTranslationShift(mTranslationShift);
     }
 
+    /**
+     * LC-Note: System cross-window blur has been replaced by HokoBlur.
+     *
+     * <p>Two solid-colour paths remain:
+     * <ul>
+     *   <li>No sheet (phone) → opaque {@code AllAppsScrimColor}</li>
+     *   <li>Sheet (tablet)   → Lawnchair-aware background colour (honours user prefs)</li>
+     * </ul>
+     */
     @Override
     protected int getScrimColor(Context context) {
         if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            // Always use an opaque scrim if there's no sheet.
             return ColorTokens.AllAppsScrimColor.resolveColor(context);
-        } else if (!Flags.allAppsBlur()) {
-            // If there's a sheet but no blur, use the old scrim color.
-            return LawnchairUtilsKt.getAllAppsBackgroundColor(context, 
-                ColorTokens.WidgetsPickerScrim.resolveColor(context));
         }
-        return ColorTokens.AllAppsScrimColor.resolveColor(context);
+        // Tablet sheet: use the Lawnchair-aware colour that respects the user's
+        // chosen background colour and opacity.
+        return LawnchairUtilsKt.getAllAppsBackgroundColor(
+                context, ColorTokens.WidgetsPickerScrim.resolveColor(context));
     }
 
     @Override
@@ -308,7 +287,8 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     public void onDeviceProfileChanged(DeviceProfile dp) {
         setShiftRange(dp.allAppsShiftRange);
         setTranslationShift(TRANSLATION_SHIFT_OPENED);
-        mBlurRadius = mMaxBlurRadius;
+        // LC-Note: System blur removed; mBlurRadius = mMaxBlurRadius replaced with 0.
+        mActivityContext.getOverlayController().setBackgroundBlurRadius(0);
     }
 
     private void setShiftRange(float shiftRange) {
@@ -325,10 +305,6 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
         return getPopupContainer().isEventOverView(mAppsView.getVisibleContainerView(), ev);
     }
 
-    /**
-     * In taskbar all apps search mode, we should scale down content inside all apps, rather
-     * than the whole all apps bottom sheet, to indicate we will navigate back within the all apps.
-     */
     @Override
     public boolean shouldAnimateContentViewInBackSwipe() {
         return mAllAppsCallbacks.canHandleSearchBackInvoked();
@@ -344,8 +320,6 @@ public class TaskbarAllAppsSlideInView extends AbstractSlideInView<TaskbarOverla
     @Override
     public void onBackInvoked() {
         if (mAllAppsCallbacks.handleSearchBackInvoked()) {
-            // We need to scale back taskbar all apps if we navigate back within search inside all
-            // apps
             post(this::animateSwipeToDismissProgressToStart);
         } else {
             super.onBackInvoked();

@@ -146,6 +146,10 @@ fun <T> SimpleColorSwatch(
     val colorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
     val isDefault = colorInt == 0
     val color = if (!isDefault) Color(colorInt) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    // For the Default "A" badge: use onSurface for the inner circle bg so it's
+    // always visible — dark in light mode, light in dark mode (inverted).
+    val defaultBadgeBg = MaterialTheme.colorScheme.surfaceVariant
+    val defaultBadgeFg = MaterialTheme.colorScheme.onSurfaceVariant
 
     // Ring stroke width — animate with no-bounce spring to avoid negative values
     val ringStroke by animateDpAsState(
@@ -200,20 +204,22 @@ fun <T> SimpleColorSwatch(
                     )
                 }
             }
-            // "Managed by Lawnchair" Default option: "A" letter in a smaller inner circle
+            // "Managed by Lawnchair" Default option: "A" letter in a smaller inner circle.
+            // Uses surfaceVariant bg + onSurfaceVariant fg so it is always legible
+            // in both light and dark mode without needing alpha adjustments.
             if (isDefault) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .fillMaxWidth(0.45f)
+                        .fillMaxWidth(0.52f)
                         .aspectRatio(1f)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
+                        .background(defaultBadgeBg),
                 ) {
                     Text(
                         text = "A",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = defaultBadgeFg,
                     )
                 }
             }

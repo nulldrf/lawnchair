@@ -144,14 +144,16 @@ fun <T> SimpleColorSwatch(
 ) {
     val context = LocalContext.current
     val isDark = isSelectedThemeDark
-    val colorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
-    val isDefault = colorInt == 0
-    // Default/Managed-by-Lawnchair: hardcoded gray outer circle, light inner
-    // badge with dark letter — mirrors the folder preference dot appearance and
-    // is always legible on both light and dark backgrounds.
-    val color = if (!isDefault) Color(colorInt) else Color(0xFF9E9E9E)  // Gray 400
+    // Check lightColor == 0 to detect Default — darkColor calls lightenColor(0)
+    // which returns a non-zero value, so checking colorInt == 0 in dark mode fails.
+    val lightColorInt = entry.lightColor(context)
+    val isDefault = lightColorInt == 0
+    val colorInt = if (isDark) entry.darkColor(context) else lightColorInt
+    // Default/Managed-by-Lawnchair: hardcoded gray outer circle, near-white inner
+    // badge with near-black letter — always legible on light and dark backgrounds.
+    val color = if (!isDefault) Color(colorInt) else Color(0xFF9E9E9E)
     val defaultBadgeBg = Color(0xFFEEEEEE)   // Near-white — high contrast on gray
-    val defaultBadgeFg = Color(0xFF212121)    // Near-black letter on near-white
+    val defaultBadgeFg = Color(0xFF212121)    // Near-black on near-white
 
     // Ring stroke width — animate with no-bounce spring to avoid negative values
     val ringStroke by animateDpAsState(
@@ -212,13 +214,13 @@ fun <T> SimpleColorSwatch(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(defaultBadgeBg),
                 ) {
                     Text(
                         text = "A",
-                        style = MaterialTheme.typography.titleMedium.copy(
+                        style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                         ),
                         color = defaultBadgeFg,

@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
@@ -214,14 +215,16 @@ fun <T> SimpleColorSwatch(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(48.dp)
+                        .fillMaxWidth(0.55f)
+                        .aspectRatio(1f)
                         .clip(CircleShape)
                         .background(defaultBadgeBg),
                 ) {
                     Text(
                         text = "A",
-                        style = MaterialTheme.typography.titleLarge.copy(
+                        style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp,
                         ),
                         color = defaultBadgeFg,
                     )

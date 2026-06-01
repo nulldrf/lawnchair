@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -145,11 +146,12 @@ fun <T> SimpleColorSwatch(
     val isDark = isSelectedThemeDark
     val colorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
     val isDefault = colorInt == 0
-    val color = if (!isDefault) Color(colorInt) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    // For the Default "A" badge: use onSurface for the inner circle bg so it's
-    // always visible — dark in light mode, light in dark mode (inverted).
-    val defaultBadgeBg = MaterialTheme.colorScheme.surfaceVariant
-    val defaultBadgeFg = MaterialTheme.colorScheme.onSurfaceVariant
+    // Default/Managed-by-Lawnchair: hardcoded gray outer circle, light inner
+    // badge with dark letter — mirrors the folder preference dot appearance and
+    // is always legible on both light and dark backgrounds.
+    val color = if (!isDefault) Color(colorInt) else Color(0xFF9E9E9E)  // Gray 400
+    val defaultBadgeBg = Color(0xFFEEEEEE)   // Near-white — high contrast on gray
+    val defaultBadgeFg = Color(0xFF212121)    // Near-black letter on near-white
 
     // Ring stroke width — animate with no-bounce spring to avoid negative values
     val ringStroke by animateDpAsState(
@@ -204,21 +206,21 @@ fun <T> SimpleColorSwatch(
                     )
                 }
             }
-            // "Managed by Lawnchair" Default option: "A" letter in a smaller inner circle.
-            // Uses surfaceVariant bg + onSurfaceVariant fg so it is always legible
-            // in both light and dark mode without needing alpha adjustments.
+            // "Managed by Lawnchair" Default option: fixed-size badge with "A" letter.
+            // Hardcoded gray palette so it is always visible on any theme background.
             if (isDefault) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .fillMaxWidth(0.52f)
-                        .aspectRatio(1f)
+                        .size(42.dp)
                         .clip(CircleShape)
                         .background(defaultBadgeBg),
                 ) {
                     Text(
                         text = "A",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
                         color = defaultBadgeFg,
                     )
                 }

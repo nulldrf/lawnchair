@@ -11,6 +11,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -77,12 +79,17 @@ fun <T> SwatchGrid(
     val rowCount = if (entries.isEmpty()) 0 else (entries.size - 1) / columnCount + 1
     val gutter = SwatchGridDefaults.GutterSize
 
-    Column(modifier = modifier.then(contentModifier)) {
+    Column(
+        modifier = modifier.then(contentModifier),
+        verticalArrangement = Arrangement.spacedBy(gutter),
+    ) {
         for (rowNo in 1..rowCount) {
             val firstIndex = (rowNo - 1) * columnCount
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gutter),
+            ) {
                 for (colIdx in 0 until columnCount) {
-                    if (colIdx > 0) Spacer(modifier = Modifier.width(gutter))
                     val entry = entries.getOrNull(firstIndex + colIdx)
                     Box(
                         modifier = Modifier.weight(1f),
@@ -102,8 +109,6 @@ fun <T> SwatchGrid(
                                     onClick = { onSwatchClick(entry.value) },
                                     selected = isSwatchSelected(entry.value),
                                     colorStyle = colorStyle,
-                                    // SystemAccent always renders with TonalSpot regardless
-                                    // of active style — LegacyKdrag doesn't apply visually.
                                     forceStyle = if (entry.value is ColorOption.SystemAccent) {
                                         TonalSpot
                                     } else {
@@ -116,7 +121,6 @@ fun <T> SwatchGrid(
                     }
                 }
             }
-            if (rowNo != rowCount) Spacer(modifier = Modifier.height(gutter))
         }
     }
 }
@@ -140,7 +144,8 @@ fun <T> SimpleColorSwatch(
     val context = LocalContext.current
     val isDark = isSelectedThemeDark
     val colorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
-    val color = if (colorInt != 0) Color(colorInt) else MaterialTheme.colorScheme.surfaceVariant
+    val isDefault = colorInt == 0
+    val color = if (!isDefault) Color(colorInt) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
 
     // Ring stroke width — animate with no-bounce spring to avoid negative values
     val ringStroke by animateDpAsState(
@@ -167,30 +172,50 @@ fun <T> SimpleColorSwatch(
             .fillMaxWidth()
             .aspectRatio(1f),
     ) {
-        Canvas(
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clickable(onClick = onClick),
         ) {
-            val circleRadius = (size.minDimension / 2f) - (ringStroke.toPx() + ringGap.toPx())
-            // Solid filled circle
-            drawCircle(
-                color = color,
-                radius = circleRadius.coerceAtLeast(1f),
-                center = center,
-            )
-            // Ring drawn outside the circle
-            if (ringStroke.value > 0f) {
+            Canvas(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
+                val circleRadius = (size.minDimension / 2f) - (ringStroke.toPx() + ringGap.toPx())
+                // Solid filled circle
                 drawCircle(
                     color = color,
-                    radius = (circleRadius + ringGap.toPx() + ringStroke.toPx() / 2f)
-                        .coerceAtLeast(1f),
+                    radius = circleRadius.coerceAtLeast(1f),
                     center = center,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = ringStroke.toPx().coerceAtLeast(0f),
-                    ),
                 )
+                // Ring drawn outside the circle
+                if (ringStroke.value > 0f) {
+                    drawCircle(
+                        color = color,
+                        radius = (circleRadius + ringGap.toPx() + ringStroke.toPx() / 2f)
+                            .coerceAtLeast(1f),
+                        center = center,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = ringStroke.toPx().coerceAtLeast(0f),
+                        ),
+                    )
+                }
+            }
+            // "Managed by Lawnchair" Default option: "A" letter in a smaller inner circle
+            if (isDefault) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth(0.45f)
+                        .aspectRatio(1f)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
+                ) {
+                    Text(
+                        text = "A",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    )
+                }
             }
         }
     }

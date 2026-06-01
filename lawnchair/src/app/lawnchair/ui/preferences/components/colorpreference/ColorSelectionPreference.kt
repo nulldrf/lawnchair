@@ -124,20 +124,24 @@ fun ColorSelection(
         },
     ) {
         Column {
+            Spacer(modifier = Modifier.height(8.dp))
+
             SelectionIndicator(
                 appliedColor = appliedColor,
                 pendingCustomColor = pendingCustomColor,
                 currentPage = pagerState.currentPage,
                 context = context,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             ColorTabRow(
                 selectedPage = pagerState.currentPage,
                 onSelectPage = { scope.launch { pagerState.animateScrollToPage(it) } },
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             HorizontalPager(
                 state = pagerState,

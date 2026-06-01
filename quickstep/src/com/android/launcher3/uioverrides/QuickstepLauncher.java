@@ -44,6 +44,7 @@ import static com.android.launcher3.Utilities.ATLEAST_BAKLAVA;
 import static com.android.launcher3.Utilities.ATLEAST_S;
 import static com.android.launcher3.Utilities.ATLEAST_S_V2;
 import static com.android.launcher3.Utilities.ATLEAST_T;
+import static com.android.launcher3.Utilities.ATLEAST_V;
 import static com.android.launcher3.Utilities.isRtl;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
@@ -1629,19 +1630,32 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // ClockEventDelegate / setClockEventDelegate were added in Android 14 (API 34); on older
         // platforms we must fall back to the framework default to avoid loading classes that do
         // not exist on the device (b/353166316, lawnchair issue #6781).
+        // Additionally, some OEM Android 14 ROMs (e.g. Samsung) strip ClockEventDelegate, so
+        // we catch NoClassDefFoundError and degrade gracefully instead of crashing.
         if (Utilities.ATLEAST_U) {
             switch (name) {
                 case "TextClock", "android.widget.TextClock" -> {
                     TextClock tc = new TextClock(context, attrs);
-                    tc.setClockEventDelegate(
-                            AsyncClockEventDelegate.INSTANCE.get(this).asClockEventDelegate());
-                    return tc;
+                    try {
+                        tc.setClockEventDelegate(
+                                AsyncClockEventDelegate.INSTANCE.get(this).asClockEventDelegate());
+                        return tc;
+                    } catch (NoClassDefFoundError e) {
+                        // ClockEventDelegate missing on this ROM (e.g. Samsung Android 14).
+                        // Fall through to super.onCreateView() so the framework inflates
+                        // TextClock normally rather than returning a broken un-delegated view.
+                        Log.w("QuickstepLauncher", "ClockEventDelegate unavailable, falling back to framework: " + e.getMessage());
+                    }
                 }
                 case "AnalogClock", "android.widget.AnalogClock" -> {
                     AnalogClock ac = new AnalogClock(context, attrs);
-                    ac.setClockEventDelegate(
-                            AsyncClockEventDelegate.INSTANCE.get(this).asClockEventDelegate());
-                    return ac;
+                    try {
+                        ac.setClockEventDelegate(
+                                AsyncClockEventDelegate.INSTANCE.get(this).asClockEventDelegate());
+                        return ac;
+                    } catch (NoClassDefFoundError e) {
+                        Log.w("QuickstepLauncher", "ClockEventDelegate unavailable, falling back to framework: " + e.getMessage());
+                    }
                 }
             }
         }

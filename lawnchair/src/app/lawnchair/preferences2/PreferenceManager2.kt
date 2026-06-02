@@ -192,7 +192,7 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = ColorStyle.fromString("tonal_spot"),
         parse = ColorStyle::fromString,
         save = ColorStyle::toString,
-        onSet = { reloadHelper.restart() },
+        onSet = { reloadHelper.recreate() },
     )
 
     val colorSpec = preference(
@@ -210,7 +210,7 @@ class PreferenceManager2 @Inject constructor(
                 SpecVersion.SPEC_2021 -> "spec_2021"
             }
         },
-        onSet = { reloadHelper.restart() },
+        onSet = { reloadHelper.recreate() },
     )
 
     val strokeColorStyle = preference(

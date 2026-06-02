@@ -1528,6 +1528,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     ? new FocusedItemDecorator(new ViewGroupFocusHelper(mRecyclerView))
                     : new FocusedItemDecorator(mRecyclerView);
             mRecyclerView.addItemDecoration(focusedItemDecorator);
+            // LC-Note: This is needed for highlight decoration
             if (isSearch()) {
                 RecyclerView.ItemDecoration searchDecorator =
                         getMainAdapterProvider().getDecorator();

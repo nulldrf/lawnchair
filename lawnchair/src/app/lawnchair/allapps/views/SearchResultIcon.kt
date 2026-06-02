@@ -81,7 +81,6 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
     }
 
     override fun bind(target: SearchTargetCompat, shortcuts: List<SearchTargetCompat>) {
-        if (boundId == target.id) return
         boundId = target.id
         flags = getFlags(target.extras)
         reset()
@@ -98,7 +97,7 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
 
             target.shortcutInfo != null -> {
                 allowLongClick = true
-                bindFromShortcutInfo(target.shortcutInfo)
+                bindFromShortcutInfo(target.id, target.shortcutInfo)
             }
 
             else -> {
@@ -165,9 +164,14 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
         }
         notifyApplied(info)
         if (bindIcon) {
+            val targetId = boundId
             Executors.MODEL_EXECUTOR.handler.postAtFrontOfQueue {
                 populateSearchActionItemInfo(target, info)
-                runOnMainThread { applyFromItemInfoWithIcon(info) }
+                runOnMainThread {
+                    if (boundId == targetId) {
+                        applyFromItemInfoWithIcon(info)
+                    }
+                }
             }
         }
     }
@@ -191,7 +195,7 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
         notifyApplied(appInfo)
     }
 
-    private fun bindFromShortcutInfo(shortcutInfo: ShortcutInfo) {
+    private fun bindFromShortcutInfo(targetId: String, shortcutInfo: ShortcutInfo) {
         val si = WorkspaceItemInfo(shortcutInfo, launcher)
         si.container = LauncherSettings.Favorites.CONTAINER_ALL_APPS
         applyFromWorkspaceItem(si)
@@ -199,7 +203,11 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
         val cache = LauncherAppState.getInstance(launcher).iconCache
         Executors.MODEL_EXECUTOR.handler.postAtFrontOfQueue {
             cache.getShortcutIcon(si, shortcutInfo)
-            runOnMainThread { applyFromWorkspaceItem(si) }
+            runOnMainThread {
+                if (boundId == targetId) {
+                    applyFromWorkspaceItem(si)
+                }
+            }
         }
     }
 

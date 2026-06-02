@@ -17,6 +17,7 @@ import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.SystemColorScheme
+import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.theme.getSystemAccent
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.Utilities
@@ -49,6 +50,7 @@ class ThemeProvider @Inject constructor(
 
     private var accentColor: ColorOption = preferenceManager2.accentColor.firstBlocking()
     private var colorStyle: ColorStyle = preferenceManager2.colorStyle.firstBlocking()
+    private var colorSpec: SpecVersion = preferenceManager2.colorSpec.firstBlocking()
 
     // Startup sync: if the stored accent is WallpaperDerived but the wallpaper
     // has since changed (e.g. changed while Lawnchair was not running), update
@@ -56,8 +58,8 @@ class ThemeProvider @Inject constructor(
     // We read wallpaperManager.wallpaperColors here — it is populated before
     // ThemeProvider in the Dagger graph, so the value is available synchronously.
 
-    // Cache for Android-system Monet schemes — keyed by (seedColor, Style).
-    private val colorSchemeMap = HashMap<Pair<Int, Style>, ColorScheme>()
+    // Cache for Android-system Monet schemes — keyed by (seedColor, Style, SpecVersion).
+    private val colorSchemeMap = HashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
 
     // Separate cache for the kdrag0n ZCAM engine — keyed by seedColor alone,
     // since LegacyKdrag has no Style variant.
@@ -96,7 +98,7 @@ class ThemeProvider @Inject constructor(
         }
 
         if (Utilities.ATLEAST_S) {
-            colorSchemeMap[Pair(0, Style.TONAL_SPOT)] = SystemColorScheme(context)
+            colorSchemeMap[Triple(0, Style.TONAL_SPOT, SpecVersion.SPEC_2021)] = SystemColorScheme(context)
             registerOverlayChangedListener()
         }
         wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
@@ -133,6 +135,11 @@ class ThemeProvider @Inject constructor(
         }
         preferenceManager2.colorStyle.onEach(launchIn = coroutineScope) {
             colorStyle = it
+            notifyColorSchemeChanged()
+        }
+        preferenceManager2.colorSpec.onEach(launchIn = coroutineScope) {
+            colorSpec = it
+            colorSchemeMap.clear()
             notifyColorSchemeChanged()
         }
 
@@ -182,7 +189,7 @@ class ThemeProvider @Inject constructor(
         context.registerReceiver(
             object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent) {
-                    colorSchemeMap[Pair(0, Style.TONAL_SPOT)] = SystemColorScheme(context)
+                    colorSchemeMap[Triple(0, Style.TONAL_SPOT, SpecVersion.SPEC_2021)] = SystemColorScheme(context)
                     if (accentColor is ColorOption.SystemAccent) {
                         notifyColorSchemeChanged()
                     }
@@ -199,7 +206,7 @@ class ThemeProvider @Inject constructor(
 
         is ColorOption.WallpaperPrimary -> {
             val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
-            getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle)
+            getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
         }
 
         // WallpaperDerived: use stored chosen swatch color normally.
@@ -213,7 +220,7 @@ class ThemeProvider @Inject constructor(
             } else {
                 accentColor.color
             }
-            getColorScheme(seedColor, colorStyle)
+            getColorScheme(seedColor, colorStyle, colorSpec)
         }
 
         // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
@@ -222,39 +229,41 @@ class ThemeProvider @Inject constructor(
         // manually-picked accents and the Custom page swatch grid.
         is ColorOption.CustomColor -> {
             val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-            getColorScheme(accentColor.color, effectiveStyle)
+            getColorScheme(accentColor.color, effectiveStyle, colorSpec)
         }
 
-        else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle)
+        else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
     }
 
     private val systemColorScheme get() = when {
         // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
         // SystemAccent must use the real system scheme or TonalSpot — never
         // KdragMonetColorScheme, which AccentColorExtractor cannot cast.
-        Utilities.ATLEAST_S -> getColorScheme(0, if (colorStyle is LegacyKdrag) TonalSpot else colorStyle)
-        else -> getColorScheme(context.getSystemAccent(darkTheme = false), if (colorStyle is LegacyKdrag) TonalSpot else colorStyle)
+        Utilities.ATLEAST_S -> getColorScheme(0, if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, colorSpec)
+        else -> getColorScheme(context.getSystemAccent(darkTheme = false), if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, colorSpec)
     }
 
     /**
-     * Returns a [ColorScheme] for [colorInt] using the requested [colorStyle].
+     * Returns a [ColorScheme] for [colorInt] using the requested [colorStyle] and [specVersion].
      *
      * When [colorStyle] is [LegacyKdrag] the kdrag0n ZCAM engine is used and the
      * result is stored in [kdragColorSchemeMap].  For every other style the Android
      * system engine ([MonetColorSchemeCompat]) is used and cached in [colorSchemeMap].
+     * [specVersion] is ignored for [LegacyKdrag] (ZCAM has its own algorithm).
      */
     private fun getColorScheme(
         colorInt: Int,
         colorStyle: ColorStyle,
+        specVersion: SpecVersion = SpecVersion.SPEC_2021,
     ): ColorScheme {
         return if (colorStyle is LegacyKdrag) {
             kdragColorSchemeMap.getOrPut(colorInt) {
                 KdragMonetColorScheme(colorInt)
             }
         } else {
-            val key = Pair(colorInt, colorStyle.style)
+            val key = Triple(colorInt, colorStyle.style, specVersion)
             colorSchemeMap.getOrPut(key) {
-                MonetColorSchemeCompat(colorInt, colorStyle.style)
+                MonetColorSchemeCompat(colorInt, colorStyle.style, specVersion)
             }
         }
     }

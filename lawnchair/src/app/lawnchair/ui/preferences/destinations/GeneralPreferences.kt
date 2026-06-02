@@ -29,6 +29,7 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
+import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
@@ -253,6 +254,11 @@ fun GeneralPreferences() {
 
         val isWallpaperAccent = accentColorValue is ColorOption.WallpaperPrimary ||
             accentColorValue is ColorOption.WallpaperDerived
+        val isCustomAccent = accentColorValue is ColorOption.CustomColor
+
+        // Color spec is only meaningful when the accent comes from a wallpaper or a
+        // custom colour — system accent always uses the system Monet pipeline.
+        val showColorSpec = isWallpaperAccent || isCustomAccent
 
         val currentColorStyle = prefs2.colorStyle.asState().value
         val effectiveColorStyle = if (!isWallpaperAccent && currentColorStyle is LegacyKdrag) {
@@ -261,6 +267,24 @@ fun GeneralPreferences() {
             currentColorStyle
         }
         val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
+
+        val colorSpecAdapter = prefs2.colorSpec.getAdapter()
+        // Build a Boolean adapter that wraps the SpecVersion preference.
+        // SwitchPreference only accepts PreferenceAdapter<Boolean>, so we map:
+        //   SPEC_2025 → true  /  SPEC_2021 → false
+        val colorSpecBoolAdapter = remember {
+            object : app.lawnchair.preferences.PreferenceAdapter<Boolean> {
+                override val state: androidx.compose.runtime.State<Boolean>
+                    get() = androidx.compose.runtime.derivedStateOf {
+                        colorSpecAdapter.state.value == SpecVersion.SPEC_2025
+                    }
+                override fun onChange(newValue: Boolean) {
+                    colorSpecAdapter.onChange(
+                        if (newValue) SpecVersion.SPEC_2025 else SpecVersion.SPEC_2021,
+                    )
+                }
+            }
+        }
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
             Item { ScrollAnchor(ScrollKeys.ACCENT_COLOR, scrollState) { ColorPreference(preference = prefs2.accentColor) } }
@@ -275,6 +299,16 @@ fun GeneralPreferences() {
                         subtitle = colorStyleSubtitle,
                     )
                 }
+            }
+            Item(
+                "color_spec",
+                showColorSpec,
+            ) {
+                SwitchPreference(
+                    adapter = colorSpecBoolAdapter,
+                    label = stringResource(id = R.string.color_spec_label),
+                    description = stringResource(id = R.string.color_spec_description),
+                )
             }
         }
 

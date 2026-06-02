@@ -31,6 +31,69 @@ const val ACCENT1_CHROMA = 48.0f
 const val GOOGLE_BLUE = 0xFF1b6ef3.toInt()
 const val MIN_CHROMA = 5
 
+/**
+ * Determines which color generation algorithm is used.
+ *
+ * SPEC_2021 — the original Monet/Material You algorithm shipped with Android 12/13.
+ *             Produces tonal palettes via CAM16 + HCT.
+ *
+ * SPEC_2025 — Material 3 Expressive (Android 16 / Google I/O 2025).
+ *             Higher chroma values, richer accent palettes, and new
+ *             Expressive hue-rotation tables for secondary/tertiary.
+ *             Low-contrast themes (contrastLevel < 0) are not supported
+ *             in this spec; use SPEC_2021 if you need them.
+ */
+enum class SpecVersion {
+    SPEC_2021,
+    SPEC_2025,
+}
+
+// ---------------------------------------------------------------------------
+// SPEC_2025 chroma overrides (Material 3 Expressive)
+// Primary chroma raised from 36 → 48 for TONAL_SPOT; neutrals slightly richer.
+// ---------------------------------------------------------------------------
+internal object Spec2025 {
+    /** TONAL_SPOT primary chroma (was 36 in 2021). */
+    const val TONAL_SPOT_A1_CHROMA = 48.0
+    /** TONAL_SPOT secondary chroma (was 16 in 2021). */
+    const val TONAL_SPOT_A2_CHROMA = 20.0
+    /** TONAL_SPOT tertiary chroma (was 24 in 2021). */
+    const val TONAL_SPOT_A3_CHROMA = 32.0
+    /** Neutral-1 chroma raised from 6 → 8. */
+    const val TONAL_SPOT_N1_CHROMA = 8.0
+    /** Neutral-2 chroma raised from 8 → 12. */
+    const val TONAL_SPOT_N2_CHROMA = 12.0
+
+    /** VIBRANT primary chroma max-out stays the same; tertiary hue add now 65° (was 60°). */
+    const val VIBRANT_A3_HUE_ADD = 65.0
+
+    /** EXPRESSIVE: secondary hue rotations updated for 2025. */
+    val EXPRESSIVE_SECONDARY_HUE_ROTATIONS = listOf(
+        Pair(0, 50),
+        Pair(21, 100),
+        Pair(51, 50),
+        Pair(121, 25),
+        Pair(151, 50),
+        Pair(191, 95),
+        Pair(271, 50),
+        Pair(321, 50),
+        Pair(360, 50),
+    )
+
+    /** EXPRESSIVE: tertiary hue rotations updated for 2025. */
+    val EXPRESSIVE_TERTIARY_HUE_ROTATIONS = listOf(
+        Pair(0, 125),
+        Pair(21, 125),
+        Pair(51, 25),
+        Pair(121, 50),
+        Pair(151, 25),
+        Pair(191, 20),
+        Pair(271, 25),
+        Pair(321, 125),
+        Pair(360, 125),
+    )
+}
+
 internal interface Hue {
     fun get(sourceColor: Cam): Double
 
@@ -153,6 +216,26 @@ internal class HueExpressiveTertiary : Hue {
     }
 }
 
+/**
+ * SPEC_2025 variant of [HueExpressiveSecondary] — uses updated rotation
+ * tables from Material 3 Expressive (Google I/O 2025).
+ */
+internal class HueExpressiveSecondary2025 : Hue {
+    override fun get(sourceColor: Cam): Double {
+        return getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_SECONDARY_HUE_ROTATIONS)
+    }
+}
+
+/**
+ * SPEC_2025 variant of [HueExpressiveTertiary] — uses updated rotation
+ * tables from Material 3 Expressive (Google I/O 2025).
+ */
+internal class HueExpressiveTertiary2025 : Hue {
+    override fun get(sourceColor: Cam): Double {
+        return getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_TERTIARY_HUE_ROTATIONS)
+    }
+}
+
 internal interface Chroma {
     fun get(sourceColor: Cam): Double
 
@@ -227,7 +310,12 @@ internal class CoreSpec(
     val n2: TonalSpec,
 )
 
-enum class Style(internal val coreSpec: CoreSpec) {
+enum class Style(
+    /** Original 2021 spec — kept for backward compatibility. */
+    internal val coreSpec: CoreSpec,
+    /** Optional 2025 spec override. Falls back to [coreSpec] if null. */
+    internal val coreSpec2025: CoreSpec? = null,
+) {
     SPRITZ(
         CoreSpec(
             a1 = TonalSpec(HueSource(), ChromaConstant(12.0)),
@@ -236,8 +324,10 @@ enum class Style(internal val coreSpec: CoreSpec) {
             n1 = TonalSpec(HueSource(), ChromaConstant(2.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(2.0)),
         ),
+        // SPRITZ is neutral by nature; chroma values unchanged in 2025.
     ),
     TONAL_SPOT(
+        // ---- SPEC_2021 (unchanged) ----
         CoreSpec(
             a1 = TonalSpec(HueSource(), ChromaConstant(36.0)),
             a2 = TonalSpec(HueSource(), ChromaConstant(16.0)),
@@ -245,8 +335,17 @@ enum class Style(internal val coreSpec: CoreSpec) {
             n1 = TonalSpec(HueSource(), ChromaConstant(6.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(8.0)),
         ),
+        // ---- SPEC_2025: richer chroma for primary, secondary, tertiary, and neutrals ----
+        coreSpec2025 = CoreSpec(
+            a1 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_A1_CHROMA)),
+            a2 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_A2_CHROMA)),
+            a3 = TonalSpec(HueAdd(60.0), ChromaConstant(Spec2025.TONAL_SPOT_A3_CHROMA)),
+            n1 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_N1_CHROMA)),
+            n2 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_N2_CHROMA)),
+        ),
     ),
     VIBRANT(
+        // ---- SPEC_2021 (unchanged) ----
         CoreSpec(
             a1 = TonalSpec(HueSource(), ChromaMaxOut()),
             a2 = TonalSpec(HueVibrantSecondary(), ChromaConstant(24.0)),
@@ -254,12 +353,29 @@ enum class Style(internal val coreSpec: CoreSpec) {
             n1 = TonalSpec(HueSource(), ChromaConstant(10.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(12.0)),
         ),
+        // ---- SPEC_2025: tertiary hue add increased from 60° → 65° ----
+        coreSpec2025 = CoreSpec(
+            a1 = TonalSpec(HueSource(), ChromaMaxOut()),
+            a2 = TonalSpec(HueVibrantSecondary(), ChromaConstant(24.0)),
+            a3 = TonalSpec(HueAdd(Spec2025.VIBRANT_A3_HUE_ADD), ChromaConstant(32.0)),
+            n1 = TonalSpec(HueSource(), ChromaConstant(10.0)),
+            n2 = TonalSpec(HueSource(), ChromaConstant(12.0)),
+        ),
     ),
     EXPRESSIVE(
+        // ---- SPEC_2021 (unchanged) ----
         CoreSpec(
             a1 = TonalSpec(HueAdd(240.0), ChromaConstant(40.0)),
             a2 = TonalSpec(HueExpressiveSecondary(), ChromaConstant(24.0)),
             a3 = TonalSpec(HueExpressiveTertiary(), ChromaConstant(32.0)),
+            n1 = TonalSpec(HueAdd(15.0), ChromaConstant(8.0)),
+            n2 = TonalSpec(HueAdd(15.0), ChromaConstant(12.0)),
+        ),
+        // ---- SPEC_2025: updated hue rotation tables for secondary and tertiary ----
+        coreSpec2025 = CoreSpec(
+            a1 = TonalSpec(HueAdd(240.0), ChromaConstant(40.0)),
+            a2 = TonalSpec(HueExpressiveSecondary2025(), ChromaConstant(24.0)),
+            a3 = TonalSpec(HueExpressiveTertiary2025(), ChromaConstant(32.0)),
             n1 = TonalSpec(HueAdd(15.0), ChromaConstant(8.0)),
             n2 = TonalSpec(HueAdd(15.0), ChromaConstant(12.0)),
         ),
@@ -319,7 +435,16 @@ enum class Style(internal val coreSpec: CoreSpec) {
             n1 = TonalSpec(HueSource(), ChromaConstant(0.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(0.0)),
         ),
-    ),
+    );
+
+    /**
+     * Returns the correct [CoreSpec] for the requested [SpecVersion].
+     * If no 2025 override is defined the 2021 spec is used for both versions.
+     */
+    internal fun getCoreSpec(specVersion: SpecVersion): CoreSpec = when (specVersion) {
+        SpecVersion.SPEC_2025 -> coreSpec2025 ?: coreSpec
+        SpecVersion.SPEC_2021 -> coreSpec
+    }
 }
 
 class TonalPalette
@@ -375,6 +500,7 @@ internal constructor(
 class ColorScheme(
     @ColorInt val seed: Int,
     val style: Style = Style.TONAL_SPOT,
+    val specVersion: SpecVersion = SpecVersion.SPEC_2021,
 ) {
     val accent1: TonalPalette
     val accent2: TonalPalette
@@ -382,7 +508,11 @@ class ColorScheme(
     val neutral1: TonalPalette
     val neutral2: TonalPalette
 
-    constructor(@ColorInt seed: Int) : this(seed, Style.TONAL_SPOT)
+    /** Backward-compatible secondary constructor — defaults to SPEC_2021. */
+    constructor(@ColorInt seed: Int) : this(seed, Style.TONAL_SPOT, SpecVersion.SPEC_2021)
+
+    /** Backward-compatible constructor with style but no specVersion — defaults to SPEC_2021. */
+    constructor(@ColorInt seed: Int, style: Style) : this(seed, style, SpecVersion.SPEC_2021)
 
     val allHues: List<TonalPalette>
         get() {
@@ -414,11 +544,12 @@ class ColorScheme(
             } else {
                 seed
             }
-        accent1 = TonalPalette(style.coreSpec.a1, seedArgb)
-        accent2 = TonalPalette(style.coreSpec.a2, seedArgb)
-        accent3 = TonalPalette(style.coreSpec.a3, seedArgb)
-        neutral1 = TonalPalette(style.coreSpec.n1, seedArgb)
-        neutral2 = TonalPalette(style.coreSpec.n2, seedArgb)
+        val spec = style.getCoreSpec(specVersion)
+        accent1 = TonalPalette(spec.a1, seedArgb)
+        accent2 = TonalPalette(spec.a2, seedArgb)
+        accent3 = TonalPalette(spec.a3, seedArgb)
+        neutral1 = TonalPalette(spec.n1, seedArgb)
+        neutral2 = TonalPalette(spec.n2, seedArgb)
     }
 
     val shadeCount
@@ -430,6 +561,7 @@ class ColorScheme(
         return "ColorScheme {\n" +
             "  seed color: ${stringForColor(seed)}\n" +
             "  style: $style\n" +
+            "  specVersion: $specVersion\n" +
             "  palettes: \n" +
             "  ${humanReadable("PRIMARY", accent1.allShades)}\n" +
             "  ${humanReadable("SECONDARY", accent2.allShades)}\n" +

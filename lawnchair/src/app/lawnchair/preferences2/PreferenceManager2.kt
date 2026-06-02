@@ -50,6 +50,7 @@ import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
+import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.popup.LauncherOptionsPopup
 import app.lawnchair.ui.popup.toOptionOrderString
 import app.lawnchair.ui.preferences.components.HiddenAppsInSearch
@@ -191,6 +192,24 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = ColorStyle.fromString("tonal_spot"),
         parse = ColorStyle::fromString,
         save = ColorStyle::toString,
+        onSet = { reloadHelper.restart() },
+    )
+
+    val colorSpec = preference(
+        key = stringPreferencesKey("color_spec"),
+        defaultValue = SpecVersion.SPEC_2021,
+        parse = { value ->
+            when (value) {
+                "spec_2025" -> SpecVersion.SPEC_2025
+                else -> SpecVersion.SPEC_2021
+            }
+        },
+        save = { specVersion ->
+            when (specVersion) {
+                SpecVersion.SPEC_2025 -> "spec_2025"
+                SpecVersion.SPEC_2021 -> "spec_2021"
+            }
+        },
         onSet = { reloadHelper.restart() },
     )
 

@@ -236,11 +236,12 @@ class ThemeProvider @Inject constructor(
     }
 
     private val systemColorScheme get() = when {
-        // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
-        // SystemAccent must use the real system scheme or TonalSpot — never
-        // KdragMonetColorScheme, which AccentColorExtractor cannot cast.
-        Utilities.ATLEAST_S -> getColorScheme(0, if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, colorSpec)
-        else -> getColorScheme(context.getSystemAccent(darkTheme = false), if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, colorSpec)
+        // SystemAccent always uses the real system Monet pipeline (SystemColorScheme on S+).
+        // SpecVersion is irrelevant here — the system generates its own palette and
+        // colorSpec must never override it. Always use SPEC_2021 so the cache key
+        // Triple(0, style, SPEC_2021) hits the SystemColorScheme stored at init.
+        Utilities.ATLEAST_S -> getColorScheme(0, if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, SpecVersion.SPEC_2021)
+        else -> getColorScheme(context.getSystemAccent(darkTheme = false), if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, SpecVersion.SPEC_2021)
     }
 
     /**

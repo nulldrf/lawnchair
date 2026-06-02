@@ -43,6 +43,7 @@ import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.ThemeProvider
+import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.toComposeColorScheme
 import app.lawnchair.ui.preferences.components.ThemeChoice
 import app.lawnchair.wallpaper.WallpaperManagerCompat
@@ -100,7 +101,12 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     val colorStyle by preferenceManager2.colorStyle.asState()
     val colorSpec by preferenceManager2.colorSpec.asState()
 
-    val colorScheme = remember(accentColor, colorStyle.style, colorSpec) {
+    // colorSpec only affects Wallpaper and Custom accent sources.
+    // For SystemAccent, ThemeProvider always uses the real system pipeline
+    // and ignores colorSpec — so we exclude it from the remember key to
+    // avoid a needless recomposition when the user toggles the spec option.
+    val isSystemAccent = accentColor == ColorOption.SystemAccent
+    val colorScheme = remember(accentColor, colorStyle.style, if (isSystemAccent) null else colorSpec) {
         ThemeProvider.INSTANCE.get(context).colorScheme
     }
 

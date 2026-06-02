@@ -98,7 +98,7 @@ class ThemeProvider @Inject constructor(
         }
 
         if (Utilities.ATLEAST_S) {
-            colorSchemeMap[Triple(0, Style.TONAL_SPOT, SpecVersion.SPEC_2021)] = SystemColorScheme(context)
+            seedSystemColorScheme()
             registerOverlayChangedListener()
         }
         wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
@@ -140,6 +140,10 @@ class ThemeProvider @Inject constructor(
         preferenceManager2.colorSpec.onEach(launchIn = coroutineScope) {
             colorSpec = it
             colorSchemeMap.clear()
+            // Re-seed the real system palette after clearing — clear() removed it
+            // and getColorScheme(0, ...) would otherwise create a synthetic
+            // MonetColorSchemeCompat(0) instead of returning the system colors.
+            if (Utilities.ATLEAST_S) seedSystemColorScheme()
             notifyColorSchemeChanged()
         }
 
@@ -182,6 +186,16 @@ class ThemeProvider @Inject constructor(
         }
     }
 
+    private fun seedSystemColorScheme() {
+        // SystemColorScheme reads Android's system_accent/neutral color resources directly.
+        // It must be stored under ALL style keys for seed=0 so that systemColorScheme
+        // never falls through to MonetColorSchemeCompat(0, ...) regardless of colorStyle.
+        val systemScheme = SystemColorScheme(context)
+        Style.values().forEach { style ->
+            colorSchemeMap[Triple(0, style, SpecVersion.SPEC_2021)] = systemScheme
+        }
+    }
+
     private fun registerOverlayChangedListener() {
         val packageFilter = IntentFilter("android.intent.action.OVERLAY_CHANGED")
         packageFilter.addDataScheme("package")
@@ -189,7 +203,7 @@ class ThemeProvider @Inject constructor(
         context.registerReceiver(
             object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent) {
-                    colorSchemeMap[Triple(0, Style.TONAL_SPOT, SpecVersion.SPEC_2021)] = SystemColorScheme(context)
+                    seedSystemColorScheme()
                     if (accentColor is ColorOption.SystemAccent) {
                         notifyColorSchemeChanged()
                     }

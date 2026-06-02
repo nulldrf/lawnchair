@@ -98,8 +98,9 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     val preferenceManager2 = preferenceManager2()
     val accentColor by preferenceManager2.accentColor.asState()
     val colorStyle by preferenceManager2.colorStyle.asState()
+    val colorSpec by preferenceManager2.colorSpec.asState()
 
-    val colorScheme = remember(accentColor, colorStyle.style) {
+    val colorScheme = remember(accentColor, colorStyle.style, colorSpec) {
         ThemeProvider.INSTANCE.get(context).colorScheme
     }
 

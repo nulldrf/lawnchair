@@ -464,7 +464,7 @@
     <string name="color_spec_label">Color spec</string>
     <string name="color_spec_2021">Spec 2021</string>
     <string name="color_spec_2025">Spec 2025</string>
-    <string name="color_spec_description">Color generation algorithm version. 2025 uses richer, more expressive palettes from Material 3 Expressive. Affect only for Tonal Spot, Vibrant and Expressive color style.</string>
+    <string name="color_spec_description">Uses richer, more expressive palettes from Material 3 Expressive. Affect only for Tonal Spot, Vibrant and Expressive color style.</string>
 
     <!-- Accent color and color picker -->
     <string name="colors">Colors</string>

@@ -38,6 +38,7 @@ import app.lawnchair.ui.preferences.components.NotificationDotsPreference
 import app.lawnchair.ui.preferences.components.ThemePreference
 import app.lawnchair.ui.preferences.components.colorpreference.ColorContrastWarning
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
+import app.lawnchair.ui.preferences.components.controls.DropdownPreference
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
@@ -269,22 +270,10 @@ fun GeneralPreferences() {
         val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
 
         val colorSpecAdapter = prefs2.colorSpec.getAdapter()
-        // Build a Boolean adapter that wraps the SpecVersion preference.
-        // SwitchPreference only accepts PreferenceAdapter<Boolean>, so we map:
-        //   SPEC_2025 → true  /  SPEC_2021 → false
-        val colorSpecBoolAdapter = remember {
-            object : app.lawnchair.preferences.PreferenceAdapter<Boolean> {
-                override val state: androidx.compose.runtime.State<Boolean>
-                    get() = androidx.compose.runtime.derivedStateOf {
-                        colorSpecAdapter.state.value == SpecVersion.SPEC_2025
-                    }
-                override fun onChange(newValue: Boolean) {
-                    colorSpecAdapter.onChange(
-                        if (newValue) SpecVersion.SPEC_2025 else SpecVersion.SPEC_2021,
-                    )
-                }
-            }
-        }
+        val colorSpecEntries = listOf(
+            SpecVersion.SPEC_2021 to stringResource(id = R.string.color_spec_2021),
+            SpecVersion.SPEC_2025 to stringResource(id = R.string.color_spec_2025),
+        )
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
             Item { ScrollAnchor(ScrollKeys.ACCENT_COLOR, scrollState) { ColorPreference(preference = prefs2.accentColor) } }
@@ -304,10 +293,12 @@ fun GeneralPreferences() {
                 "color_spec",
                 showColorSpec,
             ) {
-                SwitchPreference(
-                    adapter = colorSpecBoolAdapter,
+                DropdownPreference(
                     label = stringResource(id = R.string.color_spec_label),
                     description = stringResource(id = R.string.color_spec_description),
+                    entries = colorSpecEntries,
+                    currentValue = colorSpecAdapter.state.value,
+                    onValueChange = { colorSpecAdapter.onChange(it) },
                 )
             }
         }

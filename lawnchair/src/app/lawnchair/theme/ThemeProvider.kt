@@ -137,6 +137,8 @@ class ThemeProvider @Inject constructor(
         }
         preferenceManager2.colorStyle.onEach(launchIn = coroutineScope) {
             colorStyle = it
+            colorSchemeMap.clear()
+            if (Utilities.ATLEAST_S) seedSystemColorScheme()
             notifyColorSchemeChanged()
         }
         preferenceManager2.colorSpec.onEach(launchIn = coroutineScope) {

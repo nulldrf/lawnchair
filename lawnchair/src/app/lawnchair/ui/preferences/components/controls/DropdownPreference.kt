@@ -43,50 +43,44 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 
-// ── Popup content extracted to a top-level function ──────────────────────────
-// This completely breaks any implicit RowScope/ColumnScope receiver inherited
-// from the call site, which was causing the RowScope.AnimatedVisibility error.
-
+// ── Popup content — top-level function, no RowScope/ColumnScope in context ───
+// This is the only reliable fix for the RowScope.AnimatedVisibility compiler
+// error: by being a top-level function, no implicit receiver leaks in.
 @Composable
 private fun <T> DropdownPopupContent(
     entries: List<Pair<T, String>>,
     currentValue: T,
-    textStyle: TextStyle,
-    contentColor: androidx.compose.ui.graphics.Color,
     fontFamily: FontFamily?,
     onSelect: (T) -> Unit,
 ) {
     var animVisible by remember { mutableStateOf(false) }
+    // LaunchedEffect fires after first composition, flipping visible false→true
+    // so AnimatedVisibility always plays the enter transition.
     LaunchedEffect(Unit) { animVisible = true }
 
     AnimatedVisibility(
         visible = animVisible,
-        enter = scaleIn(
-            animationSpec = tween(durationMillis = 200),
+        enter = fadeIn(tween(120)) + scaleIn(
+            animationSpec = tween(180),
             transformOrigin = TransformOrigin(1f, 0f),
-            initialScale = 0.85f,
-        ) + fadeIn(tween(durationMillis = 170)),
-        exit = scaleOut(
-            animationSpec = tween(durationMillis = 150),
+            initialScale = 0.92f,
+        ),
+        exit = fadeOut(tween(100)) + scaleOut(
+            animationSpec = tween(140),
             transformOrigin = TransformOrigin(1f, 0f),
-            targetScale = 0.85f,
-        ) + fadeOut(tween(durationMillis = 130)),
+            targetScale = 0.92f,
+        ),
     ) {
         Surface(
             modifier = Modifier
                 .widthIn(min = 160.dp, max = 240.dp)
-                .shadow(
-                    elevation = 6.dp,
-                    shape = RoundedCornerShape(16.dp),
-                    clip = false,
-                ),
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(16.dp), clip = false),
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
             tonalElevation = 3.dp,
@@ -98,22 +92,14 @@ private fun <T> DropdownPopupContent(
             ) {
                 entries.forEach { (value, entryLabel) ->
                     val isSelected = value == currentValue
-                    val pillBg = if (isSelected) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color.Transparent
-                    }
-                    val textColor = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(pillBg)
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent,
+                            )
                             .clickable { onSelect(value) }
                             .padding(
                                 start = if (isSelected) 12.dp else 46.dp,
@@ -130,14 +116,15 @@ private fun <T> DropdownPopupContent(
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(18.dp),
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(Modifier.width(12.dp))
                         }
                         Text(
                             text = entryLabel,
-                            style = textStyle,
+                            style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
                             fontFamily = fontFamily,
-                            color = textColor,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
@@ -147,7 +134,6 @@ private fun <T> DropdownPopupContent(
 }
 
 // ── Public preference row ─────────────────────────────────────────────────────
-
 @Composable
 fun <T> DropdownPreference(
     label: String,
@@ -159,14 +145,18 @@ fun <T> DropdownPreference(
     var popupVisible by remember { mutableStateOf(false) }
     val currentLabel = entries.firstOrNull { it.first == currentValue }?.second ?: ""
 
-    // Capture locals before entering Row so they can be forwarded to the Popup's
-    // separate composition tree — this is what makes the font match the app theme.
+    // Read the app's typography font family here, before entering any scope.
+    // MaterialTheme.typography is populated by LawnchairTheme so this will be
+    // Google Sans (or whatever the app theme sets), not the system font.
+    val appFontFamily = MaterialTheme.typography.bodyLarge.fontFamily
+
+    // Capture composition locals before entering Row so they can be forwarded
+    // into the Popup's separate composition tree.
     val localTextStyle = LocalTextStyle.current
     val localContentColor = LocalContentColor.current
     val localDensity = LocalDensity.current
     val localLayoutDirection = LocalLayoutDirection.current
     val localFontFamilyResolver = LocalFontFamilyResolver.current
-    val bodyLarge = MaterialTheme.typography.bodyLarge
 
     Row(
         modifier = Modifier
@@ -179,12 +169,14 @@ fun <T> DropdownPreference(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
+                fontFamily = appFontFamily,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (description != null) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = appFontFamily,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -192,11 +184,11 @@ fun <T> DropdownPreference(
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Popup anchors to this Box (top-end of the value label)
         Box(contentAlignment = Alignment.TopEnd) {
             Text(
                 text = currentLabel,
                 style = MaterialTheme.typography.bodyMedium,
+                fontFamily = appFontFamily,
                 color = MaterialTheme.colorScheme.primary,
             )
 
@@ -206,8 +198,6 @@ fun <T> DropdownPreference(
                     onDismissRequest = { popupVisible = false },
                     properties = PopupProperties(focusable = true),
                 ) {
-                    // Forward all composition locals so the Popup inherits
-                    // the app's font, density, and layout direction.
                     CompositionLocalProvider(
                         LocalTextStyle provides localTextStyle,
                         LocalContentColor provides localContentColor,
@@ -215,15 +205,10 @@ fun <T> DropdownPreference(
                         LocalLayoutDirection provides localLayoutDirection,
                         LocalFontFamilyResolver provides localFontFamilyResolver,
                     ) {
-                        // DropdownPopupContent is a TOP-LEVEL function — no
-                        // RowScope in scope, so AnimatedVisibility resolves to
-                        // the correct generic overload without any ambiguity.
                         DropdownPopupContent(
                             entries = entries,
                             currentValue = currentValue,
-                            textStyle = bodyLarge,
-                            contentColor = localContentColor,
-                            fontFamily = bodyLarge.fontFamily,
+                            fontFamily = appFontFamily,
                             onSelect = { value ->
                                 popupVisible = false
                                 onValueChange(value)

@@ -59,11 +59,13 @@ class ThemeProvider @Inject constructor(
     // ThemeProvider in the Dagger graph, so the value is available synchronously.
 
     // Cache for Android-system Monet schemes — keyed by (seedColor, Style, SpecVersion).
-    private val colorSchemeMap = HashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
+    // ConcurrentHashMap prevents race conditions when colorSpec changes rapidly and
+    // clear() + getOrPut() overlap on the main thread during recomposition.
+    private val colorSchemeMap = java.util.concurrent.ConcurrentHashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
 
     // Separate cache for the kdrag0n ZCAM engine — keyed by seedColor alone,
     // since LegacyKdrag has no Style variant.
-    private val kdragColorSchemeMap = HashMap<Int, ColorScheme>()
+    private val kdragColorSchemeMap = java.util.concurrent.ConcurrentHashMap<Int, ColorScheme>()
 
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 

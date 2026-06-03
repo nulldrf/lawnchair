@@ -257,10 +257,6 @@ fun GeneralPreferences() {
             accentColorValue is ColorOption.WallpaperDerived
         val isCustomAccent = accentColorValue is ColorOption.CustomColor
 
-        // Color spec is only meaningful when the accent comes from a wallpaper or a
-        // custom colour — system accent always uses the system Monet pipeline.
-        val showColorSpec = isWallpaperAccent || isCustomAccent
-
         val currentColorStyle = prefs2.colorStyle.asState().value
         val effectiveColorStyle = if (!isWallpaperAccent && currentColorStyle is LegacyKdrag) {
             TonalSpot
@@ -269,6 +265,16 @@ fun GeneralPreferences() {
         }
         val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
 
+        // Color spec is only meaningful when the accent comes from a wallpaper or a
+        // custom colour — system accent always uses the system Monet pipeline.
+        // Also hide when LegacyKdrag (ZCAM engine) is active — it has its own
+        // algorithm and is unaffected by Material spec versions.
+        val showColorSpec = (isWallpaperAccent || isCustomAccent) &&
+            effectiveColorStyle !is LegacyKdrag
+
+        // Use asState() directly so Compose tracks the preference as reactive
+        // state — prevents stale reads when the user changes the value quickly.
+        val colorSpecValue by prefs2.colorSpec.asState()
         val colorSpecAdapter = prefs2.colorSpec.getAdapter()
         val colorSpecEntries = listOf(
             SpecVersion.SPEC_2021 to stringResource(id = R.string.color_spec_2021),
@@ -297,7 +303,7 @@ fun GeneralPreferences() {
                     label = stringResource(id = R.string.color_spec_label),
                     description = stringResource(id = R.string.color_spec_description),
                     entries = colorSpecEntries,
-                    currentValue = colorSpecAdapter.state.value,
+                    currentValue = colorSpecValue,
                     onValueChange = { colorSpecAdapter.onChange(it) },
                 )
             }

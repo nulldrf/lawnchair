@@ -186,12 +186,6 @@ fun About(
                 }
             }
         }
-
-        // ── Product / Support&PR / Community ─────────────────────────────────
-        // preferenceGroupItems renders all entries as one continuous rounded card
-        // (same style as Legal). The 1dp outlineVariant divider between rows is
-        // drawn inside the card surface, so gaps between sections remain
-        // transparent and show the blurred wallpaper through.
         preferenceGroupItems(
             items = uiState.coreTeam,
             isFirstChild = false,
@@ -220,8 +214,6 @@ fun About(
                 url = it.url,
             )
         }
-
-        // ── Legal ─────────────────────────────────────────────────────────────
         item {
             PreferenceGroupHeading(stringResource(R.string.legal))
         }
@@ -237,7 +229,7 @@ fun About(
             }
         }
         item {
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(4.dp))
         }
         item {
             PreferenceGroupItem(

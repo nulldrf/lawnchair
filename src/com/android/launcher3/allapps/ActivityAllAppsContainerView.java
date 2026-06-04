@@ -471,15 +471,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             MAIN_EXECUTOR.getHandler().post(mSearchUiManager::resetSearch);
         }
         if (isSearching()) mWorkManager.reset();
-
-        // When the drawer closes the workspace becomes visible — perfect moment for
-        // PixelCopy.  If the bitmap is still null (deferred by captureWindowAndBlur
-        // because the drawer was open during init, or cleared after intensity change)
-        // re-trigger applyDrawerHokoBlur() so performWindowCapture() can run now.
-        if (mBlurBitmap == null
-                && PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurBackground())) {
-            applyDrawerHokoBlur();
-        }
     }
 
     public void resetAndScrollToPrivateSpaceHeader() {
@@ -754,8 +745,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),
                     Math.round(opacity * 255));
         }
-        // LC-Note: System blur removed; always use solid-colour blending.
-        return ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio);
+        // When HokoBlur is active use the original blur path: semi-transparent
+        // header protection so the blurred wallpaper shows through to the status
+        // bar area.  Without blur, blend the background colour with the header
+        // protection colour as normal.
+        return (mBlurBitmap != null)
+                ? ColorUtils.setAlphaComponent(mHeaderProtectionColor, (int) (blendRatio * 255))
+                : ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio);
     }
 
     private int getBackgroundColor() {
@@ -1392,101 +1388,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     "applyDrawerHokoBlur: getBlurredBitmap returned "
                     + (blurred != null
                             ? blurred.getWidth() + "x" + blurred.getHeight()
-                            : "null — falling back to PixelCopy"));
-            if (blurred != null) {
-                MAIN_EXECUTOR.getHandler().post(() -> {
-                    mBlurBitmap = blurred;
-                    android.util.Log.e("DrawerWallpaperBlur",
-                            "applyDrawerHokoBlur: mBlurBitmap updated (WallpaperManager path), calling invalidateHeader");
-                    invalidateHeader();
-                });
-            } else {
-                // WallpaperManager failed (SecurityException or live wallpaper).
-                // Fall back to PixelCopy: captures the launcher window with zero
-                // permissions required since we're capturing our own surface.
-                MAIN_EXECUTOR.getHandler().post(() -> {
-                    android.util.Log.e("DrawerWallpaperBlur",
-                            "applyDrawerHokoBlur: initiating PixelCopy fallback");
-                    captureWindowAndBlur(intensity);
-                });
-            }
+                            : "null (permission denied or live wallpaper — blur disabled)"));
+            MAIN_EXECUTOR.getHandler().post(() -> {
+                mBlurBitmap = blurred; // null → no blur; non-null → blur shown
+                android.util.Log.e("DrawerWallpaperBlur",
+                        "applyDrawerHokoBlur: mBlurBitmap updated on main thread, calling invalidateHeader");
+                invalidateHeader();
+            });
         });
-    }
-
-    /**
-     * PixelCopy fallback for {@link #applyDrawerHokoBlur}.
-     *
-     * <p>Captures the launcher window (requires no permissions — we own the
-     * window) and blurs the result with HokoBlur.  Because PixelCopy must
-     * run while the <em>home screen</em> is visible (not the open drawer),
-     * this method defers if the drawer is currently showing; the deferred
-     * capture is triggered the next time {@link #reset} is called (i.e. when
-     * the drawer closes and the workspace becomes visible again).
-     */
-    private void captureWindowAndBlur(int intensity) {
-        if (isInAllApps()) {
-            // Drawer is open — the workspace is hidden behind it.
-            // reset() will re-call applyDrawerHokoBlur() when the drawer closes.
-            android.util.Log.e("DrawerWallpaperBlur",
-                    "captureWindowAndBlur: drawer open — deferring to next reset()");
-            return;
-        }
-        performWindowCapture(intensity);
-    }
-
-    /**
-     * Uses {@link android.view.PixelCopy} to capture the launcher window and
-     * applies HokoBlur on a background thread.  Stores the result in
-     * {@link #mBlurBitmap} and calls {@link #invalidateHeader()}.
-     */
-    private void performWindowCapture(int intensity) {
-        android.util.Log.e("DrawerWallpaperBlur", "performWindowCapture: requesting PixelCopy");
-        final Context ctx = getContext();
-        android.app.Activity activity = (android.app.Activity) mActivityContext;
-        android.view.Window window = activity.getWindow();
-        android.view.View decorView = window.getDecorView();
-        int w = decorView.getWidth();
-        int h = decorView.getHeight();
-
-        if (w <= 0 || h <= 0) {
-            android.util.Log.e("DrawerWallpaperBlur",
-                    "performWindowCapture: window not ready (w=" + w + " h=" + h
-                    + "), retrying in 250 ms");
-            decorView.postDelayed(() -> performWindowCapture(intensity), 250);
-            return;
-        }
-
-        android.graphics.Bitmap capture =
-                android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888);
-        try {
-            android.view.PixelCopy.request(window, capture, result -> {
-                if (result == android.view.PixelCopy.SUCCESS) {
-                    android.util.Log.e("DrawerWallpaperBlur",
-                            "performWindowCapture: PixelCopy OK (" + w + "x" + h
-                            + ") — blurring on background thread");
-                    UI_HELPER_EXECUTOR.execute(() -> {
-                        Bitmap blurred = DrawerWallpaperBlurHelper.blurBitmap(ctx, capture, intensity);
-                        if (blurred != null && blurred != capture) capture.recycle();
-                        android.util.Log.e("DrawerWallpaperBlur",
-                                "performWindowCapture: blur done, bitmap="
-                                + (blurred != null
-                                        ? blurred.getWidth() + "x" + blurred.getHeight()
-                                        : "null"));
-                        MAIN_EXECUTOR.getHandler().post(() -> {
-                            mBlurBitmap = blurred;
-                            invalidateHeader();
-                        });
-                    });
-                } else {
-                    android.util.Log.e("DrawerWallpaperBlur",
-                            "performWindowCapture: PixelCopy failed, result=" + result);
-                    capture.recycle();
-                }
-            }, new android.os.Handler(android.os.Looper.getMainLooper()));
-        } catch (Exception e) {
-            android.util.Log.e("DrawerWallpaperBlur", "performWindowCapture threw: " + e);
-            capture.recycle();
-        }
     }
 
     // -----------------------------------------------------------------------

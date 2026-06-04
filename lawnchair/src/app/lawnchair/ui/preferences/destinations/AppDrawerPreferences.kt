@@ -16,6 +16,9 @@
 
 package app.lawnchair.ui.preferences.destinations
 
+import android.Manifest
+import android.os.Build
+import android.os.Environment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,11 +33,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
@@ -62,6 +73,7 @@ object AppDrawerRoutes {
     const val HIDDEN_APPS = "hiddenApps"
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun AppDrawerPreferences(
     modifier: Modifier = Modifier,
@@ -103,7 +115,36 @@ fun AppDrawerPreferences(
         // -----------------------------------------------------------------------
         // Style — background colour, opacity, work tab colours, HokoBlur
         // -----------------------------------------------------------------------
+        // ── HokoBlur permission state (must live outside PreferenceGroup) ────
+        // Blurring the drawer background reads wallpaper pixels, so we need
+        // the same storage permissions used by the wallpaper-preview feature.
         val drawerBlurBackgroundAdapter = prefs2.drawerBlurBackground.getAdapter()
+        var showDrawerBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
+        var drawerBlurManagedFilesChecked by rememberSaveable {
+            mutableStateOf(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Environment.isExternalStorageManager()
+                } else false,
+            )
+        }
+        val drawerBlurMediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            rememberMultiplePermissionsState(
+                listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO),
+            )
+        } else null
+        val drawerBlurPermissionsGranted = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                drawerBlurManagedFilesChecked && (drawerBlurMediaPermission?.allPermissionsGranted == true)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> drawerBlurManagedFilesChecked
+            else -> true
+        }
+        LaunchedEffect(drawerBlurManagedFilesChecked, drawerBlurMediaPermission?.allPermissionsGranted) {
+            if (showDrawerBlurPermissionDialog && drawerBlurPermissionsGranted) {
+                showDrawerBlurPermissionDialog = false
+                drawerBlurBackgroundAdapter.onChange(true)
+            }
+        }
+
         PreferenceGroup(heading = stringResource(R.string.style)) {
             Item { ColorPreference(preference = prefs2.appDrawerBackgroundColor) }
             Item {
@@ -131,7 +172,14 @@ fun AppDrawerPreferences(
             // ── HokoBlur ────────────────────────────────────────────────────────
             Item {
                 SwitchPreference(
-                    adapter = drawerBlurBackgroundAdapter,
+                    checked = drawerBlurBackgroundAdapter.state.value,
+                    onCheckedChange = { checked ->
+                        if (checked && !drawerBlurPermissionsGranted) {
+                            showDrawerBlurPermissionDialog = true
+                        } else {
+                            drawerBlurBackgroundAdapter.onChange(checked)
+                        }
+                    },
                     label = stringResource(id = R.string.drawer_hoko_blur_label),
                     description = stringResource(id = R.string.drawer_hoko_blur_description),
                 )
@@ -147,6 +195,18 @@ fun AppDrawerPreferences(
                     valueRange = 10f..150f,
                 )
             }
+        }
+
+        if (showDrawerBlurPermissionDialog) {
+            WallpaperAccessPermissionDialog(
+                managedFilesChecked = drawerBlurManagedFilesChecked,
+                onDismiss = { showDrawerBlurPermissionDialog = false },
+                onPermissionRequest = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        drawerBlurManagedFilesChecked = Environment.isExternalStorageManager()
+                    }
+                },
+            )
         }
 
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {

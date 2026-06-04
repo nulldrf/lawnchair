@@ -16,9 +16,15 @@
 
 package app.lawnchair.ui.preferences.destinations
 
+import android.Manifest
+import android.os.Build
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,6 +32,10 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
+import android.os.Environment
+import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
@@ -57,6 +67,7 @@ import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun GeneralPreferences() {
     val context = LocalContext.current
@@ -354,12 +365,47 @@ fun GeneralPreferences() {
         // screens; the slider controls intensity (10 = subtle frost, 150 = heavy fog).
         // Both prefs are read inside PreferenceLayout → SettingsBlurContainer so the
         // effect is instant on the entire settings stack — no recreate needed.
+        //
+        // On Android 10+ the blur reads wallpaper pixels, so we need the same
+        // storage permissions used by the wallpaper-preview feature.
         val settingsBlurAdapter = prefs.settingsBlurBackground.getAdapter()
+        var showSettingsBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
+        var settingsBlurManagedFilesChecked by rememberSaveable {
+            mutableStateOf(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Environment.isExternalStorageManager()
+                } else false,
+            )
+        }
+        val settingsBlurMediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            rememberMultiplePermissionsState(
+                listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO),
+            )
+        } else null
+        val settingsBlurPermissionsGranted = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                settingsBlurManagedFilesChecked && (settingsBlurMediaPermission?.allPermissionsGranted == true)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> settingsBlurManagedFilesChecked
+            else -> true
+        }
+        LaunchedEffect(settingsBlurManagedFilesChecked, settingsBlurMediaPermission?.allPermissionsGranted) {
+            if (showSettingsBlurPermissionDialog && settingsBlurPermissionsGranted) {
+                showSettingsBlurPermissionDialog = false
+                settingsBlurAdapter.onChange(true)
+            }
+        }
 
         PreferenceGroup(heading = stringResource(id = R.string.settings_background_label)) {
             Item {
                 SwitchPreference(
-                    adapter = settingsBlurAdapter,
+                    checked = settingsBlurAdapter.state.value,
+                    onCheckedChange = { checked ->
+                        if (checked && !settingsBlurPermissionsGranted) {
+                            showSettingsBlurPermissionDialog = true
+                        } else {
+                            settingsBlurAdapter.onChange(checked)
+                        }
+                    },
                     label = stringResource(id = R.string.settings_blur_label),
                     description = stringResource(id = R.string.settings_blur_description),
                 )
@@ -375,6 +421,18 @@ fun GeneralPreferences() {
                     step = 10f,
                 )
             }
+        }
+
+        if (showSettingsBlurPermissionDialog) {
+            WallpaperAccessPermissionDialog(
+                managedFilesChecked = settingsBlurManagedFilesChecked,
+                onDismiss = { showSettingsBlurPermissionDialog = false },
+                onPermissionRequest = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        settingsBlurManagedFilesChecked = Environment.isExternalStorageManager()
+                    }
+                },
+            )
         }
     }
 }

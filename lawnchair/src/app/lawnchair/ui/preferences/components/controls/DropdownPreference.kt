@@ -1,11 +1,9 @@
 package app.lawnchair.ui.preferences.components.controls
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -36,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -59,73 +59,77 @@ private fun <T> DropdownPopupContent(
     resolvedStyle: TextStyle,
     onSelect: (T) -> Unit,
 ) {
-    var animVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { animVisible = true }
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
 
-    // Clip-height reveal: expand from 0 height at top to full height,
-    // combined with a gentle fade. This matches Android's native dropdown
-    // animation — content grows downward from the anchor row.
-    AnimatedVisibility(
-        visible = animVisible,
-        enter = fadeIn(tween(80)) + androidx.compose.animation.expandVertically(
-            animationSpec = tween(200),
-            expandFrom = Alignment.Top,
-        ),
-        exit = fadeOut(tween(80)) + androidx.compose.animation.shrinkVertically(
-            animationSpec = tween(150),
-            shrinkTowards = Alignment.Top,
-        ),
+    val scaleY by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "dropdownScaleY",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 120),
+        label = "dropdownAlpha",
+    )
+
+    Surface(
+        modifier = Modifier
+            .widthIn(min = 160.dp, max = 240.dp)
+            .shadow(elevation = 6.dp, shape = RoundedCornerShape(16.dp), clip = false)
+            // Scale vertically from the top edge — exactly how Android's
+            // native PopupMenu animates. scaleY goes 0→1 so the menu
+            // appears to unfold downward from the row.
+            .graphicsLayer {
+                this.scaleY = scaleY
+                this.alpha = alpha
+                transformOrigin = TransformOrigin(0.5f, 0f)
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 3.dp,
     ) {
-        Surface(
+        Column(
             modifier = Modifier
-                .widthIn(min = 160.dp, max = 240.dp)
-                .shadow(elevation = 6.dp, shape = RoundedCornerShape(16.dp), clip = false),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            tonalElevation = 3.dp,
+                .width(IntrinsicSize.Max)
+                .padding(vertical = 4.dp, horizontal = 4.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .width(IntrinsicSize.Max)
-                    .padding(vertical = 4.dp, horizontal = 4.dp),
-            ) {
-                entries.forEach { (value, entryLabel) ->
-                    val isSelected = value == currentValue
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent,
-                            )
-                            .pointerInput(value) {
-                                detectTapGestures { onSelect(value) }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        Text(
-                            text = entryLabel,
-                            style = resolvedStyle.copy(
-                                fontSize = MaterialTheme.typography.bodyLarge.fontSize,
-                                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
-                                letterSpacing = MaterialTheme.typography.bodyLarge.letterSpacing,
-                            ),
-                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurface,
+            entries.forEach { (value, entryLabel) ->
+                val isSelected = value == currentValue
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                            else Color.Transparent,
                         )
+                        .pointerInput(value) {
+                            detectTapGestures { onSelect(value) }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
                     }
+                    Text(
+                        text = entryLabel,
+                        style = resolvedStyle.copy(
+                            fontSize = MaterialTheme.typography.bodyLarge.fontSize,
+                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
+                            letterSpacing = MaterialTheme.typography.bodyLarge.letterSpacing,
+                        ),
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
         }

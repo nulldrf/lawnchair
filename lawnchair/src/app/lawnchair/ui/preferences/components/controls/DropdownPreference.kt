@@ -2,10 +2,10 @@ package app.lawnchair.ui.preferences.components.controls
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -58,23 +57,23 @@ private fun <T> DropdownPopupContent(
     entries: List<Pair<T, String>>,
     currentValue: T,
     resolvedStyle: TextStyle,
-    tapFractionX: Float = 0.5f,
     onSelect: (T) -> Unit,
 ) {
     var animVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { animVisible = true }
 
+    // Clip-height reveal: expand from 0 height at top to full height,
+    // combined with a gentle fade. This matches Android's native dropdown
+    // animation — content grows downward from the anchor row.
     AnimatedVisibility(
         visible = animVisible,
-        enter = fadeIn(tween(100)) + scaleIn(
-            animationSpec = tween(150),
-            transformOrigin = TransformOrigin(tapFractionX, 0f),
-            initialScale = 0.92f,
+        enter = fadeIn(tween(80)) + androidx.compose.animation.expandVertically(
+            animationSpec = tween(200),
+            expandFrom = Alignment.Top,
         ),
-        exit = fadeOut(tween(80)) + scaleOut(
-            animationSpec = tween(120),
-            transformOrigin = TransformOrigin(tapFractionX, 0f),
-            targetScale = 0.92f,
+        exit = fadeOut(tween(80)) + androidx.compose.animation.shrinkVertically(
+            animationSpec = tween(150),
+            shrinkTowards = Alignment.Top,
         ),
     ) {
         Surface(
@@ -146,9 +145,9 @@ fun <T> DropdownPreference(
     val currentLabel = entries.firstOrNull { it.first == currentValue }?.second ?: ""
     var resolvedTitleStyle by remember { mutableStateOf<TextStyle?>(null) }
 
-    // Absolute window coordinates of the row bottom-left, updated on layout
+    // Absolute window coordinates of the row — updated on layout
+    var rowTopLeft by remember { mutableStateOf(IntOffset.Zero) }
     var rowBottomLeft by remember { mutableStateOf(IntOffset.Zero) }
-    var rowWidth by remember { mutableStateOf(1) }
     var tapRelativeX by remember { mutableStateOf(0) }
 
     PreferenceTemplate(
@@ -156,11 +155,11 @@ fun <T> DropdownPreference(
             .fillMaxWidth()
             .onGloballyPositioned { coords ->
                 val pos = coords.positionInWindow()
+                rowTopLeft = IntOffset(pos.x.toInt(), pos.y.toInt())
                 rowBottomLeft = IntOffset(
                     x = pos.x.toInt(),
                     y = pos.y.toInt() + coords.size.height,
                 )
-                rowWidth = coords.size.width.coerceAtLeast(1)
             }
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
@@ -187,11 +186,7 @@ fun <T> DropdownPreference(
     )
 
     if (expanded) {
-        // PopupPositionProvider gives full control over where the popup
-        // window is placed in absolute screen coordinates.
-        // We ignore the anchor bounds (those are the parent View bounds)
-        // and instead place directly at the row's bottom edge + tap X.
-        val positionProvider = remember(rowBottomLeft, tapRelativeX) {
+        val positionProvider = remember(rowTopLeft, rowBottomLeft, tapRelativeX) {
             object : PopupPositionProvider {
                 override fun calculatePosition(
                     anchorBounds: IntRect,
@@ -201,8 +196,14 @@ fun <T> DropdownPreference(
                 ): IntOffset {
                     val x = (rowBottomLeft.x + tapRelativeX)
                         .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-                    val y = rowBottomLeft.y
-                        .coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                    // Show below row if there's enough space, otherwise flip above
+                    val yBelow = rowBottomLeft.y
+                    val yAbove = rowTopLeft.y - popupContentSize.height
+                    val y = if (yBelow + popupContentSize.height <= windowSize.height) {
+                        yBelow
+                    } else {
+                        yAbove.coerceAtLeast(0)
+                    }
                     return IntOffset(x, y)
                 }
             }
@@ -217,7 +218,6 @@ fun <T> DropdownPreference(
                 entries = entries,
                 currentValue = currentValue,
                 resolvedStyle = resolvedTitleStyle ?: MaterialTheme.typography.bodyLarge,
-                tapFractionX = (tapRelativeX.toFloat() / rowWidth).coerceIn(0f, 1f),
                 onSelect = { value ->
                     expanded = false
                     onValueChange(value)

@@ -45,6 +45,8 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.ThemeProvider
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.toComposeColorScheme
+import app.lawnchair.theme.toComposeColorScheme2025
+import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.preferences.components.ThemeChoice
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.Utilities
@@ -77,13 +79,11 @@ fun ComponentActivity.EdgeToEdge() {
             Color.TRANSPARENT,
             detectDarkMode = { darkTheme },
         )
-
         val navigationBarStyle = if (!darkTheme) {
             SystemBarStyle.light(scrimColor, contentColor)
         } else {
             SystemBarStyle.dark(scrimColor)
         }
-
         enableEdgeToEdge(
             statusBarStyle = statusBarStyle,
             navigationBarStyle = navigationBarStyle,
@@ -98,17 +98,27 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     val context = LocalContext.current
     val preferenceManager2 = preferenceManager2()
     val accentColor by preferenceManager2.accentColor.asState()
-    val colorStyle by preferenceManager2.colorStyle.asState()
-    val colorSpec by preferenceManager2.colorSpec.asState()
+    val colorStyle  by preferenceManager2.colorStyle.asState()
+    val colorSpec   by preferenceManager2.colorSpec.asState()
 
     val isSystemAccent = accentColor == ColorOption.SystemAccent
-    // Use full colorStyle object (not just .style) — LegacyKdrag uses
-    // TONAL_SPOT as a placeholder so .style alone never changes when
-    // switching to/from ZCAM, returning a stale cached scheme.
+
+    // SPEC_2025 path — uses MonetColorSchemeCompat2025 directly, no kdrag0n.
+    // SystemAccent always falls through to the legacy path (colorScheme2025
+    // returns null for SystemAccent because the system generates its own palette).
+    if (colorSpec == SpecVersion.SPEC_2025 && !isSystemAccent) {
+        val scheme2025 = remember(accentColor, colorStyle, colorSpec) {
+            ThemeProvider.INSTANCE.get(context).colorScheme2025
+        }
+        if (scheme2025 != null) {
+            return scheme2025.toComposeColorScheme2025(isDark = darkTheme)
+        }
+    }
+
+    // SPEC_2021 / LegacyKdrag / SystemAccent path — uses kdrag0n ColorScheme.
     val colorScheme = remember(accentColor, colorStyle, if (isSystemAccent) null else colorSpec) {
         ThemeProvider.INSTANCE.get(context).colorScheme
     }
-
     return colorScheme.toComposeColorScheme(isDark = darkTheme)
 }
 
@@ -126,17 +136,18 @@ val isSelectedThemeDark: Boolean
         val themeChoice by preferenceManager().launcherTheme.observeAsState()
         return when (themeChoice) {
             ThemeChoice.LIGHT -> false
-            ThemeChoice.DARK -> true
-            else -> isAutoThemeDark
+            ThemeChoice.DARK  -> true
+            else              -> isAutoThemeDark
         }
     }
 
-val isAutoThemeDark: Boolean @Composable get() =
-    if (LocalInspectionMode.current || Utilities.ATLEAST_P) {
-        isSystemInDarkTheme()
-    } else {
-        wallpaperSupportsDarkTheme
-    }
+val isAutoThemeDark: Boolean
+    @Composable get() =
+        if (LocalInspectionMode.current || Utilities.ATLEAST_P) {
+            isSystemInDarkTheme()
+        } else {
+            wallpaperSupportsDarkTheme
+        }
 
 val wallpaperSupportsDarkTheme: Boolean
     @Composable get() {

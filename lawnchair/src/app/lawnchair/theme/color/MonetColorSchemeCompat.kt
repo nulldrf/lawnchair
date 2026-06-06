@@ -14,11 +14,13 @@ class MonetColorSchemeCompat(
     val specVersion: SpecVersion = SpecVersion.SPEC_2021,
 ) : ColorScheme() {
 
-    private val scheme = MonetColorScheme(
+    val rawScheme: MonetColorScheme = MonetColorScheme(
         seedColor,
         style,
         specVersion,
     )
+
+    private val scheme = rawScheme
 
     override val neutral1: ColorSwatch = mapColors(scheme.neutral1.allShades)
     override val neutral2: ColorSwatch = mapColors(scheme.neutral2.allShades)

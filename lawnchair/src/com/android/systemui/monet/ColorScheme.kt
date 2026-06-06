@@ -53,35 +53,109 @@ enum class SpecVersion {
 // Primary chroma raised from 36 → 48 for TONAL_SPOT; neutrals slightly richer.
 // ---------------------------------------------------------------------------
 internal object Spec2025 {
-    /** TONAL_SPOT primary chroma (was 36 in 2021). */
-    const val TONAL_SPOT_A1_CHROMA = 48.0
-    /** TONAL_SPOT secondary chroma (was 16 in 2021). */
-    const val TONAL_SPOT_A2_CHROMA = 20.0
-    /** TONAL_SPOT tertiary chroma (was 24 in 2021). */
-    const val TONAL_SPOT_A3_CHROMA = 32.0
-    /** Neutral-1 chroma raised from 6 → 8. */
-    const val TONAL_SPOT_N1_CHROMA = 8.0
-    /** Neutral-2 chroma raised from 8 → 12. */
-    const val TONAL_SPOT_N2_CHROMA = 12.0
+    // ── TONAL_SPOT ─────────────────────────────────────────────────────────
+    // Source: ColorSpec2025.getPrimaryPalette(TONAL_SPOT) → chroma 26/32
+    // We use light-mode/non-dark phone value (32.0) as the universal default
+    // since TonalSpec has no isDark conditional.
+    const val TONAL_SPOT_A1_CHROMA = 32.0
+    // Source: ColorSpec2025.getSecondaryPalette(TONAL_SPOT) → chroma 16 (unchanged)
+    const val TONAL_SPOT_A2_CHROMA = 16.0
+    // Source: ColorSpec2025.getTertiaryPalette(TONAL_SPOT) → chroma 28/32
+    const val TONAL_SPOT_A3_CHROMA = 28.0
+    // Source: ColorSpec2025.getNeutralPalette(TONAL_SPOT) → chroma 5 (phone)
+    const val TONAL_SPOT_N1_CHROMA = 5.0
+    // Source: ColorSpec2025.getNeutralVariantPalette(TONAL_SPOT) → n1 * 1.7 = 8.5
+    const val TONAL_SPOT_N2_CHROMA = 8.5
 
-    /** VIBRANT primary chroma max-out stays the same; tertiary hue add now 65° (was 60°). */
-    const val VIBRANT_A3_HUE_ADD = 65.0
+    // TONAL_SPOT a3: hue rotation table from ColorSpec2025.getTertiaryPalette
+    // Original: hues=[0,20,71,161,333,360], rotations=[-40,48,-32,40,-32]
+    val TONAL_SPOT_A3_HUE_ROTATIONS = listOf(
+        Pair(0, -40),
+        Pair(20, 48),
+        Pair(71, -32),
+        Pair(161, 40),
+        Pair(333, -32),
+        Pair(360, -32),
+    )
 
-    // SPRITZ (SchemeNeutral) 2025: chroma values are hue-dependent in the full
-    // spec (blue hues get higher chroma), but we use the non-blue phone defaults
-    // as a universal approximation since TonalSpec has no hue-conditional logic.
-    /** SPRITZ primary chroma (was 12 in 2021; non-blue phone default in 2025). */
+    // ── VIBRANT ────────────────────────────────────────────────────────────
+    // Source: ColorSpec2025.getSecondaryPalette(VIBRANT)
+    // hues=[0,38,105,140,333,360], rotations=[-14,10,-14,10,-14], chroma=56
+    val VIBRANT_A2_HUE_ROTATIONS = listOf(
+        Pair(0, -14),
+        Pair(38, 10),
+        Pair(105, -14),
+        Pair(140, 10),
+        Pair(333, -14),
+        Pair(360, -14),
+    )
+    const val VIBRANT_A2_CHROMA = 56.0
+
+    // Source: ColorSpec2025.getTertiaryPalette(VIBRANT)
+    // hues=[0,38,71,105,140,161,253,333,360], rotations=[-72,35,24,-24,62,50,62,-72]
+    val VIBRANT_A3_HUE_ROTATIONS = listOf(
+        Pair(0, -72),
+        Pair(38, 35),
+        Pair(71, 24),
+        Pair(105, -24),
+        Pair(140, 62),
+        Pair(161, 50),
+        Pair(253, 62),
+        Pair(333, -72),
+        Pair(360, -72),
+    )
+    const val VIBRANT_A3_CHROMA = 56.0
+
+    // ── EXPRESSIVE ─────────────────────────────────────────────────────────
+    // Source: ColorSpec2025.getPrimaryPalette(EXPRESSIVE) → chroma 48 (phone light)
+    const val EXPRESSIVE_A1_CHROMA = 48.0
+
+    // Source: ColorSpec2025.getSecondaryPalette(EXPRESSIVE)
+    // hues=[0,105,140,204,253,278,300,333,360], rotations=[-160,155,-100,96,-96,-156,-165,-160]
+    // chroma = 24 (phone light)
+    val EXPRESSIVE_SECONDARY_HUE_ROTATIONS = listOf(
+        Pair(0, -160),
+        Pair(105, 155),
+        Pair(140, -100),
+        Pair(204, 96),
+        Pair(253, -96),
+        Pair(278, -156),
+        Pair(300, -165),
+        Pair(333, -160),
+        Pair(360, -160),
+    )
+    const val EXPRESSIVE_A2_CHROMA = 24.0
+
+    // Source: ColorSpec2025.getTertiaryPalette(EXPRESSIVE)
+    // hues=[0,105,140,204,253,278,300,333,360], rotations=[-165,160,-105,101,-101,-160,-170,-165]
+    // chroma = 48
+    val EXPRESSIVE_TERTIARY_HUE_ROTATIONS = listOf(
+        Pair(0, -165),
+        Pair(105, 160),
+        Pair(140, -105),
+        Pair(204, 101),
+        Pair(253, -101),
+        Pair(278, -160),
+        Pair(300, -170),
+        Pair(333, -165),
+        Pair(360, -165),
+    )
+    const val EXPRESSIVE_A3_CHROMA = 48.0
+
+    // ── SPRITZ (SchemeNeutral) ──────────────────────────────────────────────
+    // Source: ColorSpec2025.getPrimaryPalette(NEUTRAL) → non-blue phone: 8.0
     const val SPRITZ_A1_CHROMA = 8.0
-    /** SPRITZ secondary chroma (was 8 in 2021; non-blue phone default in 2025). */
+    // Source: ColorSpec2025.getSecondaryPalette(NEUTRAL) → non-blue phone: 4.0
     const val SPRITZ_A2_CHROMA = 4.0
-    /** SPRITZ tertiary chroma (was 16 in 2021; 2025 adds hue rotation + higher chroma). */
+    // Source: ColorSpec2025.getTertiaryPalette(NEUTRAL) → chroma 20 (phone)
     const val SPRITZ_A3_CHROMA = 20.0
-    /** SPRITZ neutral-1 chroma (was 2 in 2021). */
+    // Source: ColorSpec2025.getNeutralPalette(NEUTRAL) → 1.4 (phone)
     const val SPRITZ_N1_CHROMA = 1.4
-    /** SPRITZ neutral-2 chroma (was 2 in 2021; 2025 = n1 × 2.2). */
-    const val SPRITZ_N2_CHROMA = 3.1
+    // Source: ColorSpec2025.getNeutralVariantPalette(NEUTRAL) → 1.4 * 2.2 = 3.08
+    const val SPRITZ_N2_CHROMA = 3.08
 
-    /** SPRITZ 2025: tertiary hue rotation table (new — 2021 used HueSource). */
+    // Source: ColorSpec2025.getTertiaryPalette(NEUTRAL)
+    // hues=[0,38,105,161,204,278,333,360], rotations=[-32,26,10,-39,24,-15,-32]
     val SPRITZ_TERTIARY_HUE_ROTATIONS = listOf(
         Pair(0, -32),
         Pair(38, 26),
@@ -91,32 +165,6 @@ internal object Spec2025 {
         Pair(278, -15),
         Pair(333, -32),
         Pair(360, -32),
-    )
-
-    /** EXPRESSIVE: secondary hue rotations updated for 2025. */
-    val EXPRESSIVE_SECONDARY_HUE_ROTATIONS = listOf(
-        Pair(0, 50),
-        Pair(21, 100),
-        Pair(51, 50),
-        Pair(121, 25),
-        Pair(151, 50),
-        Pair(191, 95),
-        Pair(271, 50),
-        Pair(321, 50),
-        Pair(360, 50),
-    )
-
-    /** EXPRESSIVE: tertiary hue rotations updated for 2025. */
-    val EXPRESSIVE_TERTIARY_HUE_ROTATIONS = listOf(
-        Pair(0, 125),
-        Pair(21, 125),
-        Pair(51, 25),
-        Pair(121, 50),
-        Pair(151, 25),
-        Pair(191, 20),
-        Pair(271, 25),
-        Pair(321, 125),
-        Pair(360, 125),
     )
 }
 
@@ -209,10 +257,34 @@ internal class HueVibrantTertiary : Hue {
  * from SchemeNeutral in material-color-utilities (Google I/O 2025).
  * In 2021 SPRITZ used HueSource (no rotation) for all palettes.
  */
+internal class HueTonalSpotTertiary2025 : Hue {
+    override fun get(sourceColor: Cam): Double =
+        getHueRotation(sourceColor.hue, Spec2025.TONAL_SPOT_A3_HUE_ROTATIONS)
+}
+
+internal class HueVibrantSecondary2025 : Hue {
+    override fun get(sourceColor: Cam): Double =
+        getHueRotation(sourceColor.hue, Spec2025.VIBRANT_A2_HUE_ROTATIONS)
+}
+
+internal class HueVibrantTertiary2025 : Hue {
+    override fun get(sourceColor: Cam): Double =
+        getHueRotation(sourceColor.hue, Spec2025.VIBRANT_A3_HUE_ROTATIONS)
+}
+
 internal class HueSpritzTertiary2025 : Hue {
-    override fun get(sourceColor: Cam): Double {
-        return getHueRotation(sourceColor.hue, Spec2025.SPRITZ_TERTIARY_HUE_ROTATIONS)
-    }
+    override fun get(sourceColor: Cam): Double =
+        getHueRotation(sourceColor.hue, Spec2025.SPRITZ_TERTIARY_HUE_ROTATIONS)
+}
+
+internal class HueExpressiveSecondary2025 : Hue {
+    override fun get(sourceColor: Cam): Double =
+        getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_SECONDARY_HUE_ROTATIONS)
+}
+
+internal class HueExpressiveTertiary2025 : Hue {
+    override fun get(sourceColor: Cam): Double =
+        getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_TERTIARY_HUE_ROTATIONS)
 }
 
 internal class HueExpressiveSecondary : Hue {
@@ -250,26 +322,6 @@ internal class HueExpressiveTertiary : Hue {
 
     override fun get(sourceColor: Cam): Double {
         return getHueRotation(sourceColor.hue, hueToRotations)
-    }
-}
-
-/**
- * SPEC_2025 variant of [HueExpressiveSecondary] — uses updated rotation
- * tables from Material 3 Expressive (Google I/O 2025).
- */
-internal class HueExpressiveSecondary2025 : Hue {
-    override fun get(sourceColor: Cam): Double {
-        return getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_SECONDARY_HUE_ROTATIONS)
-    }
-}
-
-/**
- * SPEC_2025 variant of [HueExpressiveTertiary] — uses updated rotation
- * tables from Material 3 Expressive (Google I/O 2025).
- */
-internal class HueExpressiveTertiary2025 : Hue {
-    override fun get(sourceColor: Cam): Double {
-        return getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_TERTIARY_HUE_ROTATIONS)
     }
 }
 
@@ -381,11 +433,12 @@ enum class Style(
             n1 = TonalSpec(HueSource(), ChromaConstant(6.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(8.0)),
         ),
-        // ---- SPEC_2025: richer chroma for primary, secondary, tertiary, and neutrals ----
+        // ---- SPEC_2025: lower primary chroma, new tertiary hue rotation,
+        //      higher neutral chroma (source: ColorSpec2025, phone/light defaults)
         coreSpec2025 = CoreSpec(
             a1 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_A1_CHROMA)),
             a2 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_A2_CHROMA)),
-            a3 = TonalSpec(HueAdd(60.0), ChromaConstant(Spec2025.TONAL_SPOT_A3_CHROMA)),
+            a3 = TonalSpec(HueTonalSpotTertiary2025(), ChromaConstant(Spec2025.TONAL_SPOT_A3_CHROMA)),
             n1 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_N1_CHROMA)),
             n2 = TonalSpec(HueSource(), ChromaConstant(Spec2025.TONAL_SPOT_N2_CHROMA)),
         ),
@@ -399,11 +452,12 @@ enum class Style(
             n1 = TonalSpec(HueSource(), ChromaConstant(10.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(12.0)),
         ),
-        // ---- SPEC_2025: tertiary hue add increased from 60° → 65° ----
+        // ---- SPEC_2025: fixed primary chroma 74 (was ChromaMaxOut), new hue
+        //      rotation tables for secondary and tertiary (source: ColorSpec2025) ----
         coreSpec2025 = CoreSpec(
-            a1 = TonalSpec(HueSource(), ChromaMaxOut()),
-            a2 = TonalSpec(HueVibrantSecondary(), ChromaConstant(24.0)),
-            a3 = TonalSpec(HueAdd(Spec2025.VIBRANT_A3_HUE_ADD), ChromaConstant(32.0)),
+            a1 = TonalSpec(HueSource(), ChromaConstant(74.0)),
+            a2 = TonalSpec(HueVibrantSecondary2025(), ChromaConstant(Spec2025.VIBRANT_A2_CHROMA)),
+            a3 = TonalSpec(HueVibrantTertiary2025(), ChromaConstant(Spec2025.VIBRANT_A3_CHROMA)),
             n1 = TonalSpec(HueSource(), ChromaConstant(10.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(12.0)),
         ),
@@ -417,11 +471,12 @@ enum class Style(
             n1 = TonalSpec(HueAdd(15.0), ChromaConstant(8.0)),
             n2 = TonalSpec(HueAdd(15.0), ChromaConstant(12.0)),
         ),
-        // ---- SPEC_2025: updated hue rotation tables for secondary and tertiary ----
+        // ---- SPEC_2025: higher primary chroma, new rotation tables,
+        //      higher tertiary chroma (source: ColorSpec2025, phone/light defaults) ----
         coreSpec2025 = CoreSpec(
-            a1 = TonalSpec(HueAdd(240.0), ChromaConstant(40.0)),
-            a2 = TonalSpec(HueExpressiveSecondary2025(), ChromaConstant(24.0)),
-            a3 = TonalSpec(HueExpressiveTertiary2025(), ChromaConstant(32.0)),
+            a1 = TonalSpec(HueAdd(240.0), ChromaConstant(Spec2025.EXPRESSIVE_A1_CHROMA)),
+            a2 = TonalSpec(HueExpressiveSecondary2025(), ChromaConstant(Spec2025.EXPRESSIVE_A2_CHROMA)),
+            a3 = TonalSpec(HueExpressiveTertiary2025(), ChromaConstant(Spec2025.EXPRESSIVE_A3_CHROMA)),
             n1 = TonalSpec(HueAdd(15.0), ChromaConstant(8.0)),
             n2 = TonalSpec(HueAdd(15.0), ChromaConstant(12.0)),
         ),

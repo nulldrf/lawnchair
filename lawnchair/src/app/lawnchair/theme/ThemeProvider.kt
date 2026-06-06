@@ -16,6 +16,7 @@ import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.MonetColorSchemeCompat
+import app.lawnchair.theme.color.MonetColorSchemeCompat2025
 import app.lawnchair.theme.color.SystemColorScheme
 import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.theme.getSystemAccent
@@ -44,50 +45,33 @@ class ThemeProvider @Inject constructor(
 ) : SafeCloseable {
     private val preferenceManager2 = PreferenceManager2.getInstance(context)
     private val wallpaperManager = WallpaperManagerCompat.INSTANCE.get(context)
-    // Main dispatcher: onEach callbacks and listeners must run on the main thread
-    // because ColorSchemeChangeListener implementations call Activity.recreate().
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     private var accentColor: ColorOption = preferenceManager2.accentColor.firstBlocking()
     private var colorStyle: ColorStyle = preferenceManager2.colorStyle.firstBlocking()
     private var colorSpec: SpecVersion = preferenceManager2.colorSpec.firstBlocking()
 
-    // Startup sync: if the stored accent is WallpaperDerived but the wallpaper
-    // has since changed (e.g. changed while Lawnchair was not running), update
-    // the preference immediately so the theme and UI are correct from first frame.
-    // We read wallpaperManager.wallpaperColors here — it is populated before
-    // ThemeProvider in the Dagger graph, so the value is available synchronously.
-
-    // Cache for Android-system Monet schemes — keyed by (seedColor, Style, SpecVersion).
-    // ConcurrentHashMap prevents race conditions when colorSpec changes rapidly and
-    // clear() + getOrPut() overlap on the main thread during recomposition.
+    // Cache for SPEC_2021 / LegacyKdrag — keyed by (seedColor, Style, SpecVersion).
+    // Value type is the kdrag0n ColorScheme abstract class.
     private val colorSchemeMap = java.util.concurrent.ConcurrentHashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
 
-    // Separate cache for the kdrag0n ZCAM engine — keyed by seedColor alone,
-    // since LegacyKdrag has no Style variant.
+    // Cache for the kdrag0n ZCAM engine — keyed by seedColor alone.
     private val kdragColorSchemeMap = java.util.concurrent.ConcurrentHashMap<Int, ColorScheme>()
+
+    // Cache for SPEC_2025 — keyed by (seedColor, Style).
+    // Typed as MonetColorSchemeCompat2025 directly; no kdrag0n type involved.
+    private val colorSchemeMap2025 = java.util.concurrent.ConcurrentHashMap<Pair<Int, Style>, MonetColorSchemeCompat2025>()
 
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
-    // Holds the most-recent wallpaper primary received directly from the system
-    // OnColorsChangedListener callback — always fresh, never stale from cache.
-    // Read by the colorScheme getter to render the correct colour immediately
-    // without waiting for the async preference write to complete.
     @Volatile
     private var freshWallpaperPrimary: Int? = null
 
     init {
-        // Startup sync: if the wallpaper changed while Lawnchair was not running,
-        // the live primary will differ from the stored fingerprint.
-        // This is now safe because we compare wallpaperPrimary (fingerprint),
-        // not color (the user's chosen swatch).
         val storedAccent = accentColor
         if (storedAccent is ColorOption.WallpaperDerived) {
             val currentPrimary = wallpaperManager.wallpaperColors?.primaryColor
             if (currentPrimary != null && currentPrimary != storedAccent.wallpaperPrimary) {
-                // Wallpaper changed while closed — reset to new primary.
-                // Write synchronously via firstBlocking equivalent: launch and
-                // let onEach handle notifyColorSchemeChanged on Main.
                 coroutineScope.launch {
                     preferenceManager2.accentColor.set(
                         ColorOption.WallpaperDerived(
@@ -103,13 +87,12 @@ class ThemeProvider @Inject constructor(
             seedSystemColorScheme()
             registerOverlayChangedListener()
         }
+
         wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
             override fun onColorsChanged() {
                 when (val current = accentColor) {
                     is ColorOption.WallpaperPrimary -> notifyColorSchemeChanged()
                     is ColorOption.WallpaperDerived -> {
-                        // WallpaperManagerCompat.wallpaperColors is updated before
-                        // notifyChange() fires, so this value is current.
                         val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
                             ?: return
                         freshWallpaperPrimary = newPrimary
@@ -129,32 +112,27 @@ class ThemeProvider @Inject constructor(
                 }
             }
         })
+
         preferenceManager2.accentColor.onEach(launchIn = coroutineScope) {
             accentColor = it
-            // Clear the live override — the preference now stores the correct value.
             freshWallpaperPrimary = null
             notifyColorSchemeChanged()
         }
         preferenceManager2.colorStyle.onEach(launchIn = coroutineScope) {
             colorStyle = it
             colorSchemeMap.clear()
+            colorSchemeMap2025.clear()
             if (Utilities.ATLEAST_S) seedSystemColorScheme()
             notifyColorSchemeChanged()
         }
         preferenceManager2.colorSpec.onEach(launchIn = coroutineScope) {
             colorSpec = it
             colorSchemeMap.clear()
-            // Re-seed the real system palette after clearing — clear() removed it
-            // and getColorScheme(0, ...) would otherwise create a synthetic
-            // MonetColorSchemeCompat(0) instead of returning the system colors.
+            colorSchemeMap2025.clear()
             if (Utilities.ATLEAST_S) seedSystemColorScheme()
             notifyColorSchemeChanged()
         }
 
-        // Register a direct system WallpaperManager listener for WallpaperDerived.
-        // Unlike WallpaperManagerCompat.OnColorsChangedListener, this callback
-        // receives the new WallpaperColors as a parameter — no cache read needed,
-        // so the update is always immediate and reliable.
         if (Utilities.ATLEAST_O_MR1) {
             android.app.WallpaperManager.getInstance(context)
                 .addOnColorsChangedListener(
@@ -165,13 +143,8 @@ class ThemeProvider @Inject constructor(
                         ) {
                             val newPrimary = colors?.primaryColor?.toArgb()
                             if (newPrimary != null) {
-                                // Store the fresh primary so the colorScheme getter
-                                // can use it immediately on the next render call.
                                 freshWallpaperPrimary = newPrimary
-                                // Trigger re-render immediately — no waiting for
-                                // the async preference write.
                                 notifyColorSchemeChanged()
-                                // Persist to preference if wallpaper actually changed.
                                 if (newPrimary != current.wallpaperPrimary) {
                                     coroutineScope.launch {
                                         preferenceManager2.accentColor.set(
@@ -191,13 +164,15 @@ class ThemeProvider @Inject constructor(
     }
 
     private fun seedSystemColorScheme() {
-        // SystemColorScheme reads Android's system_accent/neutral color resources directly.
-        // It must be stored under ALL style keys for seed=0 so that systemColorScheme
-        // never falls through to MonetColorSchemeCompat(0, ...) regardless of colorStyle.
         val systemScheme = SystemColorScheme(context)
         Style.values().forEach { style ->
             colorSchemeMap[Triple(0, style, SpecVersion.SPEC_2021)] = systemScheme
         }
+        // SPEC_2025 always uses the system scheme for SystemAccent too.
+        // SystemColorScheme extends the kdrag0n ColorScheme, so it can't go into
+        // colorSchemeMap2025. Instead, colorScheme2025 falls back gracefully:
+        // when accentColor is SystemAccent, Theme.kt routes to the legacy path
+        // regardless of colorSpec (see getColorScheme in Theme.kt).
     }
 
     private fun registerOverlayChangedListener() {
@@ -219,71 +194,121 @@ class ThemeProvider @Inject constructor(
         )
     }
 
-    val colorScheme get() = when (val accentColor = this.accentColor) {
-        is ColorOption.SystemAccent -> systemColorScheme
-
-        is ColorOption.WallpaperPrimary -> {
-            val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
-            getColorScheme(wallpaperPrimary ?: ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
-        }
-
-        // WallpaperDerived: use stored chosen swatch color normally.
-        // If freshWallpaperPrimary (set by the system listener callback which
-        // always receives colors as a parameter) differs from the stored fingerprint,
-        // the wallpaper changed — use it immediately for rendering.
-        is ColorOption.WallpaperDerived -> {
-            val fresh = freshWallpaperPrimary
-            val seedColor = if (fresh != null && fresh != accentColor.wallpaperPrimary) {
-                fresh
-            } else {
-                accentColor.color
-            }
-            getColorScheme(seedColor, colorStyle, colorSpec)
-        }
-
-        // LegacyKdrag is only meaningful for wallpaper-derived seed colours.
-        // When the user has picked a specific custom colour, silently fall back
-        // to TonalSpot so the engine choice doesn't accidentally affect
-        // manually-picked accents and the Custom page swatch grid.
-        is ColorOption.CustomColor -> {
-            val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-            getColorScheme(accentColor.color, effectiveStyle, colorSpec)
-        }
-
-        else -> getColorScheme(ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
-    }
-
-    private val systemColorScheme get() = when {
-        // SystemAccent always uses the real system Monet pipeline (SystemColorScheme on S+).
-        // SpecVersion is irrelevant here — the system generates its own palette and
-        // colorSpec must never override it. Always use SPEC_2021 so the cache key
-        // Triple(0, style, SPEC_2021) hits the SystemColorScheme stored at init.
-        Utilities.ATLEAST_S -> getColorScheme(0, if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, SpecVersion.SPEC_2021)
-        else -> getColorScheme(context.getSystemAccent(darkTheme = false), if (colorStyle is LegacyKdrag) TonalSpot else colorStyle, SpecVersion.SPEC_2021)
-    }
+    /**
+     * Returns the SPEC_2021 / LegacyKdrag [ColorScheme] (kdrag0n type).
+     *
+     * Used by [Theme.kt] when colorSpec is SPEC_2021, or when accentColor is
+     * SystemAccent (which always uses the system palette regardless of spec).
+     */
+    val colorScheme: ColorScheme
+        get() = resolveColorScheme(accentColor)
 
     /**
-     * Returns a [ColorScheme] for [colorInt] using the requested [colorStyle] and [specVersion].
+     * Returns the SPEC_2025 [MonetColorSchemeCompat2025] (plain type, no kdrag0n).
      *
-     * When [colorStyle] is [LegacyKdrag] the kdrag0n ZCAM engine is used and the
-     * result is stored in [kdragColorSchemeMap].  For every other style the Android
-     * system engine ([MonetColorSchemeCompat]) is used and cached in [colorSchemeMap].
-     * [specVersion] is ignored for [LegacyKdrag] (ZCAM has its own algorithm).
+     * Returns null when accentColor is SystemAccent — the system palette is
+     * always rendered via the legacy path. [Theme.kt] checks for null and falls
+     * back to [colorScheme] in that case.
      */
-    private fun getColorScheme(
+    val colorScheme2025: MonetColorSchemeCompat2025?
+        get() = resolveColorScheme2025(accentColor)
+
+    private fun resolveColorScheme(accentColor: ColorOption): ColorScheme =
+        when (accentColor) {
+            is ColorOption.SystemAccent -> systemColorScheme
+
+            is ColorOption.WallpaperPrimary -> {
+                val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
+                getLegacyColorScheme(
+                    wallpaperPrimary ?: ColorOption.LawnchairBlue.color,
+                    colorStyle,
+                    colorSpec,
+                )
+            }
+
+            is ColorOption.WallpaperDerived -> {
+                val fresh = freshWallpaperPrimary
+                val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
+                           else accentColor.color
+                getLegacyColorScheme(seed, colorStyle, colorSpec)
+            }
+
+            is ColorOption.CustomColor -> {
+                val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+                getLegacyColorScheme(accentColor.color, effectiveStyle, colorSpec)
+            }
+
+            else -> getLegacyColorScheme(ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
+        }
+
+    private fun resolveColorScheme2025(accentColor: ColorOption): MonetColorSchemeCompat2025? =
+        when (accentColor) {
+            // SystemAccent always uses the system palette — no 2025 override.
+            is ColorOption.SystemAccent -> null
+
+            is ColorOption.WallpaperPrimary -> {
+                val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
+                get2025ColorScheme(
+                    wallpaperPrimary ?: ColorOption.LawnchairBlue.color,
+                    colorStyle,
+                )
+            }
+
+            is ColorOption.WallpaperDerived -> {
+                val fresh = freshWallpaperPrimary
+                val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
+                           else accentColor.color
+                get2025ColorScheme(seed, colorStyle)
+            }
+
+            is ColorOption.CustomColor -> {
+                // LegacyKdrag has no 2025 variant — fall back to TonalSpot.
+                val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+                get2025ColorScheme(accentColor.color, effectiveStyle)
+            }
+
+            else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, colorStyle)
+        }
+
+    private val systemColorScheme: ColorScheme
+        get() {
+            val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+            return if (Utilities.ATLEAST_S) {
+                getLegacyColorScheme(0, effectiveStyle, SpecVersion.SPEC_2021)
+            } else {
+                getLegacyColorScheme(
+                    context.getSystemAccent(darkTheme = false),
+                    effectiveStyle,
+                    SpecVersion.SPEC_2021,
+                )
+            }
+        }
+
+    /** Returns a cached kdrag0n [ColorScheme] for the SPEC_2021 / LegacyKdrag path. */
+    private fun getLegacyColorScheme(
         colorInt: Int,
         colorStyle: ColorStyle,
         specVersion: SpecVersion = SpecVersion.SPEC_2021,
-    ): ColorScheme {
-        return if (colorStyle is LegacyKdrag) {
-            kdragColorSchemeMap.getOrPut(colorInt) {
-                KdragMonetColorScheme(colorInt)
-            }
-        } else {
-            val key = Triple(colorInt, colorStyle.style, specVersion)
-            colorSchemeMap.getOrPut(key) {
-                MonetColorSchemeCompat(colorInt, colorStyle.style, specVersion)
-            }
+    ): ColorScheme = if (colorStyle is LegacyKdrag) {
+        kdragColorSchemeMap.getOrPut(colorInt) {
+            KdragMonetColorScheme(colorInt)
+        }
+    } else {
+        val key = Triple(colorInt, colorStyle.style, specVersion)
+        colorSchemeMap.getOrPut(key) {
+            MonetColorSchemeCompat(colorInt, colorStyle.style, specVersion)
+        }
+    }
+
+    /** Returns a cached [MonetColorSchemeCompat2025] for the SPEC_2025 path. */
+    private fun get2025ColorScheme(
+        colorInt: Int,
+        colorStyle: ColorStyle,
+    ): MonetColorSchemeCompat2025 {
+        // LegacyKdrag has no 2025 variant; treat as TonalSpot.
+        val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+        return colorSchemeMap2025.getOrPut(Pair(colorInt, effectiveStyle.style)) {
+            MonetColorSchemeCompat2025(colorInt, effectiveStyle.style)
         }
     }
 
@@ -296,8 +321,7 @@ class ThemeProvider @Inject constructor(
     }
 
     private fun notifyColorSchemeChanged() {
-        ArrayList(listeners)
-            .forEach(ColorSchemeChangeListener::onColorSchemeChanged)
+        ArrayList(listeners).forEach(ColorSchemeChangeListener::onColorSchemeChanged)
     }
 
     override fun close() {

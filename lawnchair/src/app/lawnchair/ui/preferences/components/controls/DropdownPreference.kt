@@ -1,10 +1,15 @@
 package app.lawnchair.ui.preferences.components.controls
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,6 +23,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.dp
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 
 @Composable
@@ -38,14 +44,17 @@ fun <T> DropdownPreference(
         PreferenceTemplate(
             modifier = Modifier
                 .fillMaxWidth()
+                // Peek at the down event position WITHOUT consuming it so the
+                // clickable below still gets the event and shows the ripple.
                 .pointerInput(Unit) {
-                    detectTapGestures { offset ->
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
                         tapOffsetDp = with(density) {
-                            DpOffset(offset.x.toDp(), offset.y.toDp())
+                            DpOffset(down.position.x.toDp(), 0.dp)
                         }
-                        expanded = true
                     }
-                },
+                }
+                .clickable { expanded = true },
             title = {
                 resolvedTitleStyle = LocalTextStyle.current
                 Text(text = label)
@@ -78,9 +87,10 @@ fun <T> DropdownPreference(
                     },
                     trailingIcon = if (value == currentValue) {
                         {
-                            Text(
-                                text = "✓",
-                                color = MaterialTheme.colorScheme.primary,
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     } else null,

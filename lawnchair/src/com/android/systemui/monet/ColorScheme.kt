@@ -67,6 +67,32 @@ internal object Spec2025 {
     /** VIBRANT primary chroma max-out stays the same; tertiary hue add now 65° (was 60°). */
     const val VIBRANT_A3_HUE_ADD = 65.0
 
+    // SPRITZ (SchemeNeutral) 2025: chroma values are hue-dependent in the full
+    // spec (blue hues get higher chroma), but we use the non-blue phone defaults
+    // as a universal approximation since TonalSpec has no hue-conditional logic.
+    /** SPRITZ primary chroma (was 12 in 2021; non-blue phone default in 2025). */
+    const val SPRITZ_A1_CHROMA = 8.0
+    /** SPRITZ secondary chroma (was 8 in 2021; non-blue phone default in 2025). */
+    const val SPRITZ_A2_CHROMA = 4.0
+    /** SPRITZ tertiary chroma (was 16 in 2021; 2025 adds hue rotation + higher chroma). */
+    const val SPRITZ_A3_CHROMA = 20.0
+    /** SPRITZ neutral-1 chroma (was 2 in 2021). */
+    const val SPRITZ_N1_CHROMA = 1.4
+    /** SPRITZ neutral-2 chroma (was 2 in 2021; 2025 = n1 × 2.2). */
+    const val SPRITZ_N2_CHROMA = 3.1
+
+    /** SPRITZ 2025: tertiary hue rotation table (new — 2021 used HueSource). */
+    val SPRITZ_TERTIARY_HUE_ROTATIONS = listOf(
+        Pair(0, -32),
+        Pair(38, 26),
+        Pair(105, 10),
+        Pair(161, -39),
+        Pair(204, 24),
+        Pair(278, -15),
+        Pair(333, -32),
+        Pair(360, -32),
+    )
+
     /** EXPRESSIVE: secondary hue rotations updated for 2025. */
     val EXPRESSIVE_SECONDARY_HUE_ROTATIONS = listOf(
         Pair(0, 50),
@@ -175,6 +201,17 @@ internal class HueVibrantTertiary : Hue {
 
     override fun get(sourceColor: Cam): Double {
         return getHueRotation(sourceColor.hue, hueToRotations)
+    }
+}
+
+/**
+ * SPEC_2025 variant of tertiary hue for SPRITZ — uses a rotation table
+ * from SchemeNeutral in material-color-utilities (Google I/O 2025).
+ * In 2021 SPRITZ used HueSource (no rotation) for all palettes.
+ */
+internal class HueSpritzTertiary2025 : Hue {
+    override fun get(sourceColor: Cam): Double {
+        return getHueRotation(sourceColor.hue, Spec2025.SPRITZ_TERTIARY_HUE_ROTATIONS)
     }
 }
 
@@ -317,6 +354,7 @@ enum class Style(
     internal val coreSpec2025: CoreSpec? = null,
 ) {
     SPRITZ(
+        // ---- SPEC_2021 (unchanged) ----
         CoreSpec(
             a1 = TonalSpec(HueSource(), ChromaConstant(12.0)),
             a2 = TonalSpec(HueSource(), ChromaConstant(8.0)),
@@ -324,7 +362,15 @@ enum class Style(
             n1 = TonalSpec(HueSource(), ChromaConstant(2.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(2.0)),
         ),
-        // SPRITZ is neutral by nature; chroma values unchanged in 2025.
+        // ---- SPEC_2025: lower chroma for a1/a2/n1/n2, higher chroma for a3
+        //      with a new hue rotation table for tertiary (from SchemeNeutral 2025).
+        coreSpec2025 = CoreSpec(
+            a1 = TonalSpec(HueSource(), ChromaConstant(Spec2025.SPRITZ_A1_CHROMA)),
+            a2 = TonalSpec(HueSource(), ChromaConstant(Spec2025.SPRITZ_A2_CHROMA)),
+            a3 = TonalSpec(HueSpritzTertiary2025(), ChromaConstant(Spec2025.SPRITZ_A3_CHROMA)),
+            n1 = TonalSpec(HueSource(), ChromaConstant(Spec2025.SPRITZ_N1_CHROMA)),
+            n2 = TonalSpec(HueSource(), ChromaConstant(Spec2025.SPRITZ_N2_CHROMA)),
+        ),
     ),
     TONAL_SPOT(
         // ---- SPEC_2021 (unchanged) ----

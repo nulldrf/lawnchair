@@ -19,6 +19,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
+        android:layout_marginStart="8dp"
         android:drawableTint="?android:textColorPrimary"
         launcher:iconDisplay="search_result_small"
         launcher:layoutHorizontal="true"
@@ -27,9 +28,10 @@
     <app.lawnchair.allapps.views.SearchResultIcon
         android:id="@+id/avatar"
         style="@style/BaseIcon"
-        android:layout_width="@dimen/search_row_icon_size"
-        android:layout_height="wrap_content"
+        android:layout_width="@dimen/search_row_medium_icon_size"
+        android:layout_height="@dimen/search_row_medium_icon_size"
         android:layout_gravity="center_vertical"
+        android:layout_marginStart="8dp"
         android:drawableTint="?android:textColorPrimary"
         launcher:iconDisplay="search_result_tall"
         launcher:layoutHorizontal="true" />
@@ -93,10 +95,9 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="end"
+        android:paddingEnd="16dp"
         android:orientation="horizontal"
-        android:paddingTop="@dimen/dynamic_grid_edge_margin"
-        android:paddingEnd="@dimen/dynamic_grid_edge_margin"
-        android:paddingBottom="@dimen/dynamic_grid_edge_margin">
+        android:singleLine="true">
 
         <ImageView
             android:id="@+id/icon1"

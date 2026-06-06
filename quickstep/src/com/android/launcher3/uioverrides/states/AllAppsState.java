@@ -193,20 +193,18 @@ public class AllAppsState extends LauncherState {
 
     @Override
     public ScrimColors getWorkspaceScrimColor(Launcher launcher) {
-        // LC-Note: System cross-window blur (Flags.allAppsBlur) has been removed in favour of
-        // HokoBlur.  The scrim colour is now always one of two solid-colour paths:
-        //   • No sheet (phones)  → AllAppsScrimColor (opaque dark scrim)
-        //   • Sheet (tablets)    → HokoBlur-aware background colour
-        final int backgroundColor;
-        if (!launcher.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            // Phone: always use the opaque all-apps scrim colour.
-            backgroundColor = ColorTokens.AllAppsScrimColor.resolveColor(launcher);
-        } else {
-            // Tablet sheet: use the Lawnchair drawer background colour (honours
-            // the user-chosen background colour + opacity from preferences).
-            backgroundColor = LawnchairUtilsKt.getAllAppsBackgroundColor(
-                    launcher, ColorTokens.WidgetsPickerScrim.resolveColor(launcher));
-        }
-        return new ScrimColors(backgroundColor, /* foregroundColor */ Color.TRANSPARENT);
+        // The ScrimView background dims the workspace that is visible above (or
+        // behind) the All Apps sheet.  It must always be semi-transparent so
+        // the wallpaper/workspace remains visible regardless of the user's
+        // drawer opacity setting.
+        //
+        // The user's drawerOpacity and background-colour preferences are applied
+        // to the sheet's own background, which is drawn separately inside
+        // ActivityAllAppsContainerView.drawOnScrimWithScaleAndBottomOffset().
+        // Using getAllAppsBackgroundColor() here caused the workspace area to go
+        // fully opaque (white in light mode) when drawerOpacity was set to 100%.
+        return new ScrimColors(
+                ColorTokens.AllAppsScrimColor.resolveColor(launcher),
+                /* foregroundColor */ Color.TRANSPARENT);
     }
 }

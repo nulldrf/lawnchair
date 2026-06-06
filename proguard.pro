@@ -30,6 +30,9 @@
 
 -keep class org.lsposed.hiddenapibypass.** { *; }
 
+# HokoBlur
+-keep class com.hoko.blur.** { *; }
+
 # We intentionally remove it to replace Smartspacer's widget popup with our own Launcher3 popup
 -dontwarn com.skydoves.balloon.*
 

@@ -27,7 +27,6 @@ import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.components.layout.ClickableIcon
 import app.lawnchair.ui.preferences.components.layout.DividerColumn
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
-import app.lawnchair.ui.preferences.components.layout.PreferenceDivider
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
@@ -157,11 +156,7 @@ private fun Options(
     onWebsiteClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferenceDivider(startIndent = 40.dp)
-    DividerColumn(
-        modifier = modifier,
-        startIndent = 40.dp,
-    ) {
+    DividerColumn(modifier = modifier) {
         PreferenceTemplate(
             title = { Text(stringResource(id = R.string.app_label)) },
             enabled = appEnabled,

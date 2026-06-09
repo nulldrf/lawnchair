@@ -53,7 +53,7 @@ fun SearchProviderPreferences(
                     val selected = adapter.state.value == qsbSearchProvider
                     val hasAppAndWebsite = qsbSearchProvider.type == QsbSearchProviderType.APP_AND_WEBSITE
                     val showDownloadButton = qsbSearchProvider.type == QsbSearchProviderType.APP && !appInstalled
-                    DividerColumn {
+                    DividerColumn(thickness = 4.dp) {
                         val title = stringResource(id = qsbSearchProvider.name)
                         ListItem(
                             title = title,
@@ -156,7 +156,7 @@ private fun Options(
     onWebsiteClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    DividerColumn(modifier = modifier) {
+    DividerColumn(modifier = modifier, thickness = 4.dp) {
         PreferenceTemplate(
             title = { Text(stringResource(id = R.string.app_label)) },
             enabled = appEnabled,

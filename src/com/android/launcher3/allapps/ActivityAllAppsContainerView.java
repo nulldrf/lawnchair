@@ -1275,7 +1275,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 canvas.drawPath(mTmpPath, mHeaderPaint);
             }
         } else {
-            canvas.drawRect(0, 0, canvas.getWidth(), headerBottomPhone, mHeaderPaint);
+            //canvas.drawRect(0, 0, canvas.getWidth(), headerBottomPhone, mHeaderPaint);
         }
 
         final int tabsHeight = headerView.getPeripheralProtectionHeight(false);

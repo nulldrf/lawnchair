@@ -53,7 +53,7 @@ fun SearchProviderPreferences(
                     val selected = adapter.state.value == qsbSearchProvider
                     val hasAppAndWebsite = qsbSearchProvider.type == QsbSearchProviderType.APP_AND_WEBSITE
                     val showDownloadButton = qsbSearchProvider.type == QsbSearchProviderType.APP && !appInstalled
-                    Column {
+                    DividerColumn {
                         val title = stringResource(id = qsbSearchProvider.name)
                         ListItem(
                             title = title,

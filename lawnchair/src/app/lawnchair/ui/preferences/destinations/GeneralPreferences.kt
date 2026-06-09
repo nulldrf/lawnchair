@@ -256,6 +256,16 @@ fun GeneralPreferences() {
                     description = stringResource(id = R.string.treat_white_adaptive_icons_description),
                 )
             }
+            Item(
+                "colorize_icon_pack_background",
+                colorizedBackgrounds.state.value,
+            ) {
+                SwitchPreference(
+                    adapter = prefs.colorizeIconPackBackground.getAdapter(),
+                    label = stringResource(id = R.string.colorize_icon_pack_background_label),
+                    description = stringResource(id = R.string.colorize_icon_pack_background_description),
+                )
+            }
         }
 
         // ── Colors ────────────────────────────────────────────────────────────

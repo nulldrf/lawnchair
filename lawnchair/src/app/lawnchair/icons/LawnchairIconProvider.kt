@@ -180,6 +180,20 @@ class LawnchairIconProvider @Inject constructor(
                 LauncherIcons.clearPool(context)
             }
         }
+
+        // Flush caches when "Apply smart backgrounds to icon pack" changes.
+        // Not routed through ThemeManager since it doesn't affect shape/theme state.
+        context.prefs.registerOnSharedPreferenceChangeListener { _, key ->
+            if (key == "pref_colorizeIconPackBackground") {
+                Executors.MODEL_EXECUTOR.execute {
+                    updateSystemState()
+                    val appState = LauncherAppState.getInstance(context)
+                    appState.iconCache.clearMemoryCache()
+                    LauncherIcons.clearPool(context)
+                    appState.model.reloadIfActive()
+                }
+            }
+        }
     }
 
     private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {

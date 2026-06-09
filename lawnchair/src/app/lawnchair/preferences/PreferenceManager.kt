@@ -194,6 +194,11 @@ class PreferenceManager @Inject constructor(
     val colorizedBackgrounds = BoolPref("pref_colorizedLegacyTreatment", false)
     val treatWhiteAdaptiveIcons = BoolPref("pref_enableWhiteOnlyTreatment", false)
 
+    // No callback — LawnchairIconProvider listens to this key directly via
+    // SharedPreferences.registerOnSharedPreferenceChangeListener and handles the
+    // cache flush + model reload itself on MODEL_EXECUTOR.
+    val colorizeIconPackBackground = BoolPref("pref_colorizeIconPackBackground", false)
+
     override fun close() {
         TODO("Not yet implemented")
     }

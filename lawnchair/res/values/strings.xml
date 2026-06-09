@@ -328,6 +328,8 @@
     <string name="colorized_backgrounds_description">Analyze icon pixels for accurate background colors and scaling</string>
     <string name="treat_white_adaptive_icons_label">Colorize foreground-only adaptive icons</string>
     <string name="treat_white_adaptive_icons_description">Color the background of adaptive icons that have no background layer, using the icon\'s dominant color</string>
+	<string name="colorize_icon_pack_background_label">Apply smart backgrounds to icon pack</string>
+    <string name="colorize_icon_pack_background_description">Apply colorized adaptive backgrounds to icon pack icons</string>
 
     <!-- Icon picker -->
     <string name="icon_picker_default_category">Icons</string>

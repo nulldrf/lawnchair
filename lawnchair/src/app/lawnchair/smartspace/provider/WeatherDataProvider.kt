@@ -198,7 +198,7 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
         while (true) {
             val fresh = fetch()
-            emit(if (fresh.isNotEmpty()) fresh else buildCachedTargets().ifEmpty { fresh })
+            emit(if (fresh.isNotEmpty()) fresh else buildCachedTargets().ifEmpty { listOf(emptyWeatherTarget()) })
             delay(intervalMinutes.minutes)
         }
     }
@@ -444,6 +444,20 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         }
 
     // ── Target builder ────────────────────────────────────────────────────────
+
+
+    /**
+     * A minimal FEATURE_WEATHER target with no headerAction.
+     * BcSmartspaceCard will show only the date row (IcuDateTextView) when
+     * headerAction is null — preserving the card so the launcher layout
+     * isn't disrupted when weather data is temporarily unavailable.
+     */
+    private fun emptyWeatherTarget() = SmartspaceTarget(
+        id = "weatherUnavailable",
+        headerAction = null,
+        score = SmartspaceScores.SCORE_WEATHER,
+        featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
+    )
 
     private fun buildTarget(
         id: String,

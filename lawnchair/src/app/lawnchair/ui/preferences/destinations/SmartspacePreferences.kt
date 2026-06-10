@@ -68,6 +68,8 @@ import app.lawnchair.ui.theme.isSelectedThemeDark
 import com.android.launcher3.R
 import com.kieronquinn.app.smartspacer.sdk.SmartspacerConstants
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.MaterialTheme
 
 private const val ICON_PACK_REPO_URL =
     "https://github.com/breezy-weather/breezy-weather-icon-packs/blob/main/README.md"
@@ -335,10 +337,22 @@ private fun CityPreference(
     } else currentCity
 
     Column(modifier = modifier) {
-        ClickablePreference(
-            label = "${stringResource(R.string.smartspace_weather_city)} — $subtitle",
-            onClick = { inputValue = adapter.state.value; showDialog = true },
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { inputValue = adapter.state.value; showDialog = true }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.smartspace_weather_city),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
     if (showDialog) {
         AlertDialog(
@@ -381,11 +395,22 @@ private fun IconPackPreference(
     val currentLabel = entries.firstOrNull { it.first == currentPack }?.second
         ?: context.getString(R.string.smartspace_weather_icon_pack_none)
 
-    ClickablePreference(
-        label = "${stringResource(R.string.smartspace_weather_icon_pack)} — $currentLabel",
-        modifier = modifier,
-        onClick = { showDialog = true },
-    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { showDialog = true }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.smartspace_weather_icon_pack),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Text(
+            text = currentLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },

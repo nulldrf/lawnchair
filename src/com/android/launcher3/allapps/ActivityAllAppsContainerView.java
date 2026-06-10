@@ -745,12 +745,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),
                     Math.round(opacity * 255));
         }
-        // When HokoBlur is active use the original blur path: semi-transparent
-        // header protection so the blurred wallpaper shows through to the status
-        // bar area.  Without blur, blend the background colour with the header
-        // protection colour as normal.
+        // When HokoBlur is active return Color.TRANSPARENT (== 0) so the early-
+        // return guard in drawOnScrimWithScaleAndBottomOffset() fires
+        // (mHeaderPaint.getColor() == 0) and no header-protection rect is drawn
+        // at all — blur shows through the full search-bar area unobstructed.
+        // Without blur, blend the background colour with the header protection
+        // colour as normal.
         return (mBlurBitmap != null)
-                ? ColorUtils.setAlphaComponent(mHeaderProtectionColor, (int) (blendRatio * 255))
+                ? Color.TRANSPARENT
                 : ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio);
     }
 
@@ -1275,7 +1277,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 canvas.drawPath(mTmpPath, mHeaderPaint);
             }
         } else {
-            //canvas.drawRect(0, 0, canvas.getWidth(), headerBottomPhone, mHeaderPaint);
+            // canvas.drawRect(0, 0, canvas.getWidth(), headerBottomPhone, mHeaderPaint);
         }
 
         final int tabsHeight = headerView.getPeripheralProtectionHeight(false);
@@ -1437,7 +1439,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     ? new FocusedItemDecorator(new ViewGroupFocusHelper(mRecyclerView))
                     : new FocusedItemDecorator(mRecyclerView);
             mRecyclerView.addItemDecoration(focusedItemDecorator);
-            // LC-Note: This is needed for highlight decoration
             if (isSearch()) {
                 RecyclerView.ItemDecoration searchDecorator =
                         getMainAdapterProvider().getDecorator();

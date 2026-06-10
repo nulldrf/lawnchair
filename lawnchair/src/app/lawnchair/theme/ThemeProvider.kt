@@ -55,6 +55,11 @@ class ThemeProvider @Inject constructor(
     // Value type is the kdrag0n ColorScheme abstract class.
     private val colorSchemeMap = java.util.concurrent.ConcurrentHashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
 
+    // Dedicated cache for the system accent palette. Replaced atomically on overlay change
+    // so stale colors are never served after the user changes the system accent.
+    @Volatile
+    private var cachedSystemColorScheme: ColorScheme? = null
+
     // Cache for the kdrag0n ZCAM engine — keyed by seedColor alone.
     private val kdragColorSchemeMap = java.util.concurrent.ConcurrentHashMap<Int, ColorScheme>()
 
@@ -164,15 +169,27 @@ class ThemeProvider @Inject constructor(
     }
 
     private fun seedSystemColorScheme() {
-        val systemScheme = SystemColorScheme(context)
-        Style.values().forEach { style ->
-            colorSchemeMap[Triple(0, style, SpecVersion.SPEC_2021)] = systemScheme
+        cachedSystemColorScheme = SystemColorScheme(context)
+    }
+
+    /**
+     * Called from [LawnchairLauncher.onResume] to handle OEM devices (e.g. Samsung)
+     * that don't broadcast [android.intent.action.OVERLAY_CHANGED] when the system
+     * accent changes. Constructs a fresh [SystemColorScheme], compares a key color
+     * against the cached one, and fires [notifyColorSchemeChanged] only if the
+     * palette actually changed — avoiding unnecessary recreates on every resume.
+     */
+    fun reseedSystemAccentIfChanged() {
+        if (!Utilities.ATLEAST_S) return
+        val fresh = SystemColorScheme(context)
+        val oldAccent = cachedSystemColorScheme?.accent1?.get(500)
+        val newAccent = fresh.accent1[600]
+        cachedSystemColorScheme = fresh
+        if (oldAccent == null || oldAccent.toAndroidColor() != newAccent?.toAndroidColor()) {
+            if (accentColor is ColorOption.SystemAccent) {
+                notifyColorSchemeChanged()
+            }
         }
-        // SPEC_2025 always uses the system scheme for SystemAccent too.
-        // SystemColorScheme extends the kdrag0n ColorScheme, so it can't go into
-        // colorSchemeMap2025. Instead, colorScheme2025 falls back gracefully:
-        // when accentColor is SystemAccent, Theme.kt routes to the legacy path
-        // regardless of colorSpec (see getColorScheme in Theme.kt).
     }
 
     private fun registerOverlayChangedListener() {
@@ -271,17 +288,19 @@ class ThemeProvider @Inject constructor(
         }
 
     private val systemColorScheme: ColorScheme
-        get() {
-            val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-            return if (Utilities.ATLEAST_S) {
-                getLegacyColorScheme(0, effectiveStyle, SpecVersion.SPEC_2021)
-            } else {
-                getLegacyColorScheme(
-                    context.getSystemAccent(darkTheme = false),
-                    effectiveStyle,
-                    SpecVersion.SPEC_2021,
-                )
+        get() = if (Utilities.ATLEAST_S) {
+            // Return the pre-seeded instance. If somehow called before init completes,
+            // fall back to constructing a fresh one and caching it.
+            cachedSystemColorScheme ?: SystemColorScheme(context).also {
+                cachedSystemColorScheme = it
             }
+        } else {
+            val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+            getLegacyColorScheme(
+                context.getSystemAccent(darkTheme = false),
+                effectiveStyle,
+                SpecVersion.SPEC_2021,
+            )
         }
 
     /** Returns a cached kdrag0n [ColorScheme] for the SPEC_2021 / LegacyKdrag path. */

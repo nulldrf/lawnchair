@@ -1182,6 +1182,13 @@ class LawnchairLauncher : QuickstepLauncher() {
         super.onResume()
         restartIfPending()
 
+        // Re-check system accent on every resume. On OEM devices (e.g. Samsung) the
+        // OVERLAY_CHANGED broadcast is never fired for accent changes, so ThemeProvider
+        // never learns the palette changed while Lawnchair was in the background.
+        // reseedSystemAccentIfChanged() only triggers a recreate if the color actually
+        // differs, so this is a no-op on normal resumes.
+        themeProvider.reseedSystemAccentIfChanged()
+
         // If an icon pack switch happened while in background, show overlay now.
         // We also start the idle timer here — the timer from LawnchairIconProvider
         // may have already fired against a null/paused instance and been lost.

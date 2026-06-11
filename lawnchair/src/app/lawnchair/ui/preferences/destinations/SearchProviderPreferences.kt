@@ -26,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -130,40 +129,39 @@ fun SearchProviderPreferences(
 
                     // App / Website sub-options
                     ExpandAndShrink(visible = selected && hasAppAndWebsite) {
-                        val dividerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+                        val gapColor = MaterialTheme.colorScheme.surface
                         val appSelected = !forceWebsiteAdapter.state.value && appInstalled
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min)
-                                .background(dividerColor),
-                        ) {
-                            // App option
-                            SubOption(
-                                label = stringResource(id = R.string.app_label),
-                                selected = appSelected,
-                                enabled = appInstalled,
-                                modifier = Modifier.weight(1f),
-                                onClick = { forceWebsiteAdapter.onChange(newValue = false) },
-                                endContent = if (!appInstalled) {
-                                    {
-                                        ClickableIcon(
-                                            painter = painterResource(R.drawable.ic_download),
-                                            onClick = { provider.launchOnAppMarket(context = context) },
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        )
-                                    }
-                                } else null,
+                        Column {
+                            // Horizontal divider — top of T-shape
+                            androidx.compose.foundation.layout.Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .background(gapColor),
                             )
-                            VerticalDivider(color = dividerColor, thickness = 3.dp)
-                            // Website option
-                            SubOption(
-                                label = stringResource(id = R.string.website_label),
-                                selected = !appSelected,
-                                enabled = true,
-                                modifier = Modifier.weight(1f),
-                                onClick = { forceWebsiteAdapter.onChange(newValue = true) },
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(IntrinsicSize.Min),
+                            ) {
+                                SubOption(
+                                    label = stringResource(id = R.string.app_label),
+                                    selected = appSelected,
+                                    enabled = appInstalled,
+                                    showDownload = !appInstalled,
+                                    onDownloadClick = { provider.launchOnAppMarket(context = context) },
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { forceWebsiteAdapter.onChange(newValue = false) },
+                                )
+                                VerticalDivider(color = gapColor, thickness = 4.dp)
+                                SubOption(
+                                    label = stringResource(id = R.string.website_label),
+                                    selected = !appSelected,
+                                    enabled = true,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { forceWebsiteAdapter.onChange(newValue = true) },
+                                )
+                            }
                         }
                     }
                 }
@@ -179,25 +177,32 @@ private fun SubOption(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    endContent: (@Composable () -> Unit)? = null,
+    showDownload: Boolean = false,
+    onDownloadClick: (() -> Unit)? = null,
 ) {
-    val bgColor = MaterialTheme.colorScheme.primaryContainer
     Row(
         modifier = modifier
-            .background(bgColor)
+            .background(MaterialTheme.colorScheme.primaryContainer)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 13.dp),
+            .padding(start = 20.dp, end = if (showDownload) 8.dp else 20.dp, top = 13.dp, bottom = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
+            else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.45f),
+            modifier = Modifier.weight(1f),
         )
-        endContent?.invoke()
+        if (showDownload && onDownloadClick != null) {
+            ClickableIcon(
+                painter = painterResource(R.drawable.ic_download),
+                onClick = onDownloadClick,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
     }
 }
 

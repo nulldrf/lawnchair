@@ -30,6 +30,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -113,8 +115,13 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                 Text(
                     text = stringResource(id = R.string.pick_icon_quick_label),
                     style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp, top = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(horizontal = 32.dp)
+                        .wrapContentHeight(Alignment.CenterVertically),
                 )
                 Surface(
                     shape = MaterialTheme.shapes.extraLarge,

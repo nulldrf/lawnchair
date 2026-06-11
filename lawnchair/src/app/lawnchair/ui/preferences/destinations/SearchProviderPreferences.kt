@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -131,7 +133,7 @@ fun SearchProviderPreferences(
                         val appSelected = !forceWebsiteAdapter.state.value && appInstalled
                         Column {
                             // Horizontal divider — top of T-shape
-                            androidx.compose.foundation.layout.Spacer(
+                            Spacer(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(4.dp)
@@ -201,7 +203,7 @@ private fun SubOption(
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         } else {
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(48.dp))
+            Spacer(modifier = Modifier.size(48.dp))
         }
     }
 }

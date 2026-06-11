@@ -337,6 +337,8 @@
     <string name="icon_pack_external_picker">Open external picker</string>
     <string name="pick_icon_from_label">Pick icon from</string>
     <string name="icon_picker_load_failed">Couldn\'t load more icons</string>
+	<string name="pick_icon_quick_label">Quick pick</string>
+    <string name="icon_picker_apply_icon">Apply selected icon</string>
 
     <!-- Icon shapes  -->
     <string name="icon_shape_system">System</string>

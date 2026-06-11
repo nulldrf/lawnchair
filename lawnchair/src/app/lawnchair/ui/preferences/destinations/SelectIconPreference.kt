@@ -4,14 +4,14 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.graphics.drawable.Drawable
-import android.os.Process
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,18 +26,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,11 +75,11 @@ fun SelectIconPreference(componentKey: ComponentKey) {
     val iconPackProvider = remember { IconPackProvider.INSTANCE.get(context) }
 
     val repo = IconOverrideRepository.INSTANCE.get(context)
+    val overrideItem by repo.observeTarget(componentKey).collectAsStateWithLifecycle(initialValue = null)
+    val hasOverride = overrideItem != null
 
-    // Tracks which strip item the user has highlighted (not yet committed)
-    var pendingStripItem by remember { mutableStateOf<IconPickerItem?>(null) }
-
-    OnResult<IconPickerItem> { item ->
+    // Apply icon immediately on tap — no pending/apply button needed
+    fun applyItem(item: IconPickerItem) {
         scope.launch {
             repo.setOverride(componentKey, item)
             (context as Activity).let {
@@ -95,139 +91,154 @@ fun SelectIconPreference(componentKey: ComponentKey) {
         }
     }
 
-    // Commit the pending strip selection on back — we wrap the back logic by
-    // applying the pending item before the column's own back handling fires.
-    // The simplest approach: a dedicated "Apply" surface at the top only when
-    // a strip item is pending, consistent with Lawnchair's existing patterns.
-    val overrideItem by repo.observeTarget(componentKey).collectAsStateWithLifecycle(initialValue = null)
-    val hasOverride = overrideItem != null
+    fun resetOverride() {
+        scope.launch {
+            repo.deleteOverride(componentKey)
+            (context as Activity).let {
+                it.setResult(Activity.RESULT_OK)
+                it.finish()
+                model.onAppIconChanged(componentKey.componentName.packageName, componentKey.user)
+                model.forceReload()
+            }
+        }
+    }
+
+    OnResult<IconPickerItem> { item -> applyItem(item) }
 
     PreferenceLayoutLazyColumn(label = label) {
-
-        // ── Reset to default (only when an override exists) ──────────────────
-        if (hasOverride) {
-            preferenceGroupItems(1, isFirstChild = true) {
-                ClickablePreference(
-                    label = stringResource(id = R.string.icon_picker_reset_to_default),
-                    onClick = {
-                        scope.launch {
-                            repo.deleteOverride(componentKey)
-                            (context as Activity).let {
-                                it.setResult(Activity.RESULT_OK)
-                                it.finish()
-                                model.onAppIconChanged(
-                                    componentKey.componentName.packageName,
-                                    componentKey.user,
-                                )
-                                model.forceReload()
-                            }
-                        }
-                    },
-                )
-            }
-        }
-
-        // ── Apply strip selection (only when user has tapped a strip icon) ───
-        if (pendingStripItem != null) {
-            preferenceGroupItems(1, isFirstChild = false) {
-                ClickablePreference(
-                    label = stringResource(id = R.string.icon_picker_apply_icon),
-                    onClick = {
-                        pendingStripItem?.let { item ->
-                            scope.launch {
-                                repo.setOverride(componentKey, item)
-                                (context as Activity).let {
-                                    it.setResult(Activity.RESULT_OK)
-                                    it.finish()
-                                    model.onAppIconChanged(
-                                        componentKey.componentName.packageName,
-                                        componentKey.user,
-                                    )
-                                    model.forceReload()
-                                }
-                            }
-                        }
-                    },
-                )
-            }
-        }
 
         // ── Quick-pick strip ─────────────────────────────────────────────────
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = stringResource(id = R.string.pick_icon_quick_label),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, top = 4.dp),
+                    modifier = Modifier.padding(bottom = 8.dp, top = 4.dp),
                 )
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
                 ) {
-                    items(iconPacks) { iconPack ->
-                        val iconEntry = remember(iconPack, componentKey) {
-                            if (iconPack.packageName.isEmpty()) null
-                            else IconEntry(
-                                packPackageName = iconPack.packageName,
-                                name = componentKey.componentName.className
-                                    .substringAfterLast('.'),
-                                type = IconType.Normal,
-                            )
-                        }
-
-                        // Resolve the icon for this app from this pack
-                        val packDrawable by produceState<Drawable?>(
+                    // Current icon (left of divider) + pack variants (right of divider)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    ) {
+                        // Current icon — whatever is active right now
+                        val currentDrawable by produceState<Drawable?>(
                             initialValue = null,
-                            iconPack,
                             componentKey,
                         ) {
                             launch(Dispatchers.IO) {
-                                value = if (iconPack.packageName.isEmpty()) {
-                                    // System icons: use the app's actual adaptive icon
-                                    context.packageManager.getApplicationIcon(
-                                        componentKey.componentName.packageName,
-                                    )
-                                } else {
-                                    val pack = iconPackProvider.getIconPack(iconPack.packageName)
-                                    pack?.loadBlocking()
-                                    val component = android.content.ComponentName(
-                                        componentKey.componentName.packageName,
-                                        componentKey.componentName.className,
-                                    )
-                                    val entry = pack?.getIcon(component)
-                                    if (entry != null) {
-                                        pack.getIcon(entry, 0)
-                                    } else {
-                                        // Pack has no mapping for this app — show system icon
-                                        context.packageManager.getApplicationIcon(
-                                            componentKey.componentName.packageName,
-                                        )
-                                    }
-                                }
+                                value = context.packageManager.getApplicationIcon(
+                                    componentKey.componentName.packageName,
+                                )
                             }
                         }
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .padding(start = 12.dp, end = 8.dp)
+                                .size(64.dp),
+                        ) {
+                            Image(
+                                painter = rememberDrawablePainter(currentDrawable),
+                                contentDescription = label,
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .aspectRatio(1f),
+                            )
+                        }
 
-                        val isSelected = pendingStripItem?.packPackageName == iconPack.packageName
+                        // Thin vertical divider
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(48.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant),
+                        )
 
-                        QuickPickStripItem(
-                            label = iconPack.name,
-                            drawable = packDrawable,
-                            isSelected = isSelected,
-                            onClick = {
-                                if (iconEntry != null) {
-                                    pendingStripItem = IconPickerItem(
+                        // Scrollable icon variants from each pack
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(iconPacks) { iconPack ->
+                                val iconEntry = remember(iconPack, componentKey) {
+                                    if (iconPack.packageName.isEmpty()) null
+                                    else IconEntry(
                                         packPackageName = iconPack.packageName,
-                                        drawableName = iconEntry.name,
-                                        label = iconPack.name,
+                                        name = componentKey.componentName.className
+                                            .substringAfterLast('.'),
                                         type = IconType.Normal,
                                     )
                                 }
-                            },
-                        )
+
+                                val packDrawable by produceState<Drawable?>(
+                                    initialValue = null,
+                                    iconPack,
+                                    componentKey,
+                                ) {
+                                    launch(Dispatchers.IO) {
+                                        value = if (iconPack.packageName.isEmpty()) {
+                                            context.packageManager.getApplicationIcon(
+                                                componentKey.componentName.packageName,
+                                            )
+                                        } else {
+                                            val pack = iconPackProvider.getIconPack(iconPack.packageName)
+                                            pack?.loadBlocking()
+                                            val component = android.content.ComponentName(
+                                                componentKey.componentName.packageName,
+                                                componentKey.componentName.className,
+                                            )
+                                            val entry = pack?.getIcon(component)
+                                            if (entry != null) {
+                                                pack.getIcon(entry, 0)
+                                            } else {
+                                                context.packageManager.getApplicationIcon(
+                                                    componentKey.componentName.packageName,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                QuickPickStripItem(
+                                    drawable = packDrawable,
+                                    contentDescription = iconPack.name,
+                                    onClick = {
+                                        val resolvedName = iconEntry?.name
+                                            ?: componentKey.componentName.className
+                                                .substringAfterLast('.')
+                                        applyItem(
+                                            IconPickerItem(
+                                                packPackageName = iconPack.packageName,
+                                                drawableName = resolvedName,
+                                                label = iconPack.name,
+                                                type = IconType.Normal,
+                                            ),
+                                        )
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+
+        // ── Reset to default ─────────────────────────────────────────────────
+        if (hasOverride) {
+            preferenceGroupItems(1, isFirstChild = false) {
+                ClickablePreference(
+                    label = stringResource(id = R.string.icon_picker_reset_to_default),
+                    onClick = { resetOverride() },
+                )
             }
         }
 
@@ -254,56 +265,25 @@ fun SelectIconPreference(componentKey: ComponentKey) {
 
 @Composable
 private fun QuickPickStripItem(
-    label: String,
     drawable: Drawable?,
-    isSelected: Boolean,
+    contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = MaterialTheme.shapes.medium
-    Column(
-        modifier = modifier.width(64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(64.dp)
+            .clip(shape)
+            .clickable(onClick = onClick),
     ) {
-        Surface(
-            shape = shape,
-            border = if (isSelected) {
-                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-            } else {
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            },
-            color = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            },
+        Image(
+            painter = rememberDrawablePainter(drawable),
+            contentDescription = contentDescription,
             modifier = Modifier
-                .size(56.dp)
-                .clip(shape)
-                .clickable(onClick = onClick),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Image(
-                    painter = rememberDrawablePainter(drawable),
-                    contentDescription = label,
-                    modifier = Modifier
-                        .padding(6.dp)
-                        .aspectRatio(1f),
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
+                .padding(4.dp)
+                .aspectRatio(1f),
         )
     }
 }

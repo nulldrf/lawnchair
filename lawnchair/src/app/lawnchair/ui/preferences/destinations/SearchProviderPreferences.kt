@@ -29,7 +29,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.preferenceManager2
@@ -93,8 +92,7 @@ fun SearchProviderPreferences(
                     ) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            style = if (selected) MaterialTheme.typography.bodyLargeEmphasized else MaterialTheme.typography.bodyLarge,
                             color = when {
                                 selected -> MaterialTheme.colorScheme.onPrimaryContainer
                                 !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
@@ -184,24 +182,26 @@ private fun SubOption(
         modifier = modifier
             .background(MaterialTheme.colorScheme.primaryContainer)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(start = 20.dp, end = if (showDownload) 8.dp else 20.dp, top = 13.dp, bottom = 13.dp),
+            .padding(horizontal = 20.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            style = if (selected) MaterialTheme.typography.bodyLargeEmphasized else MaterialTheme.typography.bodyLarge,
             color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
             else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.45f),
             modifier = Modifier.weight(1f),
         )
+        // Always reserve icon space for symmetric text alignment across both sub-options
         if (showDownload && onDownloadClick != null) {
             ClickableIcon(
                 painter = painterResource(R.drawable.ic_download),
                 onClick = onDownloadClick,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+        } else {
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(48.dp))
         }
     }
 }

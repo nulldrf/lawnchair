@@ -733,26 +733,36 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected int getHeaderColor(float blendRatio) {
+        // appDrawerSearchBarBackground is the single on/off control for the
+        // header-protection scrim across ALL layout modes (sheet / phone) and
+        // ALL blur states.
+        //
+        // false → Color.TRANSPARENT (== 0).  The draw path's early-return guard
+        //         "mHeaderPaint.getColor() == 0" then fires before any canvas
+        //         drawing, so neither the sheet rounded-rect (line ~1275) nor the
+        //         phone full-width drawRect (line ~1278) is ever executed.
+        //
+        // true  → fall through to per-mode colour calculation below.
+        boolean showHeaderBackground = PreferenceExtensionsKt.firstBlocking(
+                pref2.getAppDrawerSearchBarBackground());
+        if (!showHeaderBackground) {
+            return Color.TRANSPARENT;
+        }
+
         if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            float opacity = mSearchContainer.getAlpha();
-            var showHeaderBackground = PreferenceExtensionsKt.firstBlocking(
-                    pref2.getAppDrawerSearchBarBackground());
-            if (showHeaderBackground) {
-                opacity = pref.getDrawerOpacity().get();
-            }
+            // Phone / non-sheet mode: use drawer opacity as the scrim alpha so
+            // the protection blends proportionally with the background.
+            float opacity = pref.getDrawerOpacity().get();
             opacity = MathUtils.clamp(opacity, 0f, 1f);
             return ColorUtils.setAlphaComponent(
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),
                     Math.round(opacity * 255));
         }
-        // When HokoBlur is active return Color.TRANSPARENT (== 0) so the early-
-        // return guard in drawOnScrimWithScaleAndBottomOffset() fires
-        // (mHeaderPaint.getColor() == 0) and no header-protection rect is drawn
-        // at all — blur shows through the full search-bar area unobstructed.
-        // Without blur, blend the background colour with the header protection
-        // colour as normal.
+        // Sheet mode: when HokoBlur is active show a semi-transparent tint so
+        // the blurred wallpaper is still partially visible through the header.
+        // Without blur, blend the background with the header-protection colour.
         return (mBlurBitmap != null)
-                ? Color.TRANSPARENT
+                ? ColorUtils.setAlphaComponent(mHeaderProtectionColor, (int) (blendRatio * 255))
                 : ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio);
     }
 
@@ -1277,7 +1287,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 canvas.drawPath(mTmpPath, mHeaderPaint);
             }
         } else {
-            // canvas.drawRect(0, 0, canvas.getWidth(), headerBottomPhone, mHeaderPaint);
+            canvas.drawRect(0, 0, canvas.getWidth(), headerBottomPhone, mHeaderPaint);
         }
 
         final int tabsHeight = headerView.getPeripheralProtectionHeight(false);

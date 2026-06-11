@@ -1,23 +1,36 @@
 package app.lawnchair.ui.preferences.destinations
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.preferenceManager2
@@ -25,13 +38,12 @@ import app.lawnchair.qsb.providers.QsbSearchProvider
 import app.lawnchair.qsb.providers.QsbSearchProviderType
 import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.components.layout.ClickableIcon
-import app.lawnchair.ui.preferences.components.layout.DividerColumn
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
-import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
-import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.util.LocalBottomSheetHandler
 import com.android.launcher3.R
+
+private val CardShape = RoundedCornerShape(28.dp)
 
 @Composable
 fun SearchProviderPreferences(
@@ -46,43 +58,111 @@ fun SearchProviderPreferences(
         label = stringResource(R.string.search_provider),
         modifier = modifier,
     ) {
-        PreferenceGroup {
-            QsbSearchProvider.values().forEach { qsbSearchProvider ->
-                Item {
-                    val appInstalled = qsbSearchProvider.isDownloaded(context)
-                    val selected = adapter.state.value == qsbSearchProvider
-                    val hasAppAndWebsite = qsbSearchProvider.type == QsbSearchProviderType.APP_AND_WEBSITE
-                    val showDownloadButton = qsbSearchProvider.type == QsbSearchProviderType.APP && !appInstalled
-                    DividerColumn(thickness = 4.dp) {
-                        val title = stringResource(id = qsbSearchProvider.name)
-                        ListItem(
-                            title = title,
-                            showDownloadButton = showDownloadButton,
-                            enabled = qsbSearchProvider.type != QsbSearchProviderType.APP || appInstalled,
-                            selected = selected,
-                            onClick = { adapter.onChange(newValue = qsbSearchProvider) },
-                            onDownloadClick = { qsbSearchProvider.launchOnAppMarket(context = context) },
-                            onSponsorDisclaimerClick = {
-                                bottomSheetHandler.show {
-                                    SponsorDisclaimer(title) {
-                                        bottomSheetHandler.hide()
-                                    }
-                                }
-                            }.takeIf { qsbSearchProvider.sponsored },
-                            description = if (showDownloadButton) {
-                                stringResource(id = R.string.qsb_search_provider_app_required)
-                            } else {
-                                null
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            QsbSearchProvider.values().forEach { provider ->
+                val appInstalled = provider.isDownloaded(context)
+                val selected = adapter.state.value == provider
+                val hasAppAndWebsite = provider.type == QsbSearchProviderType.APP_AND_WEBSITE
+                val showDownloadButton = provider.type == QsbSearchProviderType.APP && !appInstalled
+                val enabled = provider.type != QsbSearchProviderType.APP || appInstalled
+                val title = stringResource(id = provider.name)
+
+                val cardColor by animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainer,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "cardColor",
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(CardShape)
+                        .background(cardColor),
+                ) {
+                    // Main provider row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = enabled) { adapter.onChange(newValue = provider) }
+                            .padding(horizontal = 20.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = when {
+                                selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                else -> MaterialTheme.colorScheme.onSurface
                             },
+                            modifier = Modifier.weight(1f),
                         )
-                        ExpandAndShrink(visible = selected && hasAppAndWebsite) {
-                            Options(
-                                appEnabled = appInstalled,
-                                appSelected = !forceWebsiteAdapter.state.value && appInstalled,
-                                onAppClick = { forceWebsiteAdapter.onChange(newValue = false) },
-                                onAppDownloadClick = { qsbSearchProvider.launchOnAppMarket(context = context) },
-                                onWebsiteClick = { forceWebsiteAdapter.onChange(newValue = true) },
-                                showAppDownloadButton = !appInstalled,
+                        if (showDownloadButton) {
+                            Text(
+                                text = stringResource(id = R.string.qsb_search_provider_app_required),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            )
+                            ClickableIcon(
+                                painter = painterResource(id = R.drawable.ic_download),
+                                onClick = { provider.launchOnAppMarket(context = context) },
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        if (provider.sponsored) {
+                            ClickableIcon(
+                                painter = painterResource(id = R.drawable.ic_about),
+                                onClick = {
+                                    bottomSheetHandler.show {
+                                        SponsorDisclaimer(title) { bottomSheetHandler.hide() }
+                                    }
+                                },
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
+                    }
+
+                    // App / Website sub-options
+                    ExpandAndShrink(visible = selected && hasAppAndWebsite) {
+                        val dividerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+                        val appSelected = !forceWebsiteAdapter.state.value && appInstalled
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                                .background(dividerColor),
+                        ) {
+                            // App option
+                            SubOption(
+                                label = stringResource(id = R.string.app_label),
+                                selected = appSelected,
+                                enabled = appInstalled,
+                                modifier = Modifier.weight(1f),
+                                onClick = { forceWebsiteAdapter.onChange(newValue = false) },
+                                endContent = if (!appInstalled) {
+                                    {
+                                        ClickableIcon(
+                                            painter = painterResource(R.drawable.ic_download),
+                                            onClick = { provider.launchOnAppMarket(context = context) },
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
+                                    }
+                                } else null,
+                            )
+                            VerticalDivider(color = dividerColor, thickness = 3.dp)
+                            // Website option
+                            SubOption(
+                                label = stringResource(id = R.string.website_label),
+                                selected = !appSelected,
+                                enabled = true,
+                                modifier = Modifier.weight(1f),
+                                onClick = { forceWebsiteAdapter.onChange(newValue = true) },
                             )
                         }
                     }
@@ -93,110 +173,31 @@ fun SearchProviderPreferences(
 }
 
 @Composable
-private fun ListItem(
-    title: String,
-    description: String?,
-    showDownloadButton: Boolean,
-    enabled: Boolean,
+private fun SubOption(
+    label: String,
     selected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
-    onDownloadClick: () -> Unit,
-    onSponsorDisclaimerClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    endContent: (@Composable () -> Unit)? = null,
 ) {
-    Column(
-        modifier = modifier,
+    val bgColor = MaterialTheme.colorScheme.primaryContainer
+    Row(
+        modifier = modifier
+            .background(bgColor)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        PreferenceTemplate(
-            title = { Text(text = title) },
-            verticalPadding = if (showDownloadButton) 12.dp else 16.dp,
-            horizontalPadding = 0.dp,
-            enabled = enabled,
-            modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
-            description = { if (description != null) Text(text = description) },
-            startWidget = {
-                RadioButton(
-                    selected = selected,
-                    onClick = null,
-                    enabled = enabled,
-                    modifier = Modifier.padding(start = 16.dp),
-                )
-            },
-            endWidget = {
-                Row {
-                    if (onSponsorDisclaimerClick != null) {
-                        ClickableIcon(
-                            painter = painterResource(id = R.drawable.ic_about),
-                            onClick = onSponsorDisclaimerClick,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 4.dp),
-                        )
-                    }
-                    if (showDownloadButton) {
-                        ClickableIcon(
-                            painter = painterResource(id = R.drawable.ic_download),
-                            onClick = onDownloadClick,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 4.dp),
-                        )
-                    }
-                }
-            },
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
         )
-    }
-}
-
-@Composable
-private fun Options(
-    appEnabled: Boolean,
-    appSelected: Boolean,
-    showAppDownloadButton: Boolean,
-    onAppClick: () -> Unit,
-    onAppDownloadClick: () -> Unit,
-    onWebsiteClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    DividerColumn(modifier = modifier, thickness = 4.dp) {
-        PreferenceTemplate(
-            title = { Text(stringResource(id = R.string.app_label)) },
-            enabled = appEnabled,
-            verticalPadding = if (!appEnabled) 4.dp else 16.dp,
-            horizontalPadding = 0.dp,
-            modifier = Modifier.clickable(
-                enabled = appEnabled,
-                onClick = onAppClick,
-            ),
-            startWidget = {
-                RadioButton(
-                    selected = appSelected,
-                    onClick = null,
-                    enabled = appEnabled,
-                    modifier = Modifier.padding(start = 56.dp),
-                )
-            },
-            endWidget = {
-                if (showAppDownloadButton) {
-                    ClickableIcon(
-                        painter = painterResource(R.drawable.ic_download),
-                        onClick = onAppDownloadClick,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 4.dp),
-                    )
-                }
-            },
-        )
-        PreferenceTemplate(
-            title = { Text(text = stringResource(id = R.string.website_label)) },
-            modifier = Modifier.clickable(onClick = onWebsiteClick),
-            horizontalPadding = 0.dp,
-            startWidget = {
-                RadioButton(
-                    selected = !appSelected,
-                    onClick = null,
-                    modifier = Modifier.padding(start = 56.dp),
-                )
-            },
-        )
+        endContent?.invoke()
     }
 }
 

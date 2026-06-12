@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.lawnchair.data.iconoverride.IconOverride
 import app.lawnchair.data.iconoverride.IconOverrideRepository
 import app.lawnchair.icons.iconpack.IconPackProvider
 import app.lawnchair.icons.picker.IconEntry
@@ -78,7 +79,7 @@ fun SelectIconPreference(componentKey: ComponentKey) {
     val iconPackProvider = remember { IconPackProvider.INSTANCE.get(context) }
 
     val repo = IconOverrideRepository.INSTANCE.get(context)
-    val overrideItem by repo.observeTarget(componentKey).collectAsStateWithLifecycle(initialValue = null)
+    val overrideItem by repo.observeTarget(componentKey).collectAsStateWithLifecycle<IconOverride?>(initialValue = null)
     val hasOverride = overrideItem != null
 
     // Apply icon immediately on tap — no pending/apply button needed
@@ -172,30 +173,31 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(vertical = 12.dp),
                     ) {
-                        // Current state — the icon as it currently appears on the launcher,
-                        // reflecting any active override (custom icon pack / custom image)
-                        // or falling back to the system icon if nothing is set.
+                        // Current state — if an override is active, resolve its drawable
+                        // directly from the icon pack. Otherwise show the system icon.
                         val currentDrawable by produceState<Drawable?>(
                             initialValue = null,
                             componentKey,
                             overrideItem,
                         ) {
                             launch(Dispatchers.IO) {
-                                value = try {
-                                    val launcherApps: LauncherApps = context.requireSystemService()
-                                    launcherApps
-                                        .getActivityList(
-                                            componentKey.componentName.packageName,
+                                val override = overrideItem?.iconPickerItem
+                                value = if (override != null) {
+                                    try {
+                                        val entry = override.toIconEntry()
+                                        iconPackProvider.getDrawable(
+                                            entry,
+                                            0,
                                             componentKey.user,
-                                        )
-                                        .firstOrNull {
-                                            it.componentName == componentKey.componentName
-                                        }
-                                        ?.getBadgedIcon(0)
-                                        ?: context.packageManager.getApplicationIcon(
+                                        ) ?: context.packageManager.getApplicationIcon(
                                             componentKey.componentName.packageName,
                                         )
-                                } catch (_: Exception) {
+                                    } catch (_: Exception) {
+                                        context.packageManager.getApplicationIcon(
+                                            componentKey.componentName.packageName,
+                                        )
+                                    }
+                                } else {
                                     context.packageManager.getApplicationIcon(
                                         componentKey.componentName.packageName,
                                     )

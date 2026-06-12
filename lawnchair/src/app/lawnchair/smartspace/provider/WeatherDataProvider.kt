@@ -126,7 +126,7 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     override val internalTargets = configFlow.flatMapLatest { config ->
         when (config.provider) {
-            WeatherProvider.NONE -> flowOf(emptyList())
+            WeatherProvider.NONE -> flowOf(listOf(emptyWeatherTarget()))
             WeatherProvider.OPEN_METEO ->
                 weatherFlow(config.refreshInterval) { fetchOpenMeteo(config) }
             WeatherProvider.PIRATE_WEATHER ->
@@ -192,13 +192,18 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         intervalMinutes: Long,
         fetch: suspend () -> List<SmartspaceTarget>,
     ) = flow {
-        // Emit cached data immediately to avoid blank card on restart
-        val cached = buildCachedTargets()
-        if (cached.isNotEmpty()) emit(cached)
+        // Always emit immediately so the date card is never blank, even on first run
+        // with no cache and no internet. emptyWeatherTarget() shows date-only card.
+        emit(buildCachedTargets().ifEmpty { listOf(emptyWeatherTarget()) })
 
         while (true) {
             val fresh = fetch()
-            emit(if (fresh.isNotEmpty()) fresh else buildCachedTargets().ifEmpty { listOf(emptyWeatherTarget()) })
+            if (fresh.isNotEmpty()) {
+                emit(fresh)
+            } else {
+                // No fresh data — re-emit cache or date-only fallback
+                emit(buildCachedTargets().ifEmpty { listOf(emptyWeatherTarget()) })
+            }
             delay(intervalMinutes.minutes)
         }
     }

@@ -114,7 +114,8 @@ fun SelectIconPreference(componentKey: ComponentKey) {
         item {
             // Resolve all packs up front, filter to only those with a real mapping
             // (system pack always included, 3rd-party only if they have the icon)
-            val resolvedStrip by produceState<List<Pair<IconPackInfo, Drawable?>>>(
+            // Triple: (IconPackInfo, Drawable?, IconEntry?) — entry is null for system
+            val resolvedStrip by produceState<List<Triple<IconPackInfo, Drawable?, IconEntry?>>>(
                 initialValue = emptyList(),
                 iconPacks,
                 componentKey,
@@ -127,19 +128,19 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                     val systemDrawable = context.packageManager
                         .getApplicationIcon(componentKey.componentName.packageName)
 
-                    val result = mutableListOf<Pair<IconPackInfo, Drawable?>>()
+                    val result = mutableListOf<Triple<IconPackInfo, Drawable?, IconEntry?>>()
 
                     iconPacks.forEach { iconPack ->
                         if (iconPack.packageName.isEmpty()) {
                             // System icons — always first, always shown, never duplicated
-                            result.add(0, Pair(iconPack, systemDrawable))
+                            result.add(0, Triple(iconPack, systemDrawable, null))
                         } else {
                             val pack = iconPackProvider.getIconPack(iconPack.packageName)
                             pack?.loadBlocking()
                             val entry = pack?.getIcon(component)
                             if (entry != null) {
-                                // Pack has a real mapping — include it
-                                result.add(Pair(iconPack, pack.getIcon(entry, 0)))
+                                // Pack has a real mapping — include with its actual IconEntry
+                                result.add(Triple(iconPack, pack.getIcon(entry, 0), entry))
                             }
                             // No mapping — skip entirely, no fallback
                         }
@@ -229,9 +230,7 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                             contentPadding = PaddingValues(horizontal = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(resolvedStrip) { (iconPack, drawable) ->
-                                val drawableName = componentKey.componentName.className
-                                    .substringAfterLast('.')
+                            items(resolvedStrip) { (iconPack, drawable, entry) ->
                                 QuickPickStripItem(
                                     drawable = drawable,
                                     contentDescription = iconPack.name,
@@ -239,9 +238,13 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                                         applyItem(
                                             IconPickerItem(
                                                 packPackageName = iconPack.packageName,
-                                                drawableName = drawableName,
+                                                // Use the actual drawable name from the pack's
+                                                // appfilter mapping, not the class simple name
+                                                drawableName = entry?.name
+                                                    ?: componentKey.componentName.className
+                                                        .substringAfterLast('.'),
                                                 label = iconPack.name,
-                                                type = IconType.Normal,
+                                                type = entry?.type ?: IconType.Normal,
                                             ),
                                         )
                                     },

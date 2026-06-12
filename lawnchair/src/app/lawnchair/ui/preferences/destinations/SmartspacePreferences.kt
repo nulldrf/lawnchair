@@ -337,22 +337,11 @@ private fun CityPreference(
     } else currentCity
 
     Column(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { inputValue = adapter.state.value; showDialog = true }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.smartspace_weather_city),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            )
-        }
+        ClickablePreference(
+            label = stringResource(R.string.smartspace_weather_city),
+            subtitle = subtitle,
+            onClick = { inputValue = adapter.state.value; showDialog = true },
+        )
     }
     if (showDialog) {
         AlertDialog(
@@ -395,22 +384,12 @@ private fun IconPackPreference(
     val currentLabel = entries.firstOrNull { it.first == currentPack }?.second
         ?: context.getString(R.string.smartspace_weather_icon_pack_none)
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { showDialog = true }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.smartspace_weather_icon_pack),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-            text = currentLabel,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-        )
-    }
+    ClickablePreference(
+        label = stringResource(R.string.smartspace_weather_icon_pack),
+        subtitle = currentLabel,
+        modifier = modifier,
+        onClick = { showDialog = true },
+    )
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },

@@ -45,6 +45,7 @@ import app.lawnchair.icons.picker.IconEntry
 import app.lawnchair.icons.picker.IconPickerItem
 import app.lawnchair.icons.picker.IconType
 import app.lawnchair.ui.preferences.LocalNavController
+import app.lawnchair.ui.preferences.destinations.IconPackInfo
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.AppItem
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
@@ -111,6 +112,42 @@ fun SelectIconPreference(componentKey: ComponentKey) {
 
         // ── Quick-pick strip ─────────────────────────────────────────────────
         item {
+            // Resolve all packs up front, filter to only those with a real mapping
+            // (system pack always included, 3rd-party only if they have the icon)
+            val resolvedStrip by produceState<List<Pair<IconPackInfo, Drawable?>>>(
+                initialValue = emptyList(),
+                iconPacks,
+                componentKey,
+            ) {
+                launch(Dispatchers.IO) {
+                    val component = android.content.ComponentName(
+                        componentKey.componentName.packageName,
+                        componentKey.componentName.className,
+                    )
+                    val systemDrawable = context.packageManager
+                        .getApplicationIcon(componentKey.componentName.packageName)
+
+                    val result = mutableListOf<Pair<IconPackInfo, Drawable?>>()
+
+                    iconPacks.forEach { iconPack ->
+                        if (iconPack.packageName.isEmpty()) {
+                            // System icons — always first, always shown, never duplicated
+                            result.add(0, Pair(iconPack, systemDrawable))
+                        } else {
+                            val pack = iconPackProvider.getIconPack(iconPack.packageName)
+                            pack?.loadBlocking()
+                            val entry = pack?.getIcon(component)
+                            if (entry != null) {
+                                // Pack has a real mapping — include it
+                                result.add(Pair(iconPack, pack.getIcon(entry, 0)))
+                            }
+                            // No mapping — skip entirely, no fallback
+                        }
+                    }
+                    value = result
+                }
+            }
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = stringResource(id = R.string.pick_icon_quick_label),
@@ -130,20 +167,38 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                 ) {
-                    // Current icon (left of divider) + pack variants (right of divider)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(vertical = 12.dp),
                     ) {
-                        // Current icon — whatever is active right now
+                        // Current state — the icon as it currently appears on the launcher,
+                        // reflecting any active override (custom icon pack / custom image)
+                        // or falling back to the system icon if nothing is set.
                         val currentDrawable by produceState<Drawable?>(
                             initialValue = null,
                             componentKey,
+                            overrideItem,
                         ) {
                             launch(Dispatchers.IO) {
-                                value = context.packageManager.getApplicationIcon(
-                                    componentKey.componentName.packageName,
-                                )
+                                value = try {
+                                    val launcherApps: LauncherApps = context.requireSystemService()
+                                    launcherApps
+                                        .getActivityList(
+                                            componentKey.componentName.packageName,
+                                            componentKey.user,
+                                        )
+                                        .firstOrNull {
+                                            it.componentName == componentKey.componentName
+                                        }
+                                        ?.getBadgedIcon(0)
+                                        ?: context.packageManager.getApplicationIcon(
+                                            componentKey.componentName.packageName,
+                                        )
+                                } catch (_: Exception) {
+                                    context.packageManager.getApplicationIcon(
+                                        componentKey.componentName.packageName,
+                                    )
+                                }
                             }
                         }
                         Box(
@@ -169,62 +224,22 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                                 .background(MaterialTheme.colorScheme.outlineVariant),
                         )
 
-                        // Scrollable icon variants from each pack
+                        // Scrollable filtered pack variants
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(iconPacks) { iconPack ->
-                                val iconEntry = remember(iconPack, componentKey) {
-                                    if (iconPack.packageName.isEmpty()) null
-                                    else IconEntry(
-                                        packPackageName = iconPack.packageName,
-                                        name = componentKey.componentName.className
-                                            .substringAfterLast('.'),
-                                        type = IconType.Normal,
-                                    )
-                                }
-
-                                val packDrawable by produceState<Drawable?>(
-                                    initialValue = null,
-                                    iconPack,
-                                    componentKey,
-                                ) {
-                                    launch(Dispatchers.IO) {
-                                        value = if (iconPack.packageName.isEmpty()) {
-                                            context.packageManager.getApplicationIcon(
-                                                componentKey.componentName.packageName,
-                                            )
-                                        } else {
-                                            val pack = iconPackProvider.getIconPack(iconPack.packageName)
-                                            pack?.loadBlocking()
-                                            val component = android.content.ComponentName(
-                                                componentKey.componentName.packageName,
-                                                componentKey.componentName.className,
-                                            )
-                                            val entry = pack?.getIcon(component)
-                                            if (entry != null) {
-                                                pack.getIcon(entry, 0)
-                                            } else {
-                                                context.packageManager.getApplicationIcon(
-                                                    componentKey.componentName.packageName,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
+                            items(resolvedStrip) { (iconPack, drawable) ->
+                                val drawableName = componentKey.componentName.className
+                                    .substringAfterLast('.')
                                 QuickPickStripItem(
-                                    drawable = packDrawable,
+                                    drawable = drawable,
                                     contentDescription = iconPack.name,
                                     onClick = {
-                                        val resolvedName = iconEntry?.name
-                                            ?: componentKey.componentName.className
-                                                .substringAfterLast('.')
                                         applyItem(
                                             IconPickerItem(
                                                 packPackageName = iconPack.packageName,
-                                                drawableName = resolvedName,
+                                                drawableName = drawableName,
                                                 label = iconPack.name,
                                                 type = IconType.Normal,
                                             ),

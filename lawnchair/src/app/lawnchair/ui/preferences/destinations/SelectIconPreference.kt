@@ -173,44 +173,51 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(vertical = 12.dp),
                     ) {
-                        // Current state — if an override is active, resolve its drawable
-                        // directly from the icon pack. Otherwise show the system icon.
+                        // Current state — mirrors LawnchairIconProvider.resolveIconEntry():
+                        // 1. Per-app override (IconOverrideRepository.overridesMap)
+                        // 2. Active icon pack (prefs.iconPackPackage — the single selected pack)
+                        // 3. System icon fallback
+                        val prefs = remember {
+                            app.lawnchair.preferences.PreferenceManager.getInstance(context)
+                        }
                         val currentDrawable by produceState<Drawable?>(
                             initialValue = null,
                             componentKey,
                             overrideItem,
                         ) {
                             launch(Dispatchers.IO) {
-                                val override = overrideItem?.iconPickerItem
-                                value = if (override != null) {
-                                    try {
+                                val component = android.content.ComponentName(
+                                    componentKey.componentName.packageName,
+                                    componentKey.componentName.className,
+                                )
+                                val systemDrawable = context.packageManager
+                                    .getApplicationIcon(componentKey.componentName.packageName)
+
+                                value = try {
+                                    // 1. Per-app override — same as overrideRepo.overridesMap lookup
+                                    val override = overrideItem?.iconPickerItem
+                                    if (override != null) {
                                         val entry = override.toIconEntry()
-                                        // Ensure the pack is loaded before resolving —
-                                        // it may have been evicted from the LRU cache
-                                        // if resolvedStrip loaded multiple packs after
-                                        // this override was set from the full picker.
                                         if (entry.packPackageName.isNotEmpty()) {
                                             iconPackProvider
                                                 .getIconPack(entry.packPackageName)
                                                 ?.loadBlocking()
                                         }
-                                        iconPackProvider.getDrawable(
-                                            entry,
-                                            0,
-                                            componentKey.user,
-                                        ) ?: context.packageManager.getApplicationIcon(
-                                            componentKey.componentName.packageName,
-                                        )
-                                    } catch (_: Exception) {
-                                        context.packageManager.getApplicationIcon(
-                                            componentKey.componentName.packageName,
-                                        )
+                                        iconPackProvider.getDrawable(entry, 0, componentKey.user)
+                                    } else {
+                                        // 2. Active icon pack — exactly what LawnchairIconProvider
+                                        //    does: read iconPackPackage pref, get that single pack
+                                        val activePackName = prefs.iconPackPackage.get()
+                                        val activePack = iconPackProvider
+                                            .getIconPack(activePackName)
+                                            ?.also { it.loadBlocking() }
+                                        val entry = activePack?.getCalendar(component)
+                                            ?: activePack?.getIcon(component)
+                                        entry?.let { iconPackProvider.getDrawable(it, 0, componentKey.user) }
                                     }
-                                } else {
-                                    context.packageManager.getApplicationIcon(
-                                        componentKey.componentName.packageName,
-                                    )
-                                }
+                                } catch (_: Exception) {
+                                    null
+                                } ?: systemDrawable
                             }
                         }
                         Box(

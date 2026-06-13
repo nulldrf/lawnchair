@@ -185,6 +185,15 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                                 value = if (override != null) {
                                     try {
                                         val entry = override.toIconEntry()
+                                        // Ensure the pack is loaded before resolving —
+                                        // it may have been evicted from the LRU cache
+                                        // if resolvedStrip loaded multiple packs after
+                                        // this override was set from the full picker.
+                                        if (entry.packPackageName.isNotEmpty()) {
+                                            iconPackProvider
+                                                .getIconPack(entry.packPackageName)
+                                                ?.loadBlocking()
+                                        }
                                         iconPackProvider.getDrawable(
                                             entry,
                                             0,

@@ -17,6 +17,20 @@ interface IconOverrideDao {
     @Query("DELETE FROM iconoverride WHERE target = :target")
     suspend fun delete(target: ComponentKey)
 
+    /**
+     * One-shot synchronous fetch of every row in the table.
+     *
+     * Used by [IconOverrideRepository] to pre-populate [_overridesMap]
+     * during construction (via [runBlocking]) so the map is never empty
+     * when the first [setOverride] or [deleteOverride] call arrives,
+     * regardless of how quickly the user acts after a cold start.
+     *
+     * All ongoing observation still goes through [observeAll]; this query
+     * is only for the initial blocking read.
+     */
+    @Query("SELECT * FROM iconoverride")
+    suspend fun getAll(): List<IconOverride>
+
     @Query("SELECT * FROM iconoverride")
     fun observeAll(): Flow<List<IconOverride>>
 

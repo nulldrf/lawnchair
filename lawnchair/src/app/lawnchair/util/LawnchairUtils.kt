@@ -30,6 +30,7 @@ import android.content.pm.ResolveInfo
 import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.drawable.BitmapDrawable
@@ -147,13 +148,75 @@ fun supportsRoundedCornersOnWindows(context: Context): Boolean {
     }
 }
 
+/**
+ * Resolves the ARGB int for a [ColorOption], or null if the option is [ColorOption.Default]
+ * (meaning "let the caller decide via its own fallback logic").
+ *
+ * Both light and dark variants are resolved; we pick light unconditionally here because
+ * text colour on a launcher surface is best determined from the surface background
+ * luminance at call-site anyway.
+ */
+private fun ColorOption.resolveColorOrNull(context: Context): Int? {
+    if (this is ColorOption.Default) return null
+    val color = colorPreferenceEntry.lightColor(context)
+    return if (color != 0) color else null
+}
+
+/**
+ * Apply the correct text colour to an app-drawer [TextView] (DISPLAY_ALL_APPS).
+ *
+ * Priority order:
+ *  1. If the user has set a non-Default [drawerIconTextColor] preference, resolve and apply it
+ *     directly — this is their explicit override and overrides luminance-based logic.
+ *  2. Otherwise fall back to the original luminance-based heuristic: if the background
+ *     is light **and** the drawer opacity is high enough, switch to the alternate
+ *     (darker) text colour.
+ */
 fun overrideAllAppsTextColor(textView: TextView) {
     val context = textView.context
-    val luminance = getAllAppsBaseColor(context, ColorTokens.AllAppsScrimColor.resolveColor(context)).luminance
+    val prefs2 = PreferenceManager2.getInstance(context)
+
+    // 1. User-chosen explicit colour takes priority.
+    val explicitColor = prefs2.drawerIconTextColor.firstBlocking().resolveColorOrNull(context)
+    if (explicitColor != null) {
+        textView.setTextColor(explicitColor)
+        return
+    }
+
+    // 2. Legacy luminance-based fallback (original behaviour).
+    val luminance = getAllAppsBaseColor(
+        context,
+        ColorTokens.AllAppsScrimColor.resolveColor(context),
+    ).luminance
     val opacity = PreferenceManager.getInstance(context).drawerOpacity.get()
     if (luminance > 0.5f || opacity <= 0.3f) {
         textView.setTextColor(Themes.getAttrColor(context, R.attr.allAppsAlternateTextColor))
     }
+}
+
+/**
+ * Apply the correct text colour to a workspace / home-screen icon label [TextView]
+ * (DISPLAY_WORKSPACE).
+ *
+ * If [workspaceIconTextColor] is [ColorOption.Default] (the factory default), this
+ * function is a no-op and the theme-derived colour from [workspaceTextColor] /
+ * [Themes.getActivityThemeRes] continues to apply unchanged.
+ *
+ * When the user selects any other option the resolved colour is set directly on the
+ * [TextView], overriding whatever the theme provided.
+ *
+ * Call this from [BubbleTextView] after the theme text colour has been applied (i.e.
+ * after [applyIconAndLabel] / [applyLabel] have run) so that the explicit preference
+ * always wins.
+ */
+fun overrideWorkspaceTextColor(textView: TextView) {
+    val context = textView.context
+    val prefs2 = PreferenceManager2.getInstance(context)
+
+    val explicitColor = prefs2.workspaceIconTextColor.firstBlocking().resolveColorOrNull(context)
+        ?: return // Default → do nothing; theme colour remains.
+
+    textView.setTextColor(explicitColor)
 }
 
 @Suppress("UNCHECKED_CAST")

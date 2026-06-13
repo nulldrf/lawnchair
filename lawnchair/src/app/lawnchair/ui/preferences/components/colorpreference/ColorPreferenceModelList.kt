@@ -18,6 +18,7 @@ class ColorPreferenceModelList @Inject constructor(
     init {
         val prefs = PreferenceManager2.getInstance(context)
 
+        // ── General / accent ─────────────────────────────────────────────────
         // Accent color — uses the full split-circle Monet swatch design.
         registerModel(
             ColorPreferenceModel(
@@ -28,7 +29,49 @@ class ColorPreferenceModelList @Inject constructor(
             ),
         )
 
-        // All other color preferences — use simple solid-circle swatches.
+        // ── Home screen ───────────────────────────────────────────────────────
+        // Home screen icon label text colour.
+        // Default = honour the Light/Dark/Auto workspaceTextColor setting.
+        registerModel(
+            ColorPreferenceModel(
+                prefObject = prefs.workspaceIconTextColor,
+                labelRes = R.string.home_screen_icon_text_color,
+                dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
+            ),
+        )
+
+        // ── App drawer ────────────────────────────────────────────────────────
+        // Drawer background colour.
+        registerModel(
+            ColorPreferenceModel(
+                prefObject = prefs.appDrawerBackgroundColor,
+                labelRes = R.string.app_drawer_bg_color_label,
+                dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
+            ),
+        )
+        // Drawer icon label text colour.
+        // Default = use the luminance-based automatic heuristic.
+        registerModel(
+            ColorPreferenceModel(
+                prefObject = prefs.drawerIconTextColor,
+                labelRes = R.string.drawer_icon_text_color,
+                dynamicEntries = dynamicColorsWithDefault,
+                useSimpleSwatches = true,
+            ),
+        )
+        // Work-profile tab background colour.
+        registerModel(
+            ColorPreferenceModel(
+                prefObject = prefs.workProfileTabBackgroundColor,
+                labelRes = R.string.work_profile_tab_background_label,
+                dynamicEntries = dynamicColors,
+                useSimpleSwatches = true,
+            ),
+        )
+
+        // ── Dock / hotseat ────────────────────────────────────────────────────
         registerModel(
             ColorPreferenceModel(
                 prefObject = prefs.strokeColorStyle,
@@ -45,22 +88,8 @@ class ColorPreferenceModelList @Inject constructor(
                 useSimpleSwatches = true,
             ),
         )
-        registerModel(
-            ColorPreferenceModel(
-                prefObject = prefs.appDrawerBackgroundColor,
-                labelRes = R.string.app_drawer_bg_color_label,
-                dynamicEntries = dynamicColorsWithDefault,
-                useSimpleSwatches = true,
-            ),
-        )
-        registerModel(
-            ColorPreferenceModel(
-                prefObject = prefs.workProfileTabBackgroundColor,
-                labelRes = R.string.work_profile_tab_background_label,
-                dynamicEntries = dynamicColors,
-                useSimpleSwatches = true,
-            ),
-        )
+
+        // ── Notification dots ─────────────────────────────────────────────────
         registerModel(
             ColorPreferenceModel(
                 prefObject = prefs.notificationDotColor,
@@ -77,6 +106,8 @@ class ColorPreferenceModelList @Inject constructor(
                 useSimpleSwatches = true,
             ),
         )
+
+        // ── Folders ───────────────────────────────────────────────────────────
         registerModel(
             ColorPreferenceModel(
                 prefObject = prefs.folderColor,

@@ -44,6 +44,7 @@ import app.lawnchair.ui.preferences.components.GestureHandlerPreference
 import app.lawnchair.ui.preferences.components.HomeLayoutSettings
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.OverlayHandlerPreference
+import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
 import app.lawnchair.ui.preferences.components.controls.ListPreference
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
@@ -152,7 +153,12 @@ fun HomeScreenPreferences(
             }
         }
         PreferenceGroup(heading = stringResource(R.string.style)) {
+            // Theme-based light/dark/auto text colour mode (existing)
             Item { ScrollAnchor(ScrollKeys.HOME_TEXT_COLOR, scrollState) { HomeScreenTextColorPreference() } }
+            // Full color-picker for home screen icon label colour (new)
+            Item {
+                ColorPreference(preference = prefs2.workspaceIconTextColor)
+            }
             Item {
                 ScrollAnchor(ScrollKeys.HOME_APP_OPEN_ANIM, scrollState) {
                 AppOpenAnimationPreference(

@@ -502,6 +502,38 @@ class PreferenceManager2 @Inject constructor(
         onSet = { reloadHelper.recreate() },
     )
 
+    // -----------------------------------------------------------------------
+    // Home screen icon text color (ColorOption-based full color picker)
+    //
+    // Uses Default (Lawnchair-managed automatic) as the out-of-the-box value
+    // so existing behaviour is preserved. When the user picks a custom colour
+    // the resolved ARGB int is applied directly as the icon label text colour
+    // on the workspace, overriding the theme-derived colour.
+    // -----------------------------------------------------------------------
+    val workspaceIconTextColor = preference(
+        key = stringPreferencesKey(name = "workspace_icon_text_color"),
+        parse = ColorOption::fromString,
+        save = ColorOption::toString,
+        // Default means "let the theme / workspaceTextColor setting decide"
+        defaultValue = ColorOption.Default,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    // -----------------------------------------------------------------------
+    // App drawer icon text color (ColorOption-based full color picker)
+    //
+    // Default (Lawnchair-managed automatic) preserves existing drawer text
+    // colour behaviour. Any other value is resolved and applied directly to
+    // the BubbleTextView in DISPLAY_ALL_APPS mode.
+    // -----------------------------------------------------------------------
+    val drawerIconTextColor = preference(
+        key = stringPreferencesKey(name = "drawer_icon_text_color"),
+        parse = ColorOption::fromString,
+        save = ColorOption::toString,
+        defaultValue = ColorOption.Default,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
     val homeIconSizeFactor = preference(
         key = floatPreferencesKey(name = "home_icon_size_factor"),
         defaultValue = resourceProvider.getFloat(R.dimen.config_default_home_icon_size_factor),

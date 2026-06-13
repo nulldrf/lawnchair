@@ -634,6 +634,26 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     ? getContext().getString(R.string.disabled_app_label, info.contentDescription)
                     : info.contentDescription);
         }
+
+        // ── Lawnchair: apply user-chosen icon text colours ────────────────────
+        // Called after setText() so any theme-derived colour set during view
+        // construction is overridden by the user's explicit preference.
+        //
+        // DISPLAY_WORKSPACE — home screen icon labels.
+        if (mDisplay == DISPLAY_WORKSPACE) {
+            LawnchairUtilsKt.overrideWorkspaceTextColor(this);
+        }
+        // DISPLAY_ALL_APPS / DISPLAY_PREDICTION_ROW / DISPLAY_DRAWER_FOLDER —
+        // app-drawer labels.  overrideAllAppsTextColor() is also called in the
+        // constructor for the initial colour, but repeating it here ensures the
+        // colour is re-applied whenever the label is refreshed (e.g. after a
+        // bind or recycle event).
+        if (mDisplay == DISPLAY_ALL_APPS
+                || mDisplay == DISPLAY_PREDICTION_ROW
+                || mDisplay == DISPLAY_DRAWER_FOLDER) {
+            LawnchairUtilsKt.overrideAllAppsTextColor(this);
+        }
+        // ─────────────────────────────────────────────────────────────────────
     }
 
     @Override

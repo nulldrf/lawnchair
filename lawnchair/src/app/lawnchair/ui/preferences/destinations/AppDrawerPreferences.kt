@@ -169,6 +169,12 @@ fun AppDrawerPreferences(
                     adapter = prefs2.appDrawerSearchBarBackground.getAdapter(),
                 )
             }
+            // ── App drawer icon text colour (new) ────────────────────────────
+            // Default = Lawnchair automatic (honours luminance-based heuristic).
+            // Any other pick overrides the automatic logic with the chosen colour.
+            Item {
+                ColorPreference(preference = prefs2.drawerIconTextColor)
+            }
             // ── HokoBlur ────────────────────────────────────────────────────────
             Item {
                 SwitchPreference(

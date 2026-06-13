@@ -208,6 +208,8 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         icon.setClipToPadding(false);
         icon.mFolderName = icon.findViewById(R.id.folder_icon_name);
         icon.mFolderName.setText(folderInfo.title);
+        // Lawnchair: apply workspace icon text colour preference to the folder name label.
+        app.lawnchair.util.LawnchairUtilsKt.overrideWorkspaceTextColor(icon.mFolderName);
         icon.mFolderName.setCompoundDrawablePadding(0);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) icon.mFolderName.getLayoutParams();
         if (folderInfo.container == ItemInfo.NO_ID) {
@@ -698,6 +700,9 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
 
     public void onTitleChanged(CharSequence title) {
         mFolderName.setText(title);
+        // Lawnchair: re-apply workspace icon text colour after rename so the
+        // folder name label stays in sync with the user preference.
+        app.lawnchair.util.LawnchairUtilsKt.overrideWorkspaceTextColor(mFolderName);
         setContentDescription(getAccessiblityTitle(title));
     }
 

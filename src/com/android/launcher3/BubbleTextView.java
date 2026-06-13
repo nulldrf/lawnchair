@@ -640,7 +640,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         // construction is overridden by the user's explicit preference.
         //
         // DISPLAY_WORKSPACE — home screen icon labels.
-        if (mDisplay == DISPLAY_WORKSPACE) {
+        // DISPLAY_FOLDER    — icons inside an open folder (on the workspace).
+        //   Both live on the workspace and share workspaceIconTextColor so the
+        //   label colour is consistent whether the icon is on the home screen
+        //   directly or nested inside a folder.
+        if (mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER) {
             LawnchairUtilsKt.overrideWorkspaceTextColor(this);
         }
         // DISPLAY_ALL_APPS / DISPLAY_PREDICTION_ROW / DISPLAY_DRAWER_FOLDER —

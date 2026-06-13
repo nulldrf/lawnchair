@@ -370,6 +370,10 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             mFolderName.setHighlightColor(ColorUtils.setAlphaComponent(accentColor, 82));
         }
 
+        // Lawnchair: apply the workspace icon text colour preference to the
+        // open-folder title field so it matches icon labels on the home screen.
+        LawnchairUtilsKt.overrideWorkspaceTextColor(mFolderName);
+
         if (Utilities.ATLEAST_R) {
             mKeyboardInsetAnimationCallback = new KeyboardInsetAnimationCallback(this);
             setWindowInsetsAnimationCallback(mKeyboardInsetAnimationCallback);
@@ -697,6 +701,10 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             mFolderName.setText("");
             mFolderName.setHint(R.string.folder_hint_text);
         }
+        // Lawnchair: re-apply the workspace icon text colour preference every
+        // time the folder title is rebound (e.g. after a model reload or theme
+        // change) so the colour always reflects the current preference value.
+        LawnchairUtilsKt.overrideWorkspaceTextColor(mFolderName);
     }
 
     /**

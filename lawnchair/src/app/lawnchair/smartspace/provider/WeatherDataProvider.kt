@@ -126,7 +126,7 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     override val internalTargets = configFlow.flatMapLatest { config ->
         when (config.provider) {
-            WeatherProvider.NONE -> flowOf(listOf(emptyWeatherTarget()))
+            WeatherProvider.NONE -> flowOf(emptyList())
             WeatherProvider.OPEN_METEO ->
                 weatherFlow(config.refreshInterval) { fetchOpenMeteo(config) }
             WeatherProvider.PIRATE_WEATHER ->

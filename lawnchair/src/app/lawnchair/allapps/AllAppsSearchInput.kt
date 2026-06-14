@@ -53,7 +53,6 @@ import com.android.launcher3.allapps.SearchUiManager
 import com.android.launcher3.allapps.search.AllAppsSearchBarController
 import com.android.launcher3.search.SearchCallback
 import com.android.launcher3.util.Themes
-import com.android.systemui.shared.system.BlurUtils
 import com.patrykmichalik.opto.core.firstBlocking
 import java.util.Locale
 import kotlin.math.max
@@ -92,8 +91,11 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private var focusedResultTitle = ""
     private var canShowHint = false
 
-    private val supportBlur = BlurUtils.supportsBlursOnWindows()
-    private val bg = if (supportBlur) {
+    // LC-Note: System cross-window blur replaced by HokoBlur. The frosted/translucent
+    // search-bar background (SearchInputFgBlur) is now driven by the drawerBlurBackground
+    // HokoBlur preference instead of BlurUtils.supportsBlursOnWindows().
+    private val drawerBlurEnabled = PreferenceManager2.getInstance(launcher).drawerBlurBackground.firstBlocking()
+    private val bg = if (drawerBlurEnabled) {
         DrawableTokens.SearchInputFgBlur.resolve(context)
     } else {
         DrawableTokens.SearchInputFg.resolve(context)

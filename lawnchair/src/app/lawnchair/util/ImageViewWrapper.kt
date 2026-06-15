@@ -7,9 +7,11 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import androidx.appcompat.widget.AppCompatImageView
+import app.lawnchair.launcher
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.theme.color.tokens.ColorTokens
 import com.android.launcher3.R
-import com.android.systemui.shared.system.BlurUtils
+import com.patrykmichalik.opto.core.firstBlocking
 
 class ImageViewWrapper(context: Context, attrs: AttributeSet?) : AppCompatImageView(context, attrs) {
 
@@ -18,8 +20,11 @@ class ImageViewWrapper(context: Context, attrs: AttributeSet?) : AppCompatImageV
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
 
-    val supportBlur = BlurUtils.supportsBlursOnWindows()
-    val groupHighlight = if (supportBlur) {
+    // LC-Note: System cross-window blur replaced by HokoBlur. The group-highlight
+    // background color is now driven by the drawerBlurBackground HokoBlur preference
+    // instead of BlurUtils.supportsBlursOnWindows().
+    private val drawerBlurEnabled = PreferenceManager2.getInstance(context.launcher).drawerBlurBackground.firstBlocking()
+    val groupHighlight = if (drawerBlurEnabled) {
         ColorTokens.GroupHighlightBlur.resolveColor(context)
     } else {
         ColorTokens.GroupHighlight.resolveColor(context)

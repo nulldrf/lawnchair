@@ -7,12 +7,13 @@ import android.widget.TextView
 import androidx.core.view.ViewCompat
 import app.lawnchair.font.FontManager
 import app.lawnchair.launcher
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.search.adapter.SPACE
 import app.lawnchair.search.adapter.SPACE_MINI
 import app.lawnchair.search.adapter.SearchTargetCompat
 import app.lawnchair.theme.color.tokens.ColorTokens
 import com.android.launcher3.R
-import com.android.systemui.shared.system.BlurUtils
+import com.patrykmichalik.opto.core.firstBlocking
 
 class SearchResultText(context: Context, attrs: AttributeSet?) :
     LinearLayout(context, attrs),
@@ -21,11 +22,16 @@ class SearchResultText(context: Context, attrs: AttributeSet?) :
     private val launcher = context.launcher
     private lateinit var title: TextView
 
+    // LC-Note: System cross-window blur replaced by HokoBlur. The title text color
+    // is now driven by the drawerBlurBackground HokoBlur preference instead of
+    // BlurUtils.supportsBlursOnWindows().
+    private val drawerBlurEnabled = PreferenceManager2.getInstance(launcher).drawerBlurBackground.firstBlocking()
+
     override fun onFinishInflate() {
         super.onFinishInflate()
         onFocusChangeListener = launcher.focusHandler
         title = ViewCompat.requireViewById(this, R.id.title)
-        if (BlurUtils.supportsBlursOnWindows()) {
+        if (drawerBlurEnabled) {
             title.setTextColor(ColorTokens.TextColorPrimary.resolveColor(context))
         } else {
             title.setTextColor(ColorTokens.ColorAccent.resolveColor(context))

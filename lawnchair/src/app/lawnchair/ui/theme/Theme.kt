@@ -104,11 +104,12 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     val isSystemAccent = accentColor == ColorOption.SystemAccent
 
     // SPEC_2025 path — uses MonetColorSchemeCompat2025 directly, no kdrag0n.
+    // isDark is passed because DynamicScheme bakes it into palette generation.
     // SystemAccent always falls through to the legacy path (colorScheme2025
     // returns null for SystemAccent because the system generates its own palette).
     if (colorSpec == SpecVersion.SPEC_2025 && !isSystemAccent) {
-        val scheme2025 = remember(accentColor, colorStyle, colorSpec) {
-            ThemeProvider.INSTANCE.get(context).colorScheme2025
+        val scheme2025 = remember(accentColor, colorStyle, colorSpec, darkTheme) {
+            ThemeProvider.INSTANCE.get(context).colorScheme2025(isDark = darkTheme)
         }
         if (scheme2025 != null) {
             return scheme2025.toComposeColorScheme2025(isDark = darkTheme)

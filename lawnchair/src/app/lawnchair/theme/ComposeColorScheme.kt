@@ -10,16 +10,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.core.math.MathUtils
 import app.lawnchair.theme.color.MonetColorSchemeCompat2025
-import com.android.systemui.monet.TonalPalette
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-// ── Luminance helpers ─────────────────────────────────────────────────────────
+// ── Luminance helpers (SPEC_2021 path only) ───────────────────────────────────
 
-/**
- * Set the luminance (L*) of this color, preserving hue and chroma as much as
- * possible. Used for intermediate surface tones that don't land on a shade key.
- */
 internal fun Color.setLuminance(
     @FloatRange(from = 0.0, to = 100.0) newLuminance: Float,
 ): Color {
@@ -54,6 +49,12 @@ private fun delinearized(rgbComponent: Float): Int {
 
 // ── SPEC 2021 ─────────────────────────────────────────────────────────────────
 
+/**
+ * Converts a kdrag0n [dev.kdrag0n.monet.theme.ColorScheme] to a Compose [ColorScheme]
+ * using SPEC_2021 fixed-tone role assignments.
+ *
+ * Used for [MonetColorSchemeCompat] (SPEC_2021), [SystemColorScheme], and LegacyKdrag.
+ */
 @Composable
 fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): ColorScheme =
     remember(this, isDark) {
@@ -140,148 +141,109 @@ fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): C
         }
     }
 
-// ── SPEC 2025 tone utilities ──────────────────────────────────────────────────
-
-/**
- * Returns the Compose [Color] at a shade-key-aligned Material tone (0–100).
- *
- * Only accurate at tones that land exactly on a shade key:
- *   0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99
- *
- * For intermediate tones (4, 6, 12, 17, 22, 24, 87, 92, 94, 96, 98) use
- * [atToneInterpolated] which applies [setLuminance] for accurate L* values.
- *
- * Shade key mapping: shadeKey = (100 - tone) * 10
- *   tone 0  → shadeKey 1000 → lstar 0   (black)
- *   tone 40 → shadeKey 600  → lstar 40
- *   tone 80 → shadeKey 200  → lstar 80
- *   tone 100 → shadeKey 0   (no key; fallback to key 10 → lstar 99)
- */
-private fun TonalPalette.atTone(tone: Int): Color {
-    val clamped  = tone.coerceIn(0, 100)
-    val shadeKey = (100 - clamped) * 10
-    val map      = allShadesMapped
-    return Color(
-        map[shadeKey]
-            ?: map.keys.minByOrNull { kotlin.math.abs(it - shadeKey) }
-                ?.let { map[it] }
-            ?: allShades.first()
-    )
-}
-
-/**
- * Returns the Compose [Color] at an intermediate [lstar] (0–100) by:
- *   1. Sampling the palette at the nearest available shade key tone as a base hue/chroma.
- *   2. Shifting that color's L* to the exact [lstar] value using CIE Lab interpolation.
- *
- * This is the same technique used by [toComposeColorScheme] (SPEC_2021) via
- * [setLuminance], and is required for surface tones like 4, 6, 12, 17, 22, 24,
- * 87, 92, 94, 96, 98 which don't land on a shade key boundary.
- *
- * Without this, multiple intermediate tones collapse to the same shade key,
- * making card surfaces indistinguishable from the background in dark mode.
- */
-private fun TonalPalette.atToneInterpolated(lstar: Float): Color {
-    // Use the mid-range shade (tone 40, shadeKey 600) as the hue/chroma anchor.
-    // This tone is always present and has the most representative chroma.
-    val anchor = atTone(40)
-    return anchor.setLuminance(lstar)
-}
-
 // ── SPEC 2025 ─────────────────────────────────────────────────────────────────
 
 /**
  * Converts a [MonetColorSchemeCompat2025] to a Compose [ColorScheme].
  *
- * Role assignments use the same fixed tones as SPEC_2021. The 2025 difference
- * is in palette generation (richer chroma, new hue rotations in ColorScheme.kt).
+ * Reads role values directly from [MonetColorSchemeCompat2025.scheme] — a
+ * materialkolor [DynamicScheme] whose ARGB properties are pre-computed by
+ * [MaterialDynamicColors] + [ColorSpec2025].
  *
- * Roles at exact shade-key tones (0,10,20,30,40,80,90,95,99) use [atTone].
- * Intermediate surface tones (4,6,12,17,22,24,87,92,94,96,98) use
- * [atToneInterpolated] which applies [setLuminance] for accurate L* values,
- * preventing surface cards from merging with the background in dark mode.
+ * No tone arithmetic, no sparse grid lookups, no [setLuminance] workarounds.
+ * Every value is the canonical HCT result matching what MaterialKolor produces.
+ *
+ * Surface roles (background, surface, surfaceContainer* etc.) use [ColorSpec2025]
+ * tone logic which accounts for yellow hue special cases, variant-specific tones,
+ * and chroma multipliers — all handled inside the library, not in Lawnchair.
+ *
+ * [isDark] is already baked into [MonetColorSchemeCompat2025.scheme] at construction,
+ * so the correct dark/light variant is always returned regardless of this parameter.
+ * We still accept [isDark] here to select the right Compose role set (dark vs light
+ * color scheme), which is separate from palette generation.
  */
 @Composable
 fun MonetColorSchemeCompat2025.toComposeColorScheme2025(isDark: Boolean): ColorScheme =
     remember(this, isDark) {
-        val p1 = accent1
-        val p2 = accent2
-        val p3 = accent3
-        val n1 = neutral1
-        val n2 = neutral2
+        val s = scheme
 
         if (isDark) {
             darkColorScheme(
-                primary                  = p1.atTone(80),
-                onPrimary                = p1.atTone(20),
-                primaryContainer         = p1.atTone(30),
-                onPrimaryContainer       = p1.atTone(90),
-                inversePrimary           = p1.atTone(40),
-                secondary                = p2.atTone(80),
-                onSecondary              = p2.atTone(20),
-                secondaryContainer       = p2.atTone(30),
-                onSecondaryContainer     = p2.atTone(90),
-                tertiary                 = p3.atTone(80),
-                onTertiary               = p3.atTone(20),
-                tertiaryContainer        = p3.atTone(30),
-                onTertiaryContainer      = p3.atTone(90),
-                // Surface roles: use atToneInterpolated for intermediate L* values
-                // so each level is visually distinct (avoids card/background collapse)
-                background               = n1.atToneInterpolated(6f),
-                onBackground             = n1.atTone(90),
-                surface                  = n1.atToneInterpolated(6f),
-                onSurface                = n1.atTone(90),
-                surfaceVariant           = n2.atTone(30),
-                onSurfaceVariant         = n2.atTone(80),
-                inverseSurface           = n1.atTone(90),
-                inverseOnSurface         = n1.atTone(20),
-                outline                  = n2.atTone(60),
-                outlineVariant           = n2.atTone(30),
-                scrim                    = n1.atTone(0),
-                surfaceBright            = n1.atToneInterpolated(24f),
-                surfaceDim               = n1.atToneInterpolated(6f),
-                surfaceContainerHighest  = n1.atToneInterpolated(22f),
-                surfaceContainerHigh     = n1.atToneInterpolated(17f),
-                surfaceContainer         = n1.atToneInterpolated(12f),
-                surfaceContainerLow      = n2.atTone(10),
-                surfaceContainerLowest   = n1.atToneInterpolated(4f),
-                surfaceTint              = p1.atTone(80),
+                primary                  = Color(s.primary),
+                onPrimary                = Color(s.onPrimary),
+                primaryContainer         = Color(s.primaryContainer),
+                onPrimaryContainer       = Color(s.onPrimaryContainer),
+                inversePrimary           = Color(s.inversePrimary),
+                secondary                = Color(s.secondary),
+                onSecondary              = Color(s.onSecondary),
+                secondaryContainer       = Color(s.secondaryContainer),
+                onSecondaryContainer     = Color(s.onSecondaryContainer),
+                tertiary                 = Color(s.tertiary),
+                onTertiary               = Color(s.onTertiary),
+                tertiaryContainer        = Color(s.tertiaryContainer),
+                onTertiaryContainer      = Color(s.onTertiaryContainer),
+                background               = Color(s.background),
+                onBackground             = Color(s.onBackground),
+                surface                  = Color(s.surface),
+                onSurface                = Color(s.onSurface),
+                surfaceVariant           = Color(s.surfaceVariant),
+                onSurfaceVariant         = Color(s.onSurfaceVariant),
+                inverseSurface           = Color(s.inverseSurface),
+                inverseOnSurface         = Color(s.inverseOnSurface),
+                outline                  = Color(s.outline),
+                outlineVariant           = Color(s.outlineVariant),
+                scrim                    = Color(s.scrim),
+                surfaceBright            = Color(s.surfaceBright),
+                surfaceDim               = Color(s.surfaceDim),
+                surfaceContainerHighest  = Color(s.surfaceContainerHighest),
+                surfaceContainerHigh     = Color(s.surfaceContainerHigh),
+                surfaceContainer         = Color(s.surfaceContainer),
+                surfaceContainerLow      = Color(s.surfaceContainerLow),
+                surfaceContainerLowest   = Color(s.surfaceContainerLowest),
+                surfaceTint              = Color(s.surfaceTint),
+                error                    = Color(s.error),
+                onError                  = Color(s.onError),
+                errorContainer           = Color(s.errorContainer),
+                onErrorContainer         = Color(s.onErrorContainer),
             )
         } else {
             lightColorScheme(
-                primary                  = p1.atTone(40),
-                onPrimary                = p1.atTone(100),
-                primaryContainer         = p1.atTone(90),
-                onPrimaryContainer       = p1.atTone(10),
-                inversePrimary           = p1.atTone(80),
-                secondary                = p2.atTone(40),
-                onSecondary              = p2.atTone(100),
-                secondaryContainer       = p2.atTone(90),
-                onSecondaryContainer     = p2.atTone(10),
-                tertiary                 = p3.atTone(40),
-                onTertiary               = p3.atTone(100),
-                tertiaryContainer        = p3.atTone(90),
-                onTertiaryContainer      = p3.atTone(10),
-                // Surface roles: use atToneInterpolated for intermediate L* values
-                background               = n1.atToneInterpolated(94f),
-                onBackground             = n2.atTone(10),
-                surface                  = n1.atToneInterpolated(94f),
-                onSurface                = n2.atTone(10),
-                surfaceVariant           = n2.atTone(90),
-                onSurfaceVariant         = n2.atTone(30),
-                inverseSurface           = n1.atTone(20),
-                inverseOnSurface         = n1.atTone(95),
-                outline                  = n2.atTone(50),
-                outlineVariant           = n2.atTone(80),
-                scrim                    = n1.atTone(0),
-                surfaceBright            = n1.atToneInterpolated(98f),
-                surfaceDim               = n1.atToneInterpolated(87f),
-                surfaceContainerHighest  = n1.atTone(90),
-                surfaceContainerHigh     = n1.atToneInterpolated(92f),
-                surfaceContainer         = n1.atToneInterpolated(98f),
-                surfaceContainerLow      = n1.atToneInterpolated(96f),
-                surfaceContainerLowest   = n1.atTone(100),
-                surfaceTint              = p1.atTone(40),
+                primary                  = Color(s.primary),
+                onPrimary                = Color(s.onPrimary),
+                primaryContainer         = Color(s.primaryContainer),
+                onPrimaryContainer       = Color(s.onPrimaryContainer),
+                inversePrimary           = Color(s.inversePrimary),
+                secondary                = Color(s.secondary),
+                onSecondary              = Color(s.onSecondary),
+                secondaryContainer       = Color(s.secondaryContainer),
+                onSecondaryContainer     = Color(s.onSecondaryContainer),
+                tertiary                 = Color(s.tertiary),
+                onTertiary               = Color(s.onTertiary),
+                tertiaryContainer        = Color(s.tertiaryContainer),
+                onTertiaryContainer      = Color(s.onTertiaryContainer),
+                background               = Color(s.background),
+                onBackground             = Color(s.onBackground),
+                surface                  = Color(s.surface),
+                onSurface                = Color(s.onSurface),
+                surfaceVariant           = Color(s.surfaceVariant),
+                onSurfaceVariant         = Color(s.onSurfaceVariant),
+                inverseSurface           = Color(s.inverseSurface),
+                inverseOnSurface         = Color(s.inverseOnSurface),
+                outline                  = Color(s.outline),
+                outlineVariant           = Color(s.outlineVariant),
+                scrim                    = Color(s.scrim),
+                surfaceBright            = Color(s.surfaceBright),
+                surfaceDim               = Color(s.surfaceDim),
+                surfaceContainerHighest  = Color(s.surfaceContainerHighest),
+                surfaceContainerHigh     = Color(s.surfaceContainerHigh),
+                surfaceContainer         = Color(s.surfaceContainer),
+                surfaceContainerLow      = Color(s.surfaceContainerLow),
+                surfaceContainerLowest   = Color(s.surfaceContainerLowest),
+                surfaceTint              = Color(s.surfaceTint),
+                error                    = Color(s.error),
+                onError                  = Color(s.onError),
+                errorContainer           = Color(s.errorContainer),
+                onErrorContainer         = Color(s.onErrorContainer),
             )
         }
     }

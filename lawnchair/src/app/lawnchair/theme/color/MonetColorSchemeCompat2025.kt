@@ -1,40 +1,70 @@
 package app.lawnchair.theme.color
 
 import androidx.annotation.ColorInt
-import com.android.systemui.monet.ColorScheme as MonetColorScheme
-import com.android.systemui.monet.SpecVersion
+import com.materialkolor.dynamiccolor.ColorSpec
+import com.materialkolor.hct.Hct
+import com.materialkolor.scheme.DynamicScheme
+import com.materialkolor.scheme.SchemeContent
+import com.materialkolor.scheme.SchemeExpressive
+import com.materialkolor.scheme.SchemeFruitSalad
+import com.materialkolor.scheme.SchemeMonochrome
+import com.materialkolor.scheme.SchemeNeutral
+import com.materialkolor.scheme.SchemeRainbow
+import com.materialkolor.scheme.SchemeTonalSpot
+import com.materialkolor.scheme.SchemeVibrant
 import com.android.systemui.monet.Style
-import com.android.systemui.monet.TonalPalette
 
 /**
- * Holds the SPEC_2025 tonal palettes for a given seed color and style.
+ * Holds a materialkolor [DynamicScheme] for the SPEC_2025 path.
  *
- * Intentionally does NOT extend [dev.kdrag0n.monet.theme.ColorScheme].
- * The kdrag0n abstract class carries its own engine abstraction (primary(),
- * neutral(), ColorSwatch maps, etc.) which has nothing to do with the 2025
- * palette path. Extending it would force unused overrides and risk the kdrag0n
- * interpolation logic interfering with direct tone lookups.
+ * Uses the canonical HCT-based palette generation from materialkolor/material-color-utilities,
+ * which gives exact [TonalPalette.tone(t)] lookups at any integer tone 0–100 with no sparse
+ * grid, no nearest-key fallback, and no CIE Lab luminance workarounds.
  *
- * Instead this class is a plain data holder. [toComposeColorScheme2025] in
- * ComposeColorScheme.kt reads [accent1], [accent2], [accent3], [neutral1],
- * [neutral2] directly via [TonalPalette.atTone].
+ * [DynamicScheme] also pre-computes every Material role as an ARGB [Int] property via
+ * [MaterialDynamicColors] and [ColorSpec2025], so [toComposeColorScheme2025] simply reads
+ * those values directly — no tone arithmetic in Lawnchair at all.
  *
- * Cached in [ThemeProvider.colorSchemeMap2025] as its own type, separate from
- * the kdrag0n [dev.kdrag0n.monet.theme.ColorScheme] cache.
+ * Intentionally does NOT extend [dev.kdrag0n.monet.theme.ColorScheme]. This is a plain
+ * data holder. The SPEC_2021 / LegacyKdrag path continues to use the existing
+ * [MonetColorSchemeCompat] which extends the kdrag0n class.
+ *
+ * [isDark] is part of construction because [DynamicScheme] / [ColorSpec2025] bakes dark/light
+ * mode into palette generation (surface tones differ, chroma multipliers differ per mode).
+ * The cache in [ThemeProvider] therefore keys on (seedColor, Style, isDark).
+ *
+ * Styles that have no SPEC_2025 variant ([Style.RAINBOW], [Style.FRUIT_SALAD],
+ * [Style.MONOCHROMATIC], [Style.CONTENT]) are handled by [maybeFallbackSpecVersion] inside
+ * [DynamicScheme] which silently falls back to SPEC_2021 for those variants.
  */
 class MonetColorSchemeCompat2025(
     @ColorInt val seedColor: Int,
     val style: Style = Style.TONAL_SPOT,
+    val isDark: Boolean = false,
 ) {
-    private val raw: MonetColorScheme = MonetColorScheme(
-        seedColor,
-        style,
-        SpecVersion.SPEC_2025,
-    )
+    val scheme: DynamicScheme = buildScheme(seedColor, style, isDark)
 
-    val accent1: TonalPalette = raw.accent1
-    val accent2: TonalPalette = raw.accent2
-    val accent3: TonalPalette = raw.accent3
-    val neutral1: TonalPalette = raw.neutral1
-    val neutral2: TonalPalette = raw.neutral2
+    companion object {
+        private fun buildScheme(
+            @ColorInt seedColor: Int,
+            style: Style,
+            isDark: Boolean,
+        ): DynamicScheme {
+            val sourceHct = Hct.fromInt(seedColor)
+            val spec = ColorSpec.SpecVersion.SPEC_2025
+            val contrast = 0.0
+
+            return when (style) {
+                Style.VIBRANT       -> SchemeVibrant(sourceHct, isDark, contrast, spec)
+                Style.EXPRESSIVE    -> SchemeExpressive(sourceHct, isDark, contrast, spec)
+                Style.SPRITZ        -> SchemeNeutral(sourceHct, isDark, contrast, spec)
+                Style.RAINBOW       -> SchemeRainbow(sourceHct, isDark, contrast, spec)
+                Style.FRUIT_SALAD   -> SchemeFruitSalad(sourceHct, isDark, contrast, spec)
+                Style.CONTENT       -> SchemeContent(sourceHct, isDark, contrast, spec)
+                Style.MONOCHROMATIC -> SchemeMonochrome(sourceHct, isDark, contrast, spec)
+                // TONAL_SPOT and anything else (including LegacyKdrag placeholder TONAL_SPOT)
+                else                -> SchemeTonalSpot(sourceHct, isDark, contrast, spec)
+            }
+        }
+    }
 }

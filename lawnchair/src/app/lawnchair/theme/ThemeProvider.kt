@@ -63,9 +63,11 @@ class ThemeProvider @Inject constructor(
     // Cache for the kdrag0n ZCAM engine — keyed by seedColor alone.
     private val kdragColorSchemeMap = java.util.concurrent.ConcurrentHashMap<Int, ColorScheme>()
 
-    // Cache for SPEC_2025 — keyed by (seedColor, Style).
+    // Cache for SPEC_2025 — keyed by (seedColor, Style, isDark).
+    // isDark is part of the key because DynamicScheme bakes dark/light into palette
+    // generation — surface tones and chroma multipliers differ per mode.
     // Typed as MonetColorSchemeCompat2025 directly; no kdrag0n type involved.
-    private val colorSchemeMap2025 = java.util.concurrent.ConcurrentHashMap<Pair<Int, Style>, MonetColorSchemeCompat2025>()
+    private val colorSchemeMap2025 = java.util.concurrent.ConcurrentHashMap<Triple<Int, Style, Boolean>, MonetColorSchemeCompat2025>()
 
     private val listeners = mutableListOf<ColorSchemeChangeListener>()
 
@@ -226,9 +228,12 @@ class ThemeProvider @Inject constructor(
      * Returns null when accentColor is SystemAccent — the system palette is
      * always rendered via the legacy path. [Theme.kt] checks for null and falls
      * back to [colorScheme] in that case.
+     *
+     * [isDark] is required because [DynamicScheme] bakes dark/light into palette
+     * generation — surface tones and chroma multipliers differ per mode.
      */
-    val colorScheme2025: MonetColorSchemeCompat2025?
-        get() = resolveColorScheme2025(accentColor)
+    fun colorScheme2025(isDark: Boolean): MonetColorSchemeCompat2025? =
+        resolveColorScheme2025(accentColor, isDark)
 
     private fun resolveColorScheme(accentColor: ColorOption): ColorScheme =
         when (accentColor) {
@@ -258,7 +263,7 @@ class ThemeProvider @Inject constructor(
             else -> getLegacyColorScheme(ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
         }
 
-    private fun resolveColorScheme2025(accentColor: ColorOption): MonetColorSchemeCompat2025? =
+    private fun resolveColorScheme2025(accentColor: ColorOption, isDark: Boolean): MonetColorSchemeCompat2025? =
         when (accentColor) {
             // SystemAccent always uses the system palette — no 2025 override.
             is ColorOption.SystemAccent -> null
@@ -268,6 +273,7 @@ class ThemeProvider @Inject constructor(
                 get2025ColorScheme(
                     wallpaperPrimary ?: ColorOption.LawnchairBlue.color,
                     colorStyle,
+                    isDark,
                 )
             }
 
@@ -275,16 +281,16 @@ class ThemeProvider @Inject constructor(
                 val fresh = freshWallpaperPrimary
                 val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
                            else accentColor.color
-                get2025ColorScheme(seed, colorStyle)
+                get2025ColorScheme(seed, colorStyle, isDark)
             }
 
             is ColorOption.CustomColor -> {
                 // LegacyKdrag has no 2025 variant — fall back to TonalSpot.
                 val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-                get2025ColorScheme(accentColor.color, effectiveStyle)
+                get2025ColorScheme(accentColor.color, effectiveStyle, isDark)
             }
 
-            else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, colorStyle)
+            else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, colorStyle, isDark)
         }
 
     private val systemColorScheme: ColorScheme
@@ -323,11 +329,12 @@ class ThemeProvider @Inject constructor(
     private fun get2025ColorScheme(
         colorInt: Int,
         colorStyle: ColorStyle,
+        isDark: Boolean,
     ): MonetColorSchemeCompat2025 {
         // LegacyKdrag has no 2025 variant; treat as TonalSpot.
         val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-        return colorSchemeMap2025.getOrPut(Pair(colorInt, effectiveStyle.style)) {
-            MonetColorSchemeCompat2025(colorInt, effectiveStyle.style)
+        return colorSchemeMap2025.getOrPut(Triple(colorInt, effectiveStyle.style, isDark)) {
+            MonetColorSchemeCompat2025(colorInt, effectiveStyle.style, isDark)
         }
     }
 

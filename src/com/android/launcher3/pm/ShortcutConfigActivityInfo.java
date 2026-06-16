@@ -30,7 +30,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
 import android.util.Log;
@@ -192,9 +191,14 @@ public abstract class ShortcutConfigActivityInfo implements CachedObject {
         for (UserHandle user : users) {
             for (LauncherActivityInfo activityInfo :
                     launcherApps.getShortcutConfigActivityList(packageName, user)) {
-                if (activityInfo.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.O) {
-                    result.add(new ShortcutConfigActivityInfoVO(activityInfo));
-                }
+                // Lawnchair: Do NOT filter out pre-API-26 apps here. AOSP Launcher3 dropped
+                // this legacy support in Android 14 (commit 84b48d8) under the assumption
+                // that all shortcut-configurator activities now target Oreo+. In practice many
+                // widely-used apps (Android Settings shortcuts, Chrome deep links, Shortcut
+                // Maker, etc.) still return legacy Intent.EXTRA_SHORTCUT_* extras regardless
+                // of their targetSdkVersion. We accept them all and let LegacyShortcutHelper
+                // parse the result in completeAddShortcut().
+                result.add(new ShortcutConfigActivityInfoVO(activityInfo));
             }
         }
         return result;

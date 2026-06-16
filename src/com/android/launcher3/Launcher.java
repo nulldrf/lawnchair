@@ -212,6 +212,7 @@ import com.android.launcher3.model.data.PredictedContainerInfo;
 import com.android.launcher3.model.data.WorkspaceData;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.notification.NotificationListener;
+import com.android.launcher3.pm.LegacyShortcutHelper;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.popup.PopupDataProvider;
@@ -1381,8 +1382,19 @@ public class Launcher extends StatefulActivity<LauncherState>
         int[] cellXY = mTmpAddItemCellCoordinates;
         CellLayout layout = getCellLayout(container, screenId);
 
+        // Primary path: modern apps (targetSdkVersion >= 26 / Oreo) return a PinItemRequest via
+        // LauncherApps.EXTRA_PIN_ITEM_REQUEST embedded in the result Intent.
         WorkspaceItemInfo info = PinRequestHelper.createWorkspaceItemFromPinItemRequest(
                     this, PinRequestHelper.getPinItemRequest(data), 0);
+
+        // Fallback path: legacy apps return old-style Intent.EXTRA_SHORTCUT_* extras instead
+        // of a PinItemRequest. AOSP Launcher3 removed this fallback in Android 14 (commit
+        // 84b48d8), breaking widely-used apps such as Android Settings shortcut widgets, Chrome
+        // deep links, and Shortcut Maker. We restore it here via LegacyShortcutHelper.
+        if (info == null && data != null) {
+            info = LegacyShortcutHelper.createWorkspaceItemFromLegacyIntent(this, data);
+        }
+
         if (info == null) {
             Log.e(TAG, "Unable to parse a valid shortcut result");
             return;

@@ -430,6 +430,11 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = context.resources.getBoolean(R.bool.config_default_app_drawer_haptic_feedback),
     )
 
+    val hapticFeedback = preference(
+        key = booleanPreferencesKey(name = "haptic_feedback"),
+        defaultValue = context.resources.getBoolean(R.bool.config_default_haptic_feedback),
+    )
+
     val hiddenAppsInSearch = preference(
         key = stringPreferencesKey(name = "hidden_apps_in_search"),
         defaultValue = HiddenAppsInSearch.NEVER,
@@ -1044,6 +1049,10 @@ class PreferenceManager2 @Inject constructor(
 
         @JvmStatic
         fun getInstance(context: Context) = INSTANCE.get(context)!!
+
+        @JvmStatic
+        fun isHapticFeedbackEnabled(context: Context): Boolean =
+            getInstance(context).hapticFeedback.firstBlocking()
 
         private const val TAG = "PreferenceManager2"
     }

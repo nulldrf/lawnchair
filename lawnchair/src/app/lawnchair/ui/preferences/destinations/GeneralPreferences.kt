@@ -118,6 +118,17 @@ fun GeneralPreferences() {
             }
         }
 
+        // ── Haptic feedback ───────────────────────────────────────────────────
+        PreferenceGroup {
+            Item {
+                SwitchPreference(
+                    adapter = prefs2.hapticFeedback.getAdapter(),
+                    label = stringResource(id = R.string.haptic_feedback_label),
+                    description = stringResource(id = R.string.haptic_feedback_description),
+                )
+            }
+        }
+
         // ── Auto-updater (nightly builds only) ────────────────────────────────
         if (BuildConfig.APPLICATION_ID.contains("nightly")) {
             PreferenceGroup(heading = stringResource(id = R.string.updater)) {

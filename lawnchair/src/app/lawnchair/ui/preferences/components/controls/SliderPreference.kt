@@ -46,8 +46,10 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.theme.LawnchairTheme
 import app.lawnchair.ui.util.preview.PreferenceGroupPreviewContainer
 import app.lawnchair.ui.util.preview.PreviewLawnchair
+import app.lawnchair.preferences2.preferenceManager2
 import com.android.launcher3.R
 import com.android.launcher3.util.MSDLPlayerWrapper
+import com.patrykmichalik.opto.core.firstBlocking
 import com.google.android.msdl.data.model.MSDLToken
 import kotlin.math.roundToInt
 
@@ -115,7 +117,9 @@ private fun SliderPreference(
     showUnit: String = "",
 ) {
     var sliderValue by remember { mutableFloatStateOf(value) }
-    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
+    val context = LocalContext.current
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
+    val prefs2 = preferenceManager2()
     val getAppropriateHaptic = if (step == 0f) {
         MSDLToken.DRAG_INDICATOR_CONTINUOUS
     } else {
@@ -167,7 +171,9 @@ private fun SliderPreference(
                 value = sliderValue,
                 onValueChange = { newValue ->
                     sliderValue = newValue
-                    mMSDLPlayerWrapper.playToken(getAppropriateHaptic)
+                    if (prefs2.hapticFeedback.firstBlocking()) {
+                        mMSDLPlayerWrapper.playToken(getAppropriateHaptic)
+                    }
                 },
                 onValueChangeFinished = { onValueChangeFinished(sliderValue) },
                 valueRange = valueRange,

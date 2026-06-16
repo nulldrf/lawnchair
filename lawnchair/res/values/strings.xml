@@ -771,6 +771,9 @@
     <string name="wallpaper_blur">Blur wallpaper (experimental)</string>
     <string name="wallpaper_background_blur">Blur intensity</string>
     <string name="wallpaper_background_blur_factor">Factor threshold</string>
+	
+	<string name="haptic_feedback_label">Haptic feedback</string>
+    <string name="haptic_feedback_description">Vibrate on interactions within Lawnchair</string>
 
     <string name="home_lawn_deck_label">Deck</string>
     <string name="home_lawn_deck_label_beta">Deck (Beta)</string>

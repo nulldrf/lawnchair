@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences2.asState
+import app.lawnchair.preferences2.preferenceManager2
+import com.patrykmichalik.opto.core.firstBlocking
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
@@ -118,6 +120,7 @@ private fun AnnouncementItemContent(
     onClose: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    val prefs2 = preferenceManager2()
     val coroutineScope = rememberCoroutineScope()
 
     val offsetX = remember { Animatable(0f) }
@@ -153,7 +156,9 @@ private fun AnnouncementItemContent(
                                     targetValue = target,
                                     animationSpec = tween(durationMillis = 180),
                                 )
-                                haptic.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                if (prefs2.hapticFeedback.firstBlocking()) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                                }
                                 onClose()
                             }
                         } else {

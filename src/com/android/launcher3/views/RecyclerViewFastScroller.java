@@ -18,6 +18,8 @@ package com.android.launcher3.views;
 
 import static androidx.core.view.HapticFeedbackConstantsCompat.CLOCK_TICK;
 
+import app.lawnchair.preferences2.PreferenceManager2;
+
 import static androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE;
 
 import static com.android.launcher3.views.RecyclerViewFastScroller.FastScrollerLocation.ALL_APPS_SCROLLER;
@@ -358,7 +360,8 @@ public class RecyclerViewFastScroller extends View {
             mPopupSectionName = sectionName;
             mPopupView.setText(sectionName);
             // AllApps haptics are taken care of by AllAppsFastScrollHelper.
-            if (mFastScrollerLocation != ALL_APPS_SCROLLER) {
+            if (mFastScrollerLocation != ALL_APPS_SCROLLER &&
+                    PreferenceManager2.isHapticFeedbackEnabled(getContext())) {
                 performHapticFeedback(CLOCK_TICK);
             }
         }

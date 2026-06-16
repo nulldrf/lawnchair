@@ -19,6 +19,7 @@ import static androidx.core.view.HapticFeedbackConstantsCompat.CLOCK_TICK;
 
 import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
+import app.lawnchair.preferences2.PreferenceManager2;
 
 import com.android.launcher3.allapps.AlphabeticalAppsList.FastScrollSectionInfo;
 
@@ -73,7 +74,9 @@ public class AllAppsFastScrollHelper {
 
         @Override
         protected int getVerticalSnapPreference() {
-            mRv.performHapticFeedback(CLOCK_TICK);
+            if (PreferenceManager2.isHapticFeedbackEnabled(mRv.getContext())) {
+                mRv.performHapticFeedback(CLOCK_TICK);
+            }
             return SNAP_TO_ANY;
         }
 

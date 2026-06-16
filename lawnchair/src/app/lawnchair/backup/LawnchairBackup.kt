@@ -127,7 +127,7 @@ class LawnchairBackup(
         )
 
         fun generateBackupFileName(): String {
-            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")
+            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
             val fileName = "Lawnchair_Backup_${LocalDateTime.now().format(formatter)}"
             return "$fileName.lawnchairbackup"
         }

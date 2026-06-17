@@ -4,22 +4,18 @@ package app.lawnchair.smartspace.provider
 import android.Manifest
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.HandlerThread
-import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
-import app.lawnchair.BlankActivity
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.smartspace.model.SmartspaceAction
 import app.lawnchair.smartspace.model.SmartspaceScores
@@ -86,6 +82,10 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
     R.string.smartspace_weather_source,
     { smartspaceWeatherEnabled },
 ) {
+    // Never block with a setup card — show date-only card instead.
+    // configFlow.flatMapLatest handles config changes reactively without needing restart().
+    override val disabledTargets get() = listOf(emptyWeatherTarget())
+    override suspend fun requiresSetup() = false
     private val prefs = PreferenceManager2.getInstance(context)
     private val iconProvider = WeatherIconProvider(context)
     private val sp: SharedPreferences =
@@ -140,51 +140,7 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
-    override suspend fun requiresSetup(): Boolean {
-        val provider = prefs.smartspaceWeatherProvider.get().first()
-        val city = prefs.smartspaceWeatherCity.get().first()
-        val needsLocation = city.isBlank() && !hasLocationPermission()
-        return when (provider) {
-            WeatherProvider.NONE -> false
-            WeatherProvider.OPEN_METEO -> needsLocation
-            WeatherProvider.PIRATE_WEATHER ->
-                needsLocation || prefs.pirateWeatherApiKey.get().first().isBlank()
-            WeatherProvider.OPEN_WEATHER_MAP ->
-                needsLocation || prefs.openWeatherMapApiKey.get().first().isBlank()
-            WeatherProvider.ACCU_WEATHER ->
-                prefs.accuWeatherApiKey.get().first().isBlank()
-        }
-    }
 
-    override suspend fun startSetup(activity: Activity) {
-        val provider = prefs.smartspaceWeatherProvider.get().first()
-        val city = prefs.smartspaceWeatherCity.get().first()
-        val (title, desc) = when {
-            provider == WeatherProvider.PIRATE_WEATHER &&
-                prefs.pirateWeatherApiKey.get().first().isBlank() ->
-                activity.getString(R.string.smartspace_pirate_weather_api_key_title) to
-                    activity.getString(R.string.smartspace_pirate_weather_api_key_description)
-            provider == WeatherProvider.OPEN_WEATHER_MAP &&
-                prefs.openWeatherMapApiKey.get().first().isBlank() ->
-                activity.getString(R.string.smartspace_owm_api_key_title) to
-                    activity.getString(R.string.smartspace_owm_api_key_description)
-            provider == WeatherProvider.ACCU_WEATHER &&
-                prefs.accuWeatherApiKey.get().first().isBlank() ->
-                activity.getString(R.string.smartspace_accu_api_key_title) to
-                    activity.getString(R.string.smartspace_accu_api_key_description)
-            city.isBlank() && !hasLocationPermission() ->
-                activity.getString(R.string.smartspace_weather_location_permission_title) to
-                    activity.getString(R.string.smartspace_weather_location_permission_description)
-            else -> return
-        }
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", context.packageName, null)
-        }
-        BlankActivity.startBlankActivityDialog(
-            activity, intent, title, desc,
-            context.getString(R.string.title_change_settings),
-        )
-    }
 
     // ── Polling flow with cache ───────────────────────────────────────────────
 
@@ -352,19 +308,40 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         }
     }
 
-    /** Maps AccuWeather icon codes to WeatherCondition — ported from Breezy's AccuService */
+    /**
+     * Maps all 44 AccuWeather icon codes to WeatherCondition.
+     * Day icons: 1-32. Night equivalents: 33-44 (roughly icon - 32 for 33-44).
+     * Reference: http://apidev.accuweather.com/developers/weatherIcons
+     */
     private fun accuIconToCondition(icon: Int?): WeatherCondition = when (icon) {
-        1, 2, 30, 33, 34 -> WeatherCondition.CLEAR
-        3, 4, 6, 35, 36, 38 -> WeatherCondition.PARTLY_CLOUDY
-        5, 37 -> WeatherCondition.CLOUDY
-        7, 8 -> WeatherCondition.CLOUDY
-        11 -> WeatherCondition.FOG
-        12, 13, 14, 18, 39, 40 -> WeatherCondition.RAIN
-        15, 16, 17, 41, 42 -> WeatherCondition.THUNDERSTORM
-        19, 20, 21, 22, 23, 24, 31, 43, 44 -> WeatherCondition.SNOW
-        25 -> WeatherCondition.HAIL
-        26, 29 -> WeatherCondition.SLEET
-        32 -> WeatherCondition.WINDY
+        1, 2 -> WeatherCondition.CLEAR                 // Sunny / Mostly Sunny
+        3, 4 -> WeatherCondition.PARTLY_CLOUDY         // Partly Sunny / Intermittent Clouds
+        5 -> WeatherCondition.MOSTLY_CLOUDY            // Hazy Sunshine
+        6 -> WeatherCondition.PARTLY_CLOUDY            // Mostly Cloudy
+        7, 8 -> WeatherCondition.CLOUDY                // Cloudy / Dreary
+        11 -> WeatherCondition.FOG                     // Fog
+        12 -> WeatherCondition.RAIN                    // Showers
+        13, 14 -> WeatherCondition.RAIN                // Mostly Cloudy w/ Showers / Partly Sunny w/ Showers
+        15 -> WeatherCondition.THUNDERSTORM            // T-Storms
+        16, 17 -> WeatherCondition.THUNDERSTORM        // Mostly Cloudy w/ T-Storms / Partly Sunny w/ T-Storms
+        18 -> WeatherCondition.RAIN                    // Rain
+        19, 20, 21 -> WeatherCondition.FLURRIES        // Flurries / Mostly Cloudy w/ Flurries / Partly Sunny w/ Flurries
+        22 -> WeatherCondition.SNOW                    // Snow
+        23 -> WeatherCondition.MOSTLY_CLOUDY           // Mostly Cloudy w/ Snow
+        24 -> WeatherCondition.SLEET                   // Ice
+        25 -> WeatherCondition.SLEET                   // Sleet
+        26 -> WeatherCondition.FREEZING_RAIN           // Freezing Rain
+        29 -> WeatherCondition.SLEET                   // Rain and Snow
+        30 -> WeatherCondition.WINDY                   // Hot (use clear)
+        31 -> WeatherCondition.WINDY                   // Cold
+        32 -> WeatherCondition.WINDY                   // Windy
+        33, 34 -> WeatherCondition.CLEAR               // Clear / Mostly Clear (night)
+        35, 36 -> WeatherCondition.PARTLY_CLOUDY       // Partly Cloudy / Intermittent Clouds (night)
+        37 -> WeatherCondition.MOSTLY_CLOUDY           // Hazy Moonlight
+        38 -> WeatherCondition.MOSTLY_CLOUDY           // Mostly Cloudy (night)
+        39, 40 -> WeatherCondition.RAIN                // Partly Cloudy w/ Showers / Mostly Cloudy w/ Showers (night)
+        41, 42 -> WeatherCondition.THUNDERSTORM        // Partly Cloudy w/ T-Storms / Mostly Cloudy w/ T-Storms (night)
+        43, 44 -> WeatherCondition.SNOW                // Mostly Cloudy w/ Flurries / Mostly Cloudy w/ Snow (night)
         else -> WeatherCondition.NA
     }
 

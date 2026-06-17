@@ -678,7 +678,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 (SearchRecyclerView) mAH.get(SEARCH).mRecyclerView,
                 getCurrentPage(), tabsHidden);
 
-        int padding = mHeader.getMaxTranslation();
+        // LC-Note (fix for app-drawer-search-bar-disabled blank space): when the
+        // header is hidden there is no search bar / tab-pill content left to leave
+        // room for. mHeader.getMaxTranslation() would otherwise still fall back to
+        // R.dimen.all_apps_search_bar_bottom_padding (the gap meant to sit *under*
+        // a visible search bar), which is exactly the leftover blank space at the
+        // top of the drawer that was reported. Force this padding to 0 in that
+        // case so the app grid / search results sit flush right under the existing
+        // top inset (i.e. right under the drag handle) instead of leaving a gap.
+        int padding = hideHeader ? 0 : mHeader.getMaxTranslation();
         mAH.forEach(adapterHolder -> {
             adapterHolder.mPadding.top = padding;
             adapterHolder.applyPadding();
@@ -818,33 +826,79 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return dp.allAppsLeftRightMargin + dp.getAllAppsIconStartMargin(mActivityContext);
     }
 
+    /**
+     * LC-Note (fix for app-drawer-search-bar-disabled blank space):
+     *
+     * R.dimen.all_apps_header_top_margin is sized to clear the *visible* search
+     * bar it bakes in the search bar's own rendered height plus a deliberate
+     * visual gap below it. When hideAppDrawerSearchBar is on, AllAppsSearchInput
+     * collapses its own height to 0 (see AllAppsSearchInput.onFinishInflate),
+     * but this method was still unconditionally applying that margin on top of
+     * the (now zero-height) search container, plus an extra
+     * all_apps_header_pill_height margin for the personal/work tab pill even
+     * though setupHeader() puts the *entire* mHeader (which contains that pill)
+     * into View.GONE in this state. The net effect was exactly the blank gap
+     * that was reported: the content was being pushed down by a margin sized
+     * for UI that is no longer there.
+     *
+     * Since there is nothing left to clear in that state, skip the margin
+     * entirely so the content's top aligns directly with the (now zero-height)
+     * search container's top i.e. right under the existing top inset / drag
+     * handle area, with no extra blank space.
+     */
     private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
         lp.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
-        int topMargin = getContext().getResources().getDimensionPixelSize(
-                R.dimen.all_apps_header_top_margin);
-        if (includeTabsMargin) {
-            topMargin += getContext().getResources().getDimensionPixelSize(
-                    R.dimen.all_apps_header_pill_height);
+
+        boolean hideSearchBar =
+                PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar());
+        int topMargin = 0;
+        if (!hideSearchBar) {
+            topMargin = getContext().getResources().getDimensionPixelSize(
+                    R.dimen.all_apps_header_top_margin);
+            if (includeTabsMargin) {
+                topMargin += getContext().getResources().getDimensionPixelSize(
+                        R.dimen.all_apps_header_pill_height);
+            }
         }
         lp.topMargin = topMargin;
     }
 
+    /**
+     * LC-Note: used only when the search bar is floating (overlaid via the drag
+     * layer rather than reserving space in this RelativeLayout's flow), so
+     * content always starts at the parent's top regardless of whether the
+     * search bar itself is shown or hidden. The only thing that still needs
+     * accounting for here is the personal/work tab pill margin and that pill
+     * lives inside mHeader, which is set to View.GONE whenever
+     * hideAppDrawerSearchBar is on, so that margin must be skipped in that case
+     * too (previously this method just bailed out entirely when the pref was
+     * on, leaving stale/unset RelativeLayout rules instead of doing the right
+     * thing).
+     */
     private void alignParentTop(View v, boolean includeTabsMargin) {
-        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)
-                || PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar())) return;
+        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
         lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
-        lp.topMargin = includeTabsMargin
+        boolean hideSearchBar =
+                PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar());
+        lp.topMargin = (includeTabsMargin && !hideSearchBar)
                 ? getContext().getResources().getDimensionPixelSize(
                         R.dimen.all_apps_header_pill_height)
                 : 0;
     }
 
+    /**
+     * LC-Note: this must always clear stale rules before the caller re-applies
+     * the correct one via layoutBelowSearchContainer()/alignParentTop() above.
+     * It previously bailed out early whenever hideAppDrawerSearchBar was on,
+     * which left old RelativeLayout rules in place instead of resetting them
+     * removed that short-circuit since it served no purpose other than leaving
+     * the layout in a stale state.
+     */
     private void removeCustomRules(View v) {
-        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)
-                || PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar())) return;
+        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
         lp.removeRule(RelativeLayout.ABOVE);
         lp.removeRule(RelativeLayout.ALIGN_TOP);

@@ -69,7 +69,7 @@ import kotlin.math.round
  * @param opacity A function returning the opacity of a color, as a number between 0 and 1.
  */
 @Suppress("MemberVisibilityCanBePrivate", "unused")
-public data class DynamicColor(
+public class DynamicColor(
     public val name: String,
     public val palette: (DynamicScheme) -> TonalPalette,
     public val tone: (DynamicScheme) -> Double,

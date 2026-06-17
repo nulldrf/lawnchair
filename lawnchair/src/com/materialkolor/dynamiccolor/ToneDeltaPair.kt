@@ -44,7 +44,7 @@ package com.materialkolor.dynamiccolor
  * (T50-59). This is necessary for certain cases where one role has two backgrounds.
  * @param[deltaConstraint] How to fulfill a tone delta pair constraint.
  */
-public data class ToneDeltaPair(
+public class ToneDeltaPair(
     public val roleA: DynamicColor,
     public val roleB: DynamicColor,
     public val delta: Double,

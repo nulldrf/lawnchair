@@ -137,29 +137,39 @@ private fun ThemePreviewMockup(currentTheme: String) {
     // this so the relationship is always relative, never hardcoded.
     val schemeBg  = MaterialTheme.colorScheme.background
 
-    // Phone wallpaper: start from the real settings background, then push it
-    // noticeably away so the phone stands out — darker in dark mode, lighter in
-    // light mode — while staying in the same tinted family.
-    val wallpaperBgTarget = if (isDark)
-        lerp(lerp(schemeBg, Color.Black, 0.35f), primary, 0.06f)   // pull toward black
-    else
-        lerp(lerp(schemeBg, Color.White, 0.55f), primary, 0.04f)   // push toward white
+    // All surfaces are derived exclusively from schemeBg + primary/tertiary —
+    // zero residual hue from any hardcoded hex constant, so the palette
+    // accurately reflects whichever accent color the user has picked.
 
-    // App/shortcut card surfaces — primary-tinted as before
-    val cardColorTarget   = if (isDark) lerp(Color(0xFF16161F), primary, 0.13f)
-                            else        lerp(Color(0xFFFFFFFF), primary, 0.04f)
-    // Widget card surface — tertiary (accent3) tinted so it reads as a different zone
-    val widgetCardTarget  = if (isDark) lerp(Color(0xFF16161F), tertiary, 0.18f)
-                            else        lerp(Color(0xFFFFFFFF), tertiary, 0.06f)
-    val subtleColorTarget = if (isDark) lerp(Color(0xFF26263A), primary, 0.18f)
-                            else        lerp(Color(0xFFE2E2F0), primary, 0.12f)
-    // Border: thin tinted ring — more visible in dark, softer in light
+    // Phone wallpaper: push schemeBg noticeably away from the page behind it —
+    // darker in dark mode, lighter in light mode — then add a whisper of primary.
+    val wallpaperBgTarget = if (isDark)
+        lerp(lerp(schemeBg, Color.Black, 0.35f), primary, 0.06f)
+    else
+        lerp(lerp(schemeBg, Color.White, 0.55f), primary, 0.04f)
+
+    // Card / dock base: lifted slightly above wallpaper then tinted from the accent.
+    // Derived from schemeBg so it carries no foreign hue of its own.
+    val cardBase = if (isDark)
+        lerp(schemeBg, Color.White, 0.10f)   // a little lighter than the wallpaper
+    else
+        lerp(schemeBg, Color.Black, 0.04f)   // a little darker than the wallpaper
+
+    val cardColorTarget   = lerp(cardBase, primary,  if (isDark) 0.10f else 0.05f)
+    val widgetCardTarget  = lerp(cardBase, tertiary, if (isDark) 0.14f else 0.07f)
+
+    // Subtle elements (status-bar clock, text-line placeholders): same neutral
+    // base, just a bit more primary tint so they're distinct but not glaring.
+    val subtleColorTarget = lerp(cardBase, primary, if (isDark) 0.22f else 0.15f)
+
+    // Border: thin tinted ring
     val borderColorTarget = if (isDark) primary.copy(alpha = 0.28f)
                             else        primary.copy(alpha = 0.18f)
-    // Widget accent stripe uses tertiary; icon dots/dock use primary
-    val accentStrongTarget  = primary.copy(alpha = if (isDark) 0.85f else 0.80f)
-    val accentMidTarget     = primary.copy(alpha = if (isDark) 0.50f else 0.45f)
-    val widgetAccentTarget  = tertiary.copy(alpha = if (isDark) 0.85f else 0.80f)
+
+    // Accent icon squares — pure primary / tertiary with alpha, no grey base at all.
+    val accentStrongTarget = primary.copy(alpha  = if (isDark) 0.85f else 0.80f)
+    val accentMidTarget    = primary.copy(alpha  = if (isDark) 0.45f else 0.40f)
+    val widgetAccentTarget = tertiary.copy(alpha = if (isDark) 0.85f else 0.80f)
 
     val spec = tween<Color>(durationMillis = 400)
     val wallpaperBg   by animateColorAsState(wallpaperBgTarget,  spec, "mock_bg")

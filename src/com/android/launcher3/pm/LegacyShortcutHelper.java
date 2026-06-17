@@ -1,11 +1,12 @@
 package com.android.launcher3.pm;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Process;
@@ -13,7 +14,6 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.icons.BitmapInfo;
@@ -24,31 +24,37 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
  * Restores legacy {@code ACTION_CREATE_SHORTCUT} result parsing that was removed from AOSP
  * Launcher3 in Android 14 (commit 84b48d8).
  *
- * <p>Before Android 8.0 (API 26 / Oreo), apps that implemented {@code ACTION_CREATE_SHORTCUT}
- * returned the shortcut data as plain {@code Intent.EXTRA_SHORTCUT_*} extras inside the result
- * {@code Intent}. Android 8.0 introduced {@link android.content.pm.ShortcutManager} and the
- * {@link android.content.pm.LauncherApps.PinItemRequest} API. AOSP Launcher3 dropped the old
- * parsing path on the assumption that every app that declares the shortcut-config activity now
- * targets API 26+. That assumption is wrong in practice: many widely-used apps still return the
- * legacy extras format regardless of their {@code targetSdkVersion}, including:
+ * <h3>Background</h3>
+ * <p>Before Android 8.0 (API 26 / Oreo), apps implementing {@code ACTION_CREATE_SHORTCUT}
+ * returned shortcut data as plain {@code Intent.EXTRA_SHORTCUT_*} extras in the activity result.
+ * Android 8.0 introduced {@link android.content.pm.ShortcutManager} and
+ * {@link android.content.pm.LauncherApps.PinItemRequest}. AOSP Launcher3 dropped the old parsing
+ * path, breaking many real-world apps that still return legacy extras regardless of their
+ * {@code targetSdkVersion}, including:
  * <ul>
  *   <li>Android Settings shortcut widgets</li>
  *   <li>Shortcut Maker</li>
  *   <li>Chrome "Add to home screen" deep links</li>
- *   <li>Any third-party shortcut-creator app not yet updated</li>
+ *   <li>Many third-party shortcut-creator apps</li>
  * </ul>
  *
- * <p>This helper re-implements the old parsing logic so that Lawnchair can accept both the modern
- * {@code PinItemRequest} path (handled by {@link PinRequestHelper}) and the legacy extras path.
+ * <h3>What this class does</h3>
+ * <p>Parses the old-style result {@code Intent} extras and builds a {@link WorkspaceItemInfo}
+ * that is safe to use throughout Lawnchair. In particular, it ensures that the stored
+ * {@code intent} always has either a {@link ComponentName} or a package name set, so that
+ * {@link com.android.launcher3.model.data.ItemInfo#getTargetComponent()} and
+ * {@link com.android.launcher3.model.data.ItemInfo#getTargetPackage()} never return {@code null}
+ * for our items. Returning {@code null} from those methods causes {@code NullPointerException}
+ * in {@link com.android.launcher3.util.ComponentKey}, {@link com.android.launcher3.util.PackageUserKey},
+ * and several {@link com.android.launcher3.popup.SystemShortcut} factories.
  *
  * <h3>Legacy Intent extras</h3>
  * <ul>
- *   <li>{@link Intent#EXTRA_SHORTCUT_NAME} — the display title (String)</li>
- *   <li>{@link Intent#EXTRA_SHORTCUT_INTENT} — the {@link Intent} to launch</li>
- *   <li>{@link Intent#EXTRA_SHORTCUT_ICON_RESOURCE} — a {@link Intent.ShortcutIconResource}
- *       pointing to a drawable resource inside the shortcut's package</li>
- *   <li>{@link Intent#EXTRA_SHORTCUT_ICON} — a raw {@link Bitmap} (used when the icon is
- *       dynamically generated rather than a static resource)</li>
+ *   <li>{@link Intent#EXTRA_SHORTCUT_NAME} — display title (required)</li>
+ *   <li>{@link Intent#EXTRA_SHORTCUT_INTENT} — the {@link Intent} to launch (required)</li>
+ *   <li>{@link Intent#EXTRA_SHORTCUT_ICON_RESOURCE} — drawable resource in the shortcut's
+ *       package (optional)</li>
+ *   <li>{@link Intent#EXTRA_SHORTCUT_ICON} — raw {@link Bitmap} (optional)</li>
  * </ul>
  */
 public final class LegacyShortcutHelper {
@@ -58,159 +64,181 @@ public final class LegacyShortcutHelper {
     private LegacyShortcutHelper() {}
 
     /**
-     * Attempts to build a {@link WorkspaceItemInfo} from the legacy
-     * {@code Intent.EXTRA_SHORTCUT_*} extras present in a result {@code Intent} returned by an
-     * {@code ACTION_CREATE_SHORTCUT} activity.
+     * Attempts to build a {@link WorkspaceItemInfo} from legacy {@code Intent.EXTRA_SHORTCUT_*}
+     * extras in a result {@code Intent} returned by an {@code ACTION_CREATE_SHORTCUT} activity.
      *
-     * <p>This method runs icon loading synchronously; callers must not invoke it on the main
-     * thread when performance is a concern. However, since it is only called from
-     * {@code Launcher.completeAddShortcut()} which already runs on the UI thread right after an
-     * {@code onActivityResult} callback, the icon bitmap loading is kept synchronous for
-     * simplicity — matching the behaviour of the old {@code InstallShortcutReceiver}.
+     * <p>Returns {@code null} if the required extras (title + launch intent) are absent, so the
+     * caller knows to treat the result as invalid.
      *
-     * @param context  An application or activity {@link Context}.
-     * @param data     The result {@link Intent} received in {@code onActivityResult}.
-     * @return A fully-populated {@link WorkspaceItemInfo}, or {@code null} if {@code data} does
-     *         not contain the required legacy extras (title + launch intent).
+     * <p>The returned item has {@code itemType} set to
+     * {@link LauncherSettings.Favorites#ITEM_TYPE_APPLICATION} and its {@code intent} is
+     * guaranteed to have either a {@link ComponentName} or a package name set, preventing
+     * downstream {@code NullPointerException}s in {@code ComponentKey} and friends.
+     *
+     * @param context application or activity context
+     * @param data    the result {@link Intent} from {@code onActivityResult}
+     * @return populated {@link WorkspaceItemInfo}, or {@code null} if data is unusable
      */
     @Nullable
     public static WorkspaceItemInfo createWorkspaceItemFromLegacyIntent(
             Context context, Intent data) {
 
-        // --- 1. Extract the mandatory extras ---
-
-        // The display title is required.
+        // ── 1. Mandatory: title ───────────────────────────────────────────────────────────────
         String title = data.getStringExtra(Intent.EXTRA_SHORTCUT_NAME);
         if (TextUtils.isEmpty(title)) {
-            Log.w(TAG, "Legacy shortcut result is missing EXTRA_SHORTCUT_NAME — ignoring.");
+            Log.w(TAG, "Legacy shortcut result missing EXTRA_SHORTCUT_NAME — ignored.");
             return null;
         }
 
-        // The launch intent is required.
+        // ── 2. Mandatory: launch intent ───────────────────────────────────────────────────────
         Intent launchIntent = data.getParcelableExtra(Intent.EXTRA_SHORTCUT_INTENT);
         if (launchIntent == null) {
-            Log.w(TAG, "Legacy shortcut result is missing EXTRA_SHORTCUT_INTENT — ignoring.");
+            Log.w(TAG, "Legacy shortcut result missing EXTRA_SHORTCUT_INTENT — ignored.");
             return null;
         }
 
-        // --- 2. Build the WorkspaceItemInfo ---
+        // ── 3. Ensure the launch intent has a package so downstream code never gets null ──────
+        //
+        // ItemInfo.getTargetComponent() → intent.getComponent() → may be null for generic intents
+        // ItemInfo.getTargetPackage()   → falls back to intent.getPackage() → also may be null
+        //
+        // Both ComponentKey and PackageUserKey call these methods without null checks and crash
+        // with NPE if they return null. We fix this by ensuring intent.getPackage() is set.
+        //
+        // Priority:
+        //   a) The intent already has a ComponentName  → getPackageName() from it
+        //   b) The intent already has a package string → keep it
+        //   c) Resolve the activity and use its package
+        //   d) No package discoverable            → log and bail, we cannot create a safe item
+        if (launchIntent.getComponent() != null) {
+            // (a) ComponentName present – getTargetComponent() will return it directly.
+            // Also make sure the package string matches so both paths return consistently.
+            if (launchIntent.getPackage() == null) {
+                launchIntent.setPackage(launchIntent.getComponent().getPackageName());
+            }
+        } else if (launchIntent.getPackage() == null) {
+            // (c) No component, no package – try resolving
+            android.content.pm.ResolveInfo ri = context.getPackageManager()
+                    .resolveActivity(launchIntent, 0);
+            if (ri != null && ri.activityInfo != null) {
+                String resolvedPackage = ri.activityInfo.packageName;
+                String resolvedClass   = ri.activityInfo.name;
+                launchIntent.setComponent(new ComponentName(resolvedPackage, resolvedClass));
+                launchIntent.setPackage(resolvedPackage);
+                Log.d(TAG, "Resolved legacy shortcut intent to " + resolvedPackage);
+            } else {
+                // (d) Unresolvable – cannot produce a safe item
+                Log.w(TAG, "Cannot resolve legacy shortcut intent " + launchIntent
+                        + " — getTargetPackage() would be null, aborting to prevent NPE.");
+                return null;
+            }
+        }
+        // At this point, launchIntent.getPackage() is guaranteed non-null.
 
+        // ── 4. Build the WorkspaceItemInfo ────────────────────────────────────────────────────
         WorkspaceItemInfo info = new WorkspaceItemInfo();
-        info.title = title;
-        info.intent = launchIntent;
-        // Legacy shortcuts are stored as ITEM_TYPE_APPLICATION so they survive DB migration
-        // (ITEM_TYPE_SHORTCUT = 1 is deprecated and stripped in onUpgrade case 31).
-        // We leave itemType at its default (ITEM_TYPE_APPLICATION = 0) which is set by the
-        // no-arg WorkspaceItemInfo() constructor.
-        info.itemType = LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
-        info.user = Process.myUserHandle();
+        info.title            = title;
         info.contentDescription = title;
+        info.intent           = launchIntent;
+        // ITEM_TYPE_APPLICATION is the correct type for legacy shortcuts after DB migration
+        // (ITEM_TYPE_SHORTCUT = 1 is deprecated and stripped in onUpgrade case 31).
+        // Using ITEM_TYPE_APPLICATION keeps ShortcutUtil.isApp() true so that
+        // ShortcutUtil.supportsShortcuts() works and the long-press popup is shown,
+        // but we must ensure getTargetComponent() is non-null (done above).
+        info.itemType         = LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
+        info.user             = Process.myUserHandle();
 
-        // --- 3. Load the icon ---
-
-        BitmapInfo iconBitmapInfo = loadLegacyIcon(context, data);
-        info.bitmap = iconBitmapInfo;
+        // ── 5. Load icon ──────────────────────────────────────────────────────────────────────
+        info.bitmap = loadLegacyIcon(context, data);
 
         Log.d(TAG, "Created legacy WorkspaceItemInfo: title=\"" + title
-                + "\", intent=" + launchIntent.toUri(0));
+                + "\", pkg=" + launchIntent.getPackage()
+                + ", component=" + launchIntent.getComponent());
         return info;
     }
 
+    // ── Icon loading ──────────────────────────────────────────────────────────────────────────
+
     /**
-     * Loads the icon for a legacy shortcut by trying, in order:
+     * Loads the icon by trying, in order:
      * <ol>
-     *   <li>A raw {@link Bitmap} from {@link Intent#EXTRA_SHORTCUT_ICON}</li>
-     *   <li>A {@link Intent.ShortcutIconResource} from
-     *       {@link Intent#EXTRA_SHORTCUT_ICON_RESOURCE}</li>
-     *   <li>{@link BitmapInfo#LOW_RES_INFO} as a final fallback (icon will be loaded later)</li>
+     *   <li>Raw {@link Bitmap} from {@link Intent#EXTRA_SHORTCUT_ICON}</li>
+     *   <li>{@link Intent.ShortcutIconResource} from {@link Intent#EXTRA_SHORTCUT_ICON_RESOURCE}</li>
+     *   <li>{@link BitmapInfo#LOW_RES_INFO} as a final fallback</li>
      * </ol>
-     *
-     * <p>The returned {@link BitmapInfo} is created via {@link LauncherIcons} so that it goes
-     * through the same badging / sizing pipeline as every other icon in the launcher.
      */
-    @Nullable
     private static BitmapInfo loadLegacyIcon(Context context, Intent data) {
-        // --- 3a. Try raw Bitmap first ---
+        // a) Raw Bitmap
         Bitmap rawBitmap = data.getParcelableExtra(Intent.EXTRA_SHORTCUT_ICON);
         if (rawBitmap != null) {
-            return bitmapToBitmapInfo(context, rawBitmap);
+            return createBitmapInfo(context, rawBitmap);
         }
 
-        // --- 3b. Try ShortcutIconResource ---
+        // b) ShortcutIconResource
         Intent.ShortcutIconResource iconResource =
                 data.getParcelableExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE);
         if (iconResource != null) {
             Bitmap resourceBitmap = loadBitmapFromResource(context, iconResource);
             if (resourceBitmap != null) {
-                return bitmapToBitmapInfo(context, resourceBitmap);
+                return createBitmapInfo(context, resourceBitmap);
             }
         }
 
-        // --- 3c. Fallback: LOW_RES placeholder ---
+        // c) Fallback
         Log.w(TAG, "Legacy shortcut has no usable icon — using LOW_RES_INFO placeholder.");
         return BitmapInfo.LOW_RES_INFO;
     }
 
     /**
-     * Converts a raw {@link Bitmap} into a properly-badged {@link BitmapInfo} using the
-     * launcher's own {@link LauncherIcons} factory.
+     * Passes a {@link Bitmap} through the launcher's own {@link LauncherIcons} factory so it
+     * is properly sized, badged, and wrapped in a {@link BitmapInfo}.
      */
-    private static BitmapInfo bitmapToBitmapInfo(Context context, Bitmap bitmap) {
+    private static BitmapInfo createBitmapInfo(Context context, Bitmap bitmap) {
         try (LauncherIcons li = LauncherIcons.obtain(context)) {
             return li.createIconBitmap(bitmap);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to create BitmapInfo from legacy shortcut bitmap", e);
+            Log.e(TAG, "Failed to create BitmapInfo from legacy shortcut Bitmap", e);
             return BitmapInfo.LOW_RES_INFO;
         }
     }
 
     /**
      * Loads a {@link Bitmap} from a {@link Intent.ShortcutIconResource} by resolving the
-     * package resources and decoding the drawable at the given resource ID.
-     *
-     * <p>Returns {@code null} on any error (package not found, resource ID invalid, etc.).
+     * package resources and decoding the drawable.  Returns {@code null} on any error.
      */
     @Nullable
     private static Bitmap loadBitmapFromResource(
             Context context, Intent.ShortcutIconResource iconResource) {
         try {
-            PackageManager pm = context.getPackageManager();
-            Resources packageResources = pm.getResourcesForApplication(iconResource.packageName);
-            int resId = packageResources.getIdentifier(
-                    iconResource.resourceName, null, null);
+            Resources pkgRes = context.getPackageManager()
+                    .getResourcesForApplication(iconResource.packageName);
+            int resId = pkgRes.getIdentifier(iconResource.resourceName, null, null);
             if (resId == 0) {
-                Log.w(TAG, "Could not find resource: " + iconResource.resourceName
+                Log.w(TAG, "Resource not found: " + iconResource.resourceName
                         + " in " + iconResource.packageName);
                 return null;
             }
-            Drawable drawable = packageResources.getDrawableForDensity(
-                    resId,
-                    context.getResources().getDisplayMetrics().densityDpi,
-                    null /* theme */);
-            if (drawable instanceof BitmapDrawable) {
-                return ((BitmapDrawable) drawable).getBitmap();
+            int densityDpi = context.getResources().getDisplayMetrics().densityDpi;
+            Drawable d = pkgRes.getDrawableForDensity(resId, densityDpi, null);
+            if (d == null) return null;
+            if (d instanceof BitmapDrawable) {
+                return ((BitmapDrawable) d).getBitmap();
             }
-            // For non-bitmap drawables, render them to a Bitmap
-            if (drawable != null) {
-                int size = Math.max(drawable.getIntrinsicWidth(), 1);
-                android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(
-                        size, Math.max(drawable.getIntrinsicHeight(), 1),
-                        android.graphics.Bitmap.Config.ARGB_8888);
-                android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-                drawable.setBounds(0, 0, size, Math.max(drawable.getIntrinsicHeight(), 1));
-                drawable.draw(canvas);
-                return bmp;
-            }
-            return null;
+            // Render vector / adaptive drawables to a Bitmap
+            int w = Math.max(d.getIntrinsicWidth(),  1);
+            int h = Math.max(d.getIntrinsicHeight(), 1);
+            Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            d.setBounds(0, 0, w, h);
+            d.draw(canvas);
+            return bmp;
         } catch (PackageManager.NameNotFoundException e) {
-            Log.w(TAG, "Package not found for legacy shortcut icon: " + iconResource.packageName);
-            return null;
+            Log.w(TAG, "Package not found for icon: " + iconResource.packageName);
         } catch (Resources.NotFoundException e) {
-            Log.w(TAG, "Resource not found for legacy shortcut icon: " + iconResource.resourceName);
-            return null;
+            Log.w(TAG, "Resource not found for icon: " + iconResource.resourceName);
         } catch (Exception e) {
-            Log.e(TAG, "Unexpected error loading legacy shortcut icon resource", e);
-            return null;
+            Log.e(TAG, "Unexpected error loading legacy shortcut icon", e);
         }
+        return null;
     }
 }

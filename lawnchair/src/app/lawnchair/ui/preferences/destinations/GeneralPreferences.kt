@@ -107,7 +107,7 @@ fun GeneralPreferences() {
         // ── Theme ─────────────────────────────────────────────────────────────
         ThemePreference()
 
-        // ── Rotation ──────────────────────────────────────────────────────────
+        // ── Rotation & Haptic feedback ────────────────────────────────────────
         PreferenceGroup {
             Item {
                 SwitchPreference(
@@ -116,10 +116,6 @@ fun GeneralPreferences() {
                     description = stringResource(id = R.string.home_screen_rotation_description),
                 )
             }
-        }
-
-        // ── Haptic feedback ───────────────────────────────────────────────────
-        PreferenceGroup {
             Item {
                 SwitchPreference(
                     adapter = prefs2.hapticFeedback.getAdapter(),
@@ -128,7 +124,6 @@ fun GeneralPreferences() {
                 )
             }
         }
-
         // ── Auto-updater (nightly builds only) ────────────────────────────────
         if (BuildConfig.APPLICATION_ID.contains("nightly")) {
             PreferenceGroup(heading = stringResource(id = R.string.updater)) {

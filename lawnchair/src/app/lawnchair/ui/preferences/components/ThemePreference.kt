@@ -129,34 +129,47 @@ private fun ThemePreviewMockup(currentTheme: String) {
         else -> isSystemDark
     }
 
-    // Pull the current accent from the live theme so every surface is tinted
-    // from the same hue the user has chosen.
-    val primary = MaterialTheme.colorScheme.primary
+    // Pull the current accents from the live theme so every surface is tinted
+    // from the same palette the user has chosen.
+    val primary   = MaterialTheme.colorScheme.primary
+    val tertiary  = MaterialTheme.colorScheme.tertiary
+    // The settings screen's own background — we derive the phone wallpaper from
+    // this so the relationship is always relative, never hardcoded.
+    val schemeBg  = MaterialTheme.colorScheme.background
 
-    // All colour targets are derived by lerp-ing from pure black/white toward
-    // the primary accent, so the whole mockup reads as one coherent tinted palette.
-    // Dark targets: deep near-black bases pulled slightly toward primary.
-    // Light targets: near-white bases pushed slightly toward primary.
-    val wallpaperBgTarget = if (isDark) lerp(Color(0xFF080810), primary, 0.07f)
-                            else        lerp(Color(0xFFF4F4FF), primary, 0.05f)
+    // Phone wallpaper: start from the real settings background, then push it
+    // noticeably away so the phone stands out — darker in dark mode, lighter in
+    // light mode — while staying in the same tinted family.
+    val wallpaperBgTarget = if (isDark)
+        lerp(lerp(schemeBg, Color.Black, 0.35f), primary, 0.06f)   // pull toward black
+    else
+        lerp(lerp(schemeBg, Color.White, 0.55f), primary, 0.04f)   // push toward white
+
+    // App/shortcut card surfaces — primary-tinted as before
     val cardColorTarget   = if (isDark) lerp(Color(0xFF16161F), primary, 0.13f)
                             else        lerp(Color(0xFFFFFFFF), primary, 0.04f)
+    // Widget card surface — tertiary (accent3) tinted so it reads as a different zone
+    val widgetCardTarget  = if (isDark) lerp(Color(0xFF16161F), tertiary, 0.18f)
+                            else        lerp(Color(0xFFFFFFFF), tertiary, 0.06f)
     val subtleColorTarget = if (isDark) lerp(Color(0xFF26263A), primary, 0.18f)
                             else        lerp(Color(0xFFE2E2F0), primary, 0.12f)
     // Border: thin tinted ring — more visible in dark, softer in light
     val borderColorTarget = if (isDark) primary.copy(alpha = 0.28f)
                             else        primary.copy(alpha = 0.18f)
-    // Widget accent stripe and icon dots scale from primary directly
-    val accentStrongTarget = primary.copy(alpha = if (isDark) 0.85f else 0.80f)
-    val accentMidTarget    = primary.copy(alpha = if (isDark) 0.50f else 0.45f)
+    // Widget accent stripe uses tertiary; icon dots/dock use primary
+    val accentStrongTarget  = primary.copy(alpha = if (isDark) 0.85f else 0.80f)
+    val accentMidTarget     = primary.copy(alpha = if (isDark) 0.50f else 0.45f)
+    val widgetAccentTarget  = tertiary.copy(alpha = if (isDark) 0.85f else 0.80f)
 
     val spec = tween<Color>(durationMillis = 400)
-    val wallpaperBg  by animateColorAsState(wallpaperBgTarget,  spec, "mock_bg")
-    val cardColor    by animateColorAsState(cardColorTarget,    spec, "mock_card")
-    val subtleColor  by animateColorAsState(subtleColorTarget,  spec, "mock_subtle")
-    val borderColor  by animateColorAsState(borderColorTarget,  spec, "mock_border")
-    val accentStrong by animateColorAsState(accentStrongTarget, spec, "mock_acc_strong")
-    val accentMid    by animateColorAsState(accentMidTarget,    spec, "mock_acc_mid")
+    val wallpaperBg   by animateColorAsState(wallpaperBgTarget,  spec, "mock_bg")
+    val cardColor     by animateColorAsState(cardColorTarget,    spec, "mock_card")
+    val widgetCard    by animateColorAsState(widgetCardTarget,   spec, "mock_widget_card")
+    val subtleColor   by animateColorAsState(subtleColorTarget,  spec, "mock_subtle")
+    val borderColor   by animateColorAsState(borderColorTarget,  spec, "mock_border")
+    val accentStrong  by animateColorAsState(accentStrongTarget, spec, "mock_acc_strong")
+    val accentMid     by animateColorAsState(accentMidTarget,    spec, "mock_acc_mid")
+    val widgetAccent  by animateColorAsState(widgetAccentTarget, spec, "mock_widget_acc")
 
     val phoneShape = RoundedCornerShape(32.dp)
 
@@ -210,12 +223,14 @@ private fun ThemePreviewMockup(currentTheme: String) {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // ── Large widget card ────────────────────────────────────────
+                // Uses tertiary (accent3) so it reads as a visually distinct zone
+                // from the primary-tinted shortcut cards and dock below it.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(92.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(cardColor),
+                        .background(widgetCard),
                 ) {
                     Column(
                         modifier = Modifier
@@ -223,13 +238,13 @@ private fun ThemePreviewMockup(currentTheme: String) {
                             .fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
-                        // Accent stripe — strong primary tint
+                        // Accent stripe — tertiary tint to match the card zone
                         Box(
                             modifier = Modifier
                                 .width(48.dp)
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(2.5.dp))
-                                .background(accentStrong),
+                                .background(widgetAccent),
                         )
                         // Body text placeholders — subtle tint
                         Box(

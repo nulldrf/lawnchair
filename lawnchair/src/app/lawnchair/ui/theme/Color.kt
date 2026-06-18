@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2

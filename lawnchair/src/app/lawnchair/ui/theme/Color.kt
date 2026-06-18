@@ -7,7 +7,10 @@ import android.view.ContextThemeWrapper
 import androidx.annotation.ColorInt
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.core.graphics.ColorUtils
+import app.lawnchair.preferences2.asState
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.UiColorMode
 import app.lawnchair.theme.color.tokens.ColorTokens
 import com.android.launcher3.R
@@ -60,7 +63,17 @@ fun Context.getSystemAccent(darkTheme: Boolean): Int {
 }
 
 @Composable
-fun preferenceGroupColor() = (if (isSelectedThemeDark) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceBright)
+fun preferenceGroupColor(): androidx.compose.ui.graphics.Color {
+    val colorSpec by preferenceManager2().colorSpec.asState()
+    return when {
+        isSelectedThemeDark -> MaterialTheme.colorScheme.surfaceContainer
+        // In SPEC_2025 light mode, surfaceBright == surface == background == tone 98.
+        // Use surfaceContainerHigh (tone 92) so cards are visually distinct.
+        colorSpec == com.android.systemui.monet.SpecVersion.SPEC_2025 ->
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.surfaceBright
+    }
+}
 
 @Composable
 fun dividerColor() = MaterialTheme.colorScheme.outlineVariant

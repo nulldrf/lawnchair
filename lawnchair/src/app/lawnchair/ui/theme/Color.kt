@@ -6,6 +6,7 @@ import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import androidx.annotation.ColorInt
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.core.graphics.ColorUtils
@@ -66,11 +67,11 @@ fun Context.getSystemAccent(darkTheme: Boolean): Int {
 fun preferenceGroupColor(): androidx.compose.ui.graphics.Color {
     val colorSpec by preferenceManager2().colorSpec.asState()
     return when {
-        isSelectedThemeDark -> MaterialTheme.colorScheme.surfaceContainer
-        // In SPEC_2025 light mode, surfaceBright == surface == background == tone 98.
-        // Use surfaceContainerHigh (tone 92) so cards are visually distinct.
+        // SPEC_2025: surface == background == surfaceBright == tone 98.
         colorSpec == com.android.systemui.monet.SpecVersion.SPEC_2025 ->
-            MaterialTheme.colorScheme.surfaceContainerHigh
+            MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        // SPEC_2021: keep existing behaviour unchanged.
+        isSelectedThemeDark -> MaterialTheme.colorScheme.surfaceContainer
         else -> MaterialTheme.colorScheme.surfaceBright
     }
 }

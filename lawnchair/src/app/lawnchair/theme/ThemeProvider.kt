@@ -263,8 +263,21 @@ class ThemeProvider @Inject constructor(
             else -> getLegacyColorScheme(ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
         }
 
-    private fun resolveColorScheme2025(accentColor: ColorOption, isDark: Boolean): MonetColorSchemeCompat2025? =
-        when (accentColor) {
+    private fun resolveColorScheme2025(accentColor: ColorOption, isDark: Boolean): MonetColorSchemeCompat2025? {
+        // These Style values have no SPEC_2025 implementation — DynamicScheme's own
+        // maybeFallbackSpecVersion forces them to SPEC_2021 tone logic internally,
+        // but they'd still run through the materialkolor HCT engine instead of the
+        // original CAM16 ColorScheme.kt engine, producing colors that don't match
+        // the rest of the SPEC_2021 UI. Returning null here routes them through
+        // resolveColorScheme (the legacy kdrag0n path) instead, exactly like
+        // SystemAccent and LegacyKdrag already do.
+        val styleHasNo2025Variant = when (colorStyle.style) {
+            Style.RAINBOW, Style.FRUIT_SALAD, Style.CONTENT, Style.MONOCHROMATIC -> true
+            else -> false
+        }
+        if (styleHasNo2025Variant) return null
+
+        return when (accentColor) {
             // SystemAccent always uses the system palette — no 2025 override.
             is ColorOption.SystemAccent -> null
 
@@ -292,6 +305,7 @@ class ThemeProvider @Inject constructor(
 
             else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, colorStyle, isDark)
         }
+    }
 
     private val systemColorScheme: ColorScheme
         get() = if (Utilities.ATLEAST_S) {

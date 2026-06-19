@@ -357,7 +357,6 @@ fun PreferencesDashboard(
         e(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted experimental", route = ExperimentalFeatures)
         e(stringResource(R.string.font_picker_label), "font customization typography typeface heading body weight", ScrollKeys.FONT_PICKER, route = ExperimentalFeatures)
         e(stringResource(R.string.show_deck_layout), "deck layout drawerless no app drawer all apps home", ScrollKeys.DECK_LAYOUT, route = ExperimentalFeatures)
-        e(stringResource(R.string.icon_swipe_gestures), "icon swipe left right gesture shortcut", ScrollKeys.ICON_SWIPE, route = ExperimentalFeatures)
         e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation", ScrollKeys.GNC, route = ExperimentalFeatures)
         e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace", ScrollKeys.MAX_GRID_SIZE, route = ExperimentalFeatures)
         e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack", ScrollKeys.ALWAYS_RELOAD_ICONS, route = ExperimentalFeatures)

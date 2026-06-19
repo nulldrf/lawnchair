@@ -1109,12 +1109,17 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // mBottomSheetHandleArea.getHeight() returns 0 there. setInsets() is called
         // after the view tree is measured, so this is the earliest safe place to read
         // the real handle area height and push it into the adapter top padding.
-        // In phone/non-sheet mode mBottomSheetHandleArea is GONE and returns height 0,
-        // so this is a safe no-op there.
+        // However, mBottomSheetHandleArea's parent (bottom_sheet_background) is marked
+        // visibility="gone" in the layout, so getHeight() always returns 0 regardless
+        // of timing. Use the dimen directly instead — it is the fixed pixel height of
+        // the handle area and is always correct.
+        // In phone/non-sheet mode shouldShowAllAppsOnSheet() is false so we skip this,
+        // keeping the adapter padding at 0 as before.
         boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
                 pref2.getHideAppDrawerSearchBar());
-        if (hideHeader) {
-            int handleHeight = mBottomSheetHandleArea.getHeight();
+        if (hideHeader && mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
+            int handleHeight = getResources().getDimensionPixelSize(
+                    R.dimen.bottom_sheet_handle_area_height);
             mAH.forEach(adapterHolder -> {
                 adapterHolder.mPadding.top = handleHeight;
                 adapterHolder.applyPadding();

@@ -683,10 +683,18 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // room for. mHeader.getMaxTranslation() would otherwise still fall back to
         // R.dimen.all_apps_search_bar_bottom_padding (the gap meant to sit *under*
         // a visible search bar), which is exactly the leftover blank space at the
-        // top of the drawer that was reported. Force this padding to 0 in that
-        // case so the app grid / search results sit flush right under the existing
-        // top inset (i.e. right under the drag handle) instead of leaving a gap.
-        int padding = hideHeader ? 0 : mHeader.getMaxTranslation();
+        // top of the drawer that was reported.
+        //
+        // LC-Note (fix for icon clipping behind drag handle / tab pill when header
+        // is hidden): setting padding to a flat 0 pushed icons under the drag
+        // handle area and (when work tabs are present) under the tab pill, because
+        // nothing else was reserving space for those views. Use the handle area's
+        // measured height as the minimum top padding so icons always start below
+        // the handle. In phone/non-sheet mode mBottomSheetHandleArea has height 0
+        // (the view is GONE), so this is a safe no-op there.
+        int padding = hideHeader
+                ? mBottomSheetHandleArea.getHeight()
+                : mHeader.getMaxTranslation();
         mAH.forEach(adapterHolder -> {
             adapterHolder.mPadding.top = padding;
             adapterHolder.applyPadding();
@@ -1128,7 +1136,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         } else {
             getSearchRecyclerView().setVisibility(GONE);
             getAppsRecyclerViewContainer().setVisibility(VISIBLE);
-            mHeader.setVisibility(VISIBLE);
+            // LC-Note (fix for tab-pill re-appearing after search when header is
+            // hidden): the original code unconditionally restored mHeader to VISIBLE
+            // here, overriding the View.GONE that setupHeader() applied when
+            // hideAppDrawerSearchBar is on. That caused the tab pill to reappear
+            // on top of the icon grid with no top padding to clear it (icon
+            // clipping bug in image 3). Guard the restore with the same pref.
+            boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
+                    pref2.getHideAppDrawerSearchBar());
+            mHeader.setVisibility(hideHeader ? GONE : VISIBLE);
         }
         if (mHeader.isSetUp()) mHeader.setActiveRV(getCurrentPage());
     }

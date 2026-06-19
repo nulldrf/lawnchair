@@ -97,15 +97,6 @@ fun ExperimentalFeaturesPreferences(
                 }
             }
             Item {
-                ScrollAnchor(ScrollKeys.ICON_SWIPE, scrollState) {
-                SwitchPreference(
-                    adapter = prefs2.iconSwipeGestures.getAdapter(),
-                    label = stringResource(R.string.icon_swipe_gestures),
-                    description = stringResource(R.string.icon_swipe_gestures_description),
-                )
-                }
-            }
-            Item {
                 ScrollAnchor(ScrollKeys.DECK_LAYOUT, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.showDeckLayout.getAdapter(),

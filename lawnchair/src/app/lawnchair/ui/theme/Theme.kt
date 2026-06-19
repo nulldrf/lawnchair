@@ -103,11 +103,27 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
 
     val isSystemAccent = accentColor == ColorOption.SystemAccent
 
-    // SPEC_2025 path — uses MonetColorSchemeCompat2025 directly, no kdrag0n.
-    // isDark is passed because DynamicScheme bakes it into palette generation.
-    // SystemAccent always falls through to the legacy path (colorScheme2025
-    // returns null for SystemAccent because the system generates its own palette).
-    if (colorSpec == SpecVersion.SPEC_2025 && !isSystemAccent) {
+    // Styles with no SPEC_2025 implementation. DynamicScheme's own
+    // maybeFallbackSpecVersion forces these to SPEC_2021 tone logic internally,
+    // but routing them through the materialkolor HCT engine would still produce
+    // colors that don't match the rest of the SPEC_2021 UI (different engine,
+    // different rounding). They must use the legacy CAM16 ColorScheme.kt engine
+    // instead, exactly as if the user had picked SPEC_2021 themselves.
+    val styleHasNo2025Variant = colorStyle.style in setOf(
+        com.android.systemui.monet.Style.RAINBOW,
+        com.android.systemui.monet.Style.FRUIT_SALAD,
+        com.android.systemui.monet.Style.CONTENT,
+        com.android.systemui.monet.Style.MONOCHROMATIC,
+    )
+
+    // Three-way routing:
+    //   1. User picked SPEC_2021                         → legacy engine
+    //   2. User picked SPEC_2025 + a 2025-capable style   → materialkolor engine
+    //   3. User picked SPEC_2025 + a non-2025-capable style → legacy engine
+    //      (silently behaves as if SPEC_2021 were selected, for this style only)
+    val useSpec2025 = colorSpec == SpecVersion.SPEC_2025 && !isSystemAccent && !styleHasNo2025Variant
+
+    if (useSpec2025) {
         val scheme2025 = remember(accentColor, colorStyle, colorSpec, darkTheme) {
             ThemeProvider.INSTANCE.get(context).colorScheme2025(isDark = darkTheme)
         }
@@ -116,7 +132,8 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
         }
     }
 
-    // SPEC_2021 / LegacyKdrag / SystemAccent path — uses kdrag0n ColorScheme.
+    // Legacy path: SPEC_2021, SystemAccent, LegacyKdrag, or a style with no
+    // SPEC_2025 implementation. Uses the kdrag0n ColorScheme engine.
     val colorScheme = remember(accentColor, colorStyle, if (isSystemAccent) null else colorSpec) {
         ThemeProvider.INSTANCE.get(context).colorScheme
     }

@@ -683,18 +683,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // room for. mHeader.getMaxTranslation() would otherwise still fall back to
         // R.dimen.all_apps_search_bar_bottom_padding (the gap meant to sit *under*
         // a visible search bar), which is exactly the leftover blank space at the
-        // top of the drawer that was reported.
+        // top of the drawer that was reported. Force this padding to 0 in that
+        // case so the app grid / search results sit flush right under the existing
+        // top inset (i.e. right under the drag handle) instead of leaving a gap.
         //
-        // LC-Note (fix for icon clipping behind drag handle / tab pill when header
-        // is hidden): setting padding to a flat 0 pushed icons under the drag
-        // handle area and (when work tabs are present) under the tab pill, because
-        // nothing else was reserving space for those views. Use the handle area's
-        // measured height as the minimum top padding so icons always start below
-        // the handle. In phone/non-sheet mode mBottomSheetHandleArea has height 0
-        // (the view is GONE), so this is a safe no-op there.
-        int padding = hideHeader
-                ? mBottomSheetHandleArea.getHeight()
-                : mHeader.getMaxTranslation();
+        // LC-Note: when hideHeader=true we intentionally leave padding=0 here.
+        // The handle-area clearance is applied later in setInsets(), which runs
+        // after the view tree has been measured and mBottomSheetHandleArea.getHeight()
+        // returns the real pixel value. Doing it here would always read 0 because
+        // setupHeader() is called from onFinishInflate(), before layout/measure.
+        int padding = hideHeader ? 0 : mHeader.getMaxTranslation();
         mAH.forEach(adapterHolder -> {
             adapterHolder.mPadding.top = padding;
             adapterHolder.applyPadding();
@@ -1104,6 +1102,24 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             setPadding(grid.allAppsLeftRightMargin, topPadding, grid.allAppsLeftRightMargin, 0);
         }
         InsettableFrameLayout.dispatchInsets(this, insets);
+
+        // LC-Note (fix for icon clipping behind drag handle when hideAppDrawerSearchBar
+        // is on): setupHeader() sets adapterHolder.mPadding.top = 0 when the header is
+        // hidden, but it runs from onFinishInflate() before layout/measure so
+        // mBottomSheetHandleArea.getHeight() returns 0 there. setInsets() is called
+        // after the view tree is measured, so this is the earliest safe place to read
+        // the real handle area height and push it into the adapter top padding.
+        // In phone/non-sheet mode mBottomSheetHandleArea is GONE and returns height 0,
+        // so this is a safe no-op there.
+        boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
+                pref2.getHideAppDrawerSearchBar());
+        if (hideHeader) {
+            int handleHeight = mBottomSheetHandleArea.getHeight();
+            mAH.forEach(adapterHolder -> {
+                adapterHolder.mPadding.top = handleHeight;
+                adapterHolder.applyPadding();
+            });
+        }
     }
 
     protected int computeNavBarScrimHeight(WindowInsets insets) { return 0; }

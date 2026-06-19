@@ -6,13 +6,8 @@ import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import androidx.annotation.ColorInt
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
-import app.lawnchair.preferences2.asState
-import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.UiColorMode
 import app.lawnchair.theme.color.tokens.ColorTokens
 import com.android.launcher3.R
@@ -66,14 +61,21 @@ fun Context.getSystemAccent(darkTheme: Boolean): Int {
 
 @Composable
 fun preferenceGroupColor(): androidx.compose.ui.graphics.Color {
-    val colorSpec by preferenceManager2().colorSpec.asState()
-    return when {
-        // SPEC_2025: surface == background == surfaceBright == tone 98.
-        colorSpec == com.android.systemui.monet.SpecVersion.SPEC_2025 ->
-            MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
-        // SPEC_2021: keep existing behaviour unchanged.
-        isSelectedThemeDark -> MaterialTheme.colorScheme.surfaceContainer
-        else -> MaterialTheme.colorScheme.surfaceBright
+    // surfaceColorAtElevation always blends surfaceTint (= primary/accent hue) over
+    // surface, regardless of style. For styles with neutral surfaces by design
+    // (Rainbow, Monochromatic, Content with a low-chroma seed) this incorrectly
+    // introduces an accent tint into cards that should stay grey. Reading the
+    // surface-family roles directly avoids this — they stay within the neutral
+    // palette (n1/n2), which is already correctly neutral or tinted per style.
+    //
+    // surfaceBright is not used in light mode because SPEC_2025's Tonal Spot/
+    // Vibrant/Expressive/Spritz styles collapse surfaceBright == surface == tone 98,
+    // making cards invisible. surfaceContainerLowest (tone 100, still pure n1) stays
+    // visually distinct from the tone-98 background in every style and spec.
+    return if (isSelectedThemeDark) {
+        MaterialTheme.colorScheme.surfaceContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLowest
     }
 }
 

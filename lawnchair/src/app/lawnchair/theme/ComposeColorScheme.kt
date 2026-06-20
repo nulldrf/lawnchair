@@ -10,6 +10,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.core.math.MathUtils
 import app.lawnchair.theme.color.MonetColorSchemeCompat2025
+import com.materialkolor.contrast.Contrast
+import com.materialkolor.hct.Hct
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -141,7 +143,54 @@ fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): C
         }
     }
 
-// ── SPEC 2025 ─────────────────────────────────────────────────────────────────
+// ── SPEC 2025 contrast safety net ────────────────────────────────────────────
+
+/**
+ * Minimum acceptable contrast ratio between a role color and its "on" counterpart
+ * (e.g. primary/onPrimary). WCAG AA for UI components is typically 3.0; using 4.5
+ * (AA for normal text) since these icon-on-thumb and text-on-fill pairings need to
+ * read clearly at a glance, not just pass a minimum bar.
+ */
+private const val MIN_ON_COLOR_CONTRAST = 4.5
+
+/**
+ * Guards against a real but narrow materialkolor/HCT edge case: [ContrastCurve]
+ * guarantees a minimum *tone* distance between a role and its "on" counterpart
+ * (e.g. 60 tone steps between primary=80 and onPrimary=20 in dark mode), but for
+ * certain hue/chroma combinations — observed specifically with Vibrant and
+ * Expressive in dark mode — high chroma on both colors can make that tone gap
+ * perceptually collapse, even though the formula technically succeeded.
+ *
+ * This is purely a lightness (tone) adjustment — [onArgb]'s hue and chroma are
+ * preserved exactly via [Hct.from], only [Hct.tone] is nudged using
+ * [Contrast.lighterUnsafe]/[Contrast.darkerUnsafe] until the WCAG ratio against
+ * [baseArgb] clears [MIN_ON_COLOR_CONTRAST]. If the existing pairing already has
+ * enough contrast (the overwhelming majority of seeds/styles), [onArgb] is
+ * returned completely untouched — this never alters colors that were already fine.
+ */
+private fun ensureOnColorContrast(baseArgb: Int, onArgb: Int): Color {
+    val baseHct = Hct.fromInt(baseArgb)
+    val onHct = Hct.fromInt(onArgb)
+
+    val currentRatio = Contrast.ratioOfTones(baseHct.tone, onHct.tone)
+    if (currentRatio >= MIN_ON_COLOR_CONTRAST) {
+        return Color(onArgb)
+    }
+
+    // onArgb is lighter than baseArgb (e.g. onPrimary=20 vs primary=80 in dark mode
+    // would actually have onArgb DARKER — handle both directions by trying whichever
+    // direction increases separation from baseHct.tone).
+    val isOnLighter = onHct.tone >= baseHct.tone
+    val adjustedTone = if (isOnLighter) {
+        Contrast.lighterUnsafe(baseHct.tone, MIN_ON_COLOR_CONTRAST)
+    } else {
+        Contrast.darkerUnsafe(baseHct.tone, MIN_ON_COLOR_CONTRAST)
+    }
+
+    val fixed = Hct.from(onHct.hue, onHct.chroma, adjustedTone)
+    return Color(fixed.toInt())
+}
+
 
 /**
  * Converts a [MonetColorSchemeCompat2025] to a Compose [ColorScheme].
@@ -170,26 +219,26 @@ fun MonetColorSchemeCompat2025.toComposeColorScheme2025(isDark: Boolean): ColorS
         if (isDark) {
             darkColorScheme(
                 primary                  = Color(s.primary),
-                onPrimary                = Color(s.onPrimary),
+                onPrimary                = ensureOnColorContrast(s.primary, s.onPrimary),
                 primaryContainer         = Color(s.primaryContainer),
-                onPrimaryContainer       = Color(s.onPrimaryContainer),
+                onPrimaryContainer       = ensureOnColorContrast(s.primaryContainer, s.onPrimaryContainer),
                 inversePrimary           = Color(s.inversePrimary),
                 secondary                = Color(s.secondary),
-                onSecondary              = Color(s.onSecondary),
+                onSecondary              = ensureOnColorContrast(s.secondary, s.onSecondary),
                 secondaryContainer       = Color(s.secondaryContainer),
-                onSecondaryContainer     = Color(s.onSecondaryContainer),
+                onSecondaryContainer     = ensureOnColorContrast(s.secondaryContainer, s.onSecondaryContainer),
                 tertiary                 = Color(s.tertiary),
-                onTertiary               = Color(s.onTertiary),
+                onTertiary               = ensureOnColorContrast(s.tertiary, s.onTertiary),
                 tertiaryContainer        = Color(s.tertiaryContainer),
-                onTertiaryContainer      = Color(s.onTertiaryContainer),
+                onTertiaryContainer      = ensureOnColorContrast(s.tertiaryContainer, s.onTertiaryContainer),
                 background               = Color(s.background),
-                onBackground             = Color(s.onBackground),
+                onBackground             = ensureOnColorContrast(s.background, s.onBackground),
                 surface                  = Color(s.surface),
-                onSurface                = Color(s.onSurface),
+                onSurface                = ensureOnColorContrast(s.surface, s.onSurface),
                 surfaceVariant           = Color(s.surfaceVariant),
-                onSurfaceVariant         = Color(s.onSurfaceVariant),
+                onSurfaceVariant         = ensureOnColorContrast(s.surfaceVariant, s.onSurfaceVariant),
                 inverseSurface           = Color(s.inverseSurface),
-                inverseOnSurface         = Color(s.inverseOnSurface),
+                inverseOnSurface         = ensureOnColorContrast(s.inverseSurface, s.inverseOnSurface),
                 outline                  = Color(s.outline),
                 outlineVariant           = Color(s.outlineVariant),
                 scrim                    = Color(s.scrim),
@@ -202,33 +251,33 @@ fun MonetColorSchemeCompat2025.toComposeColorScheme2025(isDark: Boolean): ColorS
                 surfaceContainerLowest   = Color(s.surfaceContainerLowest),
                 surfaceTint              = Color(s.surfaceTint),
                 error                    = Color(s.error),
-                onError                  = Color(s.onError),
+                onError                  = ensureOnColorContrast(s.error, s.onError),
                 errorContainer           = Color(s.errorContainer),
-                onErrorContainer         = Color(s.onErrorContainer),
+                onErrorContainer         = ensureOnColorContrast(s.errorContainer, s.onErrorContainer),
             )
         } else {
             lightColorScheme(
                 primary                  = Color(s.primary),
-                onPrimary                = Color(s.onPrimary),
+                onPrimary                = ensureOnColorContrast(s.primary, s.onPrimary),
                 primaryContainer         = Color(s.primaryContainer),
-                onPrimaryContainer       = Color(s.onPrimaryContainer),
+                onPrimaryContainer       = ensureOnColorContrast(s.primaryContainer, s.onPrimaryContainer),
                 inversePrimary           = Color(s.inversePrimary),
                 secondary                = Color(s.secondary),
-                onSecondary              = Color(s.onSecondary),
+                onSecondary              = ensureOnColorContrast(s.secondary, s.onSecondary),
                 secondaryContainer       = Color(s.secondaryContainer),
-                onSecondaryContainer     = Color(s.onSecondaryContainer),
+                onSecondaryContainer     = ensureOnColorContrast(s.secondaryContainer, s.onSecondaryContainer),
                 tertiary                 = Color(s.tertiary),
-                onTertiary               = Color(s.onTertiary),
+                onTertiary               = ensureOnColorContrast(s.tertiary, s.onTertiary),
                 tertiaryContainer        = Color(s.tertiaryContainer),
-                onTertiaryContainer      = Color(s.onTertiaryContainer),
+                onTertiaryContainer      = ensureOnColorContrast(s.tertiaryContainer, s.onTertiaryContainer),
                 background               = Color(s.background),
-                onBackground             = Color(s.onBackground),
+                onBackground             = ensureOnColorContrast(s.background, s.onBackground),
                 surface                  = Color(s.surface),
-                onSurface                = Color(s.onSurface),
+                onSurface                = ensureOnColorContrast(s.surface, s.onSurface),
                 surfaceVariant           = Color(s.surfaceVariant),
-                onSurfaceVariant         = Color(s.onSurfaceVariant),
+                onSurfaceVariant         = ensureOnColorContrast(s.surfaceVariant, s.onSurfaceVariant),
                 inverseSurface           = Color(s.inverseSurface),
-                inverseOnSurface         = Color(s.inverseOnSurface),
+                inverseOnSurface         = ensureOnColorContrast(s.inverseSurface, s.inverseOnSurface),
                 outline                  = Color(s.outline),
                 outlineVariant           = Color(s.outlineVariant),
                 scrim                    = Color(s.scrim),
@@ -241,9 +290,9 @@ fun MonetColorSchemeCompat2025.toComposeColorScheme2025(isDark: Boolean): ColorS
                 surfaceContainerLowest   = Color(s.surfaceContainerLowest),
                 surfaceTint              = Color(s.surfaceTint),
                 error                    = Color(s.error),
-                onError                  = Color(s.onError),
+                onError                  = ensureOnColorContrast(s.error, s.onError),
                 errorContainer           = Color(s.errorContainer),
-                onErrorContainer         = Color(s.onErrorContainer),
+                onErrorContainer         = ensureOnColorContrast(s.errorContainer, s.onErrorContainer),
             )
         }
     }

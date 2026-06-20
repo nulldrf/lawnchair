@@ -108,6 +108,12 @@ fun AppDrawerPreferences(
                 }
             }
             Item { SearchBarPreference(SearchRoute.DRAWER_SEARCH, showLabel = false) }
+            Item {
+                SwitchPreference(
+                    label = stringResource(id = R.string.pref_app_drawer_search_bar_at_bottom),
+                    adapter = prefs2.appDrawerSearchBarAtBottom.getAdapter(),
+                )
+            }
             SuggestionsPreference()
             AppDrawerHapticFeedbackPreference()
         }

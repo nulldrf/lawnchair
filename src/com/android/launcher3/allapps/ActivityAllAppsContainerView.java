@@ -706,6 +706,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         } else {
             layoutBelowSearchContainer(mHeader, false);
         }
+        layoutSearchContainer();
     }
 
     public void forceUpdateHeaderHeight(int offset) {
@@ -855,6 +856,21 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
+
+        // LC-Note (search-bar-at-bottom): when the search bar is pinned to the
+        // bottom of the drawer, content (RV containers, header) should fill from
+        // the parent's top instead of being anchored below the search container,
+        // since the search container is no longer at the top at all. The bottom
+        // padding needed to clear the now-bottom-pinned search bar is handled
+        // separately in applyAdapterSideAndBottomPaddings(), not here.
+        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+                pref2.getAppDrawerSearchBarAtBottom());
+        if (searchBarAtBottom) {
+            lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            lp.topMargin = 0;
+            return;
+        }
+
         lp.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
 
         boolean hideSearchBar =
@@ -893,6 +909,30 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 ? getContext().getResources().getDimensionPixelSize(
                         R.dimen.all_apps_header_pill_height)
                 : 0;
+    }
+
+    /**
+     * LC-Note (search-bar-at-bottom): pins mSearchContainer to the bottom of this
+     * RelativeLayout instead of leaving it at its implicit default top position.
+     * Bottom margin clears the system nav bar inset so the bar isn't obscured.
+     * Only applies when the search bar is not floating (floating search bar
+     * already manages its own bottom-anchored position via the DragLayer /
+     * mSearchUiDelegate, independent of this preference).
+     */
+    private void layoutSearchContainer() {
+        if (!(mSearchContainer.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
+        RelativeLayout.LayoutParams lp = (LayoutParams) mSearchContainer.getLayoutParams();
+        lp.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
+        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+                pref2.getAppDrawerSearchBarAtBottom());
+        if (searchBarAtBottom && !isSearchBarFloating()) {
+            lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            lp.bottomMargin = mInsets.bottom;
+        } else {
+            lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            lp.bottomMargin = 0;
+        }
+        mSearchContainer.setLayoutParams(lp);
     }
 
     /**
@@ -1102,6 +1142,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             setPadding(grid.allAppsLeftRightMargin, topPadding, grid.allAppsLeftRightMargin, 0);
         }
         InsettableFrameLayout.dispatchInsets(this, insets);
+        layoutSearchContainer();
 
         // LC-Note (fix for icon clipping behind drag handle when hideAppDrawerSearchBar
         // is on): setupHeader() sets adapterHolder.mPadding.top = 0 when the header is
@@ -1172,8 +1213,24 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     private void applyAdapterSideAndBottomPaddings(DeviceProfile grid) {
         int bottomPadding = Math.max(mInsets.bottom, mNavBarScrimHeight);
+
+        // LC-Note (search-bar-at-bottom): when the search bar is pinned to the
+        // bottom of the drawer (non-floating), reserve extra bottom padding equal
+        // to its height so the last row of icons doesn't render behind it. The
+        // floating search bar already does the analogous thing for itself via
+        // AdapterHolder.applyPadding()'s own isSearchBarFloating() check, so this
+        // only applies to the non-floating bottom-pin case to avoid double-adding.
+        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+                pref2.getAppDrawerSearchBarAtBottom());
+        if (searchBarAtBottom && !isSearchBarFloating()) {
+            bottomPadding += mSearchContainer.getHeight();
+        }
+
+        // Lambdas below require an effectively-final capture; bottomPadding was
+        // reassigned above via +=, so it no longer qualifies. Copy into a final.
+        final int finalBottomPadding = bottomPadding;
         mAH.forEach(adapterHolder -> {
-            adapterHolder.mPadding.bottom = bottomPadding;
+            adapterHolder.mPadding.bottom = finalBottomPadding;
             adapterHolder.mPadding.left = grid.allAppsPadding.left;
             adapterHolder.mPadding.right = grid.allAppsPadding.right;
             adapterHolder.applyPadding();

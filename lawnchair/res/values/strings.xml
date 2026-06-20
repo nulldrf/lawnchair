@@ -931,6 +931,8 @@
 	
 	<string name="drawer_icon_text_color">Text color</string>
     <string name="drawer_icon_text_color_description">Color applied to app icon labels in the app drawer</string>
+	
+	<string name="pref_app_drawer_search_bar_at_bottom">Search bar at bottom</string>
 
     <string name="app_drawer_columns">App drawer columns</string>
     <string name="row_height_label">Row height</string>

@@ -425,6 +425,17 @@ class PreferenceManager2 @Inject constructor(
         onSet = { reloadHelper.recreate() },
     )
 
+    // LC-Note: pins the app drawer search bar to the bottom of the drawer instead
+    // of the top. Independent of hideAppDrawerSearchBar (the two can be combined,
+    // though if the bar is hidden this has no visible effect). Uses recreate(),
+    // matching hideAppDrawerSearchBar, since this changes the RelativeLayout
+    // structure of ActivityAllAppsContainerView, not just a visual toggle.
+    val appDrawerSearchBarAtBottom = preference(
+        key = booleanPreferencesKey(name = "app_drawer_search_bar_at_bottom"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
     val appDrawerHapticFeedback = preference(
         key = booleanPreferencesKey(name = "app_drawer_haptic_feedback"),
         defaultValue = context.resources.getBoolean(R.bool.config_default_app_drawer_haptic_feedback),

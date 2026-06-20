@@ -4,11 +4,8 @@ import android.app.WallpaperManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -26,10 +24,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.asState
@@ -50,6 +51,8 @@ import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayoutLazyColumn
 import com.android.launcher3.R
+import com.android.systemui.monet.SpecVersion
+import com.android.systemui.monet.Style
 import dev.kdrag0n.colorkt.Color as KdragColor
 import dev.kdrag0n.monet.theme.ColorScheme as KdragColorScheme
 import dev.kdrag0n.monet.theme.toComposeColor
@@ -60,25 +63,13 @@ fun ColorStyleScreen(
 ) {
     val context = LocalContext.current
     val prefs2 = preferenceManager2()
-    val adapter = prefs2.colorStyle.getAdapter()
-    val currentStyle = adapter.state.value
-    // Use the luminance of Lawnchair's own resolved theme background rather than
-    // isSystemInDarkTheme() — the system and Lawnchair theme settings can differ
-    // (e.g. system=dark but Lawnchair settings forced to light, or vice versa).
-    // MaterialTheme.colorScheme is already resolved by Lawnchair's theme engine,
-    // so luminance < 0.5 reliably means Lawnchair is currently rendering dark.
+    val styleAdapter = prefs2.colorStyle.getAdapter()
+
+    val currentStyle = styleAdapter.state.value
+    val currentSpec = prefs2.colorSpec.asState().value
+
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-    // Derive the raw seed from the accent source before any Monet engine
-    // processes it, so previews stay stable when the user switches styles.
-    //
-    // · CustomColor      → use the stored ARGB int directly.
-    // · WallpaperPrimary → extract the raw colour from WallpaperManager.
-    // · Anything else    → fall back to the current MaterialTheme primary.
-    //
-    // accentColorValue is the remember key so the seed only re-derives when
-    // the accent SOURCE changes, not when the style changes.
-    // fallbackSeed must be read outside the lambda (composable restriction).
     val accentColorValue = prefs2.accentColor.asState().value
     val fallbackSeed = MaterialTheme.colorScheme.primary.toArgb()
     val rawWallpaperSeed: Int = remember(accentColorValue) {
@@ -90,6 +81,7 @@ fun ColorStyleScreen(
                     ?.primaryColor
                     ?.toArgb()
                     ?: fallbackSeed
+            is ColorOption.WallpaperDerived -> accentColorValue.color
             else -> fallbackSeed
         }
     }
@@ -98,13 +90,13 @@ fun ColorStyleScreen(
         ColorStyle.values().filter { it !is LegacyKdrag || showLegacyKdrag }
     }
 
-    // Pre-build all preview palettes in one block so card composition is cheap.
-    val allPreviewColors = remember(rawWallpaperSeed, isDark, showLegacyKdrag) {
+    val allPreviewColors = remember(rawWallpaperSeed, isDark, showLegacyKdrag, currentSpec) {
         styles.associateWith { style ->
             buildStylePreviewColors(
                 style = style,
                 rawWallpaperSeed = rawWallpaperSeed,
                 isDark = isDark,
+                specVersion = currentSpec,
             )
         }
     }
@@ -117,11 +109,17 @@ fun ColorStyleScreen(
             items = styles,
             key = { it.toString() },
         ) { style ->
+            // Show the current spec as a badge on styles that support both specs
+            // (Spritz, TonalSpot, Vibrant, Expressive). Others always use 2021.
+            val specBadgeStyles = setOf(Style.SPRITZ, Style.TONAL_SPOT, Style.VIBRANT, Style.EXPRESSIVE)
+            val showSpecBadge = specBadgeStyles.contains(style.style)
+
             ColorStyleCard(
                 style = style,
                 isSelected = style == currentStyle,
                 previewColors = allPreviewColors.getValue(style),
-                onClick = { adapter.onChange(style) },
+                onClick = { styleAdapter.onChange(style) },
+                specBadge = if (showSpecBadge) currentSpec else null,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
@@ -139,19 +137,16 @@ private fun ColorStyleCard(
     previewColors: StylePreviewColors,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    specBadge: SpecVersion? = null,
 ) {
     val cardShape = MaterialTheme.shapes.extraLarge
 
-    // Card surface comes from this style's OWN neutral palette, not the active
-    // theme — so Monochromatic looks gray, Vibrant looks more colourful, etc.
     val backgroundColor = if (isSelected) {
-        // Tint the card's own surface toward its primary colour.
         lerp(previewColors.cardBackground, previewColors.primary, 0.18f)
     } else {
         previewColors.cardBackground
     }
 
-    // Border also uses the style's own primary when selected.
     val borderColor = if (isSelected) previewColors.primary else previewColors.outlineVariant
     val borderWidth = if (isSelected) 2.dp else 1.dp
 
@@ -179,11 +174,35 @@ private fun ColorStyleCard(
                 verticalArrangement = Arrangement.spacedBy(3.dp),
                 modifier = Modifier.weight(1f),
             ) {
-                Text(
-                    text = stringResource(id = style.nameResourceId),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = previewColors.onCardBackground,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = stringResource(id = style.nameResourceId),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = previewColors.onCardBackground,
+                    )
+                    // Spec badge — shows the currently active spec version
+                    if (specBadge != null) {
+                        val badgeLabel = when (specBadge) {
+                            SpecVersion.SPEC_2025 -> "2025"
+                            else -> "2021"
+                        }
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = previewColors.primary.copy(alpha = 0.18f),
+                        ) {
+                            Text(
+                                text = badgeLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = previewColors.onCardBackground.copy(alpha = 0.75f),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
                 Text(
                     text = stringResource(id = style.descriptionResourceId),
                     style = MaterialTheme.typography.bodySmall,
@@ -213,26 +232,9 @@ private fun ColorStyleCard(
 }
 
 // ---------------------------------------------------------------------------
-//  Style preview icon
+//  Style preview icon — three-arc circle in a rounded rect
 // ---------------------------------------------------------------------------
 
-/**
- * Rounded-rectangle container holding a circle split into three arcs:
- *
- * ```
- *  ╭────────────────────╮
- *  │  ╭──────────────╮  │  container  = neutral1 mid-dark tone
- *  │  │▓▓▓▓▓▓▓▓▓▓▓▓▓│  │  upper half = accent1  (primary)
- *  │  │░░░░░░│▒▒▒▒▒▒│  │  lower-left = accent3  (tertiary / hue-shifted)
- *  │  ╰──────────────╯  │  lower-right= accent2  (secondary)
- *  ╰────────────────────╯
- * ```
- *
- * Compose Canvas angles (clockwise from 3 o'clock):
- *   upper half   → startAngle=180, sweep=180  (left→top→right)
- *   lower-left   → startAngle=90,  sweep=90   (bottom→left)   ← accent3/tertiary
- *   lower-right  → startAngle=0,   sweep=90   (right→bottom)  ← accent2/secondary
- */
 @Composable
 private fun StylePreviewIcon(
     colors: StylePreviewColors,
@@ -243,8 +245,6 @@ private fun StylePreviewIcon(
         modifier = modifier.clip(RoundedCornerShape(14.dp)),
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Round-rect background (filled by the clip above, drawn explicitly
-            // here so the container colour is the style's own neutral).
             drawRect(color = colors.container)
 
             val diameter = size.minDimension * 0.78f
@@ -254,35 +254,12 @@ private fun StylePreviewIcon(
             val arcTopLeft = Offset(cx - radius, cy - radius)
             val arcSize = Size(diameter, diameter)
 
-            // Upper half — accent1 (primary)
-            drawArc(
-                color = colors.primary,
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = true,
-                topLeft = arcTopLeft,
-                size = arcSize,
-            )
-
-            // Lower-left quarter — accent3 (tertiary, hue-shifted colour)
-            drawArc(
-                color = colors.tertiary,
-                startAngle = 90f,
-                sweepAngle = 90f,
-                useCenter = true,
-                topLeft = arcTopLeft,
-                size = arcSize,
-            )
-
-            // Lower-right quarter — accent2 (secondary)
-            drawArc(
-                color = colors.secondary,
-                startAngle = 0f,
-                sweepAngle = 90f,
-                useCenter = true,
-                topLeft = arcTopLeft,
-                size = arcSize,
-            )
+            drawArc(color = colors.primary, startAngle = 180f, sweepAngle = 180f,
+                useCenter = true, topLeft = arcTopLeft, size = arcSize)
+            drawArc(color = colors.tertiary, startAngle = 90f, sweepAngle = 90f,
+                useCenter = true, topLeft = arcTopLeft, size = arcSize)
+            drawArc(color = colors.secondary, startAngle = 0f, sweepAngle = 90f,
+                useCenter = true, topLeft = arcTopLeft, size = arcSize)
         }
     }
 }
@@ -292,45 +269,26 @@ private fun StylePreviewIcon(
 // ---------------------------------------------------------------------------
 
 private data class StylePreviewColors(
-    val primary: Color,          // accent1 — upper arc
-    val secondary: Color,        // accent2 — lower-right arc
-    val tertiary: Color,         // accent3 — lower-left arc  (hue-shifted)
-    val container: Color,        // neutral1 mid-dark — icon round-rect background
-    val cardBackground: Color,   // neutral1 very light/dark — card surface
-    val onCardBackground: Color, // neutral1 contrasting — text colour
-    val outlineVariant: Color,   // neutral2 mid — unselected border
+    val primary: Color,
+    val secondary: Color,
+    val tertiary: Color,
+    val container: Color,
+    val cardBackground: Color,
+    val onCardBackground: Color,
+    val outlineVariant: Color,
 )
 
-/**
- * Builds [StylePreviewColors] for [style] using the appropriate Monet engine.
- *
- * - [LegacyKdrag] → [KdragMonetColorScheme] fed with [rawWallpaperSeed] (the
- *   colour extracted directly from the wallpaper bitmap, before any AOSP monet
- *   processing). Feeding the AOSP-transformed primary into ZCAM produces
- *   tonal-spot-like results, which is why the circle was wrong at runtime.
- *
- * - All other styles → [MonetColorSchemeCompat] wrapping the AOSP engine.
- *
- * Both engines expose swatches as `Map<Int, dev.kdrag0n.colorkt.Color>` with
- * the same tone keys (0, 10, 50, 100, 200 … 1000).  [toComposeColor] converts
- * any kdrag0n colour to a Compose [Color] via [toAndroidColor].
- *
- * Tone key guide (higher key = darker):
- *   100 = very light   800 = medium-dark
- *   200 = light        900 = dark
- *   500 = saturated mid
- */
 private fun buildStylePreviewColors(
     style: ColorStyle,
     rawWallpaperSeed: Int,
     isDark: Boolean,
+    specVersion: SpecVersion = SpecVersion.SPEC_2021,
 ): StylePreviewColors {
     val scheme: KdragColorScheme = when (style) {
         is LegacyKdrag -> KdragMonetColorScheme(rawWallpaperSeed)
-        else -> MonetColorSchemeCompat(rawWallpaperSeed, style.style)
+        else -> MonetColorSchemeCompat(rawWallpaperSeed, style.style, specVersion)
     }
 
-    // Tone keys for light/dark theme variants.
     val containerKey = if (isDark) 700 else 100
     val cardBgKey = if (isDark) 900 else 50
     val onCardKey = if (isDark) 100 else 900
@@ -347,16 +305,5 @@ private fun buildStylePreviewColors(
     )
 }
 
-// ---------------------------------------------------------------------------
-//  Colour conversion helper
-// ---------------------------------------------------------------------------
-
-/**
- * Looks up [key] in this kdrag0n ColorSwatch and converts the result to a
- * Compose [Color] via [toComposeColor] (which calls through [toAndroidColor]).
- *
- * Falls back to [Color.Gray] if the key is absent — this should never happen
- * with a well-formed palette.
- */
 private fun Map<Int, KdragColor>.composeColor(key: Int): Color =
     this[key]?.toComposeColor() ?: Color.Gray

@@ -102,6 +102,10 @@ class ThemeProvider @Inject constructor(
                     is ColorOption.WallpaperDerived -> {
                         val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
                             ?: return
+                        // Clear 2025 cache so the new seed is always computed fresh —
+                        // avoids stale MonetColorSchemeCompat2025 being served if the
+                        // cache was hit before freshWallpaperPrimary was read.
+                        colorSchemeMap2025.clear()
                         freshWallpaperPrimary = newPrimary
                         notifyColorSchemeChanged()
                         if (newPrimary != current.wallpaperPrimary) {
@@ -123,6 +127,9 @@ class ThemeProvider @Inject constructor(
         preferenceManager2.accentColor.onEach(launchIn = coroutineScope) {
             accentColor = it
             freshWallpaperPrimary = null
+            // Clear 2025 cache so the next colorScheme2025() call always uses
+            // the newly committed accent color rather than a cached stale entry.
+            colorSchemeMap2025.clear()
             notifyColorSchemeChanged()
         }
         preferenceManager2.colorStyle.onEach(launchIn = coroutineScope) {
@@ -150,6 +157,7 @@ class ThemeProvider @Inject constructor(
                         ) {
                             val newPrimary = colors?.primaryColor?.toArgb()
                             if (newPrimary != null) {
+                                colorSchemeMap2025.clear()
                                 freshWallpaperPrimary = newPrimary
                                 notifyColorSchemeChanged()
                                 if (newPrimary != current.wallpaperPrimary) {

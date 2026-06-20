@@ -58,6 +58,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.RelativeLayout;
@@ -334,6 +335,37 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         updateBackgroundVisibility(mActivityContext.getDeviceProfile());
         mSearchUiManager.initializeSearch(this);
 
+        // LC-Note (search-bar-at-bottom): the slide-up animation was previously
+        // only triggered from animateToSearchState(true), which itself is only
+        // called from setSearchResults() once results actually exist/change
+        // (see setSearchResults() below). That meant tapping the (empty) search
+        // bar to focus it had no visual effect — the bar stayed at the bottom
+        // until the first keystroke produced results. Use a global focus-change
+        // listener instead, since it fires the instant the EditText gains/loses
+        // focus, regardless of whether there's any text/results yet. This is
+        // additive via addOnGlobalFocusChangeListener (not
+        // setOnFocusChangeListener), so it does not clobber whatever focus
+        // handling the EditText itself or AllAppsSearchInput already do
+        // internally for IME show/hide.
+        View searchEditText = mSearchUiManager.getEditText();
+        if (searchEditText != null) {
+            searchEditText.getViewTreeObserver().addOnGlobalFocusChangeListener(
+                    (oldFocus, newFocus) -> {
+                        if (newFocus == searchEditText) {
+                            animateSearchContainerForSearchState(
+                                    true, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
+                        } else if (oldFocus == searchEditText && !isSearching()) {
+                            // Only slide back down here if we're not actually in
+                            // the search results state — in that case dismissal
+                            // is already handled by animateToSearchState(false,
+                            // ...) via the existing exit-search flow (back press /
+                            // clear button), which already works correctly.
+                            animateSearchContainerForSearchState(
+                                    false, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
+                        }
+                    });
+        }
+
         // Kick off the async HokoBlur bitmap computation.
         applyDrawerHokoBlur();
     }
@@ -452,7 +484,20 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // Slide up so the bar's bottom edge lands at this container's own
             // top padding (the same resting position a top-anchored search bar
             // would occupy), i.e. translate by (top padding - current top).
-            int targetTop = getPaddingTop();
+            //
+            // LC-Note: AppsSearchContainerLayout.onLayout() unconditionally
+            // calls offsetTopAndBottom(mContentOverlap) on every layout pass
+            // (see all_apps_search_bar_content_overlap, 24dp) — this is how the
+            // top-anchored bar overlaps down into the header/RV content by
+            // design. mSearchContainer IS the AppsSearchContainerLayout (it
+            // extends ExtendedEditText directly, there's no separate wrapper),
+            // so that same self-shift already happened to its laid-out getTop()
+            // here too. Without adding it back, targetTop landed
+            // mContentOverlap px too high versus the true top-mode resting
+            // position, which only ever existed with that offset baked in.
+            int contentOverlap = getResources().getDimensionPixelSize(
+                    R.dimen.all_apps_search_bar_content_overlap);
+            int targetTop = getPaddingTop() + contentOverlap;
             float targetTranslationY = targetTop - mSearchContainer.getTop();
             mSearchContainer.animate()
                     .translationY(targetTranslationY)
@@ -970,6 +1015,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // Math.max(mInsets.bottom, mNavBarScrimHeight) as the real bottom
             // clearance value; match that same pattern here for consistency.
             lp.bottomMargin = Math.max(mInsets.bottom, mNavBarScrimHeight);
+            // LC-Note: AppsSearchContainerLayout.setInsets() (its own Insettable
+            // implementation, called earlier via InsettableFrameLayout
+            // .dispatchInsets() in our setInsets()) unconditionally sets
+            // topMargin = insets.top on this same view, for the top-anchored
+            // case. That topMargin is meaningless once this view is
+            // bottom-anchored, but left as-is it can still pollute getTop()'s
+            // resolved value, so zero it here.
+            lp.topMargin = 0;
         } else {
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;

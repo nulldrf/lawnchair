@@ -1023,6 +1023,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // bottom-anchored, but left as-is it can still pollute getTop()'s
             // resolved value, so zero it here.
             lp.topMargin = 0;
+            // TEMP-DEBUG (remove after diagnosing search-bar-at-bottom clipping):
+            post(() -> android.util.Log.d("LCSearchBarDebug",
+                    "layoutSearchContainer: this(RelativeLayout root).getHeight()=" + getHeight()
+                    + " mSearchContainer.getTop()=" + mSearchContainer.getTop()
+                    + " mSearchContainer.getHeight()=" + mSearchContainer.getHeight()
+                    + " bottomMargin=" + lp.bottomMargin
+                    + " mInsets.bottom=" + mInsets.bottom
+                    + " mNavBarScrimHeight=" + mNavBarScrimHeight
+                    + " screenHeightPx=" + getResources().getDisplayMetrics().heightPixels));
         } else {
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;

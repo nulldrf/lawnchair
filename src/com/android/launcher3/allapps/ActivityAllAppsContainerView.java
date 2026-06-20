@@ -1001,20 +1001,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
      * mSearchUiDelegate, independent of this preference).
      */
     private void layoutSearchContainer() {
-        if (!(mSearchContainer.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
-            android.util.Log.d("LCSearchBarDebug", "layoutSearchContainer: bailed, "
-                    + "layoutParams is not RelativeLayout.LayoutParams ("
-                    + mSearchContainer.getLayoutParams().getClass().getSimpleName() + ")");
-            return;
-        }
+        if (!(mSearchContainer.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) mSearchContainer.getLayoutParams();
         lp.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
-        boolean floating = isSearchBarFloating();
-        android.util.Log.d("LCSearchBarDebug", "layoutSearchContainer: searchBarAtBottom="
-                + searchBarAtBottom + " isSearchBarFloating=" + floating
-                + " mInsets.bottom=" + mInsets.bottom + " mNavBarScrimHeight=" + mNavBarScrimHeight);
         if (searchBarAtBottom && !isSearchBarFloating()) {
             lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             // LC-Note: mInsets.bottom alone was insufficient to clear the system
@@ -1024,8 +1015,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // Math.max(mInsets.bottom, mNavBarScrimHeight) as the real bottom
             // clearance value; match that same pattern here for consistency.
             lp.bottomMargin = Math.max(mInsets.bottom, mNavBarScrimHeight);
-            android.util.Log.d("LCSearchBarDebug", "layoutSearchContainer: applying "
-                    + "ALIGN_PARENT_BOTTOM, bottomMargin=" + lp.bottomMargin);
             // LC-Note: AppsSearchContainerLayout.setInsets() (its own Insettable
             // implementation, called earlier via InsettableFrameLayout
             // .dispatchInsets() in our setInsets()) unconditionally sets
@@ -1281,13 +1270,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     @Override
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         mNavBarScrimHeight = computeNavBarScrimHeight(insets);
-        // TEMP-DEBUG (remove after diagnosing search-bar-at-bottom clipping):
-        android.util.Log.d("LCSearchBarDebug", "dispatchApplyWindowInsets fired. "
-                + "mNavBarScrimHeight=" + mNavBarScrimHeight
-                + " mInsets.bottom=" + mInsets.bottom
-                + " stableInsetBottom=" + insets.getStableInsetBottom()
-                + " tappableBottom=" + (Utilities.ATLEAST_Q
-                        ? insets.getTappableElementInsets().bottom : -1));
         applyAdapterSideAndBottomPaddings(mActivityContext.getDeviceProfile());
         // LC-Note (search-bar-at-bottom): mNavBarScrimHeight is only known to be
         // fresh as of the line above. layoutSearchContainer()'s bottom margin

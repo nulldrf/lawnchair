@@ -111,8 +111,10 @@ fun ColorStyleScreen(
         ) { style ->
             // Show the current spec as a badge on styles that support both specs
             // (Spritz, TonalSpot, Vibrant, Expressive). Others always use 2021.
+            // LegacyKdrag uses TonalSpot as a placeholder style value — exclude it
+            // from spec badges since it uses its own ZCAM engine regardless of spec.
             val specBadgeStyles = setOf(Style.SPRITZ, Style.TONAL_SPOT, Style.VIBRANT, Style.EXPRESSIVE)
-            val showSpecBadge = specBadgeStyles.contains(style.style)
+            val showSpecBadge = specBadgeStyles.contains(style.style) && style !is LegacyKdrag
 
             ColorStyleCard(
                 style = style,

@@ -410,6 +410,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mAllAppsTransitionController.animateAllAppsToNoScale();
             mFastScroller.setVisibility(showFastScroller ? VISIBLE : INVISIBLE);
         }
+        animateSearchContainerForSearchState(goingToSearch, durationMs);
         mSearchTransitionController.animateToState(goingToSearch, durationMs, () -> {
             mIsSearching = goingToSearch;
             updateSearchResultsVisibility();
@@ -428,6 +429,41 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 onActivePageChanged(previousPage);
             }
         });
+    }
+
+    /**
+     * LC-Note (search-bar-at-bottom): when the search bar is pinned to the
+     * bottom of the drawer, tapping it to enter search should slide it up to
+     * the top of the drawer, and dismissing search should slide it back down
+     * to the bottom — independent of SearchTransitionController, which only
+     * animates the A-Z grid/header content, never mSearchContainer's own
+     * position. No-op (translationY stays 0) when the preference is off, when
+     * the search bar is floating (it already manages its own position), or
+     * before the view has been laid out (getTop()==0 && getBottom()==0).
+     */
+    private void animateSearchContainerForSearchState(boolean goingToSearch, long durationMs) {
+        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+                pref2.getAppDrawerSearchBarAtBottom());
+        if (!searchBarAtBottom || isSearchBarFloating()) return;
+        if (mSearchContainer.getHeight() == 0) return;
+
+        mSearchContainer.animate().cancel();
+        if (goingToSearch) {
+            // Slide up so the bar's bottom edge lands at this container's own
+            // top padding (the same resting position a top-anchored search bar
+            // would occupy), i.e. translate by (top padding - current top).
+            int targetTop = getPaddingTop();
+            float targetTranslationY = targetTop - mSearchContainer.getTop();
+            mSearchContainer.animate()
+                    .translationY(targetTranslationY)
+                    .setDuration(durationMs)
+                    .start();
+        } else {
+            mSearchContainer.animate()
+                    .translationY(0f)
+                    .setDuration(durationMs)
+                    .start();
+        }
     }
 
     public boolean shouldContainerScroll(MotionEvent ev) {
@@ -927,7 +963,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom && !isSearchBarFloating()) {
             lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-            lp.bottomMargin = mInsets.bottom;
+            // LC-Note: mInsets.bottom alone was insufficient to clear the system
+            // nav bar on some configs (it read 0 / too small in this context),
+            // leaving the bar mostly cut off below the visible screen. The rest
+            // of this file (see applyAdapterSideAndBottomPaddings()) uses
+            // Math.max(mInsets.bottom, mNavBarScrimHeight) as the real bottom
+            // clearance value; match that same pattern here for consistency.
+            lp.bottomMargin = Math.max(mInsets.bottom, mNavBarScrimHeight);
         } else {
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;
@@ -1176,6 +1218,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         mNavBarScrimHeight = computeNavBarScrimHeight(insets);
         applyAdapterSideAndBottomPaddings(mActivityContext.getDeviceProfile());
+        // LC-Note (search-bar-at-bottom): mNavBarScrimHeight is only known to be
+        // fresh as of the line above. layoutSearchContainer()'s bottom margin
+        // depends on it (see its own Math.max(mInsets.bottom, mNavBarScrimHeight)
+        // comment), so recompute the search bar's position here too, not just in
+        // setInsets()/setupHeader(), or it can end up using a stale (too small)
+        // value from before this callback fired.
+        layoutSearchContainer();
         return super.dispatchApplyWindowInsets(insets);
     }
 

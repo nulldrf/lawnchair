@@ -12,10 +12,13 @@ import android.view.View.MeasureSpec.makeMeasureSpec
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.viewpager.widget.ViewPager
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.smartspace.model.SmartspaceTarget
 import app.lawnchair.smartspace.provider.SmartspaceProvider
+import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.util.repeatOnAttached
 import com.android.launcher3.R
+import com.android.launcher3.util.Themes
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -27,6 +30,7 @@ class BcSmartspaceView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs) {
 
     private val provider = SmartspaceProvider.INSTANCE.get(context)
+    private val prefs = PreferenceManager2.getInstance(context)
 
     private lateinit var viewPager: ViewPager
     private lateinit var indicator: PageIndicator
@@ -56,9 +60,9 @@ class BcSmartspaceView @JvmOverloads constructor(
             override fun onPageScrollStateChanged(state: Int) {
                 scrollState = state
                 if (state == 0) {
-                    pendingTargets?.let {
+                    pendingTargets?.let { targets ->
                         pendingTargets = null
-                        onSmartspaceTargetsUpdate(it)
+                        onSmartspaceTargetsUpdate(targets)
                     }
                 }
             }
@@ -67,6 +71,30 @@ class BcSmartspaceView @JvmOverloads constructor(
         val targets = if (previewMode) provider.previewTargets else provider.targets
         repeatOnAttached {
             viewPager.adapter = adapter
+
+            // Follow the user's custom workspace icon text color preference, falling back
+            // to the existing theme-derived workspaceTextColor when set to Default.
+            // This mirrors the same logic BubbleTextView uses for home screen icon labels,
+            // so smartspace text stays consistent with the rest of the workspace.
+            prefs.workspaceIconTextColor.get()
+                .onEach { colorOption ->
+                    // Mirrors LawnchairUtils.resolveColorOrNull(): Default means
+                    // "use the existing theme-derived colour"; otherwise resolve
+                    // the explicit ARGB int via colorPreferenceEntry.lightColor.
+                    val explicitColor = if (colorOption != ColorOption.Default) {
+                        colorOption.colorPreferenceEntry.lightColor(context)
+                            .takeIf { it != 0 }
+                    } else {
+                        null
+                    }
+                    val resolvedColor = explicitColor
+                        ?: Themes.getAttrColor(context, R.attr.workspaceTextColor)
+                            .takeIf { it != 0 }
+                        ?: android.graphics.Color.WHITE
+                    adapter.updateTextColor(resolvedColor)
+                }
+                .launchIn(this)
+
             targets
                 .onEach(::onSmartspaceTargetsUpdate)
                 .launchIn(this)

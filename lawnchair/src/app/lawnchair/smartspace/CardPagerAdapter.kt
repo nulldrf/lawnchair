@@ -1,6 +1,7 @@
 package app.lawnchair.smartspace
 
 import android.content.Context
+import android.graphics.Color
 import android.util.SparseArray
 import android.view.LayoutInflater
 import android.view.View
@@ -12,7 +13,12 @@ import com.android.launcher3.util.Themes
 
 class CardPagerAdapter(context: Context) : PagerAdapter() {
 
-    private val currentTextColor = Themes.getAttrColor(context, R.attr.workspaceTextColor)
+    // Computed once at construction as a fallback. May be overridden reactively
+    // via updateTextColor() when the user picks a custom workspaceIconTextColor.
+    // Falls back to white when workspaceTextColor resolves to 0 (e.g. widget host context).
+    private var currentTextColor = Themes.getAttrColor(context, R.attr.workspaceTextColor)
+        .takeIf { it != 0 } ?: Color.WHITE
+
     private val targets = mutableListOf<SmartspaceTarget>()
     private var smartspaceTargets = targets
     private val holders = SparseArray<ViewHolder>()
@@ -21,6 +27,19 @@ class CardPagerAdapter(context: Context) : PagerAdapter() {
         targets.clear()
         targets.addAll(newTargets)
         notifyDataSetChanged()
+    }
+
+    /**
+     * Updates the text color used for all cards and immediately re-applies it
+     * to any currently bound holders, so a color preference change reflects
+     * without needing to wait for the next target update.
+     */
+    fun updateTextColor(color: Int) {
+        if (currentTextColor == color) return
+        currentTextColor = color
+        for (i in 0 until holders.size()) {
+            holders.valueAt(i).card.setPrimaryTextColor(currentTextColor)
+        }
     }
 
     override fun instantiateItem(container: ViewGroup, position: Int): ViewHolder {

@@ -1045,14 +1045,30 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // regardless of how many cumulative offsetTopAndBottom() shifts
             // happened to get it there. This is self-correcting no matter how
             // many extra onLayout() passes occur.
-            final int targetBottomMargin = mInsets.bottom;
+            //
+            // LC-Note (fix for rapid open/close race): layoutSearchContainer()
+            // is called multiple times in quick succession per single open
+            // (mInsets.bottom often arrives as 0 on the first few calls, then
+            // flips to the real value once window insets actually land - see
+            // BUILD_MARKER_V4 logs). Each call used to register its OWN listener
+            // with mInsets.bottom captured (read) at registration time; on a fast
+            // open/close, multiple stacked listeners could each fire against a
+            // DIFFERENT, possibly-stale captured target, and whichever fired
+            // last would win unpredictably. Fix: do not capture mInsets.bottom
+            // early - read it fresh from the outer mInsets field inside the
+            // listener, at the moment it actually fires. If it's still 0 at that
+            // point, insets genuinely have not arrived yet for THIS layout pass;
+            // skip correction rather than "correct" toward a wrong target of 0,
+            // since a later call (once real insets land) will register its own
+            // listener and correct properly then.
             getViewTreeObserver().addOnGlobalLayoutListener(
                     new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
                         @Override
                         public void onGlobalLayout() {
                             getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                            if (getHeight() == 0) return;
-                            int desiredBottom = getHeight() - targetBottomMargin;
+                            if (!isAttachedToWindow() || getHeight() == 0) return;
+                            if (mInsets.bottom == 0) return;
+                            int desiredBottom = getHeight() - mInsets.bottom;
                             int currentBottom = mSearchContainer.getBottom();
                             int delta = desiredBottom - currentBottom;
                             if (delta != 0) {

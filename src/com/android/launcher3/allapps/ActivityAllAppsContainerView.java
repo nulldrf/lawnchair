@@ -182,6 +182,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     boolean showFastScroller;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
+    // LC-Note (search-bar-at-bottom fix): single persistent listener instance,
+    // reused across every layoutSearchContainer() call instead of allocating a
+    // new one each time. See layoutSearchContainer() for why a fresh listener
+    // per call caused stacked/compounding offsetTopAndBottom() corrections.
+    private final ViewTreeObserver.OnGlobalLayoutListener mSearchContainerBottomCorrection =
+            this::correctSearchContainerBottomPosition;
     public SearchRecyclerView mSearchRecyclerView;
     protected SearchAdapterProvider<?> mMainAdapterProvider;
     private View mBottomSheetHandleArea;
@@ -391,13 +397,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         super.onDetachedFromWindow();
         mActivityContext.removeOnDeviceProfileChangeListener(this);
         // LC-Note: CrossWindowBlurListeners removed; system blur replaced by HokoBlur.
-        // LC-Note (fix for rapid open/close race): if a correction listener from
-        // requestSearchContainerCorrection() is still pending when the drawer
-        // closes, its own isAttachedToWindow() check will make it a no-op when it
-        // eventually fires - but reset the pending flag here too, so a fresh
-        // reopen isn't blocked from scheduling a new correction by a stale true
-        // value left over from the closed session.
-        mSearchContainerCorrectionPending = false;
     }
 
     public SearchUiManager getSearchUiManager() {
@@ -1031,9 +1030,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;
         }
-        android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V4: layoutSearchContainer "
-                + "set bottomMargin=" + lp.bottomMargin + " searchBarAtBottom=" + searchBarAtBottom
-                + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom);
         mSearchContainer.setLayoutParams(lp);
         if (searchBarAtBottom && !isSearchBarFloating()) {
             // LC-Note (fix for real overlap, multiple rounds of measurement):
@@ -1044,49 +1040,54 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // our single layoutSearchContainer() call, so a fixed margin
             // compensation calculated for "one shift" under- or over-corrects
             // depending on how many onLayout() passes actually ran before the
-            // frame is drawn. The actual position-correction listener that
-            // counteracts this is coalesced via requestSearchContainerCorrection()
-            // below rather than registered directly here - registering a new
-            // listener on every layoutSearchContainer() call caused a race
-            // on fast open/close where multiple stacked listeners, some
-            // registered while mInsets.bottom was still 0, could each fire and
-            // "correct" toward different/wrong targets.
-            requestSearchContainerCorrection();
+            // frame is drawn.
+            // Instead of guessing the right compensation, correct the view's
+            // ACTUAL final position directly and idempotently: after layout
+            // settles, force its top so its bottom edge sits exactly
+            // mInsets.bottom above the true bottom of this (root) view,
+            // regardless of how many cumulative offsetTopAndBottom() shifts
+            // happened to get it there.
+            //
+            // LC-Note (fix for compounding-correction bug): layoutSearchContainer()
+            // is called multiple times in quick succession per single open
+            // (from setupHeader(), setInsets(), and dispatchApplyWindowInsets()).
+            // The previous version allocated a NEW OnGlobalLayoutListener on every
+            // call. Each one independently read mSearchContainer.getBottom() at
+            // whatever moment ITS OWN global-layout pass happened to fire, which
+            // could already include a correction just applied by a different,
+            // still-queued listener from an earlier call in the same burst. With
+            // multiple listeners stacked, each one's offsetTopAndBottom(delta) was
+            // computed against a different, already-shifting target, so corrections
+            // compounded instead of converging - matching the reported symptom of
+            // needing to toggle the preference repeatedly before the position
+            // looked right by chance.
+            // Fix: reuse a single persistent listener instance (mSearchContainerBottomCorrection,
+            // a field) and always remove() it before add()-ing it again. This
+            // guarantees at most one correction is ever pending at a time; if a new
+            // layoutSearchContainer() call comes in before the previous correction's
+            // global-layout pass has fired, the old pending one is cancelled and
+            // replaced rather than both running.
+            getViewTreeObserver().removeOnGlobalLayoutListener(mSearchContainerBottomCorrection);
+            getViewTreeObserver().addOnGlobalLayoutListener(mSearchContainerBottomCorrection);
         }
     }
 
-    private boolean mSearchContainerCorrectionPending;
-
     /**
-     * LC-Note (fix for rapid open/close race): schedules a single position
-     * correction pass for mSearchContainer in bottom-anchored mode. Coalesces
-     * multiple calls within the same attach session into one pending listener
-     * instead of stacking a new listener per call - mSearchContainerCorrectionPending
-     * guards against duplicate registration. The listener itself reads
-     * mInsets.bottom fresh when it fires (not captured early), and bails out if
-     * insets aren't real yet, if the view is no longer attached, or if a newer
-     * onDetachedFromWindow() already cleared the pending flag (e.g. the drawer
-     * was closed before this had a chance to run).
+     * LC-Note (search-bar-at-bottom): one-shot correction invoked by
+     * mSearchContainerBottomCorrection. Removes itself so it only runs once per
+     * registration; layoutSearchContainer() re-registers it (replacing any still-
+     * pending instance) whenever the bar's target position may have changed.
      */
-    private void requestSearchContainerCorrection() {
-        if (mSearchContainerCorrectionPending) return;
-        mSearchContainerCorrectionPending = true;
-        getViewTreeObserver().addOnGlobalLayoutListener(
-                new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        mSearchContainerCorrectionPending = false;
-                        if (!isAttachedToWindow() || getHeight() == 0) return;
-                        if (mInsets.bottom == 0) return;
-                        int desiredBottom = getHeight() - mInsets.bottom;
-                        int currentBottom = mSearchContainer.getBottom();
-                        int delta = desiredBottom - currentBottom;
-                        if (delta != 0) {
-                            mSearchContainer.offsetTopAndBottom(delta);
-                        }
-                    }
-                });
+    private void correctSearchContainerBottomPosition() {
+        getViewTreeObserver().removeOnGlobalLayoutListener(mSearchContainerBottomCorrection);
+        if (!isAttachedToWindow() || getHeight() == 0) return;
+        if (mInsets.bottom == 0) return;
+        int desiredBottom = getHeight() - mInsets.bottom;
+        int currentBottom = mSearchContainer.getBottom();
+        int delta = desiredBottom - currentBottom;
+        if (delta != 0) {
+            mSearchContainer.offsetTopAndBottom(delta);
+        }
     }
 
     /**

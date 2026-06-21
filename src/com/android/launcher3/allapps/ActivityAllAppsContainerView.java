@@ -1053,15 +1053,37 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             ((View) mSearchContainer.getParent()).requestLayout();
         }
         requestLayout();
-        // TEMP-DEBUG (remove after confirming fix): captures state ~500ms later,
-        // after layout AND any in-flight animate().translationY() has settled.
-        postDelayed(() -> android.util.Log.d("LCSearchBarDebug",
-                "SETTLED_STATE: mSearchContainer.getTranslationY()="
-                + mSearchContainer.getTranslationY()
-                + " getTop()=" + mSearchContainer.getTop()
-                + " getBottom()=" + mSearchContainer.getBottom()
-                + " getHeight()=" + getHeight()
-                + " screenHeightPx=" + getResources().getDisplayMetrics().heightPixels), 500);
+        // TEMP-DEBUG (remove after confirming fix): OnGlobalLayoutListener fires
+        // synchronously after every real layout pass completes - no postDelayed
+        // staleness risk (earlier postDelayed-based logging returned getHeight()=0
+        // /getTop()=0/getBottom()=0 lines that didn't reflect the actual current
+        // view, since `this` could be a stale/detached reference by the time the
+        // delayed callback ran). One-shot: removes itself after firing once.
+        getViewTreeObserver().addOnGlobalLayoutListener(
+                new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        android.util.Log.d("LCSearchBarDebug", "GLOBAL_LAYOUT_FIRED: "
+                                + "mSearchContainer.getTop()=" + mSearchContainer.getTop()
+                                + " mSearchContainer.getBottom()=" + mSearchContainer.getBottom()
+                                + " mSearchContainer.getHeight()=" + mSearchContainer.getHeight()
+                                + " root.getHeight()=" + getHeight()
+                                + " root.getBottom()=" + getBottom()
+                                + " screenHeightPx=" + getResources().getDisplayMetrics().heightPixels
+                                + " realDisplayHeightPx=" + getRealDisplayHeightPx());
+                    }
+                });
+    }
+
+    // TEMP-DEBUG (remove after confirming fix): physical display height,
+    // unaffected by system bar visibility, for comparison against
+    // getResources().getDisplayMetrics().heightPixels (which fluctuates).
+    private int getRealDisplayHeightPx() {
+        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+        ((android.view.WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE))
+                .getDefaultDisplay().getRealMetrics(dm);
+        return dm.heightPixels;
     }
 
     /**

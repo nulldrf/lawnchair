@@ -1059,7 +1059,41 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;
         }
+        // LC-Note (fix for rapid open/close/tap race, third collision point):
+        // setLayoutParams() below forces an immediate new layout pass, which can
+        // change mSearchContainer's getTop()/getBottom() RIGHT NOW — even while
+        // animateSearchContainerForSearchState()'s translationY animator is
+        // actively running on this same view (mSearchContainerAnimating == true).
+        // That animator's target translationY was computed against the OLD
+        // layout position; if the layout position silently changes underneath
+        // it, the already-running animation will finish at the wrong visual
+        // spot once added to the new top/bottom. This is the rapid
+        // open/close+tap+swipe race: a new open's layoutSearchContainer() call
+        // can land while the previous close's slide-down animation is still
+        // mid-flight.
+        // Fix: capture the bottom edge before the layout-params change, apply
+        // the change, then if it actually moved AND an animation is running,
+        // shift translationY by the exact opposite delta so the rendered
+        // (top/bottom + translationY) position does not visibly jump. The
+        // running animator keeps animating toward its original target relative
+        // to the OLD position, which is now correctly re-based onto the new one.
+        int bottomBeforeLayout = mSearchContainer.getBottom();
         mSearchContainer.setLayoutParams(lp);
+        if (mSearchContainerAnimating) {
+            getViewTreeObserver().addOnGlobalLayoutListener(
+                    new ViewTreeObserver.OnGlobalLayoutListener() {
+                        @Override
+                        public void onGlobalLayout() {
+                            getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                            if (!mSearchContainerAnimating) return;
+                            int layoutShift = mSearchContainer.getBottom() - bottomBeforeLayout;
+                            if (layoutShift != 0) {
+                                mSearchContainer.setTranslationY(
+                                        mSearchContainer.getTranslationY() - layoutShift);
+                            }
+                        }
+                    });
+        }
         if (searchBarAtBottom && !isSearchBarFloating()) {
             // LC-Note (fix for real overlap, multiple rounds of measurement):
             // margin-based compensation for AppsSearchContainerLayout.onLayout()

@@ -57,9 +57,18 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
         // guarantee correctly, for every nav mode (gesture, 3-button, 2-button),
         // is WindowInsets.Type.navigationBars() - see its `newNavInsets` block,
         // which always runs and is never zeroed out. Use that instead.
-        return Utilities.ATLEAST_R
+        int result = Utilities.ATLEAST_R
                 ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom
                 : insets.getStableInsetBottom();
+        // TEMP-DEBUG (remove after diagnosing search-bar-at-bottom clipping):
+        android.util.Log.d("LCSearchBarDebug", "computeNavBarScrimHeight CALLED. "
+                + "ATLEAST_R=" + Utilities.ATLEAST_R
+                + " navigationBars().bottom=" + (Utilities.ATLEAST_R
+                        ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom : -1)
+                + " stableInsetBottom=" + insets.getStableInsetBottom()
+                + " tappableElementBottom=" + insets.getTappableElementInsets().bottom
+                + " result=" + result);
+        return result;
     }
 
     @Override

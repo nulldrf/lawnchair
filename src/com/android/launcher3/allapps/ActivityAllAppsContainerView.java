@@ -1019,91 +1019,48 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // bar height. Use mInsets.bottom alone; do not factor in
             // mNavBarScrimHeight here, it is not meaningful for this view.
             lp.bottomMargin = mInsets.bottom;
-            // LC-Note (fix for real overlap confirmed via GLOBAL_LAYOUT_FIRED
-            // logging - getBottom() landed ~84px short of root height minus
-            // bottomMargin, i.e. the margin was correctly set on lp but the view
-            // still rendered overlapping the nav bar): AppsSearchContainerLayout
-            // .onLayout() (mSearchContainer's own class) unconditionally calls
-            // offsetTopAndBottom(mContentOverlap) on EVERY layout pass, with no
-            // check for which anchor mode is active. mContentOverlap
-            // (all_apps_search_bar_content_overlap, 24dp) was designed to shift
-            // a TOP-anchored bar down so it overlaps into the header/RV content
-            // below it by design. In bottom-anchored mode that same downward
-            // shift instead eats directly into our bottom clearance, pushing the
-            // bar further down than the margin alone specifies. We cannot edit
-            // AppsSearchContainerLayout (shared base AOSP code, still needed for
-            // the top-anchored case), so compensate here: pad bottomMargin by
-            // the same amount so the unconditional downward shift is canceled
-            // out and the bar lands at its intended position above the real nav
-            // bar inset.
-            int contentOverlap = getResources().getDimensionPixelSize(
-                    R.dimen.all_apps_search_bar_content_overlap);
-            lp.bottomMargin += contentOverlap;
-            // LC-Note: AppsSearchContainerLayout.setInsets() (its own Insettable
-            // implementation, called earlier via InsettableFrameLayout
-            // .dispatchInsets() in our setInsets()) unconditionally sets
-            // topMargin = insets.top on this same view, for the top-anchored
-            // case. That topMargin is meaningless once this view is
-            // bottom-anchored, but left as-is it can still pollute getTop()'s
-            // resolved value, so zero it here.
             lp.topMargin = 0;
         } else {
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;
         }
-        // TEMP-DEBUG (remove after confirming fix): if this line never appears
-        // in logcat, the running APK does not contain this code change.
-        android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V3: layoutSearchContainer "
+        android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V4: layoutSearchContainer "
                 + "set bottomMargin=" + lp.bottomMargin + " searchBarAtBottom=" + searchBarAtBottom
-                + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom
-                + " mSearchContainer.getTranslationY()=" + mSearchContainer.getTranslationY());
+                + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom);
         mSearchContainer.setLayoutParams(lp);
-        // LC-Note: logging confirmed bottomMargin is correctly computed and set
-        // on lp (e.g. bottomMargin=135, matching mInsets.bottom), yet the view
-        // still visually rendered flush against the screen edge. lp is the SAME
-        // LayoutParams instance returned by getLayoutParams() above, mutated in
-        // place; setLayoutParams() can be a no-op for relayout purposes when
-        // handed back the identical object reference some ViewGroups already
-        // consider "current". Force an explicit requestLayout() on the view, its
-        // RelativeLayout parent, and self, so the new rule/margin are actually
-        // measured and drawn rather than silently retained only in the
-        // LayoutParams object's fields.
-        mSearchContainer.requestLayout();
-        if (mSearchContainer.getParent() instanceof View) {
-            ((View) mSearchContainer.getParent()).requestLayout();
+        if (searchBarAtBottom && !isSearchBarFloating()) {
+            // LC-Note (fix for real overlap, multiple rounds of measurement):
+            // margin-based compensation for AppsSearchContainerLayout.onLayout()
+            // unconditionally calling offsetTopAndBottom(mContentOverlap) proved
+            // unreliable - that call is a RELATIVE/cumulative shift applied on
+            // EVERY onLayout() pass, and onLayout() can fire more than once per
+            // our single layoutSearchContainer() call, so a fixed margin
+            // compensation calculated for "one shift" under- or over-corrects
+            // depending on how many onLayout() passes actually ran before the
+            // frame is drawn.
+            // Instead of guessing the right compensation, correct the view's
+            // ACTUAL final position directly and idempotently: after layout
+            // settles, force its top so its bottom edge sits exactly
+            // mInsets.bottom above the true bottom of this (root) view,
+            // regardless of how many cumulative offsetTopAndBottom() shifts
+            // happened to get it there. This is self-correcting no matter how
+            // many extra onLayout() passes occur.
+            final int targetBottomMargin = mInsets.bottom;
+            getViewTreeObserver().addOnGlobalLayoutListener(
+                    new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                        @Override
+                        public void onGlobalLayout() {
+                            getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                            if (getHeight() == 0) return;
+                            int desiredBottom = getHeight() - targetBottomMargin;
+                            int currentBottom = mSearchContainer.getBottom();
+                            int delta = desiredBottom - currentBottom;
+                            if (delta != 0) {
+                                mSearchContainer.offsetTopAndBottom(delta);
+                            }
+                        }
+                    });
         }
-        requestLayout();
-        // TEMP-DEBUG (remove after confirming fix): OnGlobalLayoutListener fires
-        // synchronously after every real layout pass completes - no postDelayed
-        // staleness risk (earlier postDelayed-based logging returned getHeight()=0
-        // /getTop()=0/getBottom()=0 lines that didn't reflect the actual current
-        // view, since `this` could be a stale/detached reference by the time the
-        // delayed callback ran). One-shot: removes itself after firing once.
-        getViewTreeObserver().addOnGlobalLayoutListener(
-                new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        android.util.Log.d("LCSearchBarDebug", "GLOBAL_LAYOUT_FIRED: "
-                                + "mSearchContainer.getTop()=" + mSearchContainer.getTop()
-                                + " mSearchContainer.getBottom()=" + mSearchContainer.getBottom()
-                                + " mSearchContainer.getHeight()=" + mSearchContainer.getHeight()
-                                + " root.getHeight()=" + getHeight()
-                                + " root.getBottom()=" + getBottom()
-                                + " screenHeightPx=" + getResources().getDisplayMetrics().heightPixels
-                                + " realDisplayHeightPx=" + getRealDisplayHeightPx());
-                    }
-                });
-    }
-
-    // TEMP-DEBUG (remove after confirming fix): physical display height,
-    // unaffected by system bar visibility, for comparison against
-    // getResources().getDisplayMetrics().heightPixels (which fluctuates).
-    private int getRealDisplayHeightPx() {
-        android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
-        ((android.view.WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE))
-                .getDefaultDisplay().getRealMetrics(dm);
-        return dm.heightPixels;
     }
 
     /**

@@ -1019,6 +1019,26 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // bar height. Use mInsets.bottom alone; do not factor in
             // mNavBarScrimHeight here, it is not meaningful for this view.
             lp.bottomMargin = mInsets.bottom;
+            // LC-Note (fix for real overlap confirmed via GLOBAL_LAYOUT_FIRED
+            // logging - getBottom() landed ~84px short of root height minus
+            // bottomMargin, i.e. the margin was correctly set on lp but the view
+            // still rendered overlapping the nav bar): AppsSearchContainerLayout
+            // .onLayout() (mSearchContainer's own class) unconditionally calls
+            // offsetTopAndBottom(mContentOverlap) on EVERY layout pass, with no
+            // check for which anchor mode is active. mContentOverlap
+            // (all_apps_search_bar_content_overlap, 24dp) was designed to shift
+            // a TOP-anchored bar down so it overlaps into the header/RV content
+            // below it by design. In bottom-anchored mode that same downward
+            // shift instead eats directly into our bottom clearance, pushing the
+            // bar further down than the margin alone specifies. We cannot edit
+            // AppsSearchContainerLayout (shared base AOSP code, still needed for
+            // the top-anchored case), so compensate here: pad bottomMargin by
+            // the same amount so the unconditional downward shift is canceled
+            // out and the bar lands at its intended position above the real nav
+            // bar inset.
+            int contentOverlap = getResources().getDimensionPixelSize(
+                    R.dimen.all_apps_search_bar_content_overlap);
+            lp.bottomMargin += contentOverlap;
             // LC-Note: AppsSearchContainerLayout.setInsets() (its own Insettable
             // implementation, called earlier via InsettableFrameLayout
             // .dispatchInsets() in our setInsets()) unconditionally sets
@@ -1033,7 +1053,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
         // TEMP-DEBUG (remove after confirming fix): if this line never appears
         // in logcat, the running APK does not contain this code change.
-        android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V2: layoutSearchContainer "
+        android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V3: layoutSearchContainer "
                 + "set bottomMargin=" + lp.bottomMargin + " searchBarAtBottom=" + searchBarAtBottom
                 + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom
                 + " mSearchContainer.getTranslationY()=" + mSearchContainer.getTranslationY());

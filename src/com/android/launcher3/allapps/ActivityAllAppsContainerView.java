@@ -1008,13 +1008,17 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom && !isSearchBarFloating()) {
             lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-            // LC-Note: mInsets.bottom alone was insufficient to clear the system
-            // nav bar on some configs (it read 0 / too small in this context),
-            // leaving the bar mostly cut off below the visible screen. The rest
-            // of this file (see applyAdapterSideAndBottomPaddings()) uses
-            // Math.max(mInsets.bottom, mNavBarScrimHeight) as the real bottom
-            // clearance value; match that same pattern here for consistency.
-            lp.bottomMargin = Math.max(mInsets.bottom, mNavBarScrimHeight);
+            // LC-Note: mNavBarScrimHeight (computeNavBarScrimHeight()) reads the
+            // RAW WindowInsets handed to dispatchApplyWindowInsets(). That object
+            // never passes through LawnchairWindowManagerProxy.normalizeWindowInsets()
+            // - the proxy's corrected values only ever reach this view via
+            // LauncherRootView.updateInsets() -> handleSystemWindowInsets(Rect) ->
+            // setInsets(Rect), i.e. mInsets. Confirmed via logging that
+            // mNavBarScrimHeight reads 0 in every nav mode (gesture/3-button/
+            // 2-button) while mInsets.bottom correctly carries the normalized nav
+            // bar height. Use mInsets.bottom alone; do not factor in
+            // mNavBarScrimHeight here, it is not meaningful for this view.
+            lp.bottomMargin = mInsets.bottom;
             // LC-Note: AppsSearchContainerLayout.setInsets() (its own Insettable
             // implementation, called earlier via InsettableFrameLayout
             // .dispatchInsets() in our setInsets()) unconditionally sets
@@ -1023,15 +1027,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // bottom-anchored, but left as-is it can still pollute getTop()'s
             // resolved value, so zero it here.
             lp.topMargin = 0;
-            // TEMP-DEBUG (remove after diagnosing search-bar-at-bottom clipping):
-            post(() -> android.util.Log.d("LCSearchBarDebug",
-                    "layoutSearchContainer: this(RelativeLayout root).getHeight()=" + getHeight()
-                    + " mSearchContainer.getTop()=" + mSearchContainer.getTop()
-                    + " mSearchContainer.getHeight()=" + mSearchContainer.getHeight()
-                    + " bottomMargin=" + lp.bottomMargin
-                    + " mInsets.bottom=" + mInsets.bottom
-                    + " mNavBarScrimHeight=" + mNavBarScrimHeight
-                    + " screenHeightPx=" + getResources().getDisplayMetrics().heightPixels));
         } else {
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;

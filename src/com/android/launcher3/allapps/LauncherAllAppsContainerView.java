@@ -43,32 +43,24 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
 
     @Override
     protected int computeNavBarScrimHeight(WindowInsets insets) {
-        // LC-Note (fix for search-bar-at-bottom / handle-area clipping always
-        // reading 0): this originally read insets.getTappableElementInsets()
-        // .bottom on Android Q+. LawnchairWindowManagerProxy
-        // .normalizeWindowInsets() deliberately zeroes the bottom
-        // WindowInsets.Type.tappableElement() inset whenever gesture nav is
-        // active (see the `if (isGesture) { ... newTappableInsets = ...0) }`
-        // block there), as part of how it computes gesture-nav layout. That
-        // proxy makes no such guarantee for non-gesture nav either - the
-        // tappable-element bottom inset there is left to the raw OS-reported
-        // value, which was also observed at 0 in testing across all nav modes.
-        // The one inset type LawnchairWindowManagerProxy DOES always compute and
-        // guarantee correctly, for every nav mode (gesture, 3-button, 2-button),
-        // is WindowInsets.Type.navigationBars() - see its `newNavInsets` block,
-        // which always runs and is never zeroed out. Use that instead.
-        int result = Utilities.ATLEAST_R
+        // LC-Note: originally read insets.getTappableElementInsets().bottom on
+        // Android Q+. LawnchairWindowManagerProxy.normalizeWindowInsets()
+        // deliberately zeroes the bottom WindowInsets.Type.tappableElement()
+        // inset for gesture nav, and doesn't reliably populate it for button
+        // nav either - confirmed via logging this read 0 in every nav mode.
+        // navigationBars() is the inset type the proxy actually guarantees
+        // (see its `newNavInsets` block, always computed, never zeroed).
+        // NOTE: this WindowInsets parameter is still the RAW, un-normalized
+        // insets object as delivered by the system - LawnchairWindowManagerProxy
+        // is never applied to it (that correction only reaches this view via
+        // LauncherRootView -> setInsets(Rect) -> mInsets, a separate pipeline).
+        // So even with this read fixed to the right inset type, the values here
+        // can still be 0/unreliable. Anything in this file that needs the real
+        // nav bar height should prefer mInsets.bottom over getNavBarScrimHeight()
+        // where possible.
+        return Utilities.ATLEAST_R
                 ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom
                 : insets.getStableInsetBottom();
-        // TEMP-DEBUG (remove after diagnosing search-bar-at-bottom clipping):
-        android.util.Log.d("LCSearchBarDebug", "computeNavBarScrimHeight CALLED. "
-                + "ATLEAST_R=" + Utilities.ATLEAST_R
-                + " navigationBars().bottom=" + (Utilities.ATLEAST_R
-                        ? insets.getInsets(WindowInsets.Type.navigationBars()).bottom : -1)
-                + " stableInsetBottom=" + insets.getStableInsetBottom()
-                + " tappableElementBottom=" + insets.getTappableElementInsets().bottom
-                + " result=" + result);
-        return result;
     }
 
     @Override

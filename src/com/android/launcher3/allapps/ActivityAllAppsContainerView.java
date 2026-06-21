@@ -391,6 +391,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         super.onDetachedFromWindow();
         mActivityContext.removeOnDeviceProfileChangeListener(this);
         // LC-Note: CrossWindowBlurListeners removed; system blur replaced by HokoBlur.
+        // LC-Note (fix for rapid open/close race): if a correction listener from
+        // requestSearchContainerCorrection() is still pending when the drawer
+        // closes, its own isAttachedToWindow() check will make it a no-op when it
+        // eventually fires - but reset the pending flag here too, so a fresh
+        // reopen isn't blocked from scheduling a new correction by a stale true
+        // value left over from the closed session.
+        mSearchContainerCorrectionPending = false;
     }
 
     public SearchUiManager getSearchUiManager() {
@@ -1037,46 +1044,49 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             // our single layoutSearchContainer() call, so a fixed margin
             // compensation calculated for "one shift" under- or over-corrects
             // depending on how many onLayout() passes actually ran before the
-            // frame is drawn.
-            // Instead of guessing the right compensation, correct the view's
-            // ACTUAL final position directly and idempotently: after layout
-            // settles, force its top so its bottom edge sits exactly
-            // mInsets.bottom above the true bottom of this (root) view,
-            // regardless of how many cumulative offsetTopAndBottom() shifts
-            // happened to get it there. This is self-correcting no matter how
-            // many extra onLayout() passes occur.
-            //
-            // LC-Note (fix for rapid open/close race): layoutSearchContainer()
-            // is called multiple times in quick succession per single open
-            // (mInsets.bottom often arrives as 0 on the first few calls, then
-            // flips to the real value once window insets actually land - see
-            // BUILD_MARKER_V4 logs). Each call used to register its OWN listener
-            // with mInsets.bottom captured (read) at registration time; on a fast
-            // open/close, multiple stacked listeners could each fire against a
-            // DIFFERENT, possibly-stale captured target, and whichever fired
-            // last would win unpredictably. Fix: do not capture mInsets.bottom
-            // early - read it fresh from the outer mInsets field inside the
-            // listener, at the moment it actually fires. If it's still 0 at that
-            // point, insets genuinely have not arrived yet for THIS layout pass;
-            // skip correction rather than "correct" toward a wrong target of 0,
-            // since a later call (once real insets land) will register its own
-            // listener and correct properly then.
-            getViewTreeObserver().addOnGlobalLayoutListener(
-                    new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                        @Override
-                        public void onGlobalLayout() {
-                            getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                            if (!isAttachedToWindow() || getHeight() == 0) return;
-                            if (mInsets.bottom == 0) return;
-                            int desiredBottom = getHeight() - mInsets.bottom;
-                            int currentBottom = mSearchContainer.getBottom();
-                            int delta = desiredBottom - currentBottom;
-                            if (delta != 0) {
-                                mSearchContainer.offsetTopAndBottom(delta);
-                            }
-                        }
-                    });
+            // frame is drawn. The actual position-correction listener that
+            // counteracts this is coalesced via requestSearchContainerCorrection()
+            // below rather than registered directly here - registering a new
+            // listener on every layoutSearchContainer() call caused a race
+            // on fast open/close where multiple stacked listeners, some
+            // registered while mInsets.bottom was still 0, could each fire and
+            // "correct" toward different/wrong targets.
+            requestSearchContainerCorrection();
         }
+    }
+
+    private boolean mSearchContainerCorrectionPending;
+
+    /**
+     * LC-Note (fix for rapid open/close race): schedules a single position
+     * correction pass for mSearchContainer in bottom-anchored mode. Coalesces
+     * multiple calls within the same attach session into one pending listener
+     * instead of stacking a new listener per call - mSearchContainerCorrectionPending
+     * guards against duplicate registration. The listener itself reads
+     * mInsets.bottom fresh when it fires (not captured early), and bails out if
+     * insets aren't real yet, if the view is no longer attached, or if a newer
+     * onDetachedFromWindow() already cleared the pending flag (e.g. the drawer
+     * was closed before this had a chance to run).
+     */
+    private void requestSearchContainerCorrection() {
+        if (mSearchContainerCorrectionPending) return;
+        mSearchContainerCorrectionPending = true;
+        getViewTreeObserver().addOnGlobalLayoutListener(
+                new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        mSearchContainerCorrectionPending = false;
+                        if (!isAttachedToWindow() || getHeight() == 0) return;
+                        if (mInsets.bottom == 0) return;
+                        int desiredBottom = getHeight() - mInsets.bottom;
+                        int currentBottom = mSearchContainer.getBottom();
+                        int delta = desiredBottom - currentBottom;
+                        if (delta != 0) {
+                            mSearchContainer.offsetTopAndBottom(delta);
+                        }
+                    }
+                });
     }
 
     /**

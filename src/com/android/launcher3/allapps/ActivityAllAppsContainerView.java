@@ -1037,6 +1037,21 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 + "set bottomMargin=" + lp.bottomMargin + " searchBarAtBottom=" + searchBarAtBottom
                 + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom);
         mSearchContainer.setLayoutParams(lp);
+        // LC-Note: logging confirmed bottomMargin is correctly computed and set
+        // on lp (e.g. bottomMargin=135, matching mInsets.bottom), yet the view
+        // still visually rendered flush against the screen edge. lp is the SAME
+        // LayoutParams instance returned by getLayoutParams() above, mutated in
+        // place; setLayoutParams() can be a no-op for relayout purposes when
+        // handed back the identical object reference some ViewGroups already
+        // consider "current". Force an explicit requestLayout() on the view, its
+        // RelativeLayout parent, and self, so the new rule/margin are actually
+        // measured and drawn rather than silently retained only in the
+        // LayoutParams object's fields.
+        mSearchContainer.requestLayout();
+        if (mSearchContainer.getParent() instanceof View) {
+            ((View) mSearchContainer.getParent()).requestLayout();
+        }
+        requestLayout();
     }
 
     /**

@@ -182,6 +182,17 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     boolean showFastScroller;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
+    // LC-Note (search-bar-at-bottom): single persistent listener instance used
+    // by settleSearchContainerPosition() to retry once mSearchContainer has a
+    // real height, for the case where it's called before the view tree has
+    // been measured (e.g. straight out of onFinishInflate() during a config
+    // change / recreate, such as switching nav bar <-> gesture nav). Reused
+    // and de-duplicated the same way as the earlier (now-removed)
+    // mSearchContainerBottomCorrection listener, for the same reason: adding a
+    // fresh listener on every call without removing prior pending ones can
+    // stack multiple call-once listeners across a burst of layout passes.
+    private final ViewTreeObserver.OnGlobalLayoutListener mSettleSearchContainerRetry =
+            this::settleSearchContainerPositionRetry;
     public SearchRecyclerView mSearchRecyclerView;
     protected SearchAdapterProvider<?> mMainAdapterProvider;
     private View mBottomSheetHandleArea;
@@ -1058,7 +1069,32 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
      * over - both always compute and converge on the identical target value.
      */
     private void settleSearchContainerPosition() {
-        if (mSearchContainer.getHeight() == 0) return;
+        if (mSearchContainer.getHeight() == 0) {
+            // LC-Note (fix for stuck-at-top after enabling pref / nav-mode
+            // change): this method is called from setupHeader(), itself called
+            // from onFinishInflate() - at that point in the view lifecycle (and
+            // again whenever a config change such as switching nav bar <->
+            // gesture nav triggers a fresh inflate/recreate of this view tree)
+            // mSearchContainer has not been measured yet, so getHeight() == 0
+            // here. Previously this just silently returned, leaving
+            // translationY at whatever it was before (typically 0, i.e. "stuck
+            // at top") with nothing scheduled to ever call this again until
+            // some unrelated event happened to fire setInsets() or
+            // dispatchApplyWindowInsets() after layout had caught up - on slow
+            // devices/transitions that could take a visible, indeterminate
+            // amount of time, or never happen at all until manually
+            // re-triggered by toggling the preference again.
+            // Fix: instead of giving up, queue a single retry that re-runs this
+            // exact method once the view tree actually finishes a layout pass,
+            // by which point getHeight() will be real. Deduped via
+            // removeOnGlobalLayoutListener() before add() so a burst of calls
+            // (setupHeader() + setInsets() + dispatchApplyWindowInsets() all in
+            // quick succession during the same recreate) only ever queues one
+            // retry, not a stack of them.
+            getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
+            getViewTreeObserver().addOnGlobalLayoutListener(mSettleSearchContainerRetry);
+            return;
+        }
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (!searchBarAtBottom || isSearchBarFloating()) {
@@ -1069,6 +1105,20 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 && mSearchUiManager.getEditText().hasFocus());
         mSearchContainer.setTranslationY(
                 getSearchContainerRestingTranslationY(searching));
+    }
+
+    /**
+     * LC-Note (search-bar-at-bottom): invoked by mSettleSearchContainerRetry.
+     * Removes itself so it only runs once per registration; if
+     * mSearchContainer's height is STILL 0 when this fires (layout hasn't
+     * actually produced a measured size yet, e.g. multiple passes needed),
+     * settleSearchContainerPosition() will simply re-queue another retry via
+     * the same path, rather than giving up.
+     */
+    private void settleSearchContainerPositionRetry() {
+        getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
+        if (!isAttachedToWindow()) return;
+        settleSearchContainerPosition();
     }
 
     /**

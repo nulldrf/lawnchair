@@ -188,6 +188,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     // per call caused stacked/compounding offsetTopAndBottom() corrections.
     private final ViewTreeObserver.OnGlobalLayoutListener mSearchContainerBottomCorrection =
             this::correctSearchContainerBottomPosition;
+    // LC-Note (search-bar-at-bottom): true while animateSearchContainerForSearchState()'s
+    // translationY animator is in flight on mSearchContainer. See
+    // correctSearchContainerBottomPosition() for why this guard is needed.
+    private boolean mSearchContainerAnimating = false;
     public SearchRecyclerView mSearchRecyclerView;
     protected SearchAdapterProvider<?> mMainAdapterProvider;
     private View mBottomSheetHandleArea;
@@ -486,6 +490,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (mSearchContainer.getHeight() == 0) return;
 
         mSearchContainer.animate().cancel();
+        mSearchContainerAnimating = true;
         if (goingToSearch) {
             // Slide up so the bar's bottom edge lands at this container's own
             // top padding (the same resting position a top-anchored search bar
@@ -508,11 +513,35 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mSearchContainer.animate()
                     .translationY(targetTranslationY)
                     .setDuration(durationMs)
+                    .withEndAction(() -> mSearchContainerAnimating = false)
                     .start();
         } else {
+            // LC-Note (fix for broken position after focus -> back-press cycle):
+            // this previously hardcoded translationY(0f), which assumes the
+            // view's LAYOUT top/bottom (set via margins in layoutSearchContainer()
+            // and possibly further nudged by correctSearchContainerBottomPosition()'s
+            // offsetTopAndBottom() calls) is unconditionally the correct bottom-
+            // pinned rest position with zero added transform on top. That's two
+            // separate coordinate systems (layout top/bottom vs. transform
+            // translationY) being treated as interchangeable. If a
+            // correctSearchContainerBottomPosition() correction ran while this
+            // view was mid-transition (translationY != 0) — e.g. window insets
+            // settling shortly after the drawer opened — offsetTopAndBottom()
+            // shifts the LAYOUT position while translationY still holds the old
+            // animated offset on top of it; resetting translationY to a literal 0
+            // is only correct if no such correction happened in between.
+            // Compute the true desired rest position the same way
+            // correctSearchContainerBottomPosition() does (bottom edge sitting
+            // mInsets.bottom above this view's bottom) and derive the
+            // translationY needed to reach it from the CURRENT layout position,
+            // rather than assuming 0 is always home.
+            int desiredBottom = getHeight() - mInsets.bottom;
+            int currentLayoutBottom = mSearchContainer.getBottom();
+            float targetTranslationY = desiredBottom - currentLayoutBottom;
             mSearchContainer.animate()
-                    .translationY(0f)
+                    .translationY(targetTranslationY)
                     .setDuration(durationMs)
+                    .withEndAction(() -> mSearchContainerAnimating = false)
                     .start();
         }
     }
@@ -1082,6 +1111,20 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         getViewTreeObserver().removeOnGlobalLayoutListener(mSearchContainerBottomCorrection);
         if (!isAttachedToWindow() || getHeight() == 0) return;
         if (mInsets.bottom == 0) return;
+        // LC-Note (fix for fight-with-search-animation bug): if
+        // animateSearchContainerForSearchState()'s translationY animator is
+        // currently running on this same view, offsetTopAndBottom() here would
+        // change the view's layout top/bottom out from under that animation
+        // mid-flight, corrupting the animation's notion of where "home" is (see
+        // that method's own note on this same two-coordinate-system problem).
+        // Skip this correction while that animation owns the view; it already
+        // computes its own correct end position from current layout values
+        // whenever it next runs, so there's nothing to fix here in that case.
+        // ViewPropertyAnimator (the type returned by View.animate()) has no
+        // public "is it currently running" query, so this is tracked explicitly
+        // via mSearchContainerAnimating, set/cleared around the .animate() calls
+        // in animateSearchContainerForSearchState().
+        if (mSearchContainerAnimating) return;
         int desiredBottom = getHeight() - mInsets.bottom;
         int currentBottom = mSearchContainer.getBottom();
         int delta = desiredBottom - currentBottom;

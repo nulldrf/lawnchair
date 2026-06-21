@@ -1035,7 +1035,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // in logcat, the running APK does not contain this code change.
         android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V2: layoutSearchContainer "
                 + "set bottomMargin=" + lp.bottomMargin + " searchBarAtBottom=" + searchBarAtBottom
-                + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom);
+                + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom
+                + " mSearchContainer.getTranslationY()=" + mSearchContainer.getTranslationY());
         mSearchContainer.setLayoutParams(lp);
         // LC-Note: logging confirmed bottomMargin is correctly computed and set
         // on lp (e.g. bottomMargin=135, matching mInsets.bottom), yet the view
@@ -1052,6 +1053,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             ((View) mSearchContainer.getParent()).requestLayout();
         }
         requestLayout();
+        // TEMP-DEBUG (remove after confirming fix): captures state ~500ms later,
+        // after layout AND any in-flight animate().translationY() has settled.
+        postDelayed(() -> android.util.Log.d("LCSearchBarDebug",
+                "SETTLED_STATE: mSearchContainer.getTranslationY()="
+                + mSearchContainer.getTranslationY()
+                + " getTop()=" + mSearchContainer.getTop()
+                + " getBottom()=" + mSearchContainer.getBottom()
+                + " getHeight()=" + getHeight()
+                + " screenHeightPx=" + getResources().getDisplayMetrics().heightPixels), 500);
     }
 
     /**

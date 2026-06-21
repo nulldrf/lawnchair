@@ -182,16 +182,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     boolean showFastScroller;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
-    // LC-Note (search-bar-at-bottom fix): single persistent listener instance,
-    // reused across every layoutSearchContainer() call instead of allocating a
-    // new one each time. See layoutSearchContainer() for why a fresh listener
-    // per call caused stacked/compounding offsetTopAndBottom() corrections.
-    private final ViewTreeObserver.OnGlobalLayoutListener mSearchContainerBottomCorrection =
-            this::correctSearchContainerBottomPosition;
-    // LC-Note (search-bar-at-bottom): true while animateSearchContainerForSearchState()'s
-    // translationY animator is in flight on mSearchContainer. See
-    // correctSearchContainerBottomPosition() for why this guard is needed.
-    private boolean mSearchContainerAnimating = false;
     public SearchRecyclerView mSearchRecyclerView;
     protected SearchAdapterProvider<?> mMainAdapterProvider;
     private View mBottomSheetHandleArea;
@@ -474,14 +464,36 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     /**
-     * LC-Note (search-bar-at-bottom): when the search bar is pinned to the
-     * bottom of the drawer, tapping it to enter search should slide it up to
-     * the top of the drawer, and dismissing search should slide it back down
-     * to the bottom — independent of SearchTransitionController, which only
-     * animates the A-Z grid/header content, never mSearchContainer's own
-     * position. No-op (translationY stays 0) when the preference is off, when
-     * the search bar is floating (it already manages its own position), or
-     * before the view has been laid out (getTop()==0 && getBottom()==0).
+     * LC-Note (search-bar-at-bottom, rewritten): when the search bar is pinned
+     * to the bottom of the drawer, tapping it to enter search should slide it
+     * up to the top of the drawer, and dismissing search should slide it back
+     * down to the bottom — independent of SearchTransitionController, which
+     * only animates the A-Z grid/header content, never mSearchContainer's own
+     * position.
+     *
+     * Architecture note: this used to coexist with a second system
+     * (layoutSearchContainer() mutating RelativeLayout margins / addRule
+     * ALIGN_PARENT_BOTTOM, plus a correction pass calling
+     * offsetTopAndBottom()) that ALSO repositioned mSearchContainer, via its
+     * actual layout top/bottom rather than a transform. Two systems writing to
+     * "where is this view" through two different mechanisms (layout position
+     * vs. translationY transform) raced every time one fired while the other
+     * was mid-operation - confirmed across three separate collision points
+     * during testing, each fixed individually but with a new one surfacing
+     * each time. Rather than guard a fourth, fifth, etc. collision point, the
+     * design is now: mSearchContainer's LAYOUT position (top/bottom via
+     * RelativeLayout rules/margins) is NEVER mutated for the bottom-pin
+     * feature - it stays in its single, stable, top-aligned default position
+     * always. The bottom-pinned visual position is expressed ENTIRELY as
+     * translationY, computed fresh from that one stable layout position every
+     * time via getSearchContainerRestingTranslationY(). There is exactly one
+     * function that knows the correct resting value, and exactly two ways to
+     * reach it: instantly (settleSearchContainerPosition(), used for
+     * inset/config changes, which should snap not animate) or animated (this
+     * method, used for user-driven focus/search-state changes). Both always
+     * target the same freshly-computed value, so even if calls overlap, they
+     * converge on the same answer instead of racing toward different targets
+     * computed from different code paths.
      */
     private void animateSearchContainerForSearchState(boolean goingToSearch, long durationMs) {
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
@@ -489,12 +501,29 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!searchBarAtBottom || isSearchBarFloating()) return;
         if (mSearchContainer.getHeight() == 0) return;
 
-        mSearchContainer.animate().cancel();
-        mSearchContainerAnimating = true;
-        if (goingToSearch) {
+        float targetTranslationY = getSearchContainerRestingTranslationY(goingToSearch);
+        mSearchContainer.animate()
+                .translationY(targetTranslationY)
+                .setDuration(durationMs)
+                .start();
+    }
+
+    /**
+     * LC-Note (search-bar-at-bottom): single source of truth for
+     * mSearchContainer's resting translationY. Always computed fresh from the
+     * view's stable, never-mutated layout position - never from a previous
+     * translationY or a previous correction. See
+     * animateSearchContainerForSearchState() for why this matters.
+     *
+     * @param searching true for the "slid up to top" resting position (search
+     *                   focused / showing results), false for the "pinned at
+     *                   bottom" resting position.
+     */
+    private float getSearchContainerRestingTranslationY(boolean searching) {
+        if (searching) {
             // Slide up so the bar's bottom edge lands at this container's own
             // top padding (the same resting position a top-anchored search bar
-            // would occupy), i.e. translate by (top padding - current top).
+            // would occupy), i.e. translate by (top padding - natural top).
             //
             // LC-Note: AppsSearchContainerLayout.onLayout() unconditionally
             // calls offsetTopAndBottom(mContentOverlap) on every layout pass
@@ -509,40 +538,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             int contentOverlap = getResources().getDimensionPixelSize(
                     R.dimen.all_apps_search_bar_content_overlap);
             int targetTop = getPaddingTop() + contentOverlap;
-            float targetTranslationY = targetTop - mSearchContainer.getTop();
-            mSearchContainer.animate()
-                    .translationY(targetTranslationY)
-                    .setDuration(durationMs)
-                    .withEndAction(() -> mSearchContainerAnimating = false)
-                    .start();
+            // mSearchContainer.getTop() is its STABLE, never-mutated natural
+            // layout top (no margin/rule changes are ever applied to it for
+            // this feature), so this is always a fresh, correct delta - never
+            // stale, regardless of what translationY it currently holds.
+            return targetTop - mSearchContainer.getTop();
         } else {
-            // LC-Note (fix for broken position after focus -> back-press cycle):
-            // this previously hardcoded translationY(0f), which assumes the
-            // view's LAYOUT top/bottom (set via margins in layoutSearchContainer()
-            // and possibly further nudged by correctSearchContainerBottomPosition()'s
-            // offsetTopAndBottom() calls) is unconditionally the correct bottom-
-            // pinned rest position with zero added transform on top. That's two
-            // separate coordinate systems (layout top/bottom vs. transform
-            // translationY) being treated as interchangeable. If a
-            // correctSearchContainerBottomPosition() correction ran while this
-            // view was mid-transition (translationY != 0) — e.g. window insets
-            // settling shortly after the drawer opened — offsetTopAndBottom()
-            // shifts the LAYOUT position while translationY still holds the old
-            // animated offset on top of it; resetting translationY to a literal 0
-            // is only correct if no such correction happened in between.
-            // Compute the true desired rest position the same way
-            // correctSearchContainerBottomPosition() does (bottom edge sitting
-            // mInsets.bottom above this view's bottom) and derive the
-            // translationY needed to reach it from the CURRENT layout position,
-            // rather than assuming 0 is always home.
+            // Slide down so the bar's bottom edge clears the nav bar, sitting
+            // mInsets.bottom above this container's true bottom edge.
             int desiredBottom = getHeight() - mInsets.bottom;
-            int currentLayoutBottom = mSearchContainer.getBottom();
-            float targetTranslationY = desiredBottom - currentLayoutBottom;
-            mSearchContainer.animate()
-                    .translationY(targetTranslationY)
-                    .setDuration(durationMs)
-                    .withEndAction(() -> mSearchContainerAnimating = false)
-                    .start();
+            return desiredBottom - mSearchContainer.getBottom();
         }
     }
 
@@ -822,7 +827,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         } else {
             layoutBelowSearchContainer(mHeader, false);
         }
-        layoutSearchContainer();
+        settleSearchContainerPosition();
     }
 
     public void forceUpdateHeaderHeight(int offset) {
@@ -1028,143 +1033,42 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     /**
-     * LC-Note (search-bar-at-bottom): pins mSearchContainer to the bottom of this
-     * RelativeLayout instead of leaving it at its implicit default top position.
-     * Bottom margin clears the system nav bar inset so the bar isn't obscured.
-     * Only applies when the search bar is not floating (floating search bar
-     * already manages its own bottom-anchored position via the DragLayer /
-     * mSearchUiDelegate, independent of this preference).
+     * LC-Note (search-bar-at-bottom, rewritten): previously this method mutated
+     * mSearchContainer's RelativeLayout rules/margins (ALIGN_PARENT_BOTTOM,
+     * bottomMargin) to physically move it to the bottom, AND a separate
+     * correction pass (formerly correctSearchContainerBottomPosition()) used
+     * offsetTopAndBottom() to nudge it further. Both of those mutate the
+     * view's actual LAYOUT top/bottom. animateSearchContainerForSearchState()
+     * independently animates translationY, a transform layered on top of
+     * layout position. Two systems, two different properties, both claiming
+     * to own "where this view is" - every entry point into either one was a
+     * potential race against the other. Confirmed via testing across three
+     * separate collision points, each fixed individually, with a new one
+     * surfacing each time.
+     *
+     * New design: mSearchContainer's LAYOUT position is no longer mutated for
+     * this feature at all - no rule changes, no margin changes, no
+     * offsetTopAndBottom(). It always stays in its single, stable, naturally
+     * top-aligned position. This method now only ever sets translationY
+     * (never animated - this is for insets/config changes, which should snap
+     * instantly), via the exact same getSearchContainerRestingTranslationY()
+     * calculation that the animated focus/search-state path uses. Because
+     * there is only one mechanism (translationY) and one calculation function,
+     * there is nothing left for this method and the animated path to race
+     * over - both always compute and converge on the identical target value.
      */
-    private void layoutSearchContainer() {
-        if (!(mSearchContainer.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
-        RelativeLayout.LayoutParams lp = (LayoutParams) mSearchContainer.getLayoutParams();
-        lp.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
+    private void settleSearchContainerPosition() {
+        if (mSearchContainer.getHeight() == 0) return;
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
-        if (searchBarAtBottom && !isSearchBarFloating()) {
-            lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-            // LC-Note: mNavBarScrimHeight (computeNavBarScrimHeight()) reads the
-            // RAW WindowInsets handed to dispatchApplyWindowInsets(). That object
-            // never passes through LawnchairWindowManagerProxy.normalizeWindowInsets()
-            // - the proxy's corrected values only ever reach this view via
-            // LauncherRootView.updateInsets() -> handleSystemWindowInsets(Rect) ->
-            // setInsets(Rect), i.e. mInsets. Confirmed via logging that
-            // mNavBarScrimHeight reads 0 in every nav mode (gesture/3-button/
-            // 2-button) while mInsets.bottom correctly carries the normalized nav
-            // bar height. Use mInsets.bottom alone; do not factor in
-            // mNavBarScrimHeight here, it is not meaningful for this view.
-            lp.bottomMargin = mInsets.bottom;
-            lp.topMargin = 0;
-        } else {
-            lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-            lp.bottomMargin = 0;
+        if (!searchBarAtBottom || isSearchBarFloating()) {
+            mSearchContainer.setTranslationY(0f);
+            return;
         }
-        // LC-Note (fix for rapid open/close/tap race, third collision point):
-        // setLayoutParams() below forces an immediate new layout pass, which can
-        // change mSearchContainer's getTop()/getBottom() RIGHT NOW — even while
-        // animateSearchContainerForSearchState()'s translationY animator is
-        // actively running on this same view (mSearchContainerAnimating == true).
-        // That animator's target translationY was computed against the OLD
-        // layout position; if the layout position silently changes underneath
-        // it, the already-running animation will finish at the wrong visual
-        // spot once added to the new top/bottom. This is the rapid
-        // open/close+tap+swipe race: a new open's layoutSearchContainer() call
-        // can land while the previous close's slide-down animation is still
-        // mid-flight.
-        // Fix: capture the bottom edge before the layout-params change, apply
-        // the change, then if it actually moved AND an animation is running,
-        // shift translationY by the exact opposite delta so the rendered
-        // (top/bottom + translationY) position does not visibly jump. The
-        // running animator keeps animating toward its original target relative
-        // to the OLD position, which is now correctly re-based onto the new one.
-        int bottomBeforeLayout = mSearchContainer.getBottom();
-        mSearchContainer.setLayoutParams(lp);
-        if (mSearchContainerAnimating) {
-            getViewTreeObserver().addOnGlobalLayoutListener(
-                    new ViewTreeObserver.OnGlobalLayoutListener() {
-                        @Override
-                        public void onGlobalLayout() {
-                            getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                            if (!mSearchContainerAnimating) return;
-                            int layoutShift = mSearchContainer.getBottom() - bottomBeforeLayout;
-                            if (layoutShift != 0) {
-                                mSearchContainer.setTranslationY(
-                                        mSearchContainer.getTranslationY() - layoutShift);
-                            }
-                        }
-                    });
-        }
-        if (searchBarAtBottom && !isSearchBarFloating()) {
-            // LC-Note (fix for real overlap, multiple rounds of measurement):
-            // margin-based compensation for AppsSearchContainerLayout.onLayout()
-            // unconditionally calling offsetTopAndBottom(mContentOverlap) proved
-            // unreliable - that call is a RELATIVE/cumulative shift applied on
-            // EVERY onLayout() pass, and onLayout() can fire more than once per
-            // our single layoutSearchContainer() call, so a fixed margin
-            // compensation calculated for "one shift" under- or over-corrects
-            // depending on how many onLayout() passes actually ran before the
-            // frame is drawn.
-            // Instead of guessing the right compensation, correct the view's
-            // ACTUAL final position directly and idempotently: after layout
-            // settles, force its top so its bottom edge sits exactly
-            // mInsets.bottom above the true bottom of this (root) view,
-            // regardless of how many cumulative offsetTopAndBottom() shifts
-            // happened to get it there.
-            //
-            // LC-Note (fix for compounding-correction bug): layoutSearchContainer()
-            // is called multiple times in quick succession per single open
-            // (from setupHeader(), setInsets(), and dispatchApplyWindowInsets()).
-            // The previous version allocated a NEW OnGlobalLayoutListener on every
-            // call. Each one independently read mSearchContainer.getBottom() at
-            // whatever moment ITS OWN global-layout pass happened to fire, which
-            // could already include a correction just applied by a different,
-            // still-queued listener from an earlier call in the same burst. With
-            // multiple listeners stacked, each one's offsetTopAndBottom(delta) was
-            // computed against a different, already-shifting target, so corrections
-            // compounded instead of converging - matching the reported symptom of
-            // needing to toggle the preference repeatedly before the position
-            // looked right by chance.
-            // Fix: reuse a single persistent listener instance (mSearchContainerBottomCorrection,
-            // a field) and always remove() it before add()-ing it again. This
-            // guarantees at most one correction is ever pending at a time; if a new
-            // layoutSearchContainer() call comes in before the previous correction's
-            // global-layout pass has fired, the old pending one is cancelled and
-            // replaced rather than both running.
-            getViewTreeObserver().removeOnGlobalLayoutListener(mSearchContainerBottomCorrection);
-            getViewTreeObserver().addOnGlobalLayoutListener(mSearchContainerBottomCorrection);
-        }
-    }
-
-    /**
-     * LC-Note (search-bar-at-bottom): one-shot correction invoked by
-     * mSearchContainerBottomCorrection. Removes itself so it only runs once per
-     * registration; layoutSearchContainer() re-registers it (replacing any still-
-     * pending instance) whenever the bar's target position may have changed.
-     */
-    private void correctSearchContainerBottomPosition() {
-        getViewTreeObserver().removeOnGlobalLayoutListener(mSearchContainerBottomCorrection);
-        if (!isAttachedToWindow() || getHeight() == 0) return;
-        if (mInsets.bottom == 0) return;
-        // LC-Note (fix for fight-with-search-animation bug): if
-        // animateSearchContainerForSearchState()'s translationY animator is
-        // currently running on this same view, offsetTopAndBottom() here would
-        // change the view's layout top/bottom out from under that animation
-        // mid-flight, corrupting the animation's notion of where "home" is (see
-        // that method's own note on this same two-coordinate-system problem).
-        // Skip this correction while that animation owns the view; it already
-        // computes its own correct end position from current layout values
-        // whenever it next runs, so there's nothing to fix here in that case.
-        // ViewPropertyAnimator (the type returned by View.animate()) has no
-        // public "is it currently running" query, so this is tracked explicitly
-        // via mSearchContainerAnimating, set/cleared around the .animate() calls
-        // in animateSearchContainerForSearchState().
-        if (mSearchContainerAnimating) return;
-        int desiredBottom = getHeight() - mInsets.bottom;
-        int currentBottom = mSearchContainer.getBottom();
-        int delta = desiredBottom - currentBottom;
-        if (delta != 0) {
-            mSearchContainer.offsetTopAndBottom(delta);
-        }
+        boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
+                && mSearchUiManager.getEditText().hasFocus());
+        mSearchContainer.setTranslationY(
+                getSearchContainerRestingTranslationY(searching));
     }
 
     /**
@@ -1374,7 +1278,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             setPadding(grid.allAppsLeftRightMargin, topPadding, grid.allAppsLeftRightMargin, 0);
         }
         InsettableFrameLayout.dispatchInsets(this, insets);
-        layoutSearchContainer();
+        settleSearchContainerPosition();
 
         // LC-Note (fix for icon clipping behind drag handle when hideAppDrawerSearchBar
         // is on): setupHeader() sets adapterHolder.mPadding.top = 0 when the header is
@@ -1408,13 +1312,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         mNavBarScrimHeight = computeNavBarScrimHeight(insets);
         applyAdapterSideAndBottomPaddings(mActivityContext.getDeviceProfile());
-        // LC-Note (search-bar-at-bottom): mNavBarScrimHeight is only known to be
-        // fresh as of the line above. layoutSearchContainer()'s bottom margin
-        // depends on it (see its own Math.max(mInsets.bottom, mNavBarScrimHeight)
-        // comment), so recompute the search bar's position here too, not just in
-        // setInsets()/setupHeader(), or it can end up using a stale (too small)
-        // value from before this callback fired.
-        layoutSearchContainer();
+        // LC-Note (search-bar-at-bottom): settleSearchContainerPosition() uses
+        // mInsets.bottom (not mNavBarScrimHeight), so this call is mainly here
+        // in case mInsets itself is updated as a side effect of insets
+        // dispatch on some code paths; cheap to call again and keeps the
+        // resting position correct even if so.
+        settleSearchContainerPosition();
         return super.dispatchApplyWindowInsets(insets);
     }
 

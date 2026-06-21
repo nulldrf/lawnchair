@@ -1031,6 +1031,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.bottomMargin = 0;
         }
+        // TEMP-DEBUG (remove after confirming fix): if this line never appears
+        // in logcat, the running APK does not contain this code change.
+        android.util.Log.d("LCSearchBarDebug", "BUILD_MARKER_V2: layoutSearchContainer "
+                + "set bottomMargin=" + lp.bottomMargin + " searchBarAtBottom=" + searchBarAtBottom
+                + " isSearchBarFloating=" + isSearchBarFloating() + " mInsets.bottom=" + mInsets.bottom);
         mSearchContainer.setLayoutParams(lp);
     }
 

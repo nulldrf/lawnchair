@@ -39,11 +39,13 @@ import dev.kdrag0n.monet.theme.ColorScheme;
 @RequiresApi(api = Build.VERSION_CODES.S)
 public class AccentColorExtractor extends LocalColorExtractor implements ThemeProvider.ColorSchemeChangeListener {
 
+    private final Context mContext;
     private final ThemeProvider mThemeProvider;
     private Listener mListener;
 
     @Keep
     public AccentColorExtractor(Context context) {
+        mContext = context;
         mThemeProvider = ThemeProvider.INSTANCE.get(context);
     }
 
@@ -81,8 +83,51 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
     }
 
     protected void notifyListener() {
-        if (mListener != null) {
+        if (mListener == null) return;
+        // Route to SPEC_2025 palette when active — uses materialkolor DynamicScheme
+        // rather than the kdrag0n ColorScheme so widgets reflect the true 2025 colors.
+        int uiMode = mContext.getResources().getConfiguration().uiMode;
+        boolean isDark = (uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark);
+        if (scheme2025 != null) {
+            mListener.onColorsChanged(generateColorsOverride2025(scheme2025));
+        } else {
             mListener.onColorsChanged(generateColorsOverride(mThemeProvider.getColorScheme()));
+        }
+    }
+
+    /**
+     * Builds the color resource override array from a SPEC_2025 [MonetColorSchemeCompat2025].
+     *
+     * Maps kdrag0n shade keys (0–1000) to Material tones (100–0) via:
+     *   materialTone = (1000 - shade) / 10
+     * and reads each ARGB value from the materialkolor [TonalPalette].
+     */
+    @Nullable
+    protected SparseIntArray generateColorsOverride2025(MonetColorSchemeCompat2025 scheme2025) {
+        SparseIntArray colorRes = new SparseIntArray(5 * 13);
+        addPaletteToArray(scheme2025.getScheme().getPrimaryPalette(),         ACCENT1_RES,  colorRes);
+        addPaletteToArray(scheme2025.getScheme().getSecondaryPalette(),       ACCENT2_RES,  colorRes);
+        addPaletteToArray(scheme2025.getScheme().getTertiaryPalette(),        ACCENT3_RES,  colorRes);
+        addPaletteToArray(scheme2025.getScheme().getNeutralPalette(),         NEUTRAL1_RES, colorRes);
+        addPaletteToArray(scheme2025.getScheme().getNeutralVariantPalette(),  NEUTRAL2_RES, colorRes);
+        return colorRes;
+    }
+
+    /**
+     * Iterates over [resMap] shade keys, converts each to a Material tone, looks up
+     * the ARGB value from [palette], and stores it in [array] keyed by resource ID.
+     */
+    private static void addPaletteToArray(TonalPalette palette,
+                                          SparseIntArray resMap,
+                                          SparseIntArray array) {
+        for (int i = 0; i < resMap.size(); i++) {
+            int shade  = resMap.keyAt(i);
+            int resId  = resMap.valueAt(i);
+            // kdrag0n shades run light→dark (0→1000); Material tones run dark→light (0→100).
+            int tone   = (1000 - shade) / 10;
+            array.put(resId, palette.tone(tone));
         }
     }
 
@@ -171,14 +216,8 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
             int shade = entry.getKey();
             int resId = resMap.get(shade, -1);
             if (resId != -1) {
-                Color color = entry.getValue();
-                // MonetColorSchemeCompat and SystemColorScheme store AndroidColor
-                // directly. KdragMonetColorScheme stores kdrag0n color types
-                // (Srgb, Zcam, etc.) which must be converted via toAndroidColor().
-                int colorInt = (color instanceof AndroidColor)
-                        ? ((AndroidColor) color).getColor()
-                        : ThemeProviderKt.toAndroidColor(color);
-                array.put(resId, colorInt);
+                AndroidColor color = (AndroidColor) entry.getValue();
+                array.put(resId, color.getColor());
             }
         }
     }

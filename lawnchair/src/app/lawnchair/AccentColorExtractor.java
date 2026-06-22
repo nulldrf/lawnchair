@@ -30,9 +30,12 @@ import com.android.launcher3.widget.LocalColorExtractor;
 
 import java.util.Map;
 
+import android.content.res.Configuration;
 import app.lawnchair.theme.ThemeProvider;
 import app.lawnchair.theme.ThemeProviderKt;
 import app.lawnchair.theme.color.AndroidColor;
+import app.lawnchair.theme.color.MonetColorSchemeCompat2025;
+import com.materialkolor.palettes.TonalPalette;
 import dev.kdrag0n.colorkt.Color;
 import dev.kdrag0n.monet.theme.ColorScheme;
 

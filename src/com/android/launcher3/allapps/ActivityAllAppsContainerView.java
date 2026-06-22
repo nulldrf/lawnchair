@@ -512,11 +512,49 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!searchBarAtBottom || isSearchBarFloating()) return;
         if (mSearchContainer.getHeight() == 0) return;
 
+        // LC-Note (fix for content overlap): when the bar slides up to the top
+        // for search/focus, content (RV, header) must move down to start below
+        // it; when it slides back down, content must return to ALIGN_PARENT_TOP
+        // with topMargin=0. Re-running layoutBelowSearchContainer() on the
+        // affected views is the correct way since it's already search-state-aware
+        // (reads isSearching()/hasFocus() to compute the right topMargin). Note:
+        // at the point this runs, mIsSearching has already been updated by the
+        // caller (animateToSearchState() sets it before calling this), so the
+        // state read in layoutBelowSearchContainer() is already the new state.
+        // topMargin change takes effect immediately (snap), while the bar itself
+        // animates — this is correct; the content area should snap open to make
+        // room for the bar before the bar arrives, not animate in lock-step with
+        // the bar (which would require animating a RelativeLayout topMargin, not
+        // easily supported by ViewPropertyAnimator).
+        updateContentTopMarginForSearchState();
+
         float targetTranslationY = getSearchContainerRestingTranslationY(goingToSearch);
         mSearchContainer.animate()
                 .translationY(targetTranslationY)
                 .setDuration(durationMs)
                 .start();
+    }
+
+    /**
+     * LC-Note (search-bar-at-bottom): re-applies layoutBelowSearchContainer()
+     * to all content views so their topMargin reflects the current search/focus
+     * state. Called when search state transitions (bar slides up/down) so
+     * content snaps to make room for the bar at the top, or reclaims that space
+     * when the bar returns to the bottom.
+     */
+    private void updateContentTopMarginForSearchState() {
+        boolean showTabs = mUsingTabs;
+        if (isSearchBarFloating()) {
+            alignParentTop(getAppsRecyclerViewContainer(), showTabs);
+            alignParentTop(getSearchRecyclerView(), false);
+            alignParentTop(mHeader, false);
+        } else {
+            layoutBelowSearchContainer(getAppsRecyclerViewContainer(), showTabs);
+            layoutBelowSearchContainer(getSearchRecyclerView(), false);
+            layoutBelowSearchContainer(mHeader, false);
+        }
+        // Force a layout pass so the new topMargin takes effect immediately.
+        requestLayout();
     }
 
     /**
@@ -995,11 +1033,19 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // since the search container is no longer at the top at all. The bottom
         // padding needed to clear the now-bottom-pinned search bar is handled
         // separately in applyAdapterSideAndBottomPaddings(), not here.
+        //
+        // Exception: when the bar is currently slid UP to the top (i.e. during
+        // search/focus — animateSearchContainerForSearchState(true) was called),
+        // the bar is visually at the top and content must start below it. Use
+        // topMargin = mSearchContainer.getHeight() in that case so content clears
+        // the bar, exactly as ALIGN_TOP of the search container does in normal mode.
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom) {
             lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
-            lp.topMargin = 0;
+            boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
+                    && mSearchUiManager.getEditText().hasFocus());
+            lp.topMargin = searching ? mSearchContainer.getHeight() : 0;
             return;
         }
 

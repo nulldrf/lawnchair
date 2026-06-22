@@ -73,8 +73,17 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
 
     @Override
     public void applyColorsOverride(Context base, WallpaperColors colors) {
+        // Determine dark mode from the target context — this is what makes
+        // the widget preview render with the correct SPEC_2025 palette.
+        int uiMode = base.getResources().getConfiguration().uiMode;
+        boolean isDark = (uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark);
+        SparseIntArray colorOverrides = (scheme2025 != null)
+                ? generateColorsOverride2025(scheme2025)
+                : generateColorsOverride(mThemeProvider.getColorScheme());
         RemoteViews.ColorResources res =
-                RemoteViews.ColorResources.create(base, generateColorsOverride(colors));
+                RemoteViews.ColorResources.create(base, colorOverrides);
         if (res != null) {
             res.apply(base);
         }

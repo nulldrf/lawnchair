@@ -154,37 +154,72 @@ fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): C
 private const val MIN_ON_COLOR_CONTRAST = 4.5
 
 /**
+ * Minimum acceptable HCT tone (lightness) distance between a role color and its
+ * "on" counterpart. WCAG's luminance-based ratio can still report a passing score
+ * even when two highly chromatic colors of similar lightness are paired — chroma
+ * differences partially compensate for the luminance formula in a way that doesn't
+ * match how legible the pairing actually looks. Requiring a minimum raw tone gap
+ * (HCT's perceptually-uniform L*) catches cases the luminance ratio alone misses,
+ * which is exactly what happened with Expressive: WCAG ratio passed, but the
+ * checkmark still read as nearly invisible against the thumb.
+ */
+private const val MIN_ON_COLOR_TONE_DELTA = 50.0
+
+/**
  * Guards against a real but narrow materialkolor/HCT edge case: [ContrastCurve]
  * guarantees a minimum *tone* distance between a role and its "on" counterpart
  * (e.g. 60 tone steps between primary=80 and onPrimary=20 in dark mode), but for
  * certain hue/chroma combinations — observed specifically with Vibrant and
- * Expressive in dark mode — high chroma on both colors can make that tone gap
- * perceptually collapse, even though the formula technically succeeded.
+ * Expressive in dark mode — high chroma on both colors can make that gap read as
+ * nearly invisible even when the WCAG luminance ratio nominally passes.
+ *
+ * Two independent checks must both pass, or [onArgb]'s tone gets nudged:
+ *   1. WCAG luminance ratio (via [Contrast.ratioOfTones]) ≥ [MIN_ON_COLOR_CONTRAST]
+ *   2. Raw HCT tone distance ≥ [MIN_ON_COLOR_TONE_DELTA]
+ *
+ * Check 2 is what actually catches Expressive: two highly chromatic colors can
+ * satisfy the luminance-ratio formula while still being visually close in
+ * perceived lightness, because chroma differences feed into the same formula
+ * and partially mask a small real lightness gap.
  *
  * This is purely a lightness (tone) adjustment — [onArgb]'s hue and chroma are
  * preserved exactly via [Hct.from], only [Hct.tone] is nudged using
- * [Contrast.lighterUnsafe]/[Contrast.darkerUnsafe] until the WCAG ratio against
- * [baseArgb] clears [MIN_ON_COLOR_CONTRAST]. If the existing pairing already has
- * enough contrast (the overwhelming majority of seeds/styles), [onArgb] is
- * returned completely untouched — this never alters colors that were already fine.
+ * [Contrast.lighterUnsafe]/[Contrast.darkerUnsafe] until contrast clears
+ * [MIN_ON_COLOR_CONTRAST] (this also tends to widen the raw tone gap, since
+ * lighterUnsafe/darkerUnsafe push away from [baseArgb]'s tone). If both checks
+ * already pass — the overwhelming majority of seeds/styles — [onArgb] is
+ * returned completely untouched.
  */
 private fun ensureOnColorContrast(baseArgb: Int, onArgb: Int): Color {
     val baseHct = Hct.fromInt(baseArgb)
     val onHct = Hct.fromInt(onArgb)
 
     val currentRatio = Contrast.ratioOfTones(baseHct.tone, onHct.tone)
-    if (currentRatio >= MIN_ON_COLOR_CONTRAST) {
+    val currentToneDelta = kotlin.math.abs(baseHct.tone - onHct.tone)
+
+    val passesRatio = currentRatio >= MIN_ON_COLOR_CONTRAST
+    val passesToneDelta = currentToneDelta >= MIN_ON_COLOR_TONE_DELTA
+    if (passesRatio && passesToneDelta) {
         return Color(onArgb)
     }
 
-    // onArgb is lighter than baseArgb (e.g. onPrimary=20 vs primary=80 in dark mode
-    // would actually have onArgb DARKER — handle both directions by trying whichever
-    // direction increases separation from baseHct.tone).
+    // Push onArgb's tone away from baseArgb's tone, in whichever direction it's
+    // already leaning, far enough to satisfy the stricter of the two requirements.
     val isOnLighter = onHct.tone >= baseHct.tone
-    val adjustedTone = if (isOnLighter) {
+    val ratioTargetTone = if (isOnLighter) {
         Contrast.lighterUnsafe(baseHct.tone, MIN_ON_COLOR_CONTRAST)
     } else {
         Contrast.darkerUnsafe(baseHct.tone, MIN_ON_COLOR_CONTRAST)
+    }
+    val toneDeltaTargetTone = if (isOnLighter) {
+        (baseHct.tone + MIN_ON_COLOR_TONE_DELTA).coerceIn(0.0, 100.0)
+    } else {
+        (baseHct.tone - MIN_ON_COLOR_TONE_DELTA).coerceIn(0.0, 100.0)
+    }
+    val adjustedTone = if (isOnLighter) {
+        maxOf(ratioTargetTone, toneDeltaTargetTone)
+    } else {
+        minOf(ratioTargetTone, toneDeltaTargetTone)
     }
 
     val fixed = Hct.from(onHct.hue, onHct.chroma, adjustedTone)

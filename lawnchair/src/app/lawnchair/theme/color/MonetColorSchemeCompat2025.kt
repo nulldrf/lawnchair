@@ -44,6 +44,41 @@ class MonetColorSchemeCompat2025(
 ) {
     val scheme: DynamicScheme = buildScheme(seedColor, style, isDark)
 
+    /**
+     * Builds a [SparseIntArray] mapping Android system color resource IDs to ARGB ints
+     * from this SPEC_2025 [DynamicScheme].  Called by [AccentColorExtractor] to apply
+     * the 2025 palette to widget contexts without Java needing to touch [TonalPalette].
+     *
+     * Shade keys (0–1000) from the legacy Monet system map to Material tones (100–0):
+     *   materialTone = (1000 - shade) / 10
+     */
+    fun toColorOverrides(
+        accent1Res: android.util.SparseIntArray,
+        accent2Res: android.util.SparseIntArray,
+        accent3Res: android.util.SparseIntArray,
+        neutral1Res: android.util.SparseIntArray,
+        neutral2Res: android.util.SparseIntArray,
+    ): android.util.SparseIntArray {
+        val result = android.util.SparseIntArray(5 * 13)
+
+        fun addPalette(palette: com.materialkolor.palettes.TonalPalette, resMap: android.util.SparseIntArray) {
+            for (i in 0 until resMap.size()) {
+                val shade = resMap.keyAt(i)
+                val resId = resMap.valueAt(i)
+                val tone = (1000 - shade) / 10
+                result.put(resId, palette.tone(tone))
+            }
+        }
+
+        addPalette(scheme.primaryPalette,        accent1Res)
+        addPalette(scheme.secondaryPalette,       accent2Res)
+        addPalette(scheme.tertiaryPalette,        accent3Res)
+        addPalette(scheme.neutralPalette,         neutral1Res)
+        addPalette(scheme.neutralVariantPalette,  neutral2Res)
+
+        return result
+    }
+
     companion object {
         private fun buildScheme(
             @ColorInt seedColor: Int,

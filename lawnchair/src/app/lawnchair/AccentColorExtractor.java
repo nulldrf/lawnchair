@@ -36,7 +36,6 @@ import app.lawnchair.theme.ThemeProvider;
 import app.lawnchair.theme.ThemeProviderKt;
 import app.lawnchair.theme.color.AndroidColor;
 import app.lawnchair.theme.color.MonetColorSchemeCompat2025;
-import com.materialkolor.palettes.TonalPalette;
 import dev.kdrag0n.colorkt.Color;
 import dev.kdrag0n.monet.theme.ColorScheme;
 
@@ -120,35 +119,14 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
     /**
      * Builds the color resource override array from a SPEC_2025 [MonetColorSchemeCompat2025].
      *
-     * Maps kdrag0n shade keys (0–1000) to Material tones (100–0) via:
-     *   materialTone = (1000 - shade) / 10
-     * and reads each ARGB value from the materialkolor [TonalPalette].
+     * Delegates entirely to the Kotlin [MonetColorSchemeCompat2025.toColorOverrides] method
+     * so all materialkolor/TonalPalette API access stays in Kotlin — avoids Java-side
+     * type resolution issues with Kotlin-only classes.
      */
     @Nullable
     protected SparseIntArray generateColorsOverride2025(MonetColorSchemeCompat2025 scheme2025) {
-        SparseIntArray colorRes = new SparseIntArray(5 * 13);
-        addPaletteToArray(scheme2025.getScheme().getPrimaryPalette(),         ACCENT1_RES,  colorRes);
-        addPaletteToArray(scheme2025.getScheme().getSecondaryPalette(),       ACCENT2_RES,  colorRes);
-        addPaletteToArray(scheme2025.getScheme().getTertiaryPalette(),        ACCENT3_RES,  colorRes);
-        addPaletteToArray(scheme2025.getScheme().getNeutralPalette(),         NEUTRAL1_RES, colorRes);
-        addPaletteToArray(scheme2025.getScheme().getNeutralVariantPalette(),  NEUTRAL2_RES, colorRes);
-        return colorRes;
-    }
-
-    /**
-     * Iterates over [resMap] shade keys, converts each to a Material tone, looks up
-     * the ARGB value from [palette], and stores it in [array] keyed by resource ID.
-     */
-    private static void addPaletteToArray(TonalPalette palette,
-                                          SparseIntArray resMap,
-                                          SparseIntArray array) {
-        for (int i = 0; i < resMap.size(); i++) {
-            int shade  = resMap.keyAt(i);
-            int resId  = resMap.valueAt(i);
-            // kdrag0n shades run light→dark (0→1000); Material tones run dark→light (0→100).
-            int tone   = (1000 - shade) / 10;
-            array.put(resId, palette.tone(tone));
-        }
+        return scheme2025.toColorOverrides(
+                ACCENT1_RES, ACCENT2_RES, ACCENT3_RES, NEUTRAL1_RES, NEUTRAL2_RES);
     }
 
     // Shade number -> color resource ID maps

@@ -240,6 +240,9 @@ class ThemeProvider @Inject constructor(
      * [isDark] is required because [DynamicScheme] bakes dark/light into palette
      * generation — surface tones and chroma multipliers differ per mode.
      */
+    /** Public accessor so Java callers (e.g. AccentColorExtractor) can gate on spec. */
+    val activeColorSpec: SpecVersion get() = colorSpec
+
     fun colorScheme2025(isDark: Boolean): MonetColorSchemeCompat2025? =
         resolveColorScheme2025(accentColor, isDark)
 

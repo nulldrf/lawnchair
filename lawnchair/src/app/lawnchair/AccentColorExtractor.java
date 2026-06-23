@@ -86,19 +86,39 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
         return (uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
+    /**
+     * Called by the widget picker to get colors for a specific wallpaper.
+     * We ignore the WallpaperColors hint and always use ThemeProvider so
+     * Lawnchair's accent color picker choice is respected.
+     */
+    @Nullable
     @Override
-    public void applyColorsOverride(Context base, WallpaperColors colors) {
-        // Route to SPEC_2025 materialkolor palette when available so widget
-        // previews match the vibrant 2025 colors shown in Lawnchair settings.
-        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark(base));
-        SparseIntArray colorOverrides = (scheme2025 != null)
-                ? generateColorsOverride2025(scheme2025)
-                : generateColorsOverride(mThemeProvider.getColorScheme());
-        RemoteViews.ColorResources res =
-                RemoteViews.ColorResources.create(base, colorOverrides);
+    public SparseIntArray generateColorsOverride(WallpaperColors colors) {
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark(mContext));
+        if (scheme2025 != null) {
+            return generateColorsOverride2025(scheme2025);
+        }
+        return generateColorsOverride(mThemeProvider.getColorScheme());
+    }
+
+    /**
+     * Called by the widget system to apply a precomputed SparseIntArray to a
+     * widget context. Base class is a no-op — we must override to actually
+     * inject color resources so widget previews show the right colors.
+     */
+    @Override
+    public void applyColorsOverride(Context base, SparseIntArray override) {
+        if (override == null) return;
+        RemoteViews.ColorResources res = RemoteViews.ColorResources.create(base, override);
         if (res != null) {
             res.apply(base);
         }
+    }
+
+    @Override
+    public void applyColorsOverride(Context base, WallpaperColors colors) {
+        SparseIntArray colorOverrides = generateColorsOverride(colors);
+        applyColorsOverride(base, colorOverrides);
     }
 
     @Override

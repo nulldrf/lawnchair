@@ -31,7 +31,6 @@ import com.android.launcher3.widget.LocalColorExtractor;
 import java.util.Map;
 
 import android.content.res.Configuration;
-import com.android.systemui.monet.SpecVersion;
 import app.lawnchair.theme.ThemeProvider;
 import app.lawnchair.theme.ThemeProviderKt;
 import app.lawnchair.theme.color.AndroidColor;
@@ -78,10 +77,7 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
         int uiMode = base.getResources().getConfiguration().uiMode;
         boolean isDark = (uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
-        boolean useSpec2025 = mThemeProvider.getActiveColorSpec() == SpecVersion.SPEC_2025;
-        MonetColorSchemeCompat2025 scheme2025 = useSpec2025
-                ? mThemeProvider.colorScheme2025(isDark)
-                : null;
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark);
         SparseIntArray colorOverrides = (scheme2025 != null)
                 ? generateColorsOverride2025(scheme2025)
                 : generateColorsOverride(mThemeProvider.getColorScheme());
@@ -102,13 +98,11 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
         int uiMode = mContext.getResources().getConfiguration().uiMode;
         boolean isDark = (uiMode & Configuration.UI_MODE_NIGHT_MASK)
                 == Configuration.UI_MODE_NIGHT_YES;
-        // Only route to SPEC_2025 palette when the user has actually selected SPEC_2025.
-        // resolveColorScheme2025 returns non-null for all supported styles regardless of
-        // the active spec, so we must gate here — same logic Theme.kt uses.
-        boolean useSpec2025 = mThemeProvider.getActiveColorSpec() == SpecVersion.SPEC_2025;
-        MonetColorSchemeCompat2025 scheme2025 = useSpec2025
-                ? mThemeProvider.colorScheme2025(isDark)
-                : null;
+        // colorScheme2025 returns non-null for any style that has a 2025 variant
+        // (Spritz, TonalSpot, Vibrant, Expressive, CustomColor, WallpaperDerived).
+        // No colorSpec gate needed — Theme.kt uses this same path whenever non-null,
+        // so widgets must match to stay in sync with the rest of the UI.
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark);
         if (scheme2025 != null) {
             mListener.onColorsChanged(generateColorsOverride2025(scheme2025));
         } else {

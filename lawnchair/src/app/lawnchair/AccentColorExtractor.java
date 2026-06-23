@@ -18,6 +18,7 @@ package app.lawnchair;
 
 import android.app.WallpaperColors;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.util.SparseIntArray;
 import android.widget.RemoteViews;
@@ -30,7 +31,6 @@ import com.android.launcher3.widget.LocalColorExtractor;
 
 import java.util.Map;
 
-import android.content.res.Configuration;
 import app.lawnchair.theme.ThemeProvider;
 import app.lawnchair.theme.ThemeProviderKt;
 import app.lawnchair.theme.color.AndroidColor;
@@ -70,14 +70,27 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
         return colorRes;
     }
 
+    /**
+     * Builds the color override array from a SPEC_2025 {@link MonetColorSchemeCompat2025}.
+     * Delegates to the Kotlin {@code toColorOverrides()} method so all
+     * materialkolor/TonalPalette API access stays in Kotlin.
+     */
+    @Nullable
+    protected SparseIntArray generateColorsOverride2025(MonetColorSchemeCompat2025 scheme2025) {
+        return scheme2025.toColorOverrides(
+                ACCENT1_RES, ACCENT2_RES, ACCENT3_RES, NEUTRAL1_RES, NEUTRAL2_RES);
+    }
+
+    private boolean isDark(Context context) {
+        int uiMode = context.getResources().getConfiguration().uiMode;
+        return (uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    }
+
     @Override
     public void applyColorsOverride(Context base, WallpaperColors colors) {
-        // Determine dark mode from the target context — this is what makes
-        // the widget preview render with the correct SPEC_2025 palette.
-        int uiMode = base.getResources().getConfiguration().uiMode;
-        boolean isDark = (uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
-        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark);
+        // Route to SPEC_2025 materialkolor palette when available so widget
+        // previews match the vibrant 2025 colors shown in Lawnchair settings.
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark(base));
         SparseIntArray colorOverrides = (scheme2025 != null)
                 ? generateColorsOverride2025(scheme2025)
                 : generateColorsOverride(mThemeProvider.getColorScheme());
@@ -95,32 +108,15 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
 
     protected void notifyListener() {
         if (mListener == null) return;
-        int uiMode = mContext.getResources().getConfiguration().uiMode;
-        boolean isDark = (uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
-        // colorScheme2025 returns non-null for any style that has a 2025 variant
-        // (Spritz, TonalSpot, Vibrant, Expressive, CustomColor, WallpaperDerived).
-        // No colorSpec gate needed — Theme.kt uses this same path whenever non-null,
-        // so widgets must match to stay in sync with the rest of the UI.
-        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark);
+        // colorScheme2025 returns non-null for any accent+style combination that
+        // has a SPEC_2025 materialkolor variant. Use it when available so widget
+        // colors match the vibrant 2025 palette used by the rest of Lawnchair's UI.
+        MonetColorSchemeCompat2025 scheme2025 = mThemeProvider.colorScheme2025(isDark(mContext));
         if (scheme2025 != null) {
             mListener.onColorsChanged(generateColorsOverride2025(scheme2025));
         } else {
             mListener.onColorsChanged(generateColorsOverride(mThemeProvider.getColorScheme()));
         }
-    }
-
-    /**
-     * Builds the color resource override array from a SPEC_2025 [MonetColorSchemeCompat2025].
-     *
-     * Delegates entirely to the Kotlin [MonetColorSchemeCompat2025.toColorOverrides] method
-     * so all materialkolor/TonalPalette API access stays in Kotlin — avoids Java-side
-     * type resolution issues with Kotlin-only classes.
-     */
-    @Nullable
-    protected SparseIntArray generateColorsOverride2025(MonetColorSchemeCompat2025 scheme2025) {
-        return scheme2025.toColorOverrides(
-                ACCENT1_RES, ACCENT2_RES, ACCENT3_RES, NEUTRAL1_RES, NEUTRAL2_RES);
     }
 
     // Shade number -> color resource ID maps
@@ -208,8 +204,14 @@ public class AccentColorExtractor extends LocalColorExtractor implements ThemePr
             int shade = entry.getKey();
             int resId = resMap.get(shade, -1);
             if (resId != -1) {
-                AndroidColor color = (AndroidColor) entry.getValue();
-                array.put(resId, color.getColor());
+                Color color = entry.getValue();
+                // MonetColorSchemeCompat stores AndroidColor directly.
+                // KdragMonetColorScheme stores kdrag0n color types (Srgb, Zcam, etc.)
+                // which must be converted via toAndroidColor().
+                int colorInt = (color instanceof AndroidColor)
+                        ? ((AndroidColor) color).getColor()
+                        : ThemeProviderKt.toAndroidColor(color);
+                array.put(resId, colorInt);
             }
         }
     }

@@ -1166,6 +1166,40 @@ public class DeviceProfile {
     }
 
     /**
+     * Lawnchair: returns how many lines a home screen (workspace) icon label is allowed to
+     * wrap onto, given {@code baseLineCount} (whatever the grid mode would otherwise use:
+     * {@code 1} for the scalable/legacy branches, or the responsive cell spec's own declared
+     * max line count for {@code mIsResponsiveGrid}).
+     * <p>
+     * Returns {@code max(baseLineCount, 2)} when the user has enabled the "two-line home
+     * screen labels" preference ({@link PreferenceManager2#getTwoLineHomeScreen()}),
+     * {@code baseLineCount} unchanged otherwise — so this can only ever raise the line count,
+     * never lower whatever the grid spec already wanted.
+     * <p>
+     * This is the workspace counterpart to {@code InvariantDeviceProfile.
+     * enableTwoLinesInAllApps}, which drives the equivalent App Drawer toggle. It is consumed
+     * by {@link #updateIconSize(float, Context)} below in all three grid branches:
+     * <ul>
+     *   <li>{@code mIsScalableGrid} / plain fallback: {@code cellHeightPx} is grown afterwards
+     *       to make room for the extra line.
+     *   <li>{@code mIsResponsiveGrid}: the bumped value is fed into {@code CellContentDimensions}
+     *       as a starting point; {@code resizeToFitCellHeight()} only ever shrinks it back down
+     *       (never grows beyond what's passed in), so two lines are used opportunistically when
+     *       the existing (externally computed) responsive row height already has room for them
+     *       at full icon/text size, and silently falls back to one line otherwise — the
+     *       responsive height-spec math itself is never touched.
+     * </ul>
+     * {@link com.android.launcher3.BubbleTextView#shouldUseTwoLine()} then reads the resulting
+     * {@link #maxIconTextLineCount} back to decide whether to wrap the text, keeping "is there
+     * room reserved" and "should we wrap" in sync across all three branches.
+     */
+    private int getHomeIconTextLineCount(int baseLineCount) {
+        boolean twoLine =
+                PreferenceExtensionsKt.firstBlocking(preferenceManager2.getTwoLineHomeScreen());
+        return twoLine ? Math.max(baseLineCount, 2) : baseLineCount;
+    }
+
+    /**
      * Updating the iconSize affects many aspects of the launcher layout, such as: iconSizePx,
      * iconTextSizePx, iconDrawablePaddingPx, cellWidth/Height, allApps* variants,
      * hotseat sizes, workspaceSpringLoadedShrinkFactor, folderIconSizePx, and folderIconOffsetYPx.
@@ -1182,7 +1216,14 @@ public class DeviceProfile {
         if (mIsResponsiveGrid) {
             cellWidthPx = mResponsiveWorkspaceWidthSpec.getCellSizePx();
             cellHeightPx = mResponsiveWorkspaceHeightSpec.getCellSizePx();
-            maxIconTextLineCount = mResponsiveWorkspaceCellSpec.getIconTextMaxLineCount();
+            // Lawnchair: see getHomeIconTextLineCount() — passes the spec's own declared max
+            // line count as a floor, bumping it to at least 2 when the user has enabled
+            // two-line home screen labels. CellContentDimensions.resizeToFitCellHeight() below
+            // can only shrink this back down (never grow it), so it safely self-corrects to 1
+            // line if cellHeightPx (computed by the responsive height-spec system, untouched
+            // here) doesn't actually have room for 2 at the current icon/text size.
+            maxIconTextLineCount =
+                    getHomeIconTextLineCount(mResponsiveWorkspaceCellSpec.getIconTextMaxLineCount());
 
             if (cellWidthPx < iconSizePx) {
                 // get a smaller icon size
@@ -1218,7 +1259,10 @@ public class DeviceProfile {
             iconDrawablePaddingPx = (int) (getNormalizedIconDrawablePadding() * iconScale);
             cellWidthPx = pxFromDp(inv.minCellSize[mTypeIndex].x, mMetrics, scale);
             cellHeightPx = pxFromDp(inv.minCellSize[mTypeIndex].y, mMetrics, scale);
-            maxIconTextLineCount = 1;
+            // Lawnchair: see getHomeIconTextLineCount() — becomes 2 when the user enables
+            // two-line home screen labels, so the cell-height math below reserves room for
+            // the extra line instead of leaving BubbleTextView's wrap with nowhere to put it.
+            maxIconTextLineCount = getHomeIconTextLineCount(1);
 
             if (cellWidthPx < iconSizePx) {
                 // If cellWidth no longer fit iconSize, reduce borderSpace to make cellWidth bigger.
@@ -1239,7 +1283,8 @@ public class DeviceProfile {
             }
 
             int cellTextAndPaddingHeight =
-                    iconDrawablePaddingPx + Utilities.calculateTextHeight(iconTextSizePx);
+                    iconDrawablePaddingPx
+                            + Utilities.calculateTextHeight(iconTextSizePx) * maxIconTextLineCount;
             int cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
             if (cellHeightPx < cellContentHeight) {
                 // If cellHeight no longer fit iconSize, reduce borderSpace to make cellHeight
@@ -1267,7 +1312,9 @@ public class DeviceProfile {
                         iconTextSizePx = (int) (iconTextSizePx * ratio);
                     }
                     cellTextAndPaddingHeight =
-                            iconDrawablePaddingPx + Utilities.calculateTextHeight(iconTextSizePx);
+                            iconDrawablePaddingPx
+                                    + Utilities.calculateTextHeight(iconTextSizePx)
+                                            * maxIconTextLineCount;
                 }
                 cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
             }
@@ -1277,10 +1324,12 @@ public class DeviceProfile {
         } else {
             iconDrawablePaddingPx = (int) (getNormalizedIconDrawablePadding() * iconScale);
             cellWidthPx = iconSizePx + iconDrawablePaddingPx;
+            // Lawnchair: see getHomeIconTextLineCount() above — must be set before cellHeightPx
+            // is computed below so the extra line is actually budgeted into the cell height.
+            maxIconTextLineCount = getHomeIconTextLineCount(1);
             cellHeightPx = getIconSizeWithOverlap(iconSizePx)
                     + iconDrawablePaddingPx
-                    + Utilities.calculateTextHeight(iconTextSizePx);
-            maxIconTextLineCount = 1;
+                    + Utilities.calculateTextHeight(iconTextSizePx) * maxIconTextLineCount;
             int cellPaddingY = (getCellSize().y - cellHeightPx) / 2;
             if (iconDrawablePaddingPx > cellPaddingY && !isVerticalLayout
                     && !mDeviceProperties.isMultiWindowMode()) {

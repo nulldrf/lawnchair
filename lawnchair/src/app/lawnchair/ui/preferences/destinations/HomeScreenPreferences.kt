@@ -300,6 +300,16 @@ fun HomeScreenPreferences(
                 )
                 }
             }
+            Item(
+                "workspace_two_line_label",
+                homeScreenLabelsAdapter.state.value,
+            ) {
+                SwitchPreference(
+                    adapter = prefs2.twoLineHomeScreen.getAdapter(),
+                    label = stringResource(id = R.string.home_screen_two_line_label),
+                    description = stringResource(id = R.string.home_screen_two_line_label_description),
+                )
+            }
         }
         val overrideRepo = IconOverrideRepository.INSTANCE.get(LocalContext.current)
         val customIconsCount by remember { overrideRepo.observeCount() }.collectAsStateBlocking()

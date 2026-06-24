@@ -751,6 +751,38 @@ class PreferenceManager2 @Inject constructor(
         },
     )
 
+    // -----------------------------------------------------------------------
+    // Home screen icon label line count
+    //
+    // Lawnchair: home screen counterpart to twoLineAllApps above. Unlike the
+    // App Drawer version there is no platform/IDP-level field driving this —
+    // DeviceProfile.maxIconTextLineCount is normally only non-1 when the AOSP
+    // flag enableScalabilityForDesktopExperience() is on, which regular
+    // phones never have. So instead, this preference is read directly inside
+    // DeviceProfile.getHomeIconTextLineCount() (used by updateIconSize() to
+    // both set maxIconTextLineCount and grow cellHeightPx so the extra line
+    // has room), and BubbleTextView.shouldUseTwoLine() reads the resulting
+    // maxIconTextLineCount back for DISPLAY_WORKSPACE — the same pattern
+    // InvariantDeviceProfile.enableTwoLinesInAllApps already uses for the
+    // drawer, just without an IDP-level field in between.
+    //
+    // When enabled, long app names on the home screen wrap onto a second
+    // line instead of being truncated with "…".
+    //
+    // Covers all three DeviceProfile grid branches:
+    //  - mIsScalableGrid / legacy fallback: cellHeightPx is grown to fit.
+    //  - mIsResponsiveGrid: the line count is only ever bumped *up* to 2 as
+    //    a starting point for CellContentDimensions.resizeToFitCellHeight(),
+    //    which silently shrinks it back to 1 if the existing (untouched)
+    //    responsive row height doesn't actually have room — best-effort,
+    //    never forces a layout change there.
+    // -----------------------------------------------------------------------
+    val twoLineHomeScreen = preference(
+        key = booleanPreferencesKey(name = "two_line_home_screen"),
+        defaultValue = false,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
     val enableFeed = preference(
         key = booleanPreferencesKey(name = "enable_feed"),
         defaultValue = context.resources.getBoolean(R.bool.config_default_enable_feed),

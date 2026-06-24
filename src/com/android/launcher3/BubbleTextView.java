@@ -596,6 +596,18 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             return mDeviceProfile.inv.enableTwoLinesInAllApps;
         }
 
+        // Lawnchair: home screen labels have their own independent two-line toggle
+        // (PreferenceManager2.twoLineHomeScreen), wired into DeviceProfile.updateIconSize()
+        // via DeviceProfile.getHomeIconTextLineCount(). getCellSpecMaxTextLineCount() below is
+        // gated behind the platform's enableScalabilityForDesktopExperience() flag, which is
+        // unavailable on regular phones — so without this branch, home screen labels could
+        // never wrap to a second line on a typical device. Reading maxIconTextLineCount here
+        // (rather than the preference directly) keeps this in sync with whatever DeviceProfile
+        // actually reserved room for, instead of risking the two going out of sync.
+        if (mDisplay == DISPLAY_WORKSPACE) {
+            return mDeviceProfile.maxIconTextLineCount == 2;
+        }
+
         // Otherwise, show two lines if the cell declares it can fit two line label.
         return getCellSpecMaxTextLineCount() == 2;
     }
@@ -621,6 +633,40 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             }
         }
         return 1;
+    }
+
+    /**
+     * Lawnchair: returns the icon size to subtract when computing the vertical space available
+     * for a (possibly two-line) label in {@link #onMeasure(int, int)}.
+     * <p>
+     * This used to be hardcoded to {@code mDeviceProfile.getAllAppsProfile().getIconSizePx()}
+     * unconditionally, which only matched reality for DISPLAY_ALL_APPS / DISPLAY_PREDICTION_ROW.
+     * Home screen labels (DISPLAY_WORKSPACE) use their own, independently-sized icon
+     * ({@link #mIconSize}, sized from {@code DeviceProfile.iconSizePx} — see constructor), which
+     * can differ from the App Drawer icon size (e.g. via Lawnchair's separate home/drawer icon
+     * size factor preferences). Using the wrong value here mis-measures the space left for text
+     * and can silently prevent two-line wrapping from ever succeeding.
+     */
+    private int getTwoLineIconSizePx() {
+        if (mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER) {
+            return mIconSize;
+        }
+        return mDeviceProfile.getAllAppsProfile().getIconSizePx();
+    }
+
+    /**
+     * Lawnchair: companion to {@link #getTwoLineIconSizePx()} — returns the compound drawable
+     * padding (gap between icon and label) appropriate for {@link #mDisplay}, instead of always
+     * using the App Drawer's padding.
+     */
+    private int getTwoLineIconDrawablePaddingPx() {
+        if (mDisplay == DISPLAY_WORKSPACE) {
+            return mDeviceProfile.iconDrawablePaddingPx;
+        }
+        if (mDisplay == DISPLAY_FOLDER) {
+            return mDeviceProfile.folderChildDrawablePaddingPx;
+        }
+        return mDeviceProfile.getAllAppsProfile().getIconDrawablePaddingPx();
     }
 
     @UiThread
@@ -1106,11 +1152,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     mAppTitleHorizontalPadding + mRoundRectPadding,
                     getPaddingBottom());
         }
-        // Only apply two line for all_apps and device search only if necessary.
+        // Apply two line wrapping wherever shouldUseTwoLine() allows it. This now covers
+        // DISPLAY_WORKSPACE (Lawnchair's two-line home screen label preference) in addition to
+        // all_apps and device search.
         if (shouldUseTwoLine() && (mLastOriginalText != null)) {
             int allowedVerticalSpace = height - getPaddingTop() - getPaddingBottom()
-                    - mDeviceProfile.getAllAppsProfile().getIconSizePx()
-                    - mDeviceProfile.getAllAppsProfile().getIconDrawablePaddingPx();
+                    - getTwoLineIconSizePx()
+                    - getTwoLineIconDrawablePaddingPx();
             CharSequence modifiedString = modifyTitleToSupportMultiLine(
                     MeasureSpec.getSize(widthMeasureSpec) - getCompoundPaddingLeft()
                             - getCompoundPaddingRight(),

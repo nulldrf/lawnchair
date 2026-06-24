@@ -1257,7 +1257,26 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (updateBottomSheetBackgroundColor()) needsInvalidate = true;
         if (needsInvalidate) invalidate();
 
-        // Screen dimensions changed (rotation): recompute the HokoBlur bitmap.
+        // LC-Note (blur rotation fix): screen dimensions have changed (rotation
+        // or fold/unfold). We must:
+        //   1. Null out mBlurBitmap immediately on the main thread so that
+        //      dispatchDraw() / drawOnScrimWithBottomOffset() does not draw the
+        //      now-wrong-sized cached bitmap even for a single frame while the
+        //      background recompute is in flight. Without this step the old
+        //      portrait bitmap would be rendered squished into the landscape
+        //      drawer (or vice-versa) until the async task completed.
+        //   2. Clear DrawerWallpaperBlurHelper's own cache so the helper does
+        //      not return the stale bitmap via its fast-path when the new
+        //      dimensions are passed in. The helper's cache key now includes
+        //      width and height, so even without an explicit clearCache() call
+        //      a dimension change would be treated as a miss — but calling it
+        //      here is still the right thing to do: it recycles the old Bitmap
+        //      reference and resets the cached dimensions atomically, which
+        //      prevents any window where a concurrent call on another thread
+        //      could race against a stale but not-yet-nulled value.
+        //   3. Kick off the async recompute which will post the new correct
+        //      bitmap back to the main thread once ready.
+        mBlurBitmap = null;
         DrawerWallpaperBlurHelper.clearCache();
         applyDrawerHokoBlur();
     }

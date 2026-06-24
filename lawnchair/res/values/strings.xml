@@ -787,8 +787,6 @@
     <string name="home_screen_icon_text_color_description">Color applied to app icon labels on the home screen</string>
 
     <string name="home_screen_two_line_label">Two-line labels</string>
-    <string name="home_screen_two_line_label_description">Wrap long app names onto a second line</string>
-
 
     <string name="wallpaper_scrolling_label">Scroll wallpaper</string>
     <string name="wallpaper_depth_effect_label">Wallpaper depth effect</string>

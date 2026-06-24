@@ -307,7 +307,6 @@ fun HomeScreenPreferences(
                 SwitchPreference(
                     adapter = prefs2.twoLineHomeScreen.getAdapter(),
                     label = stringResource(id = R.string.home_screen_two_line_label),
-                    description = stringResource(id = R.string.home_screen_two_line_label_description),
                 )
             }
         }

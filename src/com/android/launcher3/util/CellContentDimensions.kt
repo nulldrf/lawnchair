@@ -93,6 +93,16 @@ class CellContentDimensions(
     /** Calculate new cellContentHeight */
     fun getCellContentHeight(): Int {
         val iconTextHeight = Utilities.calculateTextHeight(iconTextSizePx.toFloat())
-        return iconSizePx + iconDrawablePaddingPx + iconTextHeight * maxLineCount
+        // Lawnchair: Utilities.calculateTextHeight() returns a single-line estimate that
+        // doesn't always exactly match what a real multi-line StaticLayout (built by
+        // BubbleTextView.modifyTitleToSupportMultiLine()) ends up needing once actual font
+        // metrics/line spacing are accounted for. With zero margin, that mismatch can be just
+        // large enough to fail the height check there right at a user's full (100%) label-size
+        // setting, silently falling back to single-line "…". For maxLineCount == 1 (the
+        // default, single-line case) extraLines is 0 and this is identical to the original
+        // zero-margin formula.
+        val extraLines = max(0, maxLineCount - 1)
+        val marginPx = (extraLines * iconTextHeight) / 4
+        return iconSizePx + iconDrawablePaddingPx + (iconTextHeight * maxLineCount) + marginPx
     }
 }

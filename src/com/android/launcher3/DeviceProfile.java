@@ -1200,6 +1200,30 @@ public class DeviceProfile {
     }
 
     /**
+     * Lawnchair: returns the total label height to budget for {@code lineCount} lines of text
+     * at the current {@code iconTextSizePx}, including a small safety margin for any line
+     * beyond the first.
+     * <p>
+     * {@code Utilities.calculateTextHeight()} returns a single-line estimate that doesn't
+     * always exactly match what a real multi-line {@code StaticLayout} (built by
+     * {@link com.android.launcher3.BubbleTextView#modifyTitleToSupportMultiLine}) ends up
+     * needing once actual font metrics/line spacing are accounted for. With zero margin, that
+     * mismatch can be just large enough to fail the height check there right at a user's full
+     * (100%) label-size setting — silently falling back to single-line "…" — while a smaller
+     * label size happens to leave enough slack to mask it. This margin removes the dependence
+     * on that coincidence. For {@code lineCount == 1} (the default, single-line case) this is
+     * mathematically identical to the original {@code calculateTextHeight() * 1} with zero
+     * margin, so single-line sizing is completely unaffected.
+     */
+    private int getHomeIconTextHeightPx(int lineCount) {
+        int perLineTextHeight = Utilities.calculateTextHeight(iconTextSizePx);
+        int extraLines = Math.max(0, lineCount - 1);
+        // A quarter of one line's height, per extra line, as slack.
+        int marginPx = (extraLines * perLineTextHeight) / 4;
+        return (perLineTextHeight * lineCount) + marginPx;
+    }
+
+    /**
      * Updating the iconSize affects many aspects of the launcher layout, such as: iconSizePx,
      * iconTextSizePx, iconDrawablePaddingPx, cellWidth/Height, allApps* variants,
      * hotseat sizes, workspaceSpringLoadedShrinkFactor, folderIconSizePx, and folderIconOffsetYPx.
@@ -1283,8 +1307,7 @@ public class DeviceProfile {
             }
 
             int cellTextAndPaddingHeight =
-                    iconDrawablePaddingPx
-                            + Utilities.calculateTextHeight(iconTextSizePx) * maxIconTextLineCount;
+                    iconDrawablePaddingPx + getHomeIconTextHeightPx(maxIconTextLineCount);
             int cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
             if (cellHeightPx < cellContentHeight) {
                 // If cellHeight no longer fit iconSize, reduce borderSpace to make cellHeight
@@ -1323,9 +1346,7 @@ public class DeviceProfile {
                         iconTextSizePx = (int) (iconTextSizePx * ratio);
                     }
                     cellTextAndPaddingHeight =
-                            iconDrawablePaddingPx
-                                    + Utilities.calculateTextHeight(iconTextSizePx)
-                                            * maxIconTextLineCount;
+                            iconDrawablePaddingPx + getHomeIconTextHeightPx(maxIconTextLineCount);
                 }
                 cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
             }
@@ -1340,7 +1361,7 @@ public class DeviceProfile {
             maxIconTextLineCount = getHomeIconTextLineCount(1);
             cellHeightPx = getIconSizeWithOverlap(iconSizePx)
                     + iconDrawablePaddingPx
-                    + Utilities.calculateTextHeight(iconTextSizePx) * maxIconTextLineCount;
+                    + getHomeIconTextHeightPx(maxIconTextLineCount);
             int cellPaddingY = (getCellSize().y - cellHeightPx) / 2;
             if (iconDrawablePaddingPx > cellPaddingY && !isVerticalLayout
                     && !mDeviceProperties.isMultiWindowMode()) {

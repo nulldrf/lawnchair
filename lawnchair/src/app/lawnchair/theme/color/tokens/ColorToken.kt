@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.core.graphics.ColorUtils
 import app.lawnchair.theme.ResourceToken
 import app.lawnchair.theme.ThemeProvider
+import app.lawnchair.theme.color.Spec2025CompatColorScheme
 import app.lawnchair.theme.UiColorMode
 import app.lawnchair.theme.color.AndroidColor
 import app.lawnchair.theme.toAndroidColor
@@ -18,7 +19,15 @@ sealed interface ColorToken : ResourceToken<Color> {
     fun resolveColor(context: Context) = resolveColor(context, UiColorMode(Themes.getAttrInteger(context, R.attr.uiColorMode)))
     fun resolveColor(context: Context, uiColorMode: UiColorMode): Int {
         val themeProvider = ThemeProvider.INSTANCE.get(context)
-        return resolveColor(context, themeProvider.colorScheme, uiColorMode)
+        // Route View-based color resolution through SPEC_2025 palette when active,
+        // so the widget picker shell and all other View-based UI match settings.
+        val scheme2025 = themeProvider.colorScheme2025(isDark = uiColorMode.isDarkTheme)
+        val scheme = if (scheme2025 != null) {
+            Spec2025CompatColorScheme(scheme2025)
+        } else {
+            themeProvider.colorScheme
+        }
+        return resolveColor(context, scheme, uiColorMode)
     }
     fun resolveColor(context: Context, scheme: ColorScheme, uiColorMode: UiColorMode): Int {
         return try {

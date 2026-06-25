@@ -1224,6 +1224,39 @@ public class DeviceProfile {
     }
 
     /**
+     * Lawnchair: computes {@link #cellHeightPx} and {@link #iconDrawablePaddingPx} for the
+     * legacy (non-scalable, non-responsive) grid branch of {@link #updateIconSize(float,
+     * Context)}, for the given label {@code lineCount}, including the two-line padding-floor
+     * protection (see the call site). Extracted into its own method so it can be called once
+     * for the preferred line count and, if that turns out not to actually fit
+     * {@link #getCellSize()}, called again for a clean single-line fallback rather than
+     * duplicating this logic inline twice.
+     */
+    private void applyLegacyCellHeightAndPadding(int lineCount, boolean isVerticalLayout) {
+        iconDrawablePaddingPx = (int) (getNormalizedIconDrawablePadding() * iconScale);
+        cellHeightPx = getIconSizeWithOverlap(iconSizePx)
+                + iconDrawablePaddingPx
+                + getHomeIconTextHeightPx(lineCount);
+        int cellPaddingY = (getCellSize().y - cellHeightPx) / 2;
+        if (iconDrawablePaddingPx > cellPaddingY && !isVerticalLayout
+                && !mDeviceProperties.isMultiWindowMode()) {
+            // Ensures that the label is closer to its corresponding icon. This is not an issue
+            // with vertical bar layout or multi-window mode since the issue is handled
+            // separately with their calls to {@link #adjustToHideWorkspaceLabels}.
+            // Lawnchair: with two-line home screen labels, cellHeightPx above is already
+            // taller by design, which shrinks (or can make negative) cellPaddingY here and
+            // would otherwise squeeze iconDrawablePaddingPx towards/below zero — visually the
+            // label ends up touching the icon. Keep at least half of the originally computed
+            // padding in that case instead of fully honoring cellPaddingY; single-line
+            // behaviour (lineCount == 1) is completely unaffected.
+            int minIconDrawablePaddingPx = lineCount >= 2 ? iconDrawablePaddingPx / 2 : 0;
+            int newIconDrawablePaddingPx = Math.max(minIconDrawablePaddingPx, cellPaddingY);
+            cellHeightPx -= (iconDrawablePaddingPx - newIconDrawablePaddingPx);
+            iconDrawablePaddingPx = newIconDrawablePaddingPx;
+        }
+    }
+
+    /**
      * Updating the iconSize affects many aspects of the launcher layout, such as: iconSizePx,
      * iconTextSizePx, iconDrawablePaddingPx, cellWidth/Height, allApps* variants,
      * hotseat sizes, workspaceSpringLoadedShrinkFactor, folderIconSizePx, and folderIconOffsetYPx.
@@ -1354,31 +1387,21 @@ public class DeviceProfile {
             desiredWorkspaceHorizontalMarginPx =
                     (int) (desiredWorkspaceHorizontalMarginOriginalPx * scale);
         } else {
-            iconDrawablePaddingPx = (int) (getNormalizedIconDrawablePadding() * iconScale);
-            cellWidthPx = iconSizePx + iconDrawablePaddingPx;
-            // Lawnchair: see getHomeIconTextLineCount() above — must be set before cellHeightPx
-            // is computed below so the extra line is actually budgeted into the cell height.
+            cellWidthPx = iconSizePx
+                    + (int) (getNormalizedIconDrawablePadding() * iconScale);
+            // Lawnchair: see getHomeIconTextLineCount() above. Try the preferred line count
+            // first; applyLegacyCellHeightAndPadding() sets cellHeightPx/iconDrawablePaddingPx
+            // for it (with the two-line padding floor). If that still doesn't actually fit the
+            // row's real allocation (getCellSize().y) even with padding floored, fall back
+            // cleanly to one line at full icon/text size below — the same outcome as if the
+            // preference were off — rather than committing to an oversized two-line layout that
+            // BubbleTextView's own height check would end up rejecting anyway (silently forcing
+            // single-line "…" despite DeviceProfile believing two lines were budgeted for).
             maxIconTextLineCount = getHomeIconTextLineCount(1);
-            cellHeightPx = getIconSizeWithOverlap(iconSizePx)
-                    + iconDrawablePaddingPx
-                    + getHomeIconTextHeightPx(maxIconTextLineCount);
-            int cellPaddingY = (getCellSize().y - cellHeightPx) / 2;
-            if (iconDrawablePaddingPx > cellPaddingY && !isVerticalLayout
-                    && !mDeviceProperties.isMultiWindowMode()) {
-                // Ensures that the label is closer to its corresponding icon. This is not an issue
-                // with vertical bar layout or multi-window mode since the issue is handled
-                // separately with their calls to {@link #adjustToHideWorkspaceLabels}.
-                // Lawnchair: with two-line home screen labels, cellHeightPx above is already
-                // taller by design, which shrinks (or can make negative) cellPaddingY here and
-                // would otherwise squeeze iconDrawablePaddingPx towards/below zero — visually the
-                // label ends up touching the icon. Keep at least half of the originally computed
-                // padding in that case instead of fully honoring cellPaddingY; single-line
-                // behaviour (maxIconTextLineCount == 1) is completely unaffected.
-                int minIconDrawablePaddingPx =
-                        maxIconTextLineCount >= 2 ? iconDrawablePaddingPx / 2 : 0;
-                int newIconDrawablePaddingPx = Math.max(minIconDrawablePaddingPx, cellPaddingY);
-                cellHeightPx -= (iconDrawablePaddingPx - newIconDrawablePaddingPx);
-                iconDrawablePaddingPx = newIconDrawablePaddingPx;
+            applyLegacyCellHeightAndPadding(maxIconTextLineCount, isVerticalLayout);
+            if (maxIconTextLineCount >= 2 && cellHeightPx > getCellSize().y) {
+                maxIconTextLineCount = 1;
+                applyLegacyCellHeightAndPadding(maxIconTextLineCount, isVerticalLayout);
             }
         }
 

@@ -4,8 +4,6 @@ import android.content.Context
 import android.util.Log
 import androidx.core.graphics.ColorUtils
 import app.lawnchair.theme.ResourceToken
-import app.lawnchair.theme.ThemeProvider
-import app.lawnchair.theme.color.Spec2025CompatColorScheme
 import app.lawnchair.theme.UiColorMode
 import app.lawnchair.theme.color.AndroidColor
 import app.lawnchair.theme.toAndroidColor
@@ -17,17 +15,18 @@ import dev.kdrag0n.monet.theme.ColorScheme
 
 sealed interface ColorToken : ResourceToken<Color> {
     fun resolveColor(context: Context) = resolveColor(context, UiColorMode(Themes.getAttrInteger(context, R.attr.uiColorMode)))
+
+    // Scheme selection (SPEC_2025 vs legacy) now happens once, in
+    // ResourceToken.resolve(context, uiColorMode). This just converts the
+    // resulting Color to an Android color int and adds the WHITE fallback —
+    // the same job it always did, minus the duplicated branch.
     fun resolveColor(context: Context, uiColorMode: UiColorMode): Int {
-        val themeProvider = ThemeProvider.INSTANCE.get(context)
-        // Route View-based color resolution through SPEC_2025 palette when active,
-        // so the widget picker shell and all other View-based UI match settings.
-        val scheme2025 = themeProvider.colorScheme2025(isDark = uiColorMode.isDarkTheme)
-        val scheme = if (scheme2025 != null) {
-            Spec2025CompatColorScheme(scheme2025)
-        } else {
-            themeProvider.colorScheme
+        return try {
+            resolve(context, uiColorMode).toAndroidColor()
+        } catch (t: Throwable) {
+            Log.e("ColorToken", "failed to resolve color", t)
+            android.graphics.Color.WHITE
         }
-        return resolveColor(context, scheme, uiColorMode)
     }
     fun resolveColor(context: Context, scheme: ColorScheme, uiColorMode: UiColorMode): Int {
         return try {

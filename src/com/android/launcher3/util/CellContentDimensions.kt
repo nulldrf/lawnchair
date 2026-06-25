@@ -42,7 +42,15 @@ class CellContentDimensions(
         // Step 2. Decrease drawable padding
         if (cellContentHeight > cellHeightPx) {
             val diff = cellContentHeight - cellHeightPx
-            iconDrawablePaddingPx = max(0, iconDrawablePaddingPx - diff)
+            // Lawnchair: with two-line labels (maxLineCount >= 2), don't let this collapse all
+            // the way towards zero — keep at least half of the originally computed padding so
+            // the label doesn't end up visually touching the icon. Any remaining deficit is
+            // absorbed by the icon/label size reduction steps below instead, same as it already
+            // would be if padding alone weren't enough. Single-line cells (maxLineCount == 1,
+            // today's default) are completely unaffected, since the floor is 0 there, matching
+            // the original `max(0, ...)` exactly.
+            val minIconDrawablePaddingPx = if (maxLineCount >= 2) iconDrawablePaddingPx / 2 else 0
+            iconDrawablePaddingPx = max(minIconDrawablePaddingPx, iconDrawablePaddingPx - diff)
             cellContentHeight = getCellContentHeight()
         }
 

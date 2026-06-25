@@ -1301,13 +1301,24 @@ public class DeviceProfile {
                     cellLayoutBorderSpacePx.y = 0;
                     // Reduce iconDrawablePaddingPx to make cellContentHeight smaller.
                     int cellContentWithoutPadding = cellContentHeight - iconDrawablePaddingPx;
-                    if (cellContentWithoutPadding <= cellHeightPx) {
-                        iconDrawablePaddingPx = cellContentHeight - cellHeightPx;
+                    // Lawnchair: remember the un-squeezed padding so two-line mode can floor the
+                    // squeeze below at half of it instead of letting it collapse to (or below)
+                    // zero — otherwise the label ends up visually touching the icon. Any
+                    // resulting deficit is absorbed by the icon/text shrink ratio below instead,
+                    // exactly like the existing fallback already does for the no-padding case.
+                    // Single-line behaviour (maxIconTextLineCount == 1) is unaffected, since
+                    // minIconDrawablePaddingPx is 0 there, matching the original formulas.
+                    int minIconDrawablePaddingPx =
+                            maxIconTextLineCount >= 2 ? iconDrawablePaddingPx / 2 : 0;
+                    if (cellContentWithoutPadding <= cellHeightPx - minIconDrawablePaddingPx) {
+                        iconDrawablePaddingPx = Math.max(
+                                minIconDrawablePaddingPx, cellContentHeight - cellHeightPx);
                     } else {
-                        // If it still doesn't fit, set iconDrawablePaddingPx to 0 to recover space,
-                        // then proportional reduce iconSizePx and iconTextSizePx to fit.
-                        iconDrawablePaddingPx = 0;
-                        float ratio = cellHeightPx / (float) cellContentWithoutPadding;
+                        // If it still doesn't fit, drop to the padding floor (0 for single-line)
+                        // and proportionally reduce iconSizePx and iconTextSizePx to fit.
+                        iconDrawablePaddingPx = minIconDrawablePaddingPx;
+                        float ratio = (cellHeightPx - iconDrawablePaddingPx)
+                                / (float) cellContentWithoutPadding;
                         iconSizePx = (int) (iconSizePx * ratio);
                         iconTextSizePx = (int) (iconTextSizePx * ratio);
                     }
@@ -1336,8 +1347,17 @@ public class DeviceProfile {
                 // Ensures that the label is closer to its corresponding icon. This is not an issue
                 // with vertical bar layout or multi-window mode since the issue is handled
                 // separately with their calls to {@link #adjustToHideWorkspaceLabels}.
-                cellHeightPx -= (iconDrawablePaddingPx - cellPaddingY);
-                iconDrawablePaddingPx = cellPaddingY;
+                // Lawnchair: with two-line home screen labels, cellHeightPx above is already
+                // taller by design, which shrinks (or can make negative) cellPaddingY here and
+                // would otherwise squeeze iconDrawablePaddingPx towards/below zero — visually the
+                // label ends up touching the icon. Keep at least half of the originally computed
+                // padding in that case instead of fully honoring cellPaddingY; single-line
+                // behaviour (maxIconTextLineCount == 1) is completely unaffected.
+                int minIconDrawablePaddingPx =
+                        maxIconTextLineCount >= 2 ? iconDrawablePaddingPx / 2 : 0;
+                int newIconDrawablePaddingPx = Math.max(minIconDrawablePaddingPx, cellPaddingY);
+                cellHeightPx -= (iconDrawablePaddingPx - newIconDrawablePaddingPx);
+                iconDrawablePaddingPx = newIconDrawablePaddingPx;
             }
         }
 

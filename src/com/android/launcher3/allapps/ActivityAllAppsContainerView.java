@@ -122,11 +122,6 @@ import app.lawnchair.theme.color.tokens.ColorTokens;
 import app.lawnchair.util.LawnchairUtilsKt;
 import app.lawnchair.ui.StretchRecyclerViewContainer;
 
-/**
- * All apps container view with search support for use in a dragging activity.
- *
- * @param <T> Type of context inflating all apps.
- */
 public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         extends SpringRelativeLayout implements DragSource, Insettable,
         OnDeviceProfileChangeListener, PersonalWorkSlidingTabStrip.OnActivePageChangedListener,
@@ -182,15 +177,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     boolean showFastScroller;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
-    // LC-Note (search-bar-at-bottom): single persistent listener instance used
-    // by settleSearchContainerPosition() to retry once mSearchContainer has a
-    // real height, for the case where it's called before the view tree has
-    // been measured (e.g. straight out of onFinishInflate() during a config
-    // change / recreate, such as switching nav bar <-> gesture nav). Reused
-    // and de-duplicated the same way as the earlier (now-removed)
-    // mSearchContainerBottomCorrection listener, for the same reason: adding a
-    // fresh listener on every call without removing prior pending ones can
-    // stack multiple call-once listeners across a burst of layout passes.
     private final ViewTreeObserver.OnGlobalLayoutListener mSettleSearchContainerRetry =
             this::settleSearchContainerPositionRetry;
     public SearchRecyclerView mSearchRecyclerView;
@@ -202,7 +188,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private float[] mBottomSheetCornerRadii;
     private ScrimView mScrimView;
     private int mHeaderColor;
-    // LC-Note: System cross-window blur removed; only the legacy solid-colour path is used.
     private int mBottomSheetBackgroundColorLegacy;
     private int mTabsProtectionAlpha;
     @Nullable private AllAppsTransitionController mAllAppsTransitionController;
@@ -210,14 +195,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private final PreferenceManager2 pref2;
     private final PreferenceManager pref;
 
-    // LC-Note: Allapps cache colour
     private int mCachedBottomSheetBgColor;
 
     // -----------------------------------------------------------------------
-    // HokoBlur drawer background (phone-only)
+    // HokoBlur drawer background
     //
-    // Stored here and drawn in dispatchDraw() so it is rendered before all
-    // child views, immune to setBackground() overrides and XML child backgrounds.
+    // Computed once per wallpaper/rotation/intensity change event on a
+    // background thread via DrawerWallpaperBlurHelper, then drawn every frame
+    // from drawOnScrimWithScaleAndBottomOffset(). No per-frame GPU readback,
+    // no PixelCopy, no Choreographer loop — zero overhead while scrolling.
     // -----------------------------------------------------------------------
     @Nullable private Bitmap mBlurBitmap;
 
@@ -280,10 +266,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return mSearchUiDelegate;
     }
 
-    /**
-     * Initializes the view hierarchy and internal variables. Any initialization which actually uses
-     * these members should be done in {@link #onFinishInflate()}.
-     */
     protected void initContent() {
         showFastScroller = PreferenceExtensionsKt.firstBlocking(pref2.getShowScrollbar());
 
@@ -337,27 +319,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 0, 0
         };
 
-        // LC-Note: System cross-window blur removed; always use legacy solid-colour.
         mBottomSheetBackgroundColorLegacy = ColorTokens.SurfaceDimColor.resolveColor(getContext());
-
-        // LC-Note: Update our allapps cached colour
         updateBottomSheetBackgroundColor();
-
         updateBackgroundVisibility(mActivityContext.getDeviceProfile());
         mSearchUiManager.initializeSearch(this);
 
-        // LC-Note (search-bar-at-bottom): the slide-up animation was previously
-        // only triggered from animateToSearchState(true), which itself is only
-        // called from setSearchResults() once results actually exist/change
-        // (see setSearchResults() below). That meant tapping the (empty) search
-        // bar to focus it had no visual effect — the bar stayed at the bottom
-        // until the first keystroke produced results. Use a global focus-change
-        // listener instead, since it fires the instant the EditText gains/loses
-        // focus, regardless of whether there's any text/results yet. This is
-        // additive via addOnGlobalFocusChangeListener (not
-        // setOnFocusChangeListener), so it does not clobber whatever focus
-        // handling the EditText itself or AllAppsSearchInput already do
-        // internally for IME show/hide.
         View searchEditText = mSearchUiManager.getEditText();
         if (searchEditText != null) {
             searchEditText.getViewTreeObserver().addOnGlobalFocusChangeListener(
@@ -366,18 +332,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                             animateSearchContainerForSearchState(
                                     true, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
                         } else if (oldFocus == searchEditText && !isSearching()) {
-                            // Only slide back down here if we're not actually in
-                            // the search results state — in that case dismissal
-                            // is already handled by animateToSearchState(false,
-                            // ...) via the existing exit-search flow (back press /
-                            // clear button), which already works correctly.
                             animateSearchContainerForSearchState(
                                     false, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
                         }
                     });
         }
 
-        // Kick off the async HokoBlur bitmap computation.
+        // Kick off the initial blur computation on a background thread.
         applyDrawerHokoBlur();
     }
 
@@ -389,11 +350,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mSearchUiDelegate.onInitializeSearchBar();
         }
         mActivityContext.addOnDeviceProfileChangeListener(this);
-        // LC-Note: CrossWindowBlurListeners removed; system blur replaced by HokoBlur.
-        // Retry blur here: WallpaperManager.getDrawable() can return null at
-        // onFinishInflate time (before the window token is live).  A second attempt
-        // once the window is attached succeeds on those devices.  If mBlurBitmap is
-        // already non-null from the first attempt this is a cheap no-op (cache hit).
+        // LC-Note: retry blur here — WallpaperManager.getWallpaperFile() can
+        // return null before the window token is live on some devices. A second
+        // attempt once attached succeeds. Cheap no-op if already cached.
         applyDrawerHokoBlur();
     }
 
@@ -401,16 +360,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mActivityContext.removeOnDeviceProfileChangeListener(this);
-        // LC-Note: CrossWindowBlurListeners removed; system blur replaced by HokoBlur.
     }
 
-    public SearchUiManager getSearchUiManager() {
-        return mSearchUiManager;
-    }
+    public SearchUiManager getSearchUiManager() { return mSearchUiManager; }
 
-    public View getSearchView() {
-        return mSearchContainer;
-    }
+    public View getSearchView() { return mSearchContainer; }
 
     public void onClearSearchResult() {
         getMainAdapterProvider().clearHighlightedItem();
@@ -474,60 +428,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         });
     }
 
-    /**
-     * LC-Note (search-bar-at-bottom, rewritten): when the search bar is pinned
-     * to the bottom of the drawer, tapping it to enter search should slide it
-     * up to the top of the drawer, and dismissing search should slide it back
-     * down to the bottom — independent of SearchTransitionController, which
-     * only animates the A-Z grid/header content, never mSearchContainer's own
-     * position.
-     *
-     * Architecture note: this used to coexist with a second system
-     * (layoutSearchContainer() mutating RelativeLayout margins / addRule
-     * ALIGN_PARENT_BOTTOM, plus a correction pass calling
-     * offsetTopAndBottom()) that ALSO repositioned mSearchContainer, via its
-     * actual layout top/bottom rather than a transform. Two systems writing to
-     * "where is this view" through two different mechanisms (layout position
-     * vs. translationY transform) raced every time one fired while the other
-     * was mid-operation - confirmed across three separate collision points
-     * during testing, each fixed individually but with a new one surfacing
-     * each time. Rather than guard a fourth, fifth, etc. collision point, the
-     * design is now: mSearchContainer's LAYOUT position (top/bottom via
-     * RelativeLayout rules/margins) is NEVER mutated for the bottom-pin
-     * feature - it stays in its single, stable, top-aligned default position
-     * always. The bottom-pinned visual position is expressed ENTIRELY as
-     * translationY, computed fresh from that one stable layout position every
-     * time via getSearchContainerRestingTranslationY(). There is exactly one
-     * function that knows the correct resting value, and exactly two ways to
-     * reach it: instantly (settleSearchContainerPosition(), used for
-     * inset/config changes, which should snap not animate) or animated (this
-     * method, used for user-driven focus/search-state changes). Both always
-     * target the same freshly-computed value, so even if calls overlap, they
-     * converge on the same answer instead of racing toward different targets
-     * computed from different code paths.
-     */
     private void animateSearchContainerForSearchState(boolean goingToSearch, long durationMs) {
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (!searchBarAtBottom || isSearchBarFloating()) return;
         if (mSearchContainer.getHeight() == 0) return;
-
-        // LC-Note (fix for content overlap): when the bar slides up to the top
-        // for search/focus, content (RV, header) must move down to start below
-        // it; when it slides back down, content must return to ALIGN_PARENT_TOP
-        // with topMargin=0. Re-running layoutBelowSearchContainer() on the
-        // affected views is the correct way since it's already search-state-aware
-        // (reads isSearching()/hasFocus() to compute the right topMargin). Note:
-        // at the point this runs, mIsSearching has already been updated by the
-        // caller (animateToSearchState() sets it before calling this), so the
-        // state read in layoutBelowSearchContainer() is already the new state.
-        // topMargin change takes effect immediately (snap), while the bar itself
-        // animates — this is correct; the content area should snap open to make
-        // room for the bar before the bar arrives, not animate in lock-step with
-        // the bar (which would require animating a RelativeLayout topMargin, not
-        // easily supported by ViewPropertyAnimator).
         updateContentTopMarginForSearchState();
-
         float targetTranslationY = getSearchContainerRestingTranslationY(goingToSearch);
         mSearchContainer.animate()
                 .translationY(targetTranslationY)
@@ -535,13 +441,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 .start();
     }
 
-    /**
-     * LC-Note (search-bar-at-bottom): re-applies layoutBelowSearchContainer()
-     * to all content views so their topMargin reflects the current search/focus
-     * state. Called when search state transitions (bar slides up/down) so
-     * content snaps to make room for the bar at the top, or reclaims that space
-     * when the bar returns to the bottom.
-     */
     private void updateContentTopMarginForSearchState() {
         boolean showTabs = mUsingTabs;
         if (isSearchBarFloating()) {
@@ -553,48 +452,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             layoutBelowSearchContainer(getSearchRecyclerView(), false);
             layoutBelowSearchContainer(mHeader, false);
         }
-        // Force a layout pass so the new topMargin takes effect immediately.
         requestLayout();
     }
 
-    /**
-     * LC-Note (search-bar-at-bottom): single source of truth for
-     * mSearchContainer's resting translationY. Always computed fresh from the
-     * view's stable, never-mutated layout position - never from a previous
-     * translationY or a previous correction. See
-     * animateSearchContainerForSearchState() for why this matters.
-     *
-     * @param searching true for the "slid up to top" resting position (search
-     *                   focused / showing results), false for the "pinned at
-     *                   bottom" resting position.
-     */
     private float getSearchContainerRestingTranslationY(boolean searching) {
         if (searching) {
-            // Slide up so the bar's bottom edge lands at this container's own
-            // top padding (the same resting position a top-anchored search bar
-            // would occupy), i.e. translate by (top padding - natural top).
-            //
-            // LC-Note: AppsSearchContainerLayout.onLayout() unconditionally
-            // calls offsetTopAndBottom(mContentOverlap) on every layout pass
-            // (see all_apps_search_bar_content_overlap, 24dp) — this is how the
-            // top-anchored bar overlaps down into the header/RV content by
-            // design. mSearchContainer IS the AppsSearchContainerLayout (it
-            // extends ExtendedEditText directly, there's no separate wrapper),
-            // so that same self-shift already happened to its laid-out getTop()
-            // here too. Without adding it back, targetTop landed
-            // mContentOverlap px too high versus the true top-mode resting
-            // position, which only ever existed with that offset baked in.
             int contentOverlap = getResources().getDimensionPixelSize(
                     R.dimen.all_apps_search_bar_content_overlap);
             int targetTop = getPaddingTop() + contentOverlap;
-            // mSearchContainer.getTop() is its STABLE, never-mutated natural
-            // layout top (no margin/rule changes are ever applied to it for
-            // this feature), so this is always a fresh, correct delta - never
-            // stale, regardless of what translationY it currently holds.
             return targetTop - mSearchContainer.getTop();
         } else {
-            // Slide down so the bar's bottom edge clears the nav bar, sitting
-            // mInsets.bottom above this container's true bottom edge.
             int desiredBottom = getHeight() - mInsets.bottom;
             return desiredBottom - mSearchContainer.getBottom();
         }
@@ -621,9 +488,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return rv.shouldContainerScroll(ev, dragLayer);
     }
 
-    public void reset(boolean animate) {
-        reset(animate, true);
-    }
+    public void reset(boolean animate) { reset(animate, true); }
 
     public void reset(boolean animate, boolean exitSearch) {
         if (!PreferenceExtensionsKt.firstBlocking(pref2.getRememberPosition())) {
@@ -700,9 +565,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mWorkManager.onActivePageChanged(currentActivePage);
     }
 
-    protected void rebindAdapters() {
-        rebindAdapters(false);
-    }
+    protected void rebindAdapters() { rebindAdapters(false); }
 
     protected void rebindAdapters(boolean force) {
         Log.d(TAG, "rebindAdapters: force: " + force);
@@ -848,20 +711,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 (SearchRecyclerView) mAH.get(SEARCH).mRecyclerView,
                 getCurrentPage(), tabsHidden);
 
-        // LC-Note (fix for app-drawer-search-bar-disabled blank space): when the
-        // header is hidden there is no search bar / tab-pill content left to leave
-        // room for. mHeader.getMaxTranslation() would otherwise still fall back to
-        // R.dimen.all_apps_search_bar_bottom_padding (the gap meant to sit *under*
-        // a visible search bar), which is exactly the leftover blank space at the
-        // top of the drawer that was reported. Force this padding to 0 in that
-        // case so the app grid / search results sit flush right under the existing
-        // top inset (i.e. right under the drag handle) instead of leaving a gap.
-        //
-        // LC-Note: when hideHeader=true we intentionally leave padding=0 here.
-        // The handle-area clearance is applied later in setInsets(), which runs
-        // after the view tree has been measured and mBottomSheetHandleArea.getHeight()
-        // returns the real pixel value. Doing it here would always read 0 because
-        // setupHeader() is called from onFinishInflate(), before layout/measure.
         int padding = hideHeader ? 0 : mHeader.getMaxTranslation();
         mAH.forEach(adapterHolder -> {
             adapterHolder.mPadding.top = padding;
@@ -918,34 +767,17 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected int getHeaderColor(float blendRatio) {
-        // appDrawerSearchBarBackground is the single on/off control for the
-        // header-protection scrim across ALL layout modes (sheet / phone) and
-        // ALL blur states.
-        //
-        // false → Color.TRANSPARENT (== 0).  The draw path's early-return guard
-        //         "mHeaderPaint.getColor() == 0" then fires before any canvas
-        //         drawing, so neither the sheet rounded-rect (line ~1275) nor the
-        //         phone full-width drawRect (line ~1278) is ever executed.
-        //
-        // true  → fall through to per-mode colour calculation below.
         boolean showHeaderBackground = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarBackground());
-        if (!showHeaderBackground) {
-            return Color.TRANSPARENT;
-        }
+        if (!showHeaderBackground) return Color.TRANSPARENT;
 
         if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            // Phone / non-sheet mode: use drawer opacity as the scrim alpha so
-            // the protection blends proportionally with the background.
             float opacity = pref.getDrawerOpacity().get();
             opacity = MathUtils.clamp(opacity, 0f, 1f);
             return ColorUtils.setAlphaComponent(
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),
                     Math.round(opacity * 255));
         }
-        // Sheet mode: when HokoBlur is active show a semi-transparent tint so
-        // the blurred wallpaper is still partially visible through the header.
-        // Without blur, blend the background with the header-protection colour.
         return (mBlurBitmap != null)
                 ? ColorUtils.setAlphaComponent(mHeaderProtectionColor, (int) (blendRatio * 255))
                 : ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio);
@@ -956,17 +788,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 ? getBottomSheetBackgroundColor() : mScrimColor;
     }
 
-    // LC-Note: cached — see updateBottomSheetBackgroundColor()
-    int getBottomSheetBackgroundColor() {
-        return mCachedBottomSheetBgColor;
-    }
+    int getBottomSheetBackgroundColor() { return mCachedBottomSheetBgColor; }
 
-    /**
-     * Recomputes the cached bottom-sheet background colour.
-     *
-     * LC-Note: System cross-window blur has been fully replaced by HokoBlur.
-     * Only the legacy solid-colour path is used here.
-     */
     private boolean updateBottomSheetBackgroundColor() {
         int newColor = LawnchairUtilsKt.getAllAppsBackgroundColor(
                 mActivityContext, mBottomSheetBackgroundColorLegacy);
@@ -977,17 +800,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return false;
     }
 
-    /**
-     * System cross-window blur has been replaced by HokoBlur.
-     * Always {@code false} so callers like PrivateProfileManager take the non-blur path.
-     */
-    boolean isBackgroundBlurEnabled() {
-        return false;
-    }
+    boolean isBackgroundBlurEnabled() { return false; }
 
-    protected boolean isSearchBarFloating() {
-        return mSearchUiDelegate.isSearchBarFloating();
-    }
+    protected boolean isSearchBarFloating() { return mSearchUiDelegate.isSearchBarFloating(); }
 
     public boolean shouldFloatingSearchBarBePillWhenUnfocused() { return false; }
 
@@ -1003,42 +818,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return dp.allAppsLeftRightMargin + dp.getAllAppsIconStartMargin(mActivityContext);
     }
 
-    /**
-     * LC-Note (fix for app-drawer-search-bar-disabled blank space):
-     *
-     * R.dimen.all_apps_header_top_margin is sized to clear the *visible* search
-     * bar it bakes in the search bar's own rendered height plus a deliberate
-     * visual gap below it. When hideAppDrawerSearchBar is on, AllAppsSearchInput
-     * collapses its own height to 0 (see AllAppsSearchInput.onFinishInflate),
-     * but this method was still unconditionally applying that margin on top of
-     * the (now zero-height) search container, plus an extra
-     * all_apps_header_pill_height margin for the personal/work tab pill even
-     * though setupHeader() puts the *entire* mHeader (which contains that pill)
-     * into View.GONE in this state. The net effect was exactly the blank gap
-     * that was reported: the content was being pushed down by a margin sized
-     * for UI that is no longer there.
-     *
-     * Since there is nothing left to clear in that state, skip the margin
-     * entirely so the content's top aligns directly with the (now zero-height)
-     * search container's top i.e. right under the existing top inset / drag
-     * handle area, with no extra blank space.
-     */
     private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
 
-        // LC-Note (search-bar-at-bottom): when the search bar is pinned to the
-        // bottom of the drawer, content (RV containers, header) should fill from
-        // the parent's top instead of being anchored below the search container,
-        // since the search container is no longer at the top at all. The bottom
-        // padding needed to clear the now-bottom-pinned search bar is handled
-        // separately in applyAdapterSideAndBottomPaddings(), not here.
-        //
-        // Exception: when the bar is currently slid UP to the top (i.e. during
-        // search/focus — animateSearchContainerForSearchState(true) was called),
-        // the bar is visually at the top and content must start below it. Use
-        // topMargin = mSearchContainer.getHeight() in that case so content clears
-        // the bar, exactly as ALIGN_TOP of the search container does in normal mode.
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom) {
@@ -1065,18 +848,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         lp.topMargin = topMargin;
     }
 
-    /**
-     * LC-Note: used only when the search bar is floating (overlaid via the drag
-     * layer rather than reserving space in this RelativeLayout's flow), so
-     * content always starts at the parent's top regardless of whether the
-     * search bar itself is shown or hidden. The only thing that still needs
-     * accounting for here is the personal/work tab pill margin and that pill
-     * lives inside mHeader, which is set to View.GONE whenever
-     * hideAppDrawerSearchBar is on, so that margin must be skipped in that case
-     * too (previously this method just bailed out entirely when the pref was
-     * on, leaving stale/unset RelativeLayout rules instead of doing the right
-     * thing).
-     */
     private void alignParentTop(View v, boolean includeTabsMargin) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
@@ -1089,54 +860,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 : 0;
     }
 
-    /**
-     * LC-Note (search-bar-at-bottom, rewritten): previously this method mutated
-     * mSearchContainer's RelativeLayout rules/margins (ALIGN_PARENT_BOTTOM,
-     * bottomMargin) to physically move it to the bottom, AND a separate
-     * correction pass (formerly correctSearchContainerBottomPosition()) used
-     * offsetTopAndBottom() to nudge it further. Both of those mutate the
-     * view's actual LAYOUT top/bottom. animateSearchContainerForSearchState()
-     * independently animates translationY, a transform layered on top of
-     * layout position. Two systems, two different properties, both claiming
-     * to own "where this view is" - every entry point into either one was a
-     * potential race against the other. Confirmed via testing across three
-     * separate collision points, each fixed individually, with a new one
-     * surfacing each time.
-     *
-     * New design: mSearchContainer's LAYOUT position is no longer mutated for
-     * this feature at all - no rule changes, no margin changes, no
-     * offsetTopAndBottom(). It always stays in its single, stable, naturally
-     * top-aligned position. This method now only ever sets translationY
-     * (never animated - this is for insets/config changes, which should snap
-     * instantly), via the exact same getSearchContainerRestingTranslationY()
-     * calculation that the animated focus/search-state path uses. Because
-     * there is only one mechanism (translationY) and one calculation function,
-     * there is nothing left for this method and the animated path to race
-     * over - both always compute and converge on the identical target value.
-     */
     private void settleSearchContainerPosition() {
         if (mSearchContainer.getHeight() == 0) {
-            // LC-Note (fix for stuck-at-top after enabling pref / nav-mode
-            // change): this method is called from setupHeader(), itself called
-            // from onFinishInflate() - at that point in the view lifecycle (and
-            // again whenever a config change such as switching nav bar <->
-            // gesture nav triggers a fresh inflate/recreate of this view tree)
-            // mSearchContainer has not been measured yet, so getHeight() == 0
-            // here. Previously this just silently returned, leaving
-            // translationY at whatever it was before (typically 0, i.e. "stuck
-            // at top") with nothing scheduled to ever call this again until
-            // some unrelated event happened to fire setInsets() or
-            // dispatchApplyWindowInsets() after layout had caught up - on slow
-            // devices/transitions that could take a visible, indeterminate
-            // amount of time, or never happen at all until manually
-            // re-triggered by toggling the preference again.
-            // Fix: instead of giving up, queue a single retry that re-runs this
-            // exact method once the view tree actually finishes a layout pass,
-            // by which point getHeight() will be real. Deduped via
-            // removeOnGlobalLayoutListener() before add() so a burst of calls
-            // (setupHeader() + setInsets() + dispatchApplyWindowInsets() all in
-            // quick succession during the same recreate) only ever queues one
-            // retry, not a stack of them.
             getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
             getViewTreeObserver().addOnGlobalLayoutListener(mSettleSearchContainerRetry);
             return;
@@ -1149,32 +874,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
         boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
                 && mSearchUiManager.getEditText().hasFocus());
-        mSearchContainer.setTranslationY(
-                getSearchContainerRestingTranslationY(searching));
+        mSearchContainer.setTranslationY(getSearchContainerRestingTranslationY(searching));
     }
 
-    /**
-     * LC-Note (search-bar-at-bottom): invoked by mSettleSearchContainerRetry.
-     * Removes itself so it only runs once per registration; if
-     * mSearchContainer's height is STILL 0 when this fires (layout hasn't
-     * actually produced a measured size yet, e.g. multiple passes needed),
-     * settleSearchContainerPosition() will simply re-queue another retry via
-     * the same path, rather than giving up.
-     */
     private void settleSearchContainerPositionRetry() {
         getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
         if (!isAttachedToWindow()) return;
         settleSearchContainerPosition();
     }
 
-    /**
-     * LC-Note: this must always clear stale rules before the caller re-applies
-     * the correct one via layoutBelowSearchContainer()/alignParentTop() above.
-     * It previously bailed out early whenever hideAppDrawerSearchBar was on,
-     * which left old RelativeLayout rules in place instead of resetting them
-     * removed that short-circuit since it served no purpose other than leaving
-     * the layout in a stale state.
-     */
     private void removeCustomRules(View v) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
@@ -1194,13 +902,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return new DefaultSearchAdapterProvider(mActivityContext);
     }
 
-    protected View inflateSearchBar() {
-        return mSearchUiDelegate.inflateSearchBar();
-    }
+    protected View inflateSearchBar() { return mSearchUiDelegate.inflateSearchBar(); }
 
-    public final SearchAdapterProvider<?> getMainAdapterProvider() {
-        return mMainAdapterProvider;
-    }
+    public final SearchAdapterProvider<?> getMainAdapterProvider() { return mMainAdapterProvider; }
 
     @Override
     protected void dispatchRestoreInstanceState(SparseArray<Parcelable> sparseArray) {
@@ -1253,29 +957,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mNavBarScrimPaint.setColor(navBarScrimColor);
             needsInvalidate = true;
         }
-        // LC-Note: Update our allapps cached colour
         if (updateBottomSheetBackgroundColor()) needsInvalidate = true;
         if (needsInvalidate) invalidate();
 
-        // LC-Note (blur rotation fix): screen dimensions have changed (rotation
-        // or fold/unfold). We must:
-        //   1. Null out mBlurBitmap immediately on the main thread so that
-        //      dispatchDraw() / drawOnScrimWithBottomOffset() does not draw the
-        //      now-wrong-sized cached bitmap even for a single frame while the
-        //      background recompute is in flight. Without this step the old
-        //      portrait bitmap would be rendered squished into the landscape
-        //      drawer (or vice-versa) until the async task completed.
-        //   2. Clear DrawerWallpaperBlurHelper's own cache so the helper does
-        //      not return the stale bitmap via its fast-path when the new
-        //      dimensions are passed in. The helper's cache key now includes
-        //      width and height, so even without an explicit clearCache() call
-        //      a dimension change would be treated as a miss — but calling it
-        //      here is still the right thing to do: it recycles the old Bitmap
-        //      reference and resets the cached dimensions atomically, which
-        //      prevents any window where a concurrent call on another thread
-        //      could race against a stale but not-yet-nulled value.
-        //   3. Kick off the async recompute which will post the new correct
-        //      bitmap back to the main thread once ready.
+        // LC-Note (rotation fix): null the stale bitmap immediately so it is
+        // not drawn at the wrong size even for one frame, then clear the helper
+        // cache (which now also checks w/h, so the dimension change alone would
+        // be a miss, but explicit clearCache() also recycles the old Bitmap).
+        // The recompute runs on a background thread and posts the new bitmap
+        // back once ready.
         mBlurBitmap = null;
         DrawerWallpaperBlurHelper.clearCache();
         applyDrawerHokoBlur();
@@ -1395,18 +1085,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         InsettableFrameLayout.dispatchInsets(this, insets);
         settleSearchContainerPosition();
 
-        // LC-Note (fix for icon clipping behind drag handle when hideAppDrawerSearchBar
-        // is on): setupHeader() sets adapterHolder.mPadding.top = 0 when the header is
-        // hidden, but it runs from onFinishInflate() before layout/measure so
-        // mBottomSheetHandleArea.getHeight() returns 0 there. setInsets() is called
-        // after the view tree is measured, so this is the earliest safe place to read
-        // the real handle area height and push it into the adapter top padding.
-        // However, mBottomSheetHandleArea's parent (bottom_sheet_background) is marked
-        // visibility="gone" in the layout, so getHeight() always returns 0 regardless
-        // of timing. Use the dimen directly instead — it is the fixed pixel height of
-        // the handle area and is always correct.
-        // In phone/non-sheet mode shouldShowAllAppsOnSheet() is false so we skip this,
-        // keeping the adapter padding at 0 as before.
         boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
                 pref2.getHideAppDrawerSearchBar());
         if (hideHeader && mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
@@ -1427,11 +1105,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         mNavBarScrimHeight = computeNavBarScrimHeight(insets);
         applyAdapterSideAndBottomPaddings(mActivityContext.getDeviceProfile());
-        // LC-Note (search-bar-at-bottom): settleSearchContainerPosition() uses
-        // mInsets.bottom (not mNavBarScrimHeight), so this call is mainly here
-        // in case mInsets itself is updated as a side effect of insets
-        // dispatch on some code paths; cheap to call again and keeps the
-        // resting position correct even if so.
         settleSearchContainerPosition();
         return super.dispatchApplyWindowInsets(insets);
     }
@@ -1455,12 +1128,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         } else {
             getSearchRecyclerView().setVisibility(GONE);
             getAppsRecyclerViewContainer().setVisibility(VISIBLE);
-            // LC-Note (fix for tab-pill re-appearing after search when header is
-            // hidden): the original code unconditionally restored mHeader to VISIBLE
-            // here, overriding the View.GONE that setupHeader() applied when
-            // hideAppDrawerSearchBar is on. That caused the tab pill to reappear
-            // on top of the icon grid with no top padding to clear it (icon
-            // clipping bug in image 3). Guard the restore with the same pref.
             boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
                     pref2.getHideAppDrawerSearchBar());
             mHeader.setVisibility(hideHeader ? GONE : VISIBLE);
@@ -1471,20 +1138,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private void applyAdapterSideAndBottomPaddings(DeviceProfile grid) {
         int bottomPadding = Math.max(mInsets.bottom, mNavBarScrimHeight);
 
-        // LC-Note (search-bar-at-bottom): when the search bar is pinned to the
-        // bottom of the drawer (non-floating), reserve extra bottom padding equal
-        // to its height so the last row of icons doesn't render behind it. The
-        // floating search bar already does the analogous thing for itself via
-        // AdapterHolder.applyPadding()'s own isSearchBarFloating() check, so this
-        // only applies to the non-floating bottom-pin case to avoid double-adding.
         boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom && !isSearchBarFloating()) {
             bottomPadding += mSearchContainer.getHeight();
         }
 
-        // Lambdas below require an effectively-final capture; bottomPadding was
-        // reassigned above via +=, so it no longer qualifies. Copy into a final.
         final int finalBottomPadding = bottomPadding;
         mAH.forEach(adapterHolder -> {
             adapterHolder.mPadding.bottom = finalBottomPadding;
@@ -1611,19 +1270,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         final View panel = mBottomSheetBackground;
         final boolean hasBottomSheet = panel.getVisibility() == VISIBLE;
 
-        // ── HokoBlur ──────────────────────────────────────────────────────────
-        // The dark background visible in the drawer is ScrimView drawing through
-        // the transparent AllApps container.  Drawing the blur bitmap here (on
-        // ScrimView's own canvas, before any other scrim content) replaces that
-        // dark scrim with the blurred wallpaper.  Phone-only: tablets use the
-        // bottom-sheet path and their background is managed separately.
+        // ── HokoBlur wallpaper background ────────────────────────────────────
         final Bitmap hokoBlur = mBlurBitmap;
         if (hokoBlur != null && !hokoBlur.isRecycled() && !hasBottomSheet) {
             canvas.drawBitmap(hokoBlur, 0f, 0f, null);
         }
         // ─────────────────────────────────────────────────────────────────────
-        final float translationY = ((View) panel.getParent()).getTranslationY();
 
+        final float translationY = ((View) panel.getParent()).getTranslationY();
         final float horizontalScaleOffset = (1 - scale) * panel.getWidth() / 2;
         final float verticalScaleOffset = (1 - scale) * (panel.getHeight() - getHeight() / 2);
         float left = getLeft() + panel.getLeft();
@@ -1644,20 +1298,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mTmpPath.reset();
             mTmpPath.addRoundRect(mTmpRectF, mBottomSheetCornerRadii, Direction.CW);
             if (hokoBlur != null && !hokoBlur.isRecycled()) {
-                // Blur mode: clip to the sheet's rounded-rect, draw the blurred
-                // wallpaper bitmap, then draw the user's background-color as a
-                // semi-transparent overlay.  bottomSheetBgAlpha encodes the
-                // drawerOpacity preference, so lowering opacity reveals more blur.
                 canvas.save();
                 canvas.clipPath(mTmpPath);
                 canvas.drawBitmap(hokoBlur, 0f, 0f, null);
                 canvas.restore();
-                canvas.drawPath(mTmpPath, mHeaderPaint); // tinted overlay
+                canvas.drawPath(mTmpPath, mHeaderPaint);
             } else {
-                // No blur — fall back to solid color.
                 canvas.drawPath(mTmpPath, mHeaderPaint);
             }
-            // LC-Note: Flags.allAppsBlur() early-return removed; always draw header protection.
         }
 
         if (DEBUG_HEADER_PROTECTION) {
@@ -1752,38 +1400,29 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     // -----------------------------------------------------------------------
-    // HokoBlur drawer background
+    // HokoBlur drawer background — event-driven, no PixelCopy, no loop
     // -----------------------------------------------------------------------
 
     /**
-     * Computes a HokoBlur blurred-wallpaper bitmap and stores it in
-     * {@link #mBlurBitmap}.  Works in both full-screen phone mode and
-     * bottom-sheet mode.
+     * Dispatches a wallpaper-blur recompute to a background thread.
      *
-     * <p>In phone mode the bitmap is drawn as a full-screen background.
-     * In sheet mode it is clipped to the rounded-rect sheet boundary with
-     * the user's background-color preference drawn on top as a tinted overlay
-     * (lower drawer opacity = more blur visible through the overlay).
+     * Called on three discrete events — never per-frame:
+     *  1. {@link #onFinishInflate()} — initial compute when the view is created
+     *  2. {@link #onAttachedToWindow()} — retry in case the window token was
+     *     not yet live during inflate (some devices return null from
+     *     WallpaperManager before the window is attached)
+     *  3. {@link #onDeviceProfileChanged(DeviceProfile)} — rotation, which
+     *     changes screen dimensions and therefore requires a new bitmap
      *
-     * <p>Bitmap computation runs on {@code UI_HELPER_EXECUTOR} (background
-     * thread).  The result is posted back to the UI thread where
-     * {@link #mBlurBitmap} is updated and {@link #invalidateHeader()} is called
-     * so ScrimView redraws and picks up the new value on the next frame.
+     * {@link DrawerWallpaperBlurHelper} also clears its own cache when
+     * {@code drawerBlurIntensity} changes (via {@link PreferenceManager2}),
+     * so the next open of the drawer after a preference change will also
+     * trigger a recompute here.
      */
     private void applyDrawerHokoBlur() {
         boolean blurEnabled = PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurBackground());
-        boolean isSheet = mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet();
-
-        // TAG matches DrawerWallpaperBlurHelper — one filter covers the whole flow:
-        //   adb logcat -s DrawerWallpaperBlur
-        android.util.Log.e("DrawerWallpaperBlur",
-                "applyDrawerHokoBlur: blurEnabled=" + blurEnabled
-                + " isSheet=" + isSheet
-                + " bitmapAlreadySet=" + (mBlurBitmap != null));
 
         if (!blurEnabled) {
-            android.util.Log.e("DrawerWallpaperBlur",
-                    "applyDrawerHokoBlur: EARLY RETURN — blurEnabled=false");
             if (mBlurBitmap != null) {
                 mBlurBitmap = null;
                 invalidateHeader();
@@ -1793,23 +1432,12 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
         int intensity = Math.round(
                 PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurIntensity()));
-        android.util.Log.e("DrawerWallpaperBlur",
-                "applyDrawerHokoBlur: dispatching blur, intensity=" + intensity);
         final Context ctx = getContext();
 
         UI_HELPER_EXECUTOR.execute(() -> {
-            android.util.Log.e("DrawerWallpaperBlur",
-                    "applyDrawerHokoBlur: background thread running");
             Bitmap blurred = DrawerWallpaperBlurHelper.getBlurredBitmap(ctx, intensity);
-            android.util.Log.e("DrawerWallpaperBlur",
-                    "applyDrawerHokoBlur: getBlurredBitmap returned "
-                    + (blurred != null
-                            ? blurred.getWidth() + "x" + blurred.getHeight()
-                            : "null (permission denied or live wallpaper — blur disabled)"));
             MAIN_EXECUTOR.getHandler().post(() -> {
-                mBlurBitmap = blurred; // null → no blur; non-null → blur shown
-                android.util.Log.e("DrawerWallpaperBlur",
-                        "applyDrawerHokoBlur: mBlurBitmap updated on main thread, calling invalidateHeader");
+                mBlurBitmap = blurred;
                 invalidateHeader();
             });
         });
@@ -1817,7 +1445,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     // -----------------------------------------------------------------------
 
-    /** Holds a {@link BaseAllAppsAdapter} and related fields. */
     public class AdapterHolder {
         public static final int MAIN = 0;
         public static final int WORK = 1;

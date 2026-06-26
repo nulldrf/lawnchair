@@ -16,37 +16,39 @@ import kotlin.math.min
 
 /**
  * Computes and caches a HokoBlur-blurred wallpaper bitmap used as the
- * app-drawer background on phones (non-sheet layout).
+ * app-drawer background.
  *
- * Wallpaper access is attempted via two methods in order:
- *  1. [WallpaperManager.getWallpaperFile] — raw-file path. Reads directly
- *     from disk so it is always up-to-date after rotation, unlike
- *     [WallpaperManager.getDrawable] whose internal bitmap cache can hold a
- *     stale (pre-rotation) frame.
- *  2. [WallpaperManager.getDrawable] — fast cached fallback for devices that
- *     do not expose a file descriptor (some OEM ROMs return null from
- *     [getWallpaperFile]).
+ * ## Recompute triggers
+ * The bitmap is recomputed only when something actually changes:
+ *  - [getBlurredBitmap] is called with a different [blurIntensity]
+ *  - Screen dimensions change (rotation) — the cache key includes width/height
+ *  - [clearCache] is called explicitly (from [PreferenceManager2] when
+ *    [drawerBlurIntensity] changes, or from [ActivityAllAppsContainerView]
+ *    when the device rotates via [onDeviceProfileChanged])
  *
- * Neither method can retrieve a live-wallpaper frame; on such devices
- * the method returns null and no blur is shown.
+ * ## Why not PixelCopy / per-frame capture?
+ * PixelCopy forces a GPU surface readback every vsync, which causes frame
+ * tears and visual glitches in the app drawer. A wallpaper bitmap only needs
+ * to be re-read when the wallpaper itself changes or the screen rotates —
+ * neither of which happens while the drawer is being scrolled or animated.
  *
- * Cache key: (intensity, screenWidth, screenHeight).  Changing any of the
- * three — including a screen rotation that swaps width and height — forces a
- * full recompute, which is exactly what we need so the blurred bitmap always
- * matches the current display orientation.
+ * ## Wallpaper source priority
+ *  1. [WallpaperManager.getWallpaperFile] — reads the raw file directly,
+ *     bypassing WallpaperManager's internal drawable cache (keyed by wallpaper
+ *     ID, not orientation) which returns stale pre-rotation pixels after rotate.
+ *  2. [WallpaperManager.getDrawable] — fallback for OEM ROMs where
+ *     [getWallpaperFile] returns null.
  *
- * All [@JvmStatic] methods are callable from Java:
- *   `DrawerWallpaperBlurHelper.getBlurredBitmap(context, intensity)`
+ * Live wallpapers return null from both calls; no blur is shown for them.
+ *
+ * ## Cache key
+ * `(blurIntensity, screenWidth, screenHeight)` — a rotation that swaps w/h
+ * is automatically a cache miss and forces a correct-sized recompute.
  */
 object DrawerWallpaperBlurHelper {
 
     private const val TAG = "DrawerWallpaperBlur"
 
-    // LC-Note: cache key is (intensity, width, height) so a rotation that
-    // swaps w/h automatically invalidates the cache and forces a recompute
-    // with the correct screen dimensions, preventing the "squished wallpaper"
-    // artifact that occurred when the cached portrait bitmap was reused in
-    // landscape (or vice-versa).
     @Volatile private var cachedBitmap: Bitmap? = null
     @Volatile private var cachedIntensity: Int = -1
     @Volatile private var cachedWidth: Int = -1
@@ -85,71 +87,50 @@ object DrawerWallpaperBlurHelper {
             return null
         }
 
-        // LC-Note: fast path now also checks width/height so a rotation
-        // (which swaps w and h) correctly bypasses the stale cached bitmap.
+        // Fast path: return cached result when intensity and dimensions all match.
         getCachedBitmap(blurEnabled = true, blurIntensity, w, h)?.let { return it }
 
         val wm = WallpaperManager.getInstance(context)
 
-        // ── Attempt 1: getWallpaperFile() ────────────────────────────────────
-        // LC-Note: this is now the PRIMARY path (previously it was the fallback).
-        // WallpaperManager.getDrawable() keeps an internal Bitmap cache that is
-        // keyed by the wallpaper ID, NOT by screen orientation.  After a
-        // rotation the drawable cache still holds the pre-rotation bitmap, so
-        // calling getDrawable() first would return the wrong-sized image and
-        // produce the "squished wallpaper" artifact even though the cached
-        // bitmap in *our* helper had been cleared.  Reading the raw file via
-        // getWallpaperFile() bypasses that internal cache entirely and always
-        // gives us fresh pixels that we then scale to the current screen bounds.
+        // Attempt 1: getWallpaperFile() — bypasses WallpaperManager's own
+        // drawable cache so we always get pixels at the correct orientation.
         val src: Bitmap = runCatching {
             val pfd = wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM)
             if (pfd == null) {
-                Log.d(TAG, "getWallpaperFile() returned null — trying getDrawable()")
+                Log.d(TAG, "getWallpaperFile() null — trying getDrawable()")
                 null
             } else {
                 pfd.use { fd ->
                     val raw = BitmapFactory.decodeFileDescriptor(fd.fileDescriptor)
                     if (raw == null) {
-                        Log.e(TAG, "BitmapFactory.decodeFileDescriptor() returned null")
+                        Log.e(TAG, "decodeFileDescriptor() returned null")
                         null
                     } else {
-                        Log.d(TAG, "wallpaper obtained via getWallpaperFile() — size ${raw.width}x${raw.height}, target ${w}x${h}")
-                        // Always scale to current screen bounds so the bitmap
-                        // fills the drawer exactly regardless of orientation.
-                        if (raw.width == w && raw.height == h) {
-                            raw
-                        } else {
-                            Bitmap.createScaledBitmap(raw, w, h, true)
-                                .also { scaled -> if (scaled !== raw) raw.recycle() }
-                        }
+                        Log.d(TAG, "wallpaper via getWallpaperFile(): ${raw.width}x${raw.height} → ${w}x${h}")
+                        if (raw.width == w && raw.height == h) raw
+                        else Bitmap.createScaledBitmap(raw, w, h, true)
+                            .also { scaled -> if (scaled !== raw) raw.recycle() }
                     }
                 }
             }
-        }.getOrElse { e ->
-            Log.e(TAG, "getWallpaperFile() threw: $e")
-            null
-        }
-            // ── Attempt 2: getDrawable() ──────────────────────────────────────
-            // Fallback for devices where getWallpaperFile() is unavailable or
-            // returns null (some OEM ROMs, live wallpapers return null here too).
+        }.getOrElse { e -> Log.e(TAG, "getWallpaperFile() threw: $e"); null }
+
+            // Attempt 2: getDrawable() fallback.
             ?: runCatching {
-                val drawable = wm.drawable
-                if (drawable == null) {
-                    Log.e(TAG, "getDrawable() returned null — likely live wallpaper, cannot blur")
+                val drawable = wm.drawable ?: run {
+                    Log.e(TAG, "getDrawable() null — likely live wallpaper")
                     return null
                 }
-                Log.d(TAG, "wallpaper obtained via getDrawable() — rendering to ${w}x${h}")
+                Log.d(TAG, "wallpaper via getDrawable() — rendering to ${w}x${h}")
                 Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { bmp ->
                     drawable.setBounds(0, 0, w, h)
                     drawable.draw(Canvas(bmp))
                 }
-            }.getOrElse { e ->
-                Log.e(TAG, "getDrawable() threw: $e")
-                null
-            }
-            ?: return null  // Both attempts failed.
+            }.getOrElse { e -> Log.e(TAG, "getDrawable() threw: $e"); null }
 
-        // ── Apply HokoBlur ────────────────────────────────────────────────────
+            ?: return null
+
+        // Apply HokoBlur on the source bitmap.
         val clamped = blurIntensity.coerceIn(10, 150)
         val hokoRadius = min(clamped, 25)
         val sampleFactor = (clamped / 25f).coerceAtLeast(1f)
@@ -163,23 +144,17 @@ object DrawerWallpaperBlurHelper {
                 .forceCopy(false)
                 .processor()
                 .blur(src)
-        }.getOrElse { e ->
-            Log.e(TAG, "HokoBlur threw: $e")
-            null
-        }
+        }.getOrElse { e -> Log.e(TAG, "HokoBlur threw: $e"); null }
 
         if (blurred == null) {
-            Log.e(TAG, "HokoBlur returned null bitmap")
+            Log.e(TAG, "HokoBlur returned null")
             src.recycle()
             return null
         }
         if (blurred !== src) src.recycle()
 
-        Log.d(TAG, "blur computed successfully — ${blurred.width}x${blurred.height} intensity=$blurIntensity")
+        Log.d(TAG, "blur done — ${blurred.width}x${blurred.height} intensity=$blurIntensity")
 
-        // LC-Note: store width/height in the cache key so any future call with
-        // different dimensions (e.g. after the next rotation) is treated as a
-        // cache miss and triggers a fresh recompute.
         cachedBitmap = blurred
         cachedIntensity = blurIntensity
         cachedWidth = w
@@ -188,38 +163,8 @@ object DrawerWallpaperBlurHelper {
     }
 
     /**
-     * Blurs [src] with HokoBlur and returns the result.
-     *
-     * Unlike [getBlurredBitmap] this method does **not** access [WallpaperManager];
-     * it is used as a permission-free fallback when the caller supplies a bitmap
-     * obtained via [android.view.PixelCopy] on the launcher window.
-     *
-     * Returns null if HokoBlur fails for any reason.
-     */
-    @JvmStatic
-    fun blurBitmap(context: Context, src: Bitmap, blurIntensity: Int): Bitmap? {
-        val clamped = blurIntensity.coerceIn(10, 150)
-        val hokoRadius = min(clamped, 25)
-        val sampleFactor = (clamped / 25f).coerceAtLeast(1f)
-        return runCatching<Bitmap?> {
-            HokoBlur.with(context)
-                .scheme(HokoBlur.SCHEME_NATIVE)
-                .mode(HokoBlur.MODE_STACK)
-                .radius(hokoRadius)
-                .sampleFactor(sampleFactor)
-                .forceCopy(false)
-                .processor()
-                .blur(src)
-        }.getOrElse { e ->
-            Log.e(TAG, "blurBitmap threw: $e")
-            null
-        }
-    }
-
-    /**
-     * Drops the cached blurred bitmap, forcing a recompute on the next call.
-     * Called from [PreferenceManager2] when [drawerBlurIntensity] changes and
-     * from [ActivityAllAppsContainerView.onDeviceProfileChanged] on rotation.
+     * Drops the cached bitmap, forcing a recompute on the next [getBlurredBitmap] call.
+     * Called when blur intensity changes or screen rotates.
      */
     @JvmStatic
     fun clearCache() {

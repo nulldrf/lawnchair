@@ -438,7 +438,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     private void animateSearchContainerForSearchState(boolean goingToSearch, long durationMs) {
-        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (!searchBarAtBottom || isSearchBarFloating()) return;
         if (mSearchContainer.getHeight() == 0) return;
@@ -835,7 +835,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
 
-        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom) {
             lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
@@ -848,7 +848,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         lp.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
 
         boolean hideSearchBar =
-                PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar());
+                PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar());
         int topMargin = 0;
         if (!hideSearchBar) {
             topMargin = getContext().getResources().getDimensionPixelSize(
@@ -879,7 +879,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             getViewTreeObserver().addOnGlobalLayoutListener(mSettleSearchContainerRetry);
             return;
         }
-        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (!searchBarAtBottom || isSearchBarFloating()) {
             mSearchContainer.setTranslationY(0f);
@@ -1102,7 +1102,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         InsettableFrameLayout.dispatchInsets(this, insets);
         settleSearchContainerPosition();
 
-        boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
+        boolean hideHeader = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getHideAppDrawerSearchBar());
         if (hideHeader && mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
             int handleHeight = getResources().getDimensionPixelSize(
@@ -1145,7 +1145,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         } else {
             getSearchRecyclerView().setVisibility(GONE);
             getAppsRecyclerViewContainer().setVisibility(VISIBLE);
-            boolean hideHeader = PreferenceExtensionsKt.firstBlocking(
+            boolean hideHeader = PreferenceCacheExtensionsKt.firstCached(
                     pref2.getHideAppDrawerSearchBar());
             mHeader.setVisibility(hideHeader ? GONE : VISIBLE);
         }
@@ -1155,7 +1155,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private void applyAdapterSideAndBottomPaddings(DeviceProfile grid) {
         int bottomPadding = Math.max(mInsets.bottom, mNavBarScrimHeight);
 
-        boolean searchBarAtBottom = PreferenceExtensionsKt.firstBlocking(
+        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom && !isSearchBarFloating()) {
             bottomPadding += mSearchContainer.getHeight();
@@ -1437,7 +1437,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
      * trigger a recompute here.
      */
     private void applyDrawerHokoBlur() {
-        boolean blurEnabled = PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurBackground());
+        boolean blurEnabled = PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerBlurBackground());
 
         if (!blurEnabled) {
             if (mBlurBitmap != null) {
@@ -1448,7 +1448,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
 
         int intensity = Math.round(
-                PreferenceExtensionsKt.firstBlocking(pref2.getDrawerBlurIntensity()));
+                PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerBlurIntensity()));
         final Context ctx = getContext();
 
         UI_HELPER_EXECUTOR.execute(() -> {

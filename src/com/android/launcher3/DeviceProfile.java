@@ -1217,7 +1217,7 @@ public class DeviceProfile {
      */
     private int getHomeIconTextLineCount(int baseLineCount) {
         boolean twoLine =
-                PreferenceExtensionsKt.firstBlocking(preferenceManager2.getTwoLineHomeScreen());
+                PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getTwoLineHomeScreen());
         return twoLine ? Math.max(baseLineCount, 2) : baseLineCount;
     }
 

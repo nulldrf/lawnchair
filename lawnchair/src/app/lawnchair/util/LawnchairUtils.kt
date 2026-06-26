@@ -178,7 +178,7 @@ fun overrideAllAppsTextColor(textView: TextView) {
     val prefs2 = PreferenceManager2.getInstance(context)
 
     // 1. User-chosen explicit colour takes priority.
-    val explicitColor = prefs2.drawerIconTextColor.firstBlocking().resolveColorOrNull(context)
+    val explicitColor = prefs2.drawerIconTextColor.firstCached().resolveColorOrNull(context)
     if (explicitColor != null) {
         textView.setTextColor(explicitColor)
         return
@@ -214,7 +214,7 @@ fun overrideWorkspaceTextColor(textView: TextView) {
     val context = textView.context
     val prefs2 = PreferenceManager2.getInstance(context)
 
-    val explicitColor = prefs2.workspaceIconTextColor.firstBlocking().resolveColorOrNull(context)
+    val explicitColor = prefs2.workspaceIconTextColor.firstCached().resolveColorOrNull(context)
         ?: return // Default → do nothing; theme colour remains.
 
     textView.setTextColor(explicitColor)

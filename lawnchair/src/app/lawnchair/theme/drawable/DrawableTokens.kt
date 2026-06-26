@@ -55,7 +55,7 @@ object DrawableTokens {
     val RoundRectFolder = NewDrawable { context, scheme, uiColorMode ->
         val drawable = AppCompatResources.getDrawable(context, R.drawable.round_rect_folder) as GradientDrawable
         val prefs2 = PreferenceManager2.getInstance(context)
-        val colorOption = prefs2.folderColor.firstBlocking()
+        val colorOption = prefs2.folderColor.firstCached()
         val customColor = colorOption.colorPreferenceEntry.lightColor.invoke(context)
         val color = if (customColor != 0) customColor
                     else ColorTokens.FolderBackgroundColor.resolveColor(context, scheme, uiColorMode)

@@ -96,15 +96,10 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private var canShowHint = false
     private var queryEmpty by mutableStateOf(true)
 
-    // LC-Note: System cross-window blur replaced by HokoBlur. The frosted/translucent
-    // search-bar background (SearchInputFgBlur) is now driven by the drawerBlurBackground
-    // HokoBlur preference instead of BlurUtils.supportsBlursOnWindows().
-    private val drawerBlurEnabled = PreferenceManager2.getInstance(launcher).drawerBlurBackground.firstCached()
-    private val bg = if (drawerBlurEnabled) {
-        DrawableTokens.SearchInputFgBlur.resolve(context)
-    } else {
-        DrawableTokens.SearchInputFg.resolve(context)
-    }
+    private var bgAlphaState by mutableFloatStateOf(1f)
+    // LC-Note: System cross-window blur replaced by HokoBlur. supportBlur is driven by
+    // the drawerBlurBackground HokoBlur preference instead of BlurUtils.supportsBlursOnWindows().
+    private val supportBlur = PreferenceManager2.getInstance(launcher).drawerBlurBackground.firstCached()
     private val bgAlphaAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 300
         interpolator = DecelerateInterpolator()

@@ -541,7 +541,7 @@ class LawnchairLauncher : QuickstepLauncher() {
     // ═══════════════════════════════════════════════════════════════════════
 
     override fun getActivityLaunchOptions(v: View?, item: ItemInfo?): ActivityOptionsWrapper {
-        val animationType = preferenceManager2.appOpenAnimation.firstBlocking()
+        val animationType = preferenceManager2.appOpenAnimation.firstCached()
         lastAppOpenAnimationType = animationType
 
         return when (animationType) {
@@ -588,6 +588,8 @@ class LawnchairLauncher : QuickstepLauncher() {
                 Utilities.allowBGLaunch(options)
                 ActivityOptionsWrapper(options, RunnableList())
             }
+
+            else -> getActivityLaunchOptionsDefault(v)
         }
     }
 

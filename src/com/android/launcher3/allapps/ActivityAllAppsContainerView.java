@@ -986,6 +986,28 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mBlurBitmap = null;
         DrawerWallpaperBlurHelper.clearCache();
         applyDrawerHokoBlur();
+
+        // LC-Note (search-bar-at-bottom rotation fix): on rotation the view is
+        // REUSED rather than recreated, so mSearchContainer.setTranslationY()
+        // from the old orientation survives into the new one. The new layout
+        // dimensions (getHeight(), mSearchContainer.getBottom(), mInsets.bottom)
+        // are not yet available here — the layout pass for the new orientation
+        // hasn't happened yet — so we can't compute the correct resting position
+        // yet. Instead: reset translationY to 0 immediately so there is no
+        // visible wrong/stale position for even one frame, then queue a settle
+        // retry (the same deduped OnGlobalLayoutListener used elsewhere) to run
+        // once the new layout pass actually completes and all dimensions are
+        // fresh. settleSearchContainerPosition() is also called from setInsets()
+        // and dispatchApplyWindowInsets() which both fire post-rotation, but
+        // those can also arrive before the view has been measured in the new
+        // orientation — the retry listener is the only reliable post-layout hook.
+        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
+                pref2.getAppDrawerSearchBarAtBottom());
+        if (searchBarAtBottom && !isSearchBarFloating()) {
+            mSearchContainer.setTranslationY(0f);
+            getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
+            getViewTreeObserver().addOnGlobalLayoutListener(mSettleSearchContainerRetry);
+        }
     }
 
     protected void updateBackgroundVisibility(DeviceProfile deviceProfile) {

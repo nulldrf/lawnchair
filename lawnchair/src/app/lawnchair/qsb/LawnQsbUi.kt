@@ -350,7 +350,8 @@ fun LawnQsbUi(
                 focusRingShape = shape,
             ),
         )
-        .addIf(style.strokeWidthPx > 0f) {
+        // LC-Note: suppress border when background is transparent (blur active) — floating pill outline looks wrong over blur bitmap.
+        .addIf(style.strokeWidthPx > 0f && style.backgroundAlpha > 0f) {
             border(strokeWidth, ComposeColor(style.strokeColor), shape)
         }
 

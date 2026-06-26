@@ -153,10 +153,22 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     showLens = lensIntent != null,
                 )
 
-                val backgroundColor = if (supportBlur) {
-                    ColorTokens.SearchboxHighlightBlur.resolveColor(context)
+                // LC-Note: buildQsbStyle does copy(alpha = backgroundAlpha / 100f) which
+                // fully replaces the color's own alpha channel. SearchboxHighlightBlur has
+                // 54% alpha baked into its resolved color int — passing bgAlphaState * 100
+                // directly would overwrite that with 100% when the bar is at rest, making it
+                // fully opaque and defeating HokoBlur. Instead, extract the token's alpha and
+                // multiply it by bgAlphaState so the bar fades in correctly AND stays at 54%
+                // transparency at rest. Non-blur path is unchanged.
+                val (backgroundColor, backgroundAlpha) = if (supportBlur) {
+                    val resolved = ColorTokens.SearchboxHighlightBlur.resolveColor(context)
+                    // Strip the pre-baked alpha byte; pass only RGB so copy(alpha=…) works cleanly.
+                    val opaqueColor = resolved or 0xFF000000.toInt()
+                    val tokenAlpha = android.graphics.Color.alpha(resolved) / 255f // ~0.54f
+                    val animatedAlpha = (tokenAlpha * bgAlphaState * 100).toInt()
+                    opaqueColor to animatedAlpha
                 } else {
-                    ColorTokens.SearchboxHighlight.resolveColor(context)
+                    ColorTokens.SearchboxHighlight.resolveColor(context) to (bgAlphaState * 100).toInt()
                 }
 
                 // Ignore other theme attributes to preserve existing behavior
@@ -164,7 +176,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     context = context,
                     themed = themedQsb,
                     backgroundColor = backgroundColor,
-                    backgroundAlpha = (bgAlphaState * 100).toInt(),
+                    backgroundAlpha = backgroundAlpha,
                     cornerRadius = 1f,
                     strokeColor = null,
                     strokeWidth = 0f,

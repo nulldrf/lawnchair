@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -97,6 +99,14 @@ fun SwitchPreference(
         onCheckedChange(newValue)
     }
 
+    // Special case for SPEC_2025 schemes - especially "Vibrant"/"Expressive" style 
+    val checkedThumbColor = MaterialTheme.colorScheme.onPrimary
+    val uncheckedThumbColor = MaterialTheme.colorScheme.outline
+    val switchColors = SwitchDefaults.colors(
+        checkedIconColor = iconTintForBackground(checkedThumbColor),
+        uncheckedIconColor = iconTintForBackground(uncheckedThumbColor),
+    )
+
     PreferenceTemplate(
         modifier = modifier.clickable(
             enabled = enabled,
@@ -133,6 +143,7 @@ fun SwitchPreference(
                 onCheckedChange = wrappedOnCheckedChange,
                 enabled = enabled,
                 interactionSource = interactionSource,
+                colors = switchColors,
                 thumbContent = {
                     if (checked) {
                         Icon(
@@ -153,6 +164,11 @@ fun SwitchPreference(
         enabled = enabled,
         applyPaddings = false,
     )
+}
+
+private fun iconTintForBackground(background: Color): Color {
+    val luma = 0.299f * background.red + 0.587f * background.green + 0.114f * background.blue
+    return if (luma > 0.5f) Color.Black else Color.White
 }
 
 @PreviewLawnchair

@@ -37,7 +37,6 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -100,11 +99,8 @@ fun SwitchPreference(
     }
 
     // Special case for SPEC_2025 schemes - especially "Vibrant"/"Expressive" style 
-    val checkedThumbColor = MaterialTheme.colorScheme.onPrimary
-    val uncheckedThumbColor = MaterialTheme.colorScheme.outline
     val switchColors = SwitchDefaults.colors(
-        checkedIconColor = iconTintForBackground(checkedThumbColor),
-        uncheckedIconColor = iconTintForBackground(uncheckedThumbColor),
+        checkedIconColor = MaterialTheme.colorScheme.primary,
     )
 
     PreferenceTemplate(
@@ -164,11 +160,6 @@ fun SwitchPreference(
         enabled = enabled,
         applyPaddings = false,
     )
-}
-
-private fun iconTintForBackground(background: Color): Color {
-    val luma = 0.299f * background.red + 0.587f * background.green + 0.114f * background.blue
-    return if (luma > 0.5f) Color.Black else Color.White
 }
 
 @PreviewLawnchair

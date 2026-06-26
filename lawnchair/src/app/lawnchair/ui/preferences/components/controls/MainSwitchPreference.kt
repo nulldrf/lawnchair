@@ -112,6 +112,11 @@ fun MainSwitchPreference(
     ) {
         val interactionSource = remember { MutableInteractionSource() }
 
+        // Special case for SPEC_2025 schemes - especially "Vibrant"/"Expressive" style 
+        val switchColors = SwitchDefaults.colors(
+            checkedIconColor = MaterialTheme.colorScheme.primary,
+        )
+
         PreferenceTemplate(
             modifier = Modifier
                 .clickable(
@@ -135,6 +140,7 @@ fun MainSwitchPreference(
                     onCheckedChange = onCheckedChange,
                     enabled = enabled,
                     interactionSource = interactionSource,
+                    colors = switchColors,
                     thumbContent = {
                         if (checked) {
                             Icon(

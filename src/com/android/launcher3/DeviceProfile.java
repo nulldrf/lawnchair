@@ -1257,6 +1257,74 @@ public class DeviceProfile {
     }
 
     /**
+     * Lawnchair: computes {@link #cellHeightPx}, {@link #iconDrawablePaddingPx},
+     * {@link #iconSizePx}, {@link #iconTextSizePx}, {@link #cellYPaddingPx}, and
+     * {@code cellLayoutBorderSpacePx.y} for the {@code mIsScalableGrid} branch of
+     * {@link #updateIconSize(float, Context)}, for the given label {@code lineCount}.
+     * <p>
+     * Always restarts from the given {@code baseline*} values (captured right after the
+     * line-count-independent width fix in the caller) rather than continuing from whatever
+     * the previous call left behind, so this can be called once for the preferred line count
+     * and, if that turns out to require shrinking the icon or label below their configured
+     * size, called again for a clean single-line fallback that isn't polluted by the failed
+     * two-line attempt's mutations (most notably {@code cellLayoutBorderSpacePx.y}, which the
+     * "insufficient border space" path below zeroes out).
+     */
+    private void applyScalableGridCellHeight(int lineCount, int baselineCellHeightPx,
+            int baselineIconDrawablePaddingPx, int baselineIconSizePx,
+            int baselineIconTextSizePx, int baselineBorderSpaceYPx) {
+        cellHeightPx = baselineCellHeightPx;
+        iconDrawablePaddingPx = baselineIconDrawablePaddingPx;
+        iconSizePx = baselineIconSizePx;
+        iconTextSizePx = baselineIconTextSizePx;
+        cellLayoutBorderSpacePx.y = baselineBorderSpaceYPx;
+
+        int cellTextAndPaddingHeight = iconDrawablePaddingPx + getHomeIconTextHeightPx(lineCount);
+        int cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
+        if (cellHeightPx < cellContentHeight) {
+            // If cellHeight no longer fit iconSize, reduce borderSpace to make cellHeight
+            // bigger.
+            int numBorders = inv.numRows - 1;
+            int extraHeightRequired = (cellContentHeight - cellHeightPx) * inv.numRows;
+            if (cellLayoutBorderSpacePx.y * numBorders >= extraHeightRequired) {
+                cellHeightPx = cellContentHeight;
+                cellLayoutBorderSpacePx.y -= extraHeightRequired / numBorders;
+            } else {
+                // If it still doesn't fit, set borderSpace to 0 to recover space.
+                cellHeightPx = (cellHeightPx * inv.numRows
+                        + cellLayoutBorderSpacePx.y * numBorders) / inv.numRows;
+                cellLayoutBorderSpacePx.y = 0;
+                // Reduce iconDrawablePaddingPx to make cellContentHeight smaller.
+                int cellContentWithoutPadding = cellContentHeight - iconDrawablePaddingPx;
+                // Lawnchair: remember the un-squeezed padding so two-line mode can floor the
+                // squeeze below at half of it instead of letting it collapse to (or below)
+                // zero — otherwise the label ends up visually touching the icon. Single-line
+                // behaviour (lineCount == 1) is unaffected, since minIconDrawablePaddingPx is
+                // 0 there, matching the original formula.
+                int minIconDrawablePaddingPx = lineCount >= 2 ? iconDrawablePaddingPx / 2 : 0;
+                if (cellContentWithoutPadding <= cellHeightPx - minIconDrawablePaddingPx) {
+                    iconDrawablePaddingPx = Math.max(
+                            minIconDrawablePaddingPx, cellContentHeight - cellHeightPx);
+                } else {
+                    // If it still doesn't fit even with padding floored, drop to the floor
+                    // (0 for single-line) and proportionally reduce iconSizePx and
+                    // iconTextSizePx to fit. The caller detects this (iconSizePx ends up
+                    // smaller than baselineIconSizePx) and falls back to one line instead.
+                    iconDrawablePaddingPx = minIconDrawablePaddingPx;
+                    float ratio = (cellHeightPx - iconDrawablePaddingPx)
+                            / (float) cellContentWithoutPadding;
+                    iconSizePx = (int) (iconSizePx * ratio);
+                    iconTextSizePx = (int) (iconTextSizePx * ratio);
+                }
+                cellTextAndPaddingHeight =
+                        iconDrawablePaddingPx + getHomeIconTextHeightPx(lineCount);
+            }
+            cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
+        }
+        cellYPaddingPx = Math.max(0, cellHeightPx - cellContentHeight) / 2;
+    }
+
+    /**
      * Updating the iconSize affects many aspects of the launcher layout, such as: iconSizePx,
      * iconTextSizePx, iconDrawablePaddingPx, cellWidth/Height, allApps* variants,
      * hotseat sizes, workspaceSpringLoadedShrinkFactor, folderIconSizePx, and folderIconOffsetYPx.
@@ -1315,11 +1383,7 @@ public class DeviceProfile {
         } else if (mIsScalableGrid) {
             iconDrawablePaddingPx = (int) (getNormalizedIconDrawablePadding() * iconScale);
             cellWidthPx = pxFromDp(inv.minCellSize[mTypeIndex].x, mMetrics, scale);
-            cellHeightPx = pxFromDp(inv.minCellSize[mTypeIndex].y, mMetrics, scale);
-            // Lawnchair: see getHomeIconTextLineCount() — becomes 2 when the user enables
-            // two-line home screen labels, so the cell-height math below reserves room for
-            // the extra line instead of leaving BubbleTextView's wrap with nowhere to put it.
-            maxIconTextLineCount = getHomeIconTextLineCount(1);
+            int baselineCellHeightPx = pxFromDp(inv.minCellSize[mTypeIndex].y, mMetrics, scale);
 
             if (cellWidthPx < iconSizePx) {
                 // If cellWidth no longer fit iconSize, reduce borderSpace to make cellWidth bigger.
@@ -1339,51 +1403,30 @@ public class DeviceProfile {
                 }
             }
 
-            int cellTextAndPaddingHeight =
-                    iconDrawablePaddingPx + getHomeIconTextHeightPx(maxIconTextLineCount);
-            int cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
-            if (cellHeightPx < cellContentHeight) {
-                // If cellHeight no longer fit iconSize, reduce borderSpace to make cellHeight
-                // bigger.
-                int numBorders = inv.numRows - 1;
-                int extraHeightRequired = (cellContentHeight - cellHeightPx) * inv.numRows;
-                if (cellLayoutBorderSpacePx.y * numBorders >= extraHeightRequired) {
-                    cellHeightPx = cellContentHeight;
-                    cellLayoutBorderSpacePx.y -= extraHeightRequired / numBorders;
-                } else {
-                    // If it still doesn't fit, set borderSpace to 0 to recover space.
-                    cellHeightPx = (cellHeightPx * inv.numRows
-                            + cellLayoutBorderSpacePx.y * numBorders) / inv.numRows;
-                    cellLayoutBorderSpacePx.y = 0;
-                    // Reduce iconDrawablePaddingPx to make cellContentHeight smaller.
-                    int cellContentWithoutPadding = cellContentHeight - iconDrawablePaddingPx;
-                    // Lawnchair: remember the un-squeezed padding so two-line mode can floor the
-                    // squeeze below at half of it instead of letting it collapse to (or below)
-                    // zero — otherwise the label ends up visually touching the icon. Any
-                    // resulting deficit is absorbed by the icon/text shrink ratio below instead,
-                    // exactly like the existing fallback already does for the no-padding case.
-                    // Single-line behaviour (maxIconTextLineCount == 1) is unaffected, since
-                    // minIconDrawablePaddingPx is 0 there, matching the original formulas.
-                    int minIconDrawablePaddingPx =
-                            maxIconTextLineCount >= 2 ? iconDrawablePaddingPx / 2 : 0;
-                    if (cellContentWithoutPadding <= cellHeightPx - minIconDrawablePaddingPx) {
-                        iconDrawablePaddingPx = Math.max(
-                                minIconDrawablePaddingPx, cellContentHeight - cellHeightPx);
-                    } else {
-                        // If it still doesn't fit, drop to the padding floor (0 for single-line)
-                        // and proportionally reduce iconSizePx and iconTextSizePx to fit.
-                        iconDrawablePaddingPx = minIconDrawablePaddingPx;
-                        float ratio = (cellHeightPx - iconDrawablePaddingPx)
-                                / (float) cellContentWithoutPadding;
-                        iconSizePx = (int) (iconSizePx * ratio);
-                        iconTextSizePx = (int) (iconTextSizePx * ratio);
-                    }
-                    cellTextAndPaddingHeight =
-                            iconDrawablePaddingPx + getHomeIconTextHeightPx(maxIconTextLineCount);
-                }
-                cellContentHeight = iconSizePx + cellTextAndPaddingHeight;
+            // Lawnchair: snapshot state right after the (line-count-independent) width fix
+            // above, so the two-line attempt below can be cleanly retried at one line —
+            // without being polluted by a failed two-line attempt's icon/text shrinking —
+            // if two lines would otherwise require shrinking the icon or label below their
+            // configured size.
+            int baselineIconDrawablePaddingPx = iconDrawablePaddingPx;
+            int baselineIconSizePx = iconSizePx;
+            int baselineIconTextSizePx = iconTextSizePx;
+            int baselineBorderSpaceYPx = cellLayoutBorderSpacePx.y;
+
+            maxIconTextLineCount = getHomeIconTextLineCount(1);
+            applyScalableGridCellHeight(maxIconTextLineCount, baselineCellHeightPx,
+                    baselineIconDrawablePaddingPx, baselineIconSizePx, baselineIconTextSizePx,
+                    baselineBorderSpaceYPx);
+            if (maxIconTextLineCount >= 2 && iconSizePx < baselineIconSizePx) {
+                // Two lines would require shrinking the icon (and/or label) below the
+                // configured size to fit — fall back cleanly to one line at full size
+                // instead, matching the legacy-branch fallback above.
+                maxIconTextLineCount = 1;
+                applyScalableGridCellHeight(maxIconTextLineCount, baselineCellHeightPx,
+                        baselineIconDrawablePaddingPx, baselineIconSizePx,
+                        baselineIconTextSizePx, baselineBorderSpaceYPx);
             }
-            cellYPaddingPx = Math.max(0, cellHeightPx - cellContentHeight) / 2;
+
             desiredWorkspaceHorizontalMarginPx =
                     (int) (desiredWorkspaceHorizontalMarginOriginalPx * scale);
         } else {

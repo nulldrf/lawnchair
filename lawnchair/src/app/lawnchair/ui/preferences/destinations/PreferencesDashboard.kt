@@ -81,6 +81,7 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.observeAsState
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
@@ -112,7 +113,6 @@ import app.lawnchair.ui.preferences.navigation.Smartspace
 import app.lawnchair.util.isDefaultLauncher
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
-import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -203,7 +203,7 @@ fun PreferencesDashboard(
     val labelAbout      = stringResource(R.string.about_label)
 
     val deckLayout = prefs2.deckLayout.getAdapter()
-    val isSmartspaceEnabled = prefs2.enableSmartspace.firstBlocking()
+    val isSmartspaceEnabled = prefs2.enableSmartspace.firstCached()
 
     val allEntries = buildList {
         fun g(label: String, kw: String = "", sk: String? = null) =

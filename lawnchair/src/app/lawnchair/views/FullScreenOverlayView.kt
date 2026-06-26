@@ -19,10 +19,10 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.theme.color.tokens.ColorTokens
 import app.lawnchair.views.overlay.AppOpenAnimationType
 import app.lawnchair.views.overlay.FullScreenOverlayMode
-import com.patrykmichalik.opto.core.firstBlocking
 
 class FullScreenOverlayView @JvmOverloads constructor(
     context: Context,
@@ -240,8 +240,8 @@ fun Activity.showFullScreenOverlay(
     onOverlayReady: () -> Unit,
 ) {
     val pref2 = PreferenceManager2.getInstance(this)
-    val overlayMode  = pref2.closingAppOverlay.firstBlocking()
-    val appOpenAnim  = pref2.appOpenAnimation.firstBlocking()
+    val overlayMode  = pref2.closingAppOverlay.firstCached()
+    val appOpenAnim  = pref2.appOpenAnimation.firstCached()
     val overlayView  = FullScreenOverlayView(this)
     val targetRoot   = rootView ?: window.decorView.findViewById<ViewGroup>(android.R.id.content)
 

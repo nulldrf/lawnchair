@@ -92,6 +92,7 @@ import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.UserCache;
+import com.android.launcher3.util.UserIconInfo;
 import com.android.launcher3.recyclerview.AllAppsRecyclerViewPool;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.Preconditions;
@@ -111,7 +112,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import com.patrykmichalik.opto.core.PreferenceExtensionsKt;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
 import static com.topjohnwu.superuser.internal.Utils.context;
 import app.lawnchair.allapps.DrawerWallpaperBlurHelper;
 import app.lawnchair.allapps.LawnchairAlphabeticalAppsList;
@@ -136,8 +137,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     protected final T mActivityContext;
     protected final List<AdapterHolder> mAH;
-    protected final Predicate<ItemInfo> mPersonalMatcher = ItemInfoMatcher.ofUser(
-            Process.myUserHandle());
+    protected final Predicate<ItemInfo> mPersonalMatcher = info -> {
+        if (info == null) {
+            return false;
+        }
+        if (Process.myUserHandle().equals(info.user)) {
+            return true;
+        }
+        UserIconInfo userIconInfo = UserCache.getInstance(getContext()).getUserInfo(info.user);
+        return userIconInfo.isCloned();
+    }; // Lawnchair: Show app from clone profile
     protected WorkProfileManager mWorkManager;
     protected final PrivateProfileManager mPrivateProfileManager;
     protected final Point mFastScrollerOffset = new Point();
@@ -267,7 +276,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected void initContent() {
-        showFastScroller = PreferenceExtensionsKt.firstBlocking(pref2.getShowScrollbar());
+        showFastScroller = PreferenceCacheExtensionsKt.firstCached(pref2.getShowScrollbar());
 
         mMainAdapterProvider = mSearchUiDelegate.createMainAdapterProvider();
 
@@ -491,7 +500,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public void reset(boolean animate) { reset(animate, true); }
 
     public void reset(boolean animate, boolean exitSearch) {
-        if (!PreferenceExtensionsKt.firstBlocking(pref2.getRememberPosition())) {
+        // Scroll Main and Work RV to top. Search RV is done in `resetSearch`.
+        if (!PreferenceCacheExtensionsKt.firstCached(pref2.getRememberPosition())) {
             for (int i = 0; i < mAH.size(); i++) {
                 if (i != SEARCH && mAH.get(i).mRecyclerView != null) {
                     mAH.get(i).mRecyclerView.scrollToTop();
@@ -702,7 +712,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     void setupHeader() {
         mAdditionalHeaderRows.forEach(row -> mHeader.onPluginDisconnected(row));
 
-        var hideHeader = PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar());
+        var hideHeader = PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar());
         mHeader.setVisibility(hideHeader ? View.GONE : View.VISIBLE);
         boolean tabsHidden = !mUsingTabs;
         mHeader.setup(
@@ -745,11 +755,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected void updateHeaderScroll(int scrolledOffset) {
-        if (PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar())) return;
-
-        boolean showTabContainerBackground = PreferenceExtensionsKt.firstBlocking(
-                pref2.getWorkProfileTabContainerBackground());
-
+        if (PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar()))
+            return;
+        
+        // Check if tab container background should be shown
+        boolean showTabContainerBackground = PreferenceCacheExtensionsKt.firstCached(
+                pref2.getWorkProfileTabContainerBackground(), pref2);
+        
         float prog = Utilities.boundToRange((float) scrolledOffset / mHeaderThreshold, 0f, 1f);
         int headerColor = getHeaderColor(prog);
         int tabsAlpha = (!showTabContainerBackground
@@ -767,12 +779,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected int getHeaderColor(float blendRatio) {
-        boolean showHeaderBackground = PreferenceExtensionsKt.firstBlocking(
-                pref2.getAppDrawerSearchBarBackground());
-        if (!showHeaderBackground) return Color.TRANSPARENT;
-
         if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            float opacity = pref.getDrawerOpacity().get();
+            float opacity = mSearchContainer.getAlpha();
+            var showHeaderBackground = PreferenceCacheExtensionsKt.firstCached(
+                pref2.getAppDrawerSearchBarBackground(), pref2);
+            if (showHeaderBackground) {
+                opacity = pref.getDrawerOpacity().get();
+            }
             opacity = MathUtils.clamp(opacity, 0f, 1f);
             return ColorUtils.setAlphaComponent(
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),
@@ -853,7 +866,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
         lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
         boolean hideSearchBar =
-                PreferenceExtensionsKt.firstBlocking(pref2.getHideAppDrawerSearchBar());
+                PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar());
         lp.topMargin = (includeTabsMargin && !hideSearchBar)
                 ? getContext().getResources().getDimensionPixelSize(
                         R.dimen.all_apps_header_pill_height)
@@ -884,11 +897,15 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     private void removeCustomRules(View v) {
-        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
-        RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
-        lp.removeRule(RelativeLayout.ABOVE);
-        lp.removeRule(RelativeLayout.ALIGN_TOP);
-        lp.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
+        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)
+                || PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar())) {
+            return;
+        }
+
+        RelativeLayout.LayoutParams layoutParams = (LayoutParams) v.getLayoutParams();
+        layoutParams.removeRule(RelativeLayout.ABOVE);
+        layoutParams.removeRule(RelativeLayout.ALIGN_TOP);
+        layoutParams.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
     }
 
     protected BaseAllAppsAdapter<T> createAdapter(AlphabeticalAppsList<T> appsList) {

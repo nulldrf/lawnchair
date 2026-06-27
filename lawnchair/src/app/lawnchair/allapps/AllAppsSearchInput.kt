@@ -233,8 +233,12 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
             if (hasFocus) {
                 if (prefs2.searchAlgorithm.firstCached() != LawnchairSearchAlgorithm.APP_SEARCH) {
                     input.setHint(R.string.all_apps_device_search_hint)
+					setBackgroundVisibility(true, 1f)
+                    animateHintVisibility(true)
                 } else {
-                    input.setHint(R.string.all_apps_search_bar_hint)
+                    setBackgroundVisibility(prefs2.appDrawerSearchBarBackground.firstCached(), 1f)
+                    animateHintVisibility(false)
+		            input.setHint(R.string.all_apps_search_bar_hint)
                 }
 
                 if (input.text.toString().isEmpty()) {
@@ -493,6 +497,12 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private fun updateBgAlpha() {
         val fraction = bgAlphaAnimator.animatedFraction
         bgAlphaState = Utilities.mapRange(fraction, 0f, bgAlpha)
+        // LC-Note: mirror onto the host View's own alpha. ActivityAllAppsContainerView
+        // #getHeaderColor() reads mSearchContainer.getAlpha() as the header-protection
+        // fallback opacity when appDrawerSearchBarBackground is off. Since the QSB pill's
+        // background now lives entirely inside Compose (bgAlphaState), the host View's
+        // alpha is never otherwise touched and stays pinned at 1f, breaking that contract.
+        alpha = bgAlphaState
     }
 
     override fun onIdpChanged(modelPropertiesChanged: Boolean) {

@@ -41,6 +41,35 @@ fun setThemedIconResource(
     }.mutate()
 
     if (!themed) {
+        // LC-Note: unthemed G icon still gets the brand-color sweep gradient.
+        if (resId == R.drawable.ic_super_g_color && drawable is LayerDrawable) {
+            val blue   = 0xFF4285F4.toInt()
+            val green  = 0xFF34A853.toInt()
+            val yellow = 0xFFFBBC05.toInt()
+            val red    = 0xFFEA4335.toInt()
+
+            val d = 0.03f
+            val sweepColors = intArrayOf(
+                blue, blue, green, green, yellow, yellow, red, red, blue, blue,
+            )
+            val sweepPositions = floatArrayOf(
+                0.000f,
+                0.1358f - d, 0.1358f + d,
+                0.4259f - d, 0.4259f + d,
+                0.5741f - d, 0.5741f + d,
+                0.9000f - d, 0.9000f + d,
+                1.000f,
+            )
+            return SweepGradientDrawable(
+                drawable,
+                sweepColors,
+                sweepPositions,
+                barExcludeLeft   = 0.500f,
+                barExcludeTop    = 0.417f,
+                barExcludeRight  = 1.000f,
+                barExcludeBottom = 0.605f,
+            )
+        }
         return drawable
     }
 

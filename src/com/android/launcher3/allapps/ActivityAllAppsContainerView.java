@@ -907,20 +907,34 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private void settleSearchContainerPositionRetry() {
         getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
         if (!isAttachedToWindow()) return;
-        // LC-Note (portrait-restore width fix): after rotating back to portrait,
-        // the first global-layout pass that triggers this retry can fire before
-        // AppsSearchContainerLayout.onMeasure() has run with the new portrait
-        // dimensions — so mSearchContainer may still carry the landscape width at
-        // this point. Calling requestLayout() on mSearchContainer forces it to
-        // re-measure itself (which recomputes its width from the RV padding in
-        // the new orientation) before we read its getBottom() to compute the
-        // correct resting translationY. Without this, settleSearchContainerPosition()
-        // would set the right Y but the bar would appear truncated/wrong-width
-        // until the next incidental layout pass happened to fix it.
-        mSearchContainer.requestLayout();
-        // Post the actual settle so it runs after the requestLayout()'s measure
-        // pass has completed, not in the same synchronous call stack.
-        mSearchContainer.post(this::settleSearchContainerPosition);
+        // LC-Note (portrait-restore width + position fix): after rotating back
+        // to portrait, mSearchContainer may still have landscape dimensions at
+        // this point (wrong width, wrong getBottom()). Two things need to happen
+        // before settleSearchContainerPosition() can compute a correct result:
+        //
+        // 1. The PARENT needs a full layout pass so the RV padding (which
+        //    AppsSearchContainerLayout.onMeasure() uses to compute its own
+        //    width) is recomputed for the new orientation. requestLayout() on
+        //    the parent triggers that.
+        //
+        // 2. settleSearchContainerPosition() must run AFTER that layout pass
+        //    completes — not via .post() which races against the Choreographer-
+        //    batched layout pass, but via another OnGlobalLayoutListener which
+        //    is guaranteed to fire after layout finishes.
+        //
+        // Use a fresh, anonymous listener for this second pass so it doesn't
+        // conflict with mSettleSearchContainerRetry (which was just removed
+        // above). It removes itself immediately on first fire so it's one-shot.
+        requestLayout();
+        getViewTreeObserver().addOnGlobalLayoutListener(
+                new ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        if (!isAttachedToWindow()) return;
+                        settleSearchContainerPosition();
+                    }
+                });
     }
 
     private void removeCustomRules(View v) {

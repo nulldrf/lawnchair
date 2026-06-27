@@ -885,6 +885,20 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mSearchContainer.setTranslationY(0f);
             return;
         }
+        // LC-Note (phone landscape fix): on phones in landscape all-apps is
+        // fullscreen, not a bottom sheet. shouldShowAllAppsOnSheet() is false
+        // in that mode. Bottom-pinning via translationY only makes visual sense
+        // in the sheet (portrait) layout — in landscape the computed
+        // translationY (getHeight() - mInsets.bottom - getBottom()) can push
+        // the bar completely off the visible area since the container is much
+        // shorter. Reset to 0 (natural top position) in non-sheet mode so the
+        // bar is at least visible; the preference is still stored, and when the
+        // user rotates back to portrait (sheet mode) the retry mechanism will
+        // re-settle it at the bottom correctly.
+        if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
+            mSearchContainer.setTranslationY(0f);
+            return;
+        }
         boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
                 && mSearchUiManager.getEditText().hasFocus());
         mSearchContainer.setTranslationY(getSearchContainerRestingTranslationY(searching));
@@ -893,7 +907,20 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private void settleSearchContainerPositionRetry() {
         getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
         if (!isAttachedToWindow()) return;
-        settleSearchContainerPosition();
+        // LC-Note (portrait-restore width fix): after rotating back to portrait,
+        // the first global-layout pass that triggers this retry can fire before
+        // AppsSearchContainerLayout.onMeasure() has run with the new portrait
+        // dimensions — so mSearchContainer may still carry the landscape width at
+        // this point. Calling requestLayout() on mSearchContainer forces it to
+        // re-measure itself (which recomputes its width from the RV padding in
+        // the new orientation) before we read its getBottom() to compute the
+        // correct resting translationY. Without this, settleSearchContainerPosition()
+        // would set the right Y but the bar would appear truncated/wrong-width
+        // until the next incidental layout pass happened to fix it.
+        mSearchContainer.requestLayout();
+        // Post the actual settle so it runs after the requestLayout()'s measure
+        // pass has completed, not in the same synchronous call stack.
+        mSearchContainer.post(this::settleSearchContainerPosition);
     }
 
     private void removeCustomRules(View v) {
@@ -987,20 +1014,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         DrawerWallpaperBlurHelper.clearCache();
         applyDrawerHokoBlur();
 
-        // LC-Note (search-bar-at-bottom rotation fix): on rotation the view is
-        // REUSED rather than recreated, so mSearchContainer.setTranslationY()
-        // from the old orientation survives into the new one. The new layout
-        // dimensions (getHeight(), mSearchContainer.getBottom(), mInsets.bottom)
-        // are not yet available here — the layout pass for the new orientation
-        // hasn't happened yet — so we can't compute the correct resting position
-        // yet. Instead: reset translationY to 0 immediately so there is no
-        // visible wrong/stale position for even one frame, then queue a settle
-        // retry (the same deduped OnGlobalLayoutListener used elsewhere) to run
-        // once the new layout pass actually completes and all dimensions are
-        // fresh. settleSearchContainerPosition() is also called from setInsets()
-        // and dispatchApplyWindowInsets() which both fire post-rotation, but
-        // those can also arrive before the view has been measured in the new
-        // orientation — the retry listener is the only reliable post-layout hook.
+        // LC-Note (search-bar-at-bottom rotation fix): the view is REUSED on
+        // rotation so mSearchContainer.translationY from the old orientation
+        // survives. Reset to 0 immediately (before any layout pass) so there is
+        // no visible stale position, then queue a retry that runs after the new
+        // layout pass has fully settled (including a fresh measure of
+        // mSearchContainer itself) to compute and apply the correct resting
+        // translationY for the new orientation. The retry is deduped via the
+        // same mSettleSearchContainerRetry field used everywhere else.
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom && !isSearchBarFloating()) {

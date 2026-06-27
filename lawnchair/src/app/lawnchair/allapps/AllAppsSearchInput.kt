@@ -497,12 +497,10 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private fun updateBgAlpha() {
         val fraction = bgAlphaAnimator.animatedFraction
         bgAlphaState = Utilities.mapRange(fraction, 0f, bgAlpha)
-        // LC-Note: mirror onto the host View's own alpha. ActivityAllAppsContainerView
-        // #getHeaderColor() reads mSearchContainer.getAlpha() as the header-protection
-        // fallback opacity when appDrawerSearchBarBackground is off. Since the QSB pill's
-        // background now lives entirely inside Compose (bgAlphaState), the host View's
-        // alpha is never otherwise touched and stays pinned at 1f, breaking that contract.
         alpha = bgAlphaState
+        if (::appsView.isInitialized) {
+            appsView.invalidateHeaderColor()
+        }
     }
 
     override fun onIdpChanged(modelPropertiesChanged: Boolean) {

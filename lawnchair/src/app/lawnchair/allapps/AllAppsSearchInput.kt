@@ -233,12 +233,8 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
             if (hasFocus) {
                 if (prefs2.searchAlgorithm.firstCached() != LawnchairSearchAlgorithm.APP_SEARCH) {
                     input.setHint(R.string.all_apps_device_search_hint)
-					setBackgroundVisibility(true, 1f)
-                    animateHintVisibility(true)
                 } else {
-                    setBackgroundVisibility(prefs2.appDrawerSearchBarBackground.firstCached(), 1f)
-                    animateHintVisibility(false)
-		            input.setHint(R.string.all_apps_search_bar_hint)
+                    input.setHint(R.string.all_apps_search_bar_hint)
                 }
 
                 if (input.text.toString().isEmpty()) {
@@ -497,10 +493,6 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private fun updateBgAlpha() {
         val fraction = bgAlphaAnimator.animatedFraction
         bgAlphaState = Utilities.mapRange(fraction, 0f, bgAlpha)
-        alpha = bgAlphaState
-        if (::appsView.isInitialized) {
-            appsView.invalidateHeaderColor()
-        }
     }
 
     override fun onIdpChanged(modelPropertiesChanged: Boolean) {

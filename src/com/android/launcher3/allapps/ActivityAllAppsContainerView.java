@@ -779,39 +779,37 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected int getHeaderColor(float blendRatio) {
-        if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            float opacity = mSearchContainer.getAlpha();
-            var showHeaderBackground = PreferenceCacheExtensionsKt.firstCached(
+        // appDrawerSearchBarBackground is the single on/off control for the
+        // header-protection scrim across ALL layout modes (sheet / phone) and
+        // ALL blur states.
+        //
+        // false → Color.TRANSPARENT (== 0). The draw path's early-return guard
+        //         "mHeaderPaint.getColor() == 0" then fires before any canvas
+        //         drawing, so neither the sheet rounded-rect nor the phone
+        //         full-width drawRect is ever executed.
+        //
+        // true  → fall through to per-mode colour calculation below.
+        boolean showHeaderBackground = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarBackground(), pref2);
-            if (showHeaderBackground) {
-                opacity = pref.getDrawerOpacity().get();
-            }
+        if (!showHeaderBackground) {
+            return Color.TRANSPARENT;
+        }
+
+        if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
+            // Phone / non-sheet mode: use drawer opacity as the scrim alpha so
+            // the protection blends proportionally with the background.
+            float opacity = pref.getDrawerOpacity().get();
             opacity = MathUtils.clamp(opacity, 0f, 1f);
             return ColorUtils.setAlphaComponent(
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),
                     Math.round(opacity * 255));
         }
+        // Sheet mode: when HokoBlur is active show a semi-transparent tint so
+        // the blurred wallpaper is still partially visible through the header.
+        // Without blur, blend the background with the header-protection colour.
         return (mBlurBitmap != null)
                 ? ColorUtils.setAlphaComponent(mHeaderProtectionColor, (int) (blendRatio * 255))
                 : ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio);
-    }
-
-    // LC-Note: recomputes mHeaderColor outside of scroll events so the header protection
-    // backdrop stays in sync with mSearchContainer's own alpha (e.g. the search bar's
-    // focus-driven show/hide animation in AllAppsSearchInput) instead of only refreshing
-    // on the next scroll. Deliberately does NOT call updateHeaderScroll(), since that
-    // method unconditionally forces mSearchUiManager.setBackgroundVisibility(true, 1f),
-    // which would fight an in-progress hide animation.
-    public void invalidateHeaderColor() {
-        if (PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar()))
-            return;
-        float prog = Utilities.boundToRange(
-                (float) mSearchRecyclerView.computeVerticalScrollOffset() / mHeaderThreshold, 0f, 1f);
-        int headerColor = getHeaderColor(prog);
-        if (headerColor != mHeaderColor) {
-            mHeaderColor = headerColor;
-            invalidateHeader();
-        }
     }
 
     private int getBackgroundColor() {

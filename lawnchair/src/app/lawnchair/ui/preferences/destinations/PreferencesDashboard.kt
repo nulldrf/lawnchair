@@ -67,6 +67,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -639,10 +640,19 @@ private fun SearchOverlay(
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
 
+    // Recomputed whenever the configuration changes (e.g. rotation). Mirrors
+    // SettingsWallpaperBlurHelper's own screenBounds() exactly, so this key
+    // changes precisely when the helper's internal cache would otherwise miss —
+    // forcing a fresh, correctly-sized capture instead of the old bitmap being
+    // stretched into the new orientation by ContentScale.Crop below.
+    val configuration = LocalConfiguration.current
+    val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
+    val screenWidth = screenBounds.width()
+    val screenHeight = screenBounds.height()
+
     val blurredBitmap: Bitmap? by produceState<Bitmap?>(
-        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
-        key1 = blurEnabled,
-        key2 = blurIntensity,
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
+        blurEnabled, blurIntensity, screenWidth, screenHeight,
     ) {
         this.value = if (blurEnabled) {
             withContext(Dispatchers.IO) {

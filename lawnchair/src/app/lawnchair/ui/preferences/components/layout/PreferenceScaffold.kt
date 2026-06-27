@@ -38,10 +38,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCompositionContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
@@ -91,10 +93,17 @@ fun PreferenceScaffold(
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
 
+    // Recomputed whenever the configuration changes (e.g. rotation) — see
+    // SettingsWallpaperBlurHelper.screenBounds() / PreferencesDashboard's
+    // SearchOverlay for the matching fix on the other call site.
+    val configuration = LocalConfiguration.current
+    val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
+    val screenWidth = screenBounds.width()
+    val screenHeight = screenBounds.height()
+
     val blurredBitmap by produceState(
-        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
-        key1 = blurEnabled,
-        key2 = blurIntensity,
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
+        blurEnabled, blurIntensity, screenWidth, screenHeight,
     ) {
         value = if (blurEnabled) {
             withContext(Dispatchers.IO) {

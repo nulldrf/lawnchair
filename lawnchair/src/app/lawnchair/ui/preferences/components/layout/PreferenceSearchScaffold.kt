@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
@@ -73,11 +74,18 @@ fun PreferenceSearchScaffold(
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
 
+    // Recomputed whenever the configuration changes (e.g. rotation) — see
+    // SettingsWallpaperBlurHelper.screenBounds() / PreferencesDashboard's
+    // SearchOverlay for the matching fix on the other call sites.
+    val configuration = LocalConfiguration.current
+    val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
+    val screenWidth = screenBounds.width()
+    val screenHeight = screenBounds.height()
+
     // Use explicit type and `this.value` to avoid clashing with the `value: String` parameter.
     val blurredBitmap: Bitmap? by produceState<Bitmap?>(
-        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity),
-        key1 = blurEnabled,
-        key2 = blurIntensity,
+        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
+        blurEnabled, blurIntensity, screenWidth, screenHeight,
     ) {
         this.value = if (blurEnabled) {
             withContext(Dispatchers.IO) {

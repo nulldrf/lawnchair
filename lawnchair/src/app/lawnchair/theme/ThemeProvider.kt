@@ -278,15 +278,27 @@ class ThemeProvider @Inject constructor(
         }
 
     private fun resolveColorScheme2025(accentColor: ColorOption, isDark: Boolean): MonetColorSchemeCompat2025? {
-        // These Style values have no SPEC_2025 implementation — DynamicScheme's own
+        // LegacyKdrag always routes to the ZCAM engine regardless of active spec version.
+        // Returning null here lets the caller fall back to resolveColorScheme(), which
+        // correctly dispatches to KdragMonetColorScheme. Without this guard, LegacyKdrag
+        // would pass the styleHasNo2025Variant check below (because its style placeholder
+        // is TONAL_SPOT) and silently produce a SPEC_2025 TonalSpot scheme instead of ZCAM.
+        if (colorStyle is LegacyKdrag) return null
+
+        // These ColorStyle subtypes have no SPEC_2025 implementation — DynamicScheme's own
         // maybeFallbackSpecVersion forces them to SPEC_2021 tone logic internally,
         // but they'd still run through the materialkolor HCT engine instead of the
         // original CAM16 ColorScheme.kt engine, producing colors that don't match
         // the rest of the SPEC_2021 UI. Returning null here routes them through
         // resolveColorScheme (the legacy kdrag0n path) instead, exactly like
         // SystemAccent and LegacyKdrag already do.
-        val styleHasNo2025Variant = when (colorStyle.style) {
-            Style.RAINBOW, Style.FRUIT_SALAD, Style.CONTENT, Style.MONOCHROMATIC -> true
+        // NOTE: intentionally checked against the sealed subtype (not colorStyle.style) so
+        // that any future ColorStyle that shares a Style enum value can't silently bypass this.
+        val styleHasNo2025Variant = when (colorStyle) {
+            is app.lawnchair.theme.color.Rainbow,
+            is app.lawnchair.theme.color.FruitSalad,
+            is app.lawnchair.theme.color.Content,
+            is app.lawnchair.theme.color.Monochromatic -> true
             else -> false
         }
         if (styleHasNo2025Variant) return null
@@ -312,9 +324,8 @@ class ThemeProvider @Inject constructor(
             }
 
             is ColorOption.CustomColor -> {
-                // LegacyKdrag has no 2025 variant — fall back to TonalSpot.
-                val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-                get2025ColorScheme(accentColor.color, effectiveStyle, isDark)
+                // LegacyKdrag is already returned null above; colorStyle is safe to use directly.
+                get2025ColorScheme(accentColor.color, colorStyle, isDark)
             }
 
             else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, colorStyle, isDark)
@@ -359,7 +370,9 @@ class ThemeProvider @Inject constructor(
         colorStyle: ColorStyle,
         isDark: Boolean,
     ): MonetColorSchemeCompat2025 {
-        // LegacyKdrag has no 2025 variant; treat as TonalSpot.
+        // LegacyKdrag is intercepted upstream in resolveColorScheme2025() before this
+        // function is ever called, so this branch is unreachable in normal operation.
+        // Kept as a defensive fallback in case of future call-site changes.
         val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
         return colorSchemeMap2025.getOrPut(Triple(colorInt, effectiveStyle.style, isDark)) {
             MonetColorSchemeCompat2025(colorInt, effectiveStyle.style, isDark)

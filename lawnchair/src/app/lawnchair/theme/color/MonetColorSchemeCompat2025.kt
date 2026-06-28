@@ -86,6 +86,7 @@ class MonetColorSchemeCompat2025(
             isDark: Boolean,
         ): DynamicScheme {
             val sourceHct = Hct.fromInt(seedColor)
+			android.util.Log.d("HCT_DEBUG", "hue=${sourceHct.hue} chroma=${sourceHct.chroma} tone=${sourceHct.tone}")
             val spec = ColorSpec.SpecVersion.SPEC_2025
             val contrast = 0.0
 

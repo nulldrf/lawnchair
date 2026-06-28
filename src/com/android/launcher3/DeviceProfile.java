@@ -220,6 +220,11 @@ public class DeviceProfile {
     private final HotseatProfile hotseatProfile;
     public int numShownHotseatIcons;
     public int hotseatCellHeightPx;
+    // Lawnchair: dock counterpart to maxIconTextLineCount, set in updateHotseatSizes() —
+    // see getHotseatIconTextLineCount() below and BubbleTextView.shouldUseTwoLine(). Fully
+    // independent of maxIconTextLineCount/twoLineHomeScreen so dock and home screen labels can
+    // each be toggled to two lines on their own.
+    public int maxHotseatTextLineCount = 1;
     private int mHotseatColumnSpan;
     private int mHotseatWidthPx; // not used in vertical bar layout
     // In portrait: size = height, in landscape: size = width
@@ -879,8 +884,22 @@ public class DeviceProfile {
 
     /** Updates hotseatCellHeightPx and hotseatBarSizePx */
     private void updateHotseatSizes(int hotseatIconSizePx) {
-        int iconTextHeight = Utilities.calculateTextHeight(iconTextSizePx);
         boolean isLabelInDock = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getEnableLabelInDock());
+        // Lawnchair: maxHotseatTextLineCount mirrors maxIconTextLineCount but for the dock —
+        // see getHotseatIconTextLineCount() above. Only set to 2 when labels are shown in the
+        // dock at all, since that's the only case any extra height is budgeted for below;
+        // otherwise this stays 1 so "room reserved" and "should we wrap" (read back by
+        // BubbleTextView.shouldUseTwoLine()) remain in sync.
+        maxHotseatTextLineCount = isLabelInDock ? getHotseatIconTextLineCount(1) : 1;
+        // Lawnchair: was Utilities.calculateTextHeight(iconTextSizePx) — generalized to the
+        // same line-count + margin aware helper the home-screen two-line feature uses, so the
+        // dock can budget for 2 lines too when twoLineDock is enabled. For
+        // maxHotseatTextLineCount == 1 (the default, and whenever twoLineDock is off) this is
+        // mathematically identical to the original single-line formula (extraLines == 0, so
+        // marginPx == 0 and the result reduces to perLineTextHeight * 1), so existing
+        // single-line dock behaviour — including with isLabelInDock on its own — is completely
+        // unaffected.
+        int iconTextHeight = getHomeIconTextHeightPx(maxHotseatTextLineCount);
         // Ensure there is enough space for folder icons, which have a slightly larger radius.
         hotseatCellHeightPx = getIconSizeWithOverlap(hotseatIconSizePx * 2) - hotseatIconSizePx / 2;
         hotseatCellHeightPx += isLabelInDock ? iconTextHeight : 0;
@@ -1218,6 +1237,27 @@ public class DeviceProfile {
     private int getHomeIconTextLineCount(int baseLineCount) {
         boolean twoLine =
                 PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getTwoLineHomeScreen());
+        return twoLine ? Math.max(baseLineCount, 2) : baseLineCount;
+    }
+
+    /**
+     * Lawnchair: dock (hotseat) counterpart to {@link #getHomeIconTextLineCount(int)} above.
+     * Same shape — returns {@code max(baseLineCount, 2)} when enabled, {@code baseLineCount}
+     * unchanged otherwise — but reads the fully separate {@code PreferenceManager2.
+     * twoLineDock} preference instead of {@code twoLineHomeScreen}. This is the entire reason
+     * dock and home screen two-line labels are independent toggles: they each read their own
+     * preference into their own {@link DeviceProfile} field ({@link #maxHotseatTextLineCount}
+     * vs {@link #maxIconTextLineCount}), and {@link com.android.launcher3.BubbleTextView#
+     * shouldUseTwoLine()} picks which field to read based on whether the bound item is a
+     * hotseat item, so flipping one preference never affects the other.
+     * <p>
+     * Consumed only by {@link #updateHotseatSizes(int)}, which is itself a single method
+     * shared by all three grid branches (responsive / scalable / legacy) — unlike the home
+     * screen feature, there is no need to special-case multiple branches here.
+     */
+    private int getHotseatIconTextLineCount(int baseLineCount) {
+        boolean twoLine =
+                PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getTwoLineDock());
         return twoLine ? Math.max(baseLineCount, 2) : baseLineCount;
     }
 

@@ -95,13 +95,23 @@ fun DockPreferences(modifier: Modifier = Modifier) {
             SearchBarPreference(SearchRoute.DOCK_SEARCH)
             GridSettings(prefs, prefs2, scrollState)
             PreferenceGroup(heading = stringResource(id = R.string.icons)) {
+                val enableLabelInDockAdapter = prefs2.enableLabelInDock.getAdapter()
                 Item {
                     ScrollAnchor(ScrollKeys.DOCK_SHOW_LABELS, scrollState) {
                     SwitchPreference(
-                        adapter = prefs2.enableLabelInDock.getAdapter(),
+                        adapter = enableLabelInDockAdapter,
                         label = stringResource(id = R.string.show_labels),
                     )
                     }
+                }
+                Item(
+                    key = "dock_two_line_pref",
+                    visible = enableLabelInDockAdapter.state.value,
+                ) {
+                    SwitchPreference(
+                        adapter = prefs2.twoLineDock.getAdapter(),
+                        label = stringResource(id = R.string.dock_two_line_label),
+                    )
                 }
             }
         }

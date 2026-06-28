@@ -605,11 +605,38 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         // (rather than the preference directly) keeps this in sync with whatever DeviceProfile
         // actually reserved room for, instead of risking the two going out of sync.
         if (mDisplay == DISPLAY_WORKSPACE) {
+            // Lawnchair: the dock (hotseat) reuses DISPLAY_WORKSPACE for its icons — there is
+            // no separate display type for it (see isHotseatItem() below) — but has its own,
+            // fully independent two-line toggle: DeviceProfile.maxHotseatTextLineCount, driven
+            // by PreferenceManager2.twoLineDock and computed in DeviceProfile.
+            // updateHotseatSizes() / getHotseatIconTextLineCount(). This keeps the dock and
+            // true home-screen icons decoupled — enabling one preference never affects the
+            // other, since each reads its own DeviceProfile field.
+            if (isHotseatItem()) {
+                return mDeviceProfile.maxHotseatTextLineCount == 2;
+            }
             return mDeviceProfile.maxIconTextLineCount == 2;
         }
 
         // Otherwise, show two lines if the cell declares it can fit two line label.
         return getCellSpecMaxTextLineCount() == 2;
+    }
+
+    /**
+     * Lawnchair: returns {@code true} if this view's currently-bound item lives in the hotseat
+     * (dock) rather than directly on the workspace. The dock has no display type of its own —
+     * its icons are inflated and bound exactly like home-screen icons and share {@code mDisplay
+     * == DISPLAY_WORKSPACE} — so the only way to distinguish "dock icon" from "home screen
+     * icon" is via {@link ItemInfo#container}, the same check {@link #shouldTextBeVisible()}
+     * already performs to special-case hiding labels in the dock. Returns {@code false} (i.e.
+     * "treat as home screen") if no item is bound yet, matching that method's null-safety.
+     */
+    private boolean isHotseatItem() {
+        Object tag = getParent() instanceof FolderIcon ? ((View) getParent()).getTag() : getTag();
+        ItemInfo info = tag instanceof ItemInfo ? (ItemInfo) tag : null;
+        return info != null
+                && (info.container == LauncherSettings.Favorites.CONTAINER_HOTSEAT
+                        || info.container == LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION);
     }
 
     /**

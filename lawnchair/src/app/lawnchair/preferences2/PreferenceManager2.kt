@@ -994,6 +994,36 @@ class PreferenceManager2 @Inject constructor(
         onSet = { reloadHelper.reloadGrid() },
     )
 
+    // -----------------------------------------------------------------------
+    // Dock (hotseat) icon label line count
+    //
+    // Lawnchair: dock counterpart to twoLineHomeScreen above. Deliberately a
+    // fully separate preference/field/code path — not a re-use of
+    // twoLineHomeScreen — so home screen icons and dock icons can each be
+    // toggled to two-line labels independently of one another:
+    //
+    //  - BubbleTextView shares mDisplay == DISPLAY_WORKSPACE between true
+    //    home-screen icons and dock icons (the dock has no display type of
+    //    its own). BubbleTextView.shouldUseTwoLine() tells them apart via
+    //    ItemInfo.container (CONTAINER_HOTSEAT / CONTAINER_HOTSEAT_PREDICTION,
+    //    the same check shouldTextBeVisible() already uses) and reads
+    //    DeviceProfile.maxHotseatTextLineCount for dock icons,
+    //    DeviceProfile.maxIconTextLineCount for everything else.
+    //  - This preference itself is read directly inside
+    //    DeviceProfile.getHotseatIconTextLineCount(), consumed only by
+    //    DeviceProfile.updateHotseatSizes() — the single method (shared by
+    //    all three grid branches) that already grows hotseatCellHeightPx /
+    //    hotseatBarSizePx for enableLabelInDock's existing single-line case.
+    //
+    // Only has a visible effect when enableLabelInDock is also true, since
+    // two-line wrapping is meaningless with dock labels hidden entirely.
+    // -----------------------------------------------------------------------
+    val twoLineDock = preference(
+        key = booleanPreferencesKey(name = "two_line_dock"),
+        defaultValue = false,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
     val doubleTapGestureHandler = serializablePreference<GestureHandlerConfig>(
         key = stringPreferencesKey("double_tap_gesture_handler"),
         defaultValue = GestureHandlerConfig.Sleep,

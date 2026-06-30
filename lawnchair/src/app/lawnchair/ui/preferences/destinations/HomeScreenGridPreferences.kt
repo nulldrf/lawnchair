@@ -34,8 +34,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.lawnchair.DeviceProfileOverrides
 import app.lawnchair.preferences.asPreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
@@ -51,6 +51,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import com.android.launcher3.InvariantDeviceProfile
+import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -65,6 +66,8 @@ fun HomeScreenGridPreferences(
         label = stringResource(id = R.string.home_screen_grid),
         modifier = modifier,
         isExpandedScreen = true,
+        // No outer scroll — the screen manages its own fixed-height preview
+        // area plus an independently scrollable controls area below it.
         scrollState = null,
     ) {
         val controlsScrollState = rememberScrollState()
@@ -88,53 +91,14 @@ fun HomeScreenGridPreferences(
             mutableIntStateOf(originalHotseatColumnsUnfolded.coerceAtLeast(originalHotseatColumns))
         }
 
-        // ── Phone-frame mockup ───────────────────────────────────────────────
-        // Same pattern as IconPackPreferences: only constrain width and let
-        // DummyLauncherBox's internal aspectRatio() own the height so the
-        // border + clip always trace the exact computed box — no gaps.
-        val primary = MaterialTheme.colorScheme.primary
-        val phoneShape = RoundedCornerShape(28.dp)
-        val borderColor = primary.copy(alpha = 0.25f)
-        val widthFraction = if (isPortrait) 0.65f else 0.45f
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(widthFraction),
-            ) {
-                WithWallpaper(displayWallpaperButton = false) { wallpaper ->
-                    DummyLauncherBox(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(width = 1.dp, color = borderColor, shape = phoneShape)
-                            .clip(phoneShape),
-                    ) {
-                        WallpaperPreview(
-                            wallpaper = wallpaper,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        // Use createPreviewIdp so the grid preview reflects the
-                        // current column/row slider values in real time.
-                        DummyLauncherLayout(
-                            idp = createPreviewIdp {
-                                copy(numColumns = columns.intValue, numRows = rows.intValue)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-        }
-
+        // Keep the unfolded dock count from ever dropping below the folded
+        // count — unfolded is always a superset of the folded layout.
         LaunchedEffect(hotseatColumns.intValue) {
             if (hotseatColumnsUnfolded.intValue < hotseatColumns.intValue) {
                 hotseatColumnsUnfolded.intValue = hotseatColumns.intValue
             }
         }
 
-        // ── Grid controls ────────────────────────────────────────────────────
         val maxGridSize = if (increaseMaxGridSize.state.value) 20 else 10
 
         BoxWithConstraints(
@@ -142,47 +106,28 @@ fun HomeScreenGridPreferences(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            // Don't stress over the coerce value,
-            // we eyeballing it till there's a much better solutions(tm) or permanent workarounds.
+            // Eyeballed split between preview and controls so the controls area
+            // always has enough height to show its content (or a scroll hint)
+            // without the preview shrinking to nothing on small screens.
             val settingsMinHeight = when {
-                // This should allow user to see the unfolded label,
-                // which will be their indicator that they can scroll the settings entries.
                 isFoldable -> (maxHeight * 0.58f).coerceAtLeast(360.dp)
-
-                // This should be enough for 3 preferences, they can't scroll beyond this.
-                // Should you introduce another prefs, raise the value by a little so that they
-                // have an indication that you can scroll the entries.
                 isPortrait -> (maxHeight * 0.40f).coerceAtLeast(315.dp)
-
-                // Landscape mode
                 else -> (maxHeight * 0.52f).coerceAtLeast(280.dp)
             }
             val previewMaxHeight = (maxHeight - settingsMinHeight)
                 .coerceAtLeast(if (isPortrait) 180.dp else 140.dp)
 
-            Column(
-                modifier = Modifier.fillMaxHeight(),
-            ) {
-                GridOverridesPreview(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = previewMaxHeight)
-                        .padding(horizontal = 16.dp, vertical = if (isPortrait) 16.dp else 12.dp),
-                    expandToAvailableSpace = false,
-                    updateGridOptions = {
-                        copy(
-                            numColumns = columns.intValue,
-                            numRows = rows.intValue,
-                            numHotseatColumns = hotseatColumns.intValue,
-                        )
-                    },
-                    previewOverrides = if (isFoldable) {
-                        DeviceProfileOverrides.PreviewOverrides(
-                            foldableDatabaseHotseatIcons = hotseatColumnsUnfolded.intValue,
-                        )
-                    } else {
-                        DeviceProfileOverrides.PreviewOverrides()
-                    },
+            Column(modifier = Modifier.fillMaxHeight()) {
+                // ── Phone-frame mockup ───────────────────────────────────────
+                // Bordered/clipped DummyLauncherBox pattern (own), constrained
+                // to previewMaxHeight (upstream) so it never crowds out the
+                // controls area below it on small or foldable screens.
+                GridMockup(
+                    previewMaxHeight = previewMaxHeight,
+                    isPortrait = isPortrait,
+                    columns = columns.intValue,
+                    rows = rows.intValue,
+                    hotseatColumns = hotseatColumns.intValue,
                 )
 
                 Column(
@@ -286,7 +231,7 @@ fun HomeScreenGridPreferences(
                             hotseatColumnsAdapter.onChange(hotseatColumns.intValue)
                             hotseatColumnsUnfoldedAdapter.onChange(hotseatColumnsUnfolded.intValue)
                         }
-                        InvariantDeviceProfile.INSTANCE.get(context).onPreferencesChanged(context)
+                        LauncherAppState.getIDP(context).onPreferencesChanged(context)
                         navController.popBackStack()
                     }
 
@@ -317,6 +262,74 @@ fun HomeScreenGridPreferences(
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Phone-frame mockup (bordered/clipped DummyLauncherBox pattern)
+// ---------------------------------------------------------------------------
+
+/**
+ * Live grid preview using the same border+clip pattern as IconPackPreferences,
+ * but height-capped at [previewMaxHeight] so it shares space fairly with the
+ * controls area below it — important on foldables and landscape where vertical
+ * space is scarce. Width-only constraint lets DummyLauncherBox's internal
+ * aspectRatio() own the height (gap-free), then heightIn(max=...) caps the
+ * result from above if the natural aspect-ratio height would be too tall.
+ */
+@Composable
+private fun GridMockup(
+    previewMaxHeight: Dp,
+    isPortrait: Boolean,
+    columns: Int,
+    rows: Int,
+    hotseatColumns: Int,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val phoneShape = RoundedCornerShape(28.dp)
+    val borderColor = primary.copy(alpha = 0.25f)
+    val widthFraction = if (isPortrait) 0.65f else 0.45f
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = if (isPortrait) 16.dp else 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(widthFraction),
+        ) {
+            WithWallpaper(displayWallpaperButton = false) { wallpaper ->
+                DummyLauncherBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = previewMaxHeight)
+                        .border(width = 1.dp, color = borderColor, shape = phoneShape)
+                        .clip(phoneShape),
+                ) {
+                    WallpaperPreview(
+                        wallpaper = wallpaper,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    // createPreviewIdp reflects current slider values live,
+                    // including the dock column count added in this merge.
+                    DummyLauncherLayout(
+                        idp = createPreviewIdp {
+                            copy(
+                                numColumns = columns,
+                                numRows = rows,
+                                numHotseatColumns = hotseatColumns,
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Foldable "when unfolded" fake preview row (unchanged from upstream)
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun FakeExpandedGridPreference(

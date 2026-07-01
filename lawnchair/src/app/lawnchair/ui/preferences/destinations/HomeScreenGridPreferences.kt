@@ -4,17 +4,13 @@ import android.content.res.Configuration
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -34,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.asPreferenceAdapter
 import app.lawnchair.preferences.getAdapter
@@ -70,7 +65,6 @@ fun HomeScreenGridPreferences(
         // area plus an independently scrollable controls area below it.
         scrollState = null,
     ) {
-        val controlsScrollState = rememberScrollState()
         val prefs = preferenceManager()
         val columnsAdapter = prefs.workspaceColumns.getAdapter()
         val rowsAdapter = prefs.workspaceRows.getAdapter()
@@ -101,162 +95,142 @@ fun HomeScreenGridPreferences(
 
         val maxGridSize = if (increaseMaxGridSize.state.value) 20 else 10
 
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        ) {
-            // Eyeballed split between preview and controls so the controls area
-            // always has enough height to show its content (or a scroll hint)
-            // without the preview shrinking to nothing on small screens.
-            val settingsMinHeight = when {
-                isFoldable -> (maxHeight * 0.58f).coerceAtLeast(360.dp)
-                isPortrait -> (maxHeight * 0.40f).coerceAtLeast(315.dp)
-                else -> (maxHeight * 0.52f).coerceAtLeast(280.dp)
-            }
-            val previewMaxHeight = (maxHeight - settingsMinHeight)
-                .coerceAtLeast(if (isPortrait) 180.dp else 140.dp)
+        // NOTE: PreferenceLayout always renders inside StretchNestedScrollView,
+        // which measures its Compose content with UNSPECIFIED (unbounded) height
+        // regardless of the `scrollState` parameter passed in — PreferenceColumn
+        // never actually applies verticalScroll() itself. That means
+        // BoxWithConstraints + weight(1f) (upstream's split-height approach)
+        // receives infinite maxHeight here and weight(1f) silently collapses to
+        // zero, producing a blank screen below the mockup.
+        //
+        // Fix: drop the bounded-height split entirely and let the screen flow
+        // naturally inside the outer NestedScrollView, same as every other
+        // screen in this fork. The mockup gets a sensible fixed-fraction size
+        // instead of a computed previewMaxHeight, and the controls + apply
+        // button are just regular content — no inner weight()/heightIn(min=).
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // ── Phone-frame mockup ───────────────────────────────────────────
+            GridMockup(
+                isPortrait = isPortrait,
+                columns = columns.intValue,
+                rows = rows.intValue,
+                hotseatColumns = hotseatColumns.intValue,
+            )
 
-            Column(modifier = Modifier.fillMaxHeight()) {
-                // ── Phone-frame mockup ───────────────────────────────────────
-                // Bordered/clipped DummyLauncherBox pattern (own), constrained
-                // to previewMaxHeight (upstream) so it never crowds out the
-                // controls area below it on small or foldable screens.
-                GridMockup(
-                    previewMaxHeight = previewMaxHeight,
-                    isPortrait = isPortrait,
-                    columns = columns.intValue,
-                    rows = rows.intValue,
-                    hotseatColumns = hotseatColumns.intValue,
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = settingsMinHeight),
+            if (isFoldable) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    maxItemsInEachRow = if (isExpandedScreen) Int.MAX_VALUE else 1,
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(controlsScrollState),
+                    PreferenceGroup(heading = stringResource(id = R.string.when_folded_label)) {
+                        Item {
+                            SliderPreference(
+                                label = stringResource(id = R.string.columns),
+                                adapter = columns.asPreferenceAdapter(),
+                                step = 1,
+                                valueRange = 3..maxGridSize,
+                            )
+                        }
+                        Item {
+                            SliderPreference(
+                                label = stringResource(id = R.string.rows),
+                                adapter = rows.asPreferenceAdapter(),
+                                step = 1,
+                                valueRange = 3..maxGridSize,
+                            )
+                        }
+                        Item {
+                            SliderPreference(
+                                label = stringResource(id = R.string.dock_icons),
+                                adapter = hotseatColumns.asPreferenceAdapter(),
+                                step = 1,
+                                valueRange = 3..maxGridSize,
+                            )
+                        }
+                    }
+
+                    PreferenceGroup(
+                        heading = stringResource(id = R.string.when_unfolded_label),
                     ) {
-                        if (isFoldable) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                maxItemsInEachRow = if (isExpandedScreen) Int.MAX_VALUE else 1,
-                            ) {
-                                PreferenceGroup(heading = stringResource(id = R.string.when_folded_label)) {
-                                    Item {
-                                        SliderPreference(
-                                            label = stringResource(id = R.string.columns),
-                                            adapter = columns.asPreferenceAdapter(),
-                                            step = 1,
-                                            valueRange = 3..maxGridSize,
-                                        )
-                                    }
-                                    Item {
-                                        SliderPreference(
-                                            label = stringResource(id = R.string.rows),
-                                            adapter = rows.asPreferenceAdapter(),
-                                            step = 1,
-                                            valueRange = 3..maxGridSize,
-                                        )
-                                    }
-                                    Item {
-                                        SliderPreference(
-                                            label = stringResource(id = R.string.dock_icons),
-                                            adapter = hotseatColumns.asPreferenceAdapter(),
-                                            step = 1,
-                                            valueRange = 3..maxGridSize,
-                                        )
-                                    }
-                                }
-
-                                PreferenceGroup(
-                                    heading = stringResource(id = R.string.when_unfolded_label),
-                                ) {
-                                    Item {
-                                        SliderPreference(
-                                            label = stringResource(id = R.string.dock_icons),
-                                            adapter = hotseatColumnsUnfolded.asPreferenceAdapter(),
-                                            step = 1,
-                                            valueRange = hotseatColumns.intValue..maxGridSize,
-                                        )
-                                    }
-                                    Item {
-                                        FakeExpandedGridPreference(
-                                            columns = columns.intValue * 2,
-                                            rows = rows.intValue,
-                                            description = stringResource(id = R.string.unfolded_grid_description),
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            PreferenceGroup {
-                                Item {
-                                    SliderPreference(
-                                        label = stringResource(id = R.string.columns),
-                                        adapter = columns.asPreferenceAdapter(),
-                                        step = 1,
-                                        valueRange = 3..maxGridSize,
-                                    )
-                                }
-                                Item {
-                                    SliderPreference(
-                                        label = stringResource(id = R.string.rows),
-                                        adapter = rows.asPreferenceAdapter(),
-                                        step = 1,
-                                        valueRange = 3..maxGridSize,
-                                    )
-                                }
-                                Item {
-                                    SliderPreference(
-                                        label = stringResource(id = R.string.dock_icons),
-                                        adapter = hotseatColumns.asPreferenceAdapter(),
-                                        step = 1,
-                                        valueRange = 3..maxGridSize,
-                                    )
-                                }
-                            }
+                        Item {
+                            SliderPreference(
+                                label = stringResource(id = R.string.dock_icons),
+                                adapter = hotseatColumnsUnfolded.asPreferenceAdapter(),
+                                step = 1,
+                                valueRange = hotseatColumns.intValue..maxGridSize,
+                            )
+                        }
+                        Item {
+                            FakeExpandedGridPreference(
+                                columns = columns.intValue * 2,
+                                rows = rows.intValue,
+                                description = stringResource(id = R.string.unfolded_grid_description),
+                            )
                         }
                     }
-
-                    val navController = LocalNavController.current
-                    val context = LocalContext.current
-                    val applyOverrides = {
-                        prefs.batchEdit {
-                            columnsAdapter.onChange(columns.intValue)
-                            rowsAdapter.onChange(rows.intValue)
-                            hotseatColumnsAdapter.onChange(hotseatColumns.intValue)
-                            hotseatColumnsUnfoldedAdapter.onChange(hotseatColumnsUnfolded.intValue)
-                        }
-                        LauncherAppState.getIDP(context).onPreferencesChanged(context)
-                        navController.popBackStack()
+                }
+            } else {
+                PreferenceGroup {
+                    Item {
+                        SliderPreference(
+                            label = stringResource(id = R.string.columns),
+                            adapter = columns.asPreferenceAdapter(),
+                            step = 1,
+                            valueRange = 3..maxGridSize,
+                        )
                     }
-
-                    val isChanged = columns.intValue != originalColumns ||
-                        rows.intValue != originalRows ||
-                        hotseatColumns.intValue != originalHotseatColumns ||
-                        hotseatColumnsUnfolded.intValue != originalHotseatColumnsUnfolded
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .padding(horizontal = 16.dp),
-                    ) {
-                        Button(
-                            onClick = { applyOverrides() },
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .fillMaxWidth(),
-                            enabled = isChanged,
-                            shapes = ButtonDefaults.shapes(),
-                        ) {
-                            Text(text = stringResource(id = R.string.action_apply))
-                        }
+                    Item {
+                        SliderPreference(
+                            label = stringResource(id = R.string.rows),
+                            adapter = rows.asPreferenceAdapter(),
+                            step = 1,
+                            valueRange = 3..maxGridSize,
+                        )
                     }
+                    Item {
+                        SliderPreference(
+                            label = stringResource(id = R.string.dock_icons),
+                            adapter = hotseatColumns.asPreferenceAdapter(),
+                            step = 1,
+                            valueRange = 3..maxGridSize,
+                        )
+                    }
+                }
+            }
+
+            val navController = LocalNavController.current
+            val context = LocalContext.current
+            val applyOverrides = {
+                prefs.batchEdit {
+                    columnsAdapter.onChange(columns.intValue)
+                    rowsAdapter.onChange(rows.intValue)
+                    hotseatColumnsAdapter.onChange(hotseatColumns.intValue)
+                    hotseatColumnsUnfoldedAdapter.onChange(hotseatColumnsUnfolded.intValue)
+                }
+                LauncherAppState.getIDP(context).onPreferencesChanged(context)
+                navController.popBackStack()
+            }
+
+            val isChanged = columns.intValue != originalColumns ||
+                rows.intValue != originalRows ||
+                hotseatColumns.intValue != originalHotseatColumns ||
+                hotseatColumnsUnfolded.intValue != originalHotseatColumnsUnfolded
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .padding(horizontal = 16.dp),
+            ) {
+                Button(
+                    onClick = { applyOverrides() },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxWidth(),
+                    enabled = isChanged,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(text = stringResource(id = R.string.action_apply))
                 }
             }
         }
@@ -277,7 +251,6 @@ fun HomeScreenGridPreferences(
  */
 @Composable
 private fun GridMockup(
-    previewMaxHeight: Dp,
     isPortrait: Boolean,
     columns: Int,
     rows: Int,
@@ -286,6 +259,10 @@ private fun GridMockup(
     val primary = MaterialTheme.colorScheme.primary
     val phoneShape = RoundedCornerShape(28.dp)
     val borderColor = primary.copy(alpha = 0.25f)
+    // Fixed width fraction — same pattern as every other mockup in this fork.
+    // No previewMaxHeight needed: DummyLauncherBox's internal aspectRatio()
+    // derives height from width alone, so this stays gap-free without relying
+    // on a bounded parent height (which StretchNestedScrollView never provides).
     val widthFraction = if (isPortrait) 0.65f else 0.45f
 
     Box(
@@ -301,7 +278,6 @@ private fun GridMockup(
                 DummyLauncherBox(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = previewMaxHeight)
                         .border(width = 1.dp, color = borderColor, shape = phoneShape)
                         .clip(phoneShape),
                 ) {

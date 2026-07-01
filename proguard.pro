@@ -19,6 +19,19 @@
   public static final ** CREATOR;
 }
 
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+-keepclassmembers class * implements java.io.Serializable {
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
+
 # Lawnchair specific rules.
 -keep,allowshrinking,allowoptimization class app.lawnchair.LawnchairProto$* { *; }
 -keep,allowshrinking,allowoptimization class app.lawnchair.LawnchairApp { *; }

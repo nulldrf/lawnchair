@@ -15,6 +15,20 @@
 -keep,allowshrinking class com.android.systemui.** { *; }
 -keep,allowshrinking class com.android.wm.shell.** { *; }
 
+-keep,allowobfuscation class * implements android.window.OnBackInvokedCallback {
+    public void onBackInvoked();
+}
+-keep,allowobfuscation class * implements android.window.OnBackAnimationCallback {
+    public void onBackInvoked();
+    public void onBackStarted(...);
+    public void onBackProgressed(...);
+    public void onBackCancelled();
+}
+-keepclassmembers,allowobfuscation class androidx.activity.OnBackPressedDispatcher$Api33Impl {
+    *;
+}
+-keep,allowobfuscation class androidx.activity.OnBackPressedDispatcher$* { *; }
+
 -keepclassmembers class * implements android.os.Parcelable {
   public static final ** CREATOR;
 }

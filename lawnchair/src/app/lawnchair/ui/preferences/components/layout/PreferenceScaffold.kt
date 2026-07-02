@@ -330,7 +330,16 @@ fun PreferenceScaffold(
                             collapsingToolbar?.setExpandedTitleColor(rgbMask or (alpha shl 24))
                         }
                         addListener(object : AnimatorListenerAdapter() {
+                            // onAnimationEnd fires even after cancel() — guard with this flag
+                            // so a rapid label change doesn't lock the title to a stale value.
+                            private var wasCancelled = false
+                            override fun onAnimationCancel(animation: Animator) {
+                                wasCancelled = true
+                                // Restore full opacity so the title isn't left invisible.
+                                collapsingToolbar?.setExpandedTitleColor(onSurfaceArgb)
+                            }
                             override fun onAnimationEnd(animation: Animator) {
+                                if (wasCancelled) return
                                 state.expandedTitle = incomingTitle
                                 val visible = if (isCollapsed) label else incomingTitle
                                 if (collapsingToolbar?.title != visible) collapsingToolbar?.title = visible

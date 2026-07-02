@@ -44,7 +44,6 @@ fun DrawerSearchPreference(
     val context = LocalContext.current
 
     val showDrawerSearchBar = !prefs2.hideAppDrawerSearchBar.getAdapter()
-    val hiddenApps = prefs2.hiddenApps.getAdapter().state.value
 
     val scrollState = rememberPreferenceScrollState()
     MainSwitchPreference(
@@ -52,10 +51,11 @@ fun DrawerSearchPreference(
         label = stringResource(id = R.string.show_app_search_bar),
         modifier = modifier,
     ) {
-        ScrollAnchor(ScrollKeys.DS_SHOW_SEARCH_BAR, scrollState) { HiddenAppsInSearchPreference() }
         PreferenceGroup(heading = stringResource(R.string.general_label)) {
-            if (hiddenApps.isNotEmpty()) {
-                Item { HiddenAppsInSearchPreference() }
+            Item {
+                ScrollAnchor(ScrollKeys.DS_SHOW_SEARCH_BAR, scrollState) {
+                    HiddenAppsInSearchPreference()
+                }
             }
             Item {
                 ScrollAnchor(ScrollKeys.DS_AUTO_KEYBOARD, scrollState) {

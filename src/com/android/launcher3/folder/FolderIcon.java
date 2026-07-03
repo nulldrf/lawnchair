@@ -88,6 +88,8 @@ import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.FloatingIconViewCompanion;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
+import app.lawnchair.theme.ThemeProvider;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
@@ -121,6 +123,17 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     FolderGridOrganizer mPreviewVerifier;
     ClippedFolderIconLayoutRule mPreviewLayoutRule;
     private PreviewItemManager mPreviewItemManager;
+
+    // Re-resolves the folder preview background color (ColorTokens / folder color
+    // preference) whenever the app's theme changes. Color resolution is otherwise
+    // only triggered by layout size/padding changes in PreviewItemManager, so
+    // without this, accent/wallpaper/style changes never reach the closed-folder
+    // preview after its first layout pass.
+    private final ThemeProvider.ColorSchemeChangeListener mColorSchemeChangeListener =
+            () -> {
+                mPreviewItemManager.invalidateColors();
+                invalidate();
+            };
     private PreviewItemDrawingParams mTmpParams = new PreviewItemDrawingParams(0, 0, 0);
     private List<ItemInfo> mCurrentPreviewItems = new ArrayList<>();
 
@@ -170,6 +183,18 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         mPreviewLayoutRule = new ClippedFolderIconLayoutRule();
         mPreviewItemManager = new PreviewItemManager(this);
         mDotParams = new DotRenderer.DrawParams();
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        ThemeProvider.INSTANCE.get(getContext()).addListener(mColorSchemeChangeListener);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        ThemeProvider.INSTANCE.get(getContext()).removeListener(mColorSchemeChangeListener);
     }
 
     public static <T extends Context & ActivityContext> FolderIcon inflateFolderAndIcon(int resId,

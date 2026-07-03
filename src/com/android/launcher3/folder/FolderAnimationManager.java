@@ -198,10 +198,23 @@ public class FolderAnimationManager implements FolderAnimationCreator {
         int finalColor = ColorTokens.FolderBackgroundColor.resolveColor(mContext);
 
         ColorOption colorOption = PreferenceCacheExtensionsKt.firstCached(mFolder.preferenceManager2.getFolderColor(), mFolder.preferenceManager2);
-        int folderColor = colorOption.getColorPreferenceEntry().getLightColor().invoke(mContext);
+        boolean isDarkTheme = Themes.getAttrBoolean(mContext, R.attr.isMainColorDark);
+        // Check the sentinel via lightColor first: ColorOption.Default only defines a
+        // lightColor lambda ({ 0 }), so calling getDarkColor() on it directly is unsafe
+        // and may not resolve back to 0. Only reach for the dark variant once we know
+        // this is a real user-picked color (light value is non-zero).
+        int folderLightColor = colorOption.getColorPreferenceEntry().getLightColor().invoke(mContext);
+        int folderColor = (folderLightColor == 0) ? 0
+                : (isDarkTheme ? colorOption.getColorPreferenceEntry().getDarkColor().invoke(mContext) : folderLightColor);
 
+        // folderColor is 0 only for ColorOption.Default ("managed by Lawnchair"), in
+        // which case the ColorTokens-derived initialColor/finalColor above are kept.
+        // Otherwise the user picked an explicit color (system accent, wallpaper, or
+        // custom) — apply it to both preview and background, but preserve the same
+        // preview-alpha treatment used on the ColorTokens path so the open animation
+        // still has a distinct initial vs. final tone to animate between.
         if (folderColor != 0) {
-            initialColor = folderColor;
+            initialColor = ColorUtils.setAlphaComponent(folderColor, LawnchairUtilsKt.getFolderPreviewAlpha(mContext));
             finalColor = folderColor;
         }
 

@@ -27,7 +27,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -193,11 +192,20 @@ public class PreviewBackground extends DelegatedCellDrawing {
 
         // Load folder color
         ColorOption colorOption = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getFolderColor());
-        int folderColor = colorOption.getColorPreferenceEntry().getLightColor().invoke(context);
+        boolean isDarkTheme = Themes.getAttrBoolean(context, R.attr.isMainColorDark);
+        // Check the sentinel via lightColor first: ColorOption.Default only defines a
+        // lightColor lambda ({ 0 }), so calling getDarkColor() on it directly is unsafe
+        // and may not resolve back to 0. Only reach for the dark variant once we know
+        // this is a real user-picked color (light value is non-zero).
+        int folderLightColor = colorOption.getColorPreferenceEntry().getLightColor().invoke(context);
+        int folderColor = (folderLightColor == 0) ? 0
+                : (isDarkTheme ? colorOption.getColorPreferenceEntry().getDarkColor().invoke(context) : folderLightColor);
 
-        TypedArray ta = context.getTheme().obtainStyledAttributes(R.styleable.FolderIconPreview);
         ColorOption dotColorOption = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getNotificationDotColor());
-        mDotColor = dotColorOption.getColorPreferenceEntry().getLightColor().invoke(context);
+        int dotLightColor = dotColorOption.getColorPreferenceEntry().getLightColor().invoke(context);
+        int dotColor = (dotLightColor == 0) ? 0
+                : (isDarkTheme ? dotColorOption.getColorPreferenceEntry().getDarkColor().invoke(context) : dotLightColor);
+        mDotColor = dotColor != 0 ? dotColor : ColorTokens.DotColor.resolveColor(context);
         mStrokeColor = ColorTokens.FolderIconBorderColor.resolveColor(context);
         if (folderColor != 0) {
             mBgColor = folderColor;
@@ -205,7 +213,6 @@ public class PreviewBackground extends DelegatedCellDrawing {
             mBgColor = ColorTokens.FolderPreviewColor.resolveColor(context);
         }
         mBgColor = ColorUtils.setAlphaComponent(mBgColor, LawnchairUtilsKt.getFolderPreviewAlpha(context));
-        ta.recycle();
 
         DeviceProfile grid = activity.getDeviceProfile();
         // Lawnchair: Find the correct icon size depending on which parent owned them

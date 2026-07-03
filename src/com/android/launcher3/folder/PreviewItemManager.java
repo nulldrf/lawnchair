@@ -160,6 +160,26 @@ public class PreviewItemManager {
         }
     }
 
+    /**
+     * Forces {@link PreviewBackground#setup} to re-run and re-resolve its background
+     * color, even though layout size/padding haven't changed. Color resolution
+     * (ColorTokens / folder color preference) is normally only re-triggered as a
+     * side effect of the size/padding guard below, so theme, accent, or wallpaper
+     * changes are otherwise never picked up after the first layout pass.
+     *
+     * Unlike {@link #recomputePreviewDrawingParams}, this does not depend on
+     * {@link #mReferenceDrawable}, which is only non-null during create/destroy
+     * animations, so it works for icons at rest on the workspace or in all-apps.
+     */
+    public void invalidateColors() {
+        int savedIconSize = (int) mIntrinsicIconSize;
+        int savedTotalWidth = mTotalWidth;
+        // Invalidate the cache key so the guard in computePreviewDrawingParams()
+        // fails even though the actual layout size hasn't changed.
+        mIntrinsicIconSize = -1;
+        computePreviewDrawingParams(savedIconSize, savedTotalWidth);
+    }
+
     private void computePreviewDrawingParams(int drawableSize, int totalSize) {
         if (mIntrinsicIconSize != drawableSize || mTotalWidth != totalSize ||
                 mPrevTopPadding != mIcon.getPaddingTop()) {

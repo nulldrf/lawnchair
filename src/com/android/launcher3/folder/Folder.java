@@ -138,6 +138,7 @@ import java.util.stream.Stream;
 
 import com.patrykmichalik.opto.core.PreferenceExtensionsKt;
 import app.lawnchair.preferences2.PreferenceManager2;
+import app.lawnchair.theme.ThemeProvider;
 import app.lawnchair.theme.color.ColorOption;
 import app.lawnchair.theme.color.tokens.ColorTokens;
 import app.lawnchair.theme.drawable.DrawableTokens;
@@ -295,6 +296,13 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     private @NonNull GradientDrawable mBackground;
 
+    // Re-resolves the open-folder background color whenever the app's theme
+    // changes. DrawableTokens.RoundRectFolder is otherwise only resolved once
+    // in onFinishInflate(), so accent/wallpaper/style changes never reach an
+    // already-inflated Folder view.
+    private final ThemeProvider.ColorSchemeChangeListener mColorSchemeChangeListener =
+            this::refreshBackgroundColor;
+
     PreferenceManager2 preferenceManager2;
 
     /**
@@ -330,6 +338,20 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         return mBackground;
     }
 
+    /**
+     * Re-resolves {@link DrawableTokens#RoundRectFolder} against the current
+     * ColorScheme and swaps it in as the folder's background, preserving the
+     * alpha set from the folder background opacity preference. Called on initial
+     * inflate and whenever {@link ThemeProvider} reports a theme change.
+     */
+    private void refreshBackgroundColor() {
+        int previousAlpha = mBackground.getAlpha();
+        mBackground = DrawableTokens.RoundRectFolder.resolve(getContext());
+        mBackground.setCallback(this);
+        mBackground.setAlpha(previousAlpha);
+        invalidate();
+    }
+
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
@@ -337,6 +359,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         final int paddingLeftRight = dp.folderContentPaddingLeftRight;
 
         mBackground = DrawableTokens.RoundRectFolder.resolve(getContext());
+        mBackground.setCallback(this);
         var alpha = LawnchairUtilsKt.getFolderBackgroundAlpha(getContext());
         mBackground.setAlpha(alpha);
 
@@ -643,12 +666,14 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         requestFocus();
         super.onAttachedToWindow();
         mFolderName.addOnFocusChangeListener(this);
+        ThemeProvider.INSTANCE.get(getContext()).addListener(mColorSchemeChangeListener);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mFolderName.removeOnFocusChangeListener(this);
+        ThemeProvider.INSTANCE.get(getContext()).removeListener(mColorSchemeChangeListener);
     }
 
     @Override

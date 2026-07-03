@@ -23,6 +23,7 @@ import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import androidx.core.graphics.ColorUtils
 import android.util.FloatProperty
 import android.util.Property
 import android.view.View
@@ -33,12 +34,16 @@ import com.android.launcher3.BubbleTextView
 import com.android.launcher3.LauncherAnimUtils
 import com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY
 import com.android.launcher3.LauncherState
-import com.android.launcher3.R
 import com.android.launcher3.Utilities.isDarkTheme
 import com.android.launcher3.anim.SpringAnimationBuilder
 import com.android.launcher3.apppairs.AppPairIcon
 import com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW
-import com.android.launcher3.util.Themes
+
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
+import app.lawnchair.theme.color.tokens.ColorTokens
+import app.lawnchair.util.getFolderBackgroundAlpha
+import app.lawnchair.util.getFolderPreviewAlpha
 
 /** Holder for Animators created from [FolderAnimationSpringBuilderManager] */
 class FolderSpringAnimatorSet(val animatorSet: AnimatorSet) {
@@ -235,8 +240,37 @@ class FolderSpringAnimatorSet(val animatorSet: AnimatorSet) {
                 val folderBackground = folder.background as GradientDrawable
                 // Set up the Folder background.
                 val isOpening = animationData.isOpening
-                val initialColor = Themes.getAttrColor(context, R.attr.folderPreviewColor)
-                val finalColor = Themes.getAttrColor(context, R.attr.folderBackgroundColor)
+
+                // Resolve against ColorTokens (matching FolderAnimationManager /
+                // PreviewBackground / DrawableTokens.RoundRectFolder), instead of the raw
+                // AOSP ?attr/folderPreviewColor / ?attr/folderBackgroundColor theme
+                // attributes, which are static and never reflect the user's chosen accent,
+                // wallpaper colors, or their folder color preference.
+                val previewColor = ColorTokens.FolderPreviewColor.resolveColor(context)
+                var initialColor = ColorUtils.setAlphaComponent(previewColor, getFolderPreviewAlpha(context))
+                var finalColor = ColorTokens.FolderBackgroundColor.resolveColor(context)
+
+                val prefs2 = PreferenceManager2.getInstance(context)
+                val colorOption = prefs2.folderColor.firstCached()
+                val isDark = isDarkTheme(context)
+                // Check the sentinel via lightColor first: ColorOption.Default only defines
+                // a lightColor lambda ({ 0 }), so calling darkColor on it directly is unsafe
+                // and may not resolve back to 0. Only reach for the dark variant once we
+                // know this is a real user-picked color (light value is non-zero).
+                val folderLightColor = colorOption.colorPreferenceEntry.lightColor.invoke(context)
+                val folderColor = when {
+                    folderLightColor == 0 -> 0
+                    isDark -> colorOption.colorPreferenceEntry.darkColor.invoke(context)
+                    else -> folderLightColor
+                }
+
+                // folderColor is 0 only for ColorOption.Default ("managed by Lawnchair"), in
+                // which case the ColorTokens-derived colors above are kept.
+                if (folderColor != 0) {
+                    initialColor = ColorUtils.setAlphaComponent(folderColor, getFolderPreviewAlpha(context))
+                    finalColor = folderColor
+                }
+
                 folderBackground.mutate()
                 folderBackground.setColor(if (isOpening) initialColor else finalColor)
                 // TODO: convert to spring animation?

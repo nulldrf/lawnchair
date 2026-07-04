@@ -5,8 +5,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Process
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -122,6 +126,7 @@ import app.lawnchair.ui.preferences.destinations.SearchRoute
 import app.lawnchair.ui.preferences.navigation.Smartspace
 import app.lawnchair.util.isDefaultLauncher
 import com.android.launcher3.BuildConfig
+import com.android.launcher3.Flags
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import kotlinx.coroutines.Dispatchers
@@ -135,6 +140,21 @@ private data class SearchableEntry(
     val route: PreferenceRootRoute,
     val scrollKey: String? = null,
 )
+
+// Mirrors the private isDrawerHapticFeedbackSupported() check inside
+// AppDrawerHapticFeedbackPreference.kt exactly, so the search entry is only
+// shown when that switch would actually render.
+private fun isDrawerHapticFeedbackSupported(context: Context): Boolean {
+    val vibrator = context.getSystemService(Vibrator::class.java) ?: return false
+    if (!vibrator.hasVibrator()) return false
+
+    if (Flags.msdlFeedback() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        return vibrator.arePrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_CLICK)[0] ||
+            vibrator.areEffectsSupported(VibrationEffect.EFFECT_CLICK)[0] == Vibrator.VIBRATION_EFFECT_SUPPORT_YES
+    }
+
+    return true
+}
 
 @Composable
 fun PreferencesDashboard(
@@ -238,6 +258,12 @@ fun PreferencesDashboard(
 
     val drawerListEnabled = prefs.drawerList.getAdapter().state.value
     val showDrawerLabels = prefs2.showIconLabelsInDrawer.getAdapter().state.value
+    val drawerHapticSupported = remember { isDrawerHapticFeedbackSupported(context) }
+    val suggestionsIntent = remember { Intent("android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS") }
+    val hasPkgUsagePermission = context.checkCallingOrSelfPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) == PackageManager.PERMISSION_GRANTED
+    val canResolveToSuggestionPreference = context.packageManager.resolveActivity(suggestionsIntent, 0) != null
+    val suggestionSettingsAvailable = hasPkgUsagePermission && canResolveToSuggestionPreference
+    val showSuggestedAppsToggleAvailable = !suggestionSettingsAvailable && LawnchairApp.isRecentsEnabled
 
     val isHotseatEnabled = prefs2.isHotseatEnabled.getAdapter().state.value
     val hotseatModeValue = prefs2.hotseatMode.getAdapter().state.value
@@ -386,6 +412,9 @@ fun PreferencesDashboard(
             a(stringResource(R.string.hidden_apps_label), "hide apps from drawer hidden list", ScrollKeys.HIDDEN_APPS)
             a(stringResource(R.string.search_bar_settings), "app drawer search bar settings", ScrollKeys.DRAWER_SEARCH_ENTRY)
             a(stringResource(R.string.pref_app_drawer_search_bar_at_bottom), "search bar at bottom app drawer", ScrollKeys.DRAWER_SEARCH_AT_BOTTOM)
+            a(stringResource(R.string.suggestion_pref_screen_title), "suggestions apps content", ScrollKeys.DRAWER_SUGGESTIONS, visible = suggestionSettingsAvailable)
+            a(stringResource(R.string.show_suggested_apps_at_drawer_top), "suggested apps top drawer recent", ScrollKeys.DRAWER_SUGGESTIONS, visible = showSuggestedAppsToggleAvailable)
+            a(stringResource(R.string.app_drawer_haptic_feedback_label), "haptic feedback vibration app drawer", ScrollKeys.DRAWER_HAPTIC_FEEDBACK, visible = drawerHapticSupported)
             a(stringResource(R.string.app_drawer_bg_color_label), "background color app drawer", ScrollKeys.DRAWER_BG_COLOR)
             a(stringResource(R.string.background_opacity), "background opacity app drawer", ScrollKeys.DRAWER_BG_OPACITY)
             a(stringResource(R.string.work_profile_tab_background_label), "tab background color work profile app drawer", ScrollKeys.DRAWER_TAB_BG_COLOR)

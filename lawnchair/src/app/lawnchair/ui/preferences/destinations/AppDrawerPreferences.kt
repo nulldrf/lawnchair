@@ -123,8 +123,8 @@ fun AppDrawerPreferences(
                 )
                 }
             }
-            SuggestionsPreference()
-            AppDrawerHapticFeedbackPreference()
+            SuggestionsPreference(scrollState = scrollState)
+            AppDrawerHapticFeedbackPreference(scrollState = scrollState)
         }
 
         // -----------------------------------------------------------------------

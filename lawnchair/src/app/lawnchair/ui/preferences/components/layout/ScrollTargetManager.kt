@@ -112,6 +112,8 @@ object ScrollKeys {
     const val DRAWER_SHOW_LABELS     = "drawer.show_labels"
     const val DRAWER_LABEL_SIZE      = "drawer.label_size"
     const val DRAWER_TWO_LINE        = "drawer.two_line"
+    const val DRAWER_HAPTIC_FEEDBACK = "drawer.haptic_feedback"
+    const val DRAWER_SUGGESTIONS     = "drawer.suggestions"
     // Folders
     const val FOLDER_SHAPE           = "folder.shape"
     const val FOLDER_MAX_COLUMNS     = "folder.max_columns"

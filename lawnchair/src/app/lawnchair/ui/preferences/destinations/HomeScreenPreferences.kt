@@ -153,7 +153,9 @@ fun HomeScreenPreferences(
                 key = "feed_pref",
                 visible = feedAvailable && enableFeedAdapter.state.value,
             ) {
-                FeedPreference()
+                ScrollAnchor(ScrollKeys.HOME_FEED_PROVIDER, scrollState) {
+                    FeedPreference()
+                }
             }
         }
         PreferenceGroup(heading = stringResource(R.string.style)) {

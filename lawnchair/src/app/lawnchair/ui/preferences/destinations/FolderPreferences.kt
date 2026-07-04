@@ -69,7 +69,11 @@ fun FolderPreferences(
                 )
                 }
             }
-            Item { ColorPreference(preference = prefs2.folderColor) }
+            Item {
+                ScrollAnchor(ScrollKeys.FOLDER_ICON_BG_COLOR, scrollState) {
+                    ColorPreference(preference = prefs2.folderColor)
+                }
+            }
             Item {
                 ScrollAnchor(ScrollKeys.FOLDER_PREVIEW_OPACITY, scrollState) {
                 SliderPreference(
@@ -119,15 +123,18 @@ fun FolderPreferences(
         val homeScreenLabelsAdapter = prefs2.showIconLabelsOnHomeScreenFolder.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.icons)) {
             Item {
+                ScrollAnchor(ScrollKeys.FOLDER_SHOW_LABELS, scrollState) {
                 SwitchPreference(
                     adapter = homeScreenLabelsAdapter,
                     label = stringResource(id = R.string.show_labels),
                 )
+                }
             }
             Item(
                 "label_size",
                 homeScreenLabelsAdapter.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.FOLDER_LABEL_SIZE, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.label_size),
                     adapter = prefs2.homeIconLabelFolderSizeFactor.getAdapter(),
@@ -135,6 +142,7 @@ fun FolderPreferences(
                     valueRange = 0.5F..1.5F,
                     showAsPercentage = true,
                 )
+                }
             }
         }
     }

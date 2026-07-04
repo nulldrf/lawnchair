@@ -150,6 +150,7 @@ fun DockSearchPreference(
                                 }
                             }
                             Item {
+                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_STROKE_WIDTH, scrollState) {
                                 SliderPreference(
                                     label = stringResource(id = R.string.qsb_hotseat_stroke_width),
                                     adapter = qsbHotseatStrokeWidth,
@@ -157,6 +158,7 @@ fun DockSearchPreference(
                                     valueRange = 0f..10f,
                                     showUnit = "vw",
                                 )
+                                }
                             }
                             if (qsbHotseatStrokeWidth.state.value > 0f) {
                                 Item { ColorPreference(preference = prefs2.strokeColorStyle) }

@@ -205,25 +205,31 @@ private fun SmartspaceWeatherSettings(
 
         // API keys — shown per-provider
         Item(visible = selectedProvider == WeatherProvider.PIRATE_WEATHER) {
+            ScrollAnchor(ScrollKeys.SS_API_KEY, scrollState) {
             ApiKeyPreference(
                 adapter = prefs.pirateWeatherApiKey.getAdapter(),
                 label = stringResource(R.string.smartspace_pirate_weather_api_key),
                 hint = stringResource(R.string.smartspace_pirate_weather_api_key_hint),
             )
+            }
         }
         Item(visible = selectedProvider == WeatherProvider.OPEN_WEATHER_MAP) {
+            ScrollAnchor(ScrollKeys.SS_API_KEY, scrollState) {
             ApiKeyPreference(
                 adapter = prefs.openWeatherMapApiKey.getAdapter(),
                 label = stringResource(R.string.smartspace_owm_api_key),
                 hint = stringResource(R.string.smartspace_owm_api_key_hint),
             )
+            }
         }
         Item(visible = selectedProvider == WeatherProvider.ACCU_WEATHER) {
+            ScrollAnchor(ScrollKeys.SS_API_KEY, scrollState) {
             ApiKeyPreference(
                 adapter = prefs.accuWeatherApiKey.getAdapter(),
                 label = stringResource(R.string.smartspace_accu_api_key),
                 hint = stringResource(R.string.smartspace_accu_api_key_hint),
             )
+            }
         }
 
         // City — shown for all providers when source is active
@@ -246,10 +252,12 @@ private fun SmartspaceWeatherSettings(
 
         // Icon pack
         Item(visible = hasSource) {
+            ScrollAnchor(ScrollKeys.SS_WEATHER_ICON_PACK, scrollState) {
             IconPackPreference(
                 adapter = prefs.smartspaceWeatherIconPack.getAdapter(),
                 installedPacks = installedPacks,
             )
+            }
         }
 
         // Refresh interval
@@ -265,6 +273,7 @@ private fun SmartspaceWeatherSettings(
 
         // Manual refresh
         Item(visible = hasSource) {
+            ScrollAnchor(ScrollKeys.SS_WEATHER_REFRESH_NOW, scrollState) {
             ClickablePreference(
                 label = stringResource(R.string.smartspace_weather_refresh_now),
                 onClick = {
@@ -276,6 +285,7 @@ private fun SmartspaceWeatherSettings(
                     }
                 },
             )
+            }
         }
     }
 }

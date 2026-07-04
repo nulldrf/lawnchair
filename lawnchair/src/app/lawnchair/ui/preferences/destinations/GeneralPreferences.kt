@@ -110,18 +110,22 @@ fun GeneralPreferences() {
         // ── Rotation & Haptic feedback ────────────────────────────────────────
         PreferenceGroup {
             Item {
+                ScrollAnchor(ScrollKeys.HOME_ROTATION, scrollState) {
                 SwitchPreference(
                     adapter = prefs.allowRotation.getAdapter(),
                     label = stringResource(id = R.string.home_screen_rotation_label),
                     description = stringResource(id = R.string.home_screen_rotation_description),
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HAPTIC_FEEDBACK, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.hapticFeedback.getAdapter(),
                     label = stringResource(id = R.string.haptic_feedback_label),
                     description = stringResource(id = R.string.haptic_feedback_description),
                 )
+                }
             }
         }
         // ── Auto-updater (nightly builds only) ────────────────────────────────
@@ -141,34 +145,44 @@ fun GeneralPreferences() {
         ExpandAndShrink(visible = prefs2.enableFontSelection.asState().value) {
             PreferenceGroup(heading = stringResource(id = R.string.font_label)) {
                 Item {
+                    ScrollAnchor(ScrollKeys.FONT_WORKSPACE, scrollState) {
                     FontPreference(
                         fontPref = prefs.fontWorkspace,
                         label = stringResource(R.string.fontWorkspace),
                     )
+                    }
                 }
                 Item {
+                    ScrollAnchor(ScrollKeys.FONT_HEADING, scrollState) {
                     FontPreference(
                         fontPref = prefs.fontHeading,
                         label = stringResource(R.string.fontHeading),
                     )
+                    }
                 }
                 Item {
+                    ScrollAnchor(ScrollKeys.FONT_HEADING_MEDIUM, scrollState) {
                     FontPreference(
                         fontPref = prefs.fontHeadingMedium,
                         label = stringResource(R.string.fontHeadingMedium),
                     )
+                    }
                 }
                 Item {
+                    ScrollAnchor(ScrollKeys.FONT_BODY, scrollState) {
                     FontPreference(
                         fontPref = prefs.fontBody,
                         label = stringResource(R.string.fontBody),
                     )
+                    }
                 }
                 Item {
+                    ScrollAnchor(ScrollKeys.FONT_BODY_MEDIUM, scrollState) {
                     FontPreference(
                         fontPref = prefs.fontBodyMedium,
                         label = stringResource(R.string.fontBodyMedium),
                     )
+                    }
                 }
             }
         }
@@ -193,11 +207,13 @@ fun GeneralPreferences() {
             }
             val transparentIconBackground = prefs.transparentIconBackground.getAdapter()
             Item {
+                ScrollAnchor(ScrollKeys.TRANSPARENT_ICON_BG, scrollState) {
                 SwitchPreference(
                     adapter = transparentIconBackground,
                     label = stringResource(id = R.string.transparent_background_icons_label),
                     description = stringResource(id = R.string.transparent_background_icons_description),
                 )
+                }
             }
             Item {
                 ScrollAnchor(ScrollKeys.ICON_SHAPE, scrollState) {
@@ -232,6 +248,7 @@ fun GeneralPreferences() {
                 "wrap_adaptive_icons",
                 wrapAdaptiveIcons.state.value && !transparentIconBackground.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.BACKGROUND_LIGHTNESS, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.background_lightness_label),
                     adapter = prefs.coloredBackgroundLightness.getAdapter(),
@@ -239,36 +256,43 @@ fun GeneralPreferences() {
                     step = 0.1f,
                     showAsPercentage = true,
                 )
+                }
             }
             Item(
                 "colorized_backgrounds",
                 wrapAdaptiveIcons.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.COLORIZED_BG, scrollState) {
                 SwitchPreference(
                     adapter = colorizedBackgrounds,
                     label = stringResource(id = R.string.colorized_backgrounds_label),
                     description = stringResource(id = R.string.colorized_backgrounds_description),
                 )
+                }
             }
             Item(
                 "treat_white_adaptive_icons",
                 wrapAdaptiveIcons.state.value && colorizedBackgrounds.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.TREAT_WHITE_ADAPTIVE, scrollState) {
                 SwitchPreference(
                     adapter = prefs.treatWhiteAdaptiveIcons.getAdapter(),
                     label = stringResource(id = R.string.treat_white_adaptive_icons_label),
                     description = stringResource(id = R.string.treat_white_adaptive_icons_description),
                 )
+                }
             }
             Item(
                 "colorize_icon_pack_background",
                 colorizedBackgrounds.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.COLORIZE_ICON_PACK_BG, scrollState) {
                 SwitchPreference(
                     adapter = prefs.colorizeIconPackBackground.getAdapter(),
                     label = stringResource(id = R.string.colorize_icon_pack_background_label),
                     description = stringResource(id = R.string.colorize_icon_pack_background_description),
                 )
+                }
             }
         }
 
@@ -324,6 +348,7 @@ fun GeneralPreferences() {
                 "color_spec",
                 showColorSpec,
             ) {
+                ScrollAnchor(ScrollKeys.COLOR_SPEC, scrollState) {
                 DropdownPreference(
                     label = stringResource(id = R.string.color_spec_label),
                     description = stringResource(id = R.string.color_spec_description),
@@ -331,6 +356,7 @@ fun GeneralPreferences() {
                     currentValue = colorSpecValue,
                     onValueChange = { colorSpecAdapter.onChange(it) },
                 )
+                }
             }
         }
 
@@ -411,6 +437,7 @@ fun GeneralPreferences() {
 
         PreferenceGroup(heading = stringResource(id = R.string.settings_background_label)) {
             Item {
+                ScrollAnchor(ScrollKeys.SETTINGS_BLUR, scrollState) {
                 SwitchPreference(
                     checked = settingsBlurAdapter.state.value,
                     onCheckedChange = { checked ->
@@ -423,6 +450,7 @@ fun GeneralPreferences() {
                     label = stringResource(id = R.string.settings_blur_label),
                     description = stringResource(id = R.string.settings_blur_description),
                 )
+                }
             }
             Item(
                 "settings_blur_intensity",

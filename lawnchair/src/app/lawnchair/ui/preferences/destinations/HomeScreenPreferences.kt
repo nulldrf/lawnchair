@@ -104,10 +104,12 @@ fun HomeScreenPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_DOUBLE_TAP, scrollState) {
                 GestureHandlerPreference(
                     adapter = prefs2.doubleTapGestureHandler.getAdapter(),
                     label = stringResource(id = R.string.gesture_double_tap),
                 )
+                }
             }
             Item {
                 ScrollAnchor(ScrollKeys.INFINITE_SCROLLING, scrollState) {
@@ -121,6 +123,7 @@ fun HomeScreenPreferences(
         }
         PreferenceGroup(heading = stringResource(id = R.string.home_screen_actions)) {
             Item {
+                ScrollAnchor(ScrollKeys.HOME_CLEAR, scrollState) {
                 ClickablePreference(
                     label = stringResource(id = R.string.remove_all_views_from_home_screen),
                     confirmationText = stringResource(id = R.string.remove_all_views_from_home_screen_desc),
@@ -130,6 +133,7 @@ fun HomeScreenPreferences(
                         }
                     },
                 )
+                }
             }
         }
         val feedAvailable = OverlayCallbackImpl.minusOneAvailable(LocalContext.current)
@@ -157,7 +161,9 @@ fun HomeScreenPreferences(
             Item { ScrollAnchor(ScrollKeys.HOME_TEXT_COLOR, scrollState) { HomeScreenTextColorPreference() } }
             // Full color-picker for home screen icon label colour (new)
             Item {
-                ColorPreference(preference = prefs2.workspaceIconTextColor)
+                ScrollAnchor(ScrollKeys.HOME_ICON_TEXT_COLOR, scrollState) {
+                    ColorPreference(preference = prefs2.workspaceIconTextColor)
+                }
             }
             Item {
                 ScrollAnchor(ScrollKeys.HOME_APP_OPEN_ANIM, scrollState) {
@@ -219,6 +225,7 @@ fun HomeScreenPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_PADDING_HORIZONTAL, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.horizontal_padding_label),
                     adapter = prefs2.workspacePaddingHorizontalFactor.getAdapter(),
@@ -226,8 +233,10 @@ fun HomeScreenPreferences(
                     valueRange = 0F..2F,
                     showAsPercentage = true,
                 )
+                }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_PADDING_VERTICAL, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.vertical_padding_label),
                     adapter = prefs2.workspacePaddingVerticalFactor.getAdapter(),
@@ -235,6 +244,7 @@ fun HomeScreenPreferences(
                     valueRange = 0F..2F,
                     showAsPercentage = true,
                 )
+                }
             }
             Item {
                 ScrollAnchor(ScrollKeys.LOCK_HOME, scrollState) {
@@ -322,10 +332,12 @@ fun HomeScreenPreferences(
                 "workspace_two_line_label",
                 homeScreenLabelsAdapter.state.value,
             ) {
+                ScrollAnchor(ScrollKeys.HOME_TWO_LINE, scrollState) {
                 SwitchPreference(
                     adapter = prefs2.twoLineHomeScreen.getAdapter(),
                     label = stringResource(id = R.string.home_screen_two_line_label),
                 )
+                }
             }
         }
         val overrideRepo = IconOverrideRepository.INSTANCE.get(LocalContext.current)
@@ -377,6 +389,7 @@ fun HomeScreenPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.HOME_WIDGET_PADDING, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.widget_padding_label),
                     adapter = prefs2.widgetPaddingFactor.getAdapter(),
@@ -384,6 +397,7 @@ fun HomeScreenPreferences(
                     valueRange = 0F..2F,
                     showAsPercentage = true,
                 )
+                }
             }
         }
     }

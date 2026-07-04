@@ -74,6 +74,7 @@ object ScrollKeys {
     const val HOME_PADDING_VERTICAL  = "home.padding_vertical"
     const val HOME_TWO_LINE          = "home.two_line"
     const val HOME_WIDGET_PADDING    = "home.widget_padding"
+    const val HOME_FEED_PROVIDER     = "home.feed_provider"
     // Dock
     const val SHOW_DOCK              = "dock.show"
     const val DOCK_SEARCH            = "dock.search"
@@ -82,6 +83,13 @@ object ScrollKeys {
     const val DOCK_PAGE_INDICATOR    = "dock.page_indicator"
     const val DOCK_BG                = "dock.bg"
     const val DOCK_SHOW_LABELS       = "dock.show_labels"
+    const val DOCK_BG_COLOR          = "dock.bg_color"
+    const val DOCK_BG_OPACITY        = "dock.bg_opacity"
+    const val DOCK_BG_LEFT_MARGIN    = "dock.bg_left_margin"
+    const val DOCK_BG_RIGHT_MARGIN   = "dock.bg_right_margin"
+    const val DOCK_BG_TOP_MARGIN     = "dock.bg_top_margin"
+    const val DOCK_BG_BOTTOM_MARGIN  = "dock.bg_bottom_margin"
+    const val DOCK_TWO_LINE          = "dock.two_line"
     // App drawer
     const val HIDDEN_APPS            = "drawer.hidden"
     const val DRAWER_COLUMNS         = "drawer.columns"

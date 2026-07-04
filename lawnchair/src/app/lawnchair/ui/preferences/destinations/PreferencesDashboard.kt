@@ -80,6 +80,7 @@ import app.lawnchair.LawnchairLauncher
 import app.lawnchair.backup.ui.restoreBackupOpener
 import app.lawnchair.hotseat.DisabledHotseat
 import app.lawnchair.hotseat.LawnchairHotseat
+import app.lawnchair.nexuslauncher.OverlayCallbackImpl
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.observeAsState
 import app.lawnchair.preferences.preferenceManager
@@ -232,6 +233,8 @@ fun PreferencesDashboard(
 
     val homeScreenLabelsAdapter = prefs2.showIconLabelsOnHomeScreen.getAdapter().state.value
     val showStatusBarState = prefs2.showStatusBar.getAdapter().state.value
+    val feedAvailableState = OverlayCallbackImpl.minusOneAvailable(context)
+    val enableFeedState = prefs2.enableFeed.getAdapter().state.value
 
     val drawerListEnabled = prefs.drawerList.getAdapter().state.value
     val showDrawerLabels = prefs2.showIconLabelsInDrawer.getAdapter().state.value
@@ -239,6 +242,8 @@ fun PreferencesDashboard(
     val isHotseatEnabled = prefs2.isHotseatEnabled.getAdapter().state.value
     val hotseatModeValue = prefs2.hotseatMode.getAdapter().state.value
     val isLawnchairHotseat = hotseatModeValue == LawnchairHotseat && hotseatModeValue != DisabledHotseat
+    val hotseatBgEnabled = prefs.hotseatBG.getAdapter().state.value
+    val enableLabelInDockState = prefs2.enableLabelInDock.getAdapter().state.value
 
     val showDrawerSearchBarEnabled = !prefs2.hideAppDrawerSearchBar.getAdapter().state.value
     val searchAlgorithmValue = prefs2.searchAlgorithm.getAdapter().state.value
@@ -292,6 +297,7 @@ fun PreferencesDashboard(
         h(stringResource(R.string.infinite_scrolling_label), "loop pages wrap around infinite", ScrollKeys.INFINITE_SCROLLING)
         h(stringResource(R.string.remove_all_views_from_home_screen), "clear home screen remove all views", ScrollKeys.HOME_CLEAR)
         h(stringResource(R.string.minus_one_enable), "feed google discover news enable show", ScrollKeys.HOME_FEED)
+        h(stringResource(R.string.feed_provider), "feed provider google discover news source", ScrollKeys.HOME_FEED_PROVIDER, visible = feedAvailableState && enableFeedState)
         h(stringResource(R.string.home_screen_text_color), "text color light dark workspace", ScrollKeys.HOME_TEXT_COLOR)
         h(stringResource(R.string.home_screen_icon_text_color), "icon text color workspace label", ScrollKeys.HOME_ICON_TEXT_COLOR)
         h(stringResource(R.string.app_opening_animation), "app opening animation reveal slide scale blink fade", ScrollKeys.HOME_APP_OPEN_ANIM)
@@ -359,11 +365,18 @@ fun PreferencesDashboard(
             if (visible) add(SearchableEntry(label, kw, labelDock, R.drawable.ic_dock, Dock, sk))
         }
         d(stringResource(R.string.hotseat_background), "dock background show hide", ScrollKeys.DOCK_BG, visible = isHotseatEnabled)
+        d(stringResource(R.string.hotseat_bg_color_label), "background color dock hotseat", ScrollKeys.DOCK_BG_COLOR, visible = isHotseatEnabled && hotseatBgEnabled)
+        d(stringResource(R.string.hotseat_bg_alpha), "background opacity dock hotseat", ScrollKeys.DOCK_BG_OPACITY, visible = isHotseatEnabled && hotseatBgEnabled)
+        d(stringResource(R.string.hotseat_bg_horizontal_inset_left), "left margin dock background", ScrollKeys.DOCK_BG_LEFT_MARGIN, visible = isHotseatEnabled && hotseatBgEnabled)
+        d(stringResource(R.string.hotseat_bg_horizontal_inset_right), "right margin dock background", ScrollKeys.DOCK_BG_RIGHT_MARGIN, visible = isHotseatEnabled && hotseatBgEnabled)
+        d(stringResource(R.string.hotseat_bg_vertical_inset_top), "top margin dock background", ScrollKeys.DOCK_BG_TOP_MARGIN, visible = isHotseatEnabled && hotseatBgEnabled)
+        d(stringResource(R.string.hotseat_bg_vertical_inset_bottom), "bottom margin dock background", ScrollKeys.DOCK_BG_BOTTOM_MARGIN, visible = isHotseatEnabled && hotseatBgEnabled)
         d(stringResource(R.string.search_bar_settings), "search bar dock settings", visible = isHotseatEnabled)
         d(stringResource(R.string.dock_icons), "dock icon count columns hotseat number", ScrollKeys.DOCK_ICONS, visible = isHotseatEnabled)
         d(stringResource(R.string.hotseat_bottom_space_label), "bottom padding spacing dock margin", ScrollKeys.DOCK_BOTTOM_SPACE, visible = isHotseatEnabled)
         d(stringResource(R.string.page_indicator_height), "page indicator dots height size", ScrollKeys.DOCK_PAGE_INDICATOR, visible = isHotseatEnabled)
         d(stringResource(R.string.show_labels), "dock labels show hide", ScrollKeys.DOCK_SHOW_LABELS, visible = isHotseatEnabled)
+        d(stringResource(R.string.dock_two_line_label), "two line label dock", ScrollKeys.DOCK_TWO_LINE, visible = isHotseatEnabled && enableLabelInDockState)
 
         if (!deckLayout.state.value) {
             fun a(label: String, kw: String = "", sk: String? = null, visible: Boolean = true) {
@@ -375,7 +388,7 @@ fun PreferencesDashboard(
             a(stringResource(R.string.pref_app_drawer_search_bar_at_bottom), "search bar at bottom app drawer", ScrollKeys.DRAWER_SEARCH_AT_BOTTOM)
             a(stringResource(R.string.app_drawer_bg_color_label), "background color app drawer", ScrollKeys.DRAWER_BG_COLOR)
             a(stringResource(R.string.background_opacity), "background opacity app drawer", ScrollKeys.DRAWER_BG_OPACITY)
-            a("Tab background color", "work profile tab background color", ScrollKeys.DRAWER_TAB_BG_COLOR)
+            a(stringResource(R.string.work_profile_tab_background_label), "tab background color work profile app drawer", ScrollKeys.DRAWER_TAB_BG_COLOR)
             a(stringResource(R.string.work_profile_tab_container_background_label), "show background behind tabs work profile", ScrollKeys.DRAWER_TAB_CONTAINER_BG)
             a(stringResource(R.string.pref_all_apps_search_bar_background), "show background behind search bar app drawer", ScrollKeys.DRAWER_SEARCH_BAR_BG)
             a(stringResource(R.string.drawer_icon_text_color), "text color app drawer icon label", ScrollKeys.DRAWER_TEXT_COLOR)

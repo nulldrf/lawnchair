@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import app.lawnchair.ui.preferences.components.layout.PreferenceScrollState
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
@@ -89,7 +90,7 @@ fun DockPreferences(modifier: Modifier = Modifier) {
                     key = "feed_pref",
                     visible = hotseatBgAdapter.state.value,
                 ) {
-                    HotseatBackgroundSettings(prefs, prefs2)
+                    HotseatBackgroundSettings(prefs, prefs2, scrollState = scrollState)
                 }
             }
             SearchBarPreference(SearchRoute.DOCK_SEARCH)
@@ -108,10 +109,12 @@ fun DockPreferences(modifier: Modifier = Modifier) {
                     key = "dock_two_line_pref",
                     visible = enableLabelInDockAdapter.state.value,
                 ) {
+                    ScrollAnchor(ScrollKeys.DOCK_TWO_LINE, scrollState) {
                     SwitchPreference(
                         adapter = prefs2.twoLineDock.getAdapter(),
                         label = stringResource(id = R.string.dock_two_line_label),
                     )
+                    }
                 }
             }
         }
@@ -120,9 +123,16 @@ fun DockPreferences(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManager2) {
+fun HotseatBackgroundSettings(
+    prefs: PreferenceManager,
+    prefs2: PreferenceManager2,
+    scrollState: PreferenceScrollState = rememberPreferenceScrollState(),
+) {
     DividerColumn(thickness = 0.dp) {
-        ColorPreference(preference = prefs2.hotseatBackgroundColor)
+        ScrollAnchor(ScrollKeys.DOCK_BG_COLOR, scrollState) {
+            ColorPreference(preference = prefs2.hotseatBackgroundColor)
+        }
+        ScrollAnchor(ScrollKeys.DOCK_BG_OPACITY, scrollState) {
         SliderPreference(
             label = stringResource(id = R.string.hotseat_bg_alpha),
             adapter = prefs.hotseatBGAlpha.getAdapter(),
@@ -130,6 +140,8 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
             valueRange = 5..100,
             showUnit = "%",
         )
+        }
+        ScrollAnchor(ScrollKeys.DOCK_BG_LEFT_MARGIN, scrollState) {
         SliderPreference(
             label = stringResource(id = R.string.hotseat_bg_horizontal_inset_left),
             adapter = prefs.hotseatBGHorizontalInsetLeft.getAdapter(),
@@ -137,6 +149,8 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
             valueRange = 0..100,
             showUnit = "px",
         )
+        }
+        ScrollAnchor(ScrollKeys.DOCK_BG_RIGHT_MARGIN, scrollState) {
         SliderPreference(
             label = stringResource(id = R.string.hotseat_bg_horizontal_inset_right),
             adapter = prefs.hotseatBGHorizontalInsetRight.getAdapter(),
@@ -144,6 +158,8 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
             valueRange = 0..100,
             showUnit = "px",
         )
+        }
+        ScrollAnchor(ScrollKeys.DOCK_BG_TOP_MARGIN, scrollState) {
         SliderPreference(
             label = stringResource(id = R.string.hotseat_bg_vertical_inset_top),
             adapter = prefs.hotseatBGVerticalInsetTop.getAdapter(),
@@ -151,6 +167,8 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
             valueRange = 0..100,
             showUnit = "px",
         )
+        }
+        ScrollAnchor(ScrollKeys.DOCK_BG_BOTTOM_MARGIN, scrollState) {
         SliderPreference(
             label = stringResource(id = R.string.hotseat_bg_vertical_inset_bottom),
             adapter = prefs.hotseatBGVerticalInsetBottom.getAdapter(),
@@ -158,6 +176,7 @@ fun HotseatBackgroundSettings(prefs: PreferenceManager, prefs2: PreferenceManage
             valueRange = 0..100,
             showUnit = "px",
         )
+        }
     }
 }
 

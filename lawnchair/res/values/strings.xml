@@ -626,6 +626,27 @@
     <string name="smartspace_media_info_separator">" — "</string>
     <string name="accessibility_smartspace_page">Page %1$d of %2$d</string>
     <string name="smartspace_widget_placeholder_date">Fri, Mar 3</string>
+	
+	<!-- Personality -->
+	<string name="smartspace_personality">Greetings</string>
+
+    <string-array name="greetings_morning">
+        <item>Good morning!</item>
+        <item>Have a great day!</item>
+        <item>It\'s a beautiful day outside!</item>
+    </string-array>
+    <string-array name="greetings_evening">
+        <item>What\'s up?</item>
+        <item>Good evening!</item>
+        <item>How did your day go?</item>
+        <item>How was your day?</item>
+    </string-array>
+    <string-array name="greetings_night">
+        <item>Sleep well!</item>
+        <item>See you tomorrow!</item>
+        <item>Good night!</item>
+        <item>Don\'t stay up too late!</item>
+    </string-array>
 
     <!--
 

@@ -32,6 +32,7 @@ class SmartspaceProvider @Inject constructor(
         TorchProvider(context),
         NowPlayingProvider(context),
         OnboardingProvider(context),
+		PersonalityProvider(context),
     )
 
     private val state = dataSources

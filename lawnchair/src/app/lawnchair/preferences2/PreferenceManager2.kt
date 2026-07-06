@@ -896,6 +896,11 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = true,
 	)
 	
+	val smartspacePersonality = preference(
+        key = booleanPreferencesKey("enable_smartspace_personality"),
+        defaultValue = true,
+    )
+	
 	val smartspaceWeatherEnabled = preference(
         key = booleanPreferencesKey("enable_smartspace_weather"),
         defaultValue = true,

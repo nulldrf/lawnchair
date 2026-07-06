@@ -781,27 +781,32 @@ class LawnchairLauncher : QuickstepLauncher() {
         }
 
         // ── 4. SplashLayout equivalent ─────────────────────────────────────
-        // splashView is added at FULL SCREEN SIZE (rootView.width x rootView.height,
-        // laid out once) with alpha=0 and pivotX/Y=0.
+        // FAITHFUL PORT of AnimationType_old.kt PieAnimation.getOpeningWindowAnimators
+        // (lines 204-275 of the reference source) — this is the ACTUAL algorithm
+        // that produced the reference recording, transcribed as directly as
+        // possible rather than redesigned:
         //
-        // Its scaleX/scaleY grow independently (per-axis) from icon size to
-        // full screen size, while its CENTRE POINT travels from the icon's
-        // centre to the screen's centre over the same progress (see the
-        // iconCenterX/Y derivation below) — reproducing the old reference
-        // behaviour where the icon visibly drifts toward the middle of the
-        // screen before flaring out to cover the edges. This is a
-        // self-contained interpolation of the splash's own start/end state;
-        // it is NOT derived by tracking the floating icon's live position
-        // (that view has its own, differently-timed fly-to-centre animation
-        // in 5a, and reading its position each frame was the old bug).
+        //   iconWidth  = bounds.width()  * floatingView.scaleX
+        //   iconHeight = bounds.height() * floatingView.scaleY
+        //   scale      = min(1, min(iconWidth/windowW, iconHeight/windowH))   -- UNIFORM
+        //   offsetX/Y  = (windowSize*scale - iconSize) / 2
+        //   transX0/Y0 = floatingView.getLocationOnScreen() - offset
         //
-        // Corner radius: starts at the current icon shape's windowTransitionRadius
-        // (IconShapeManager.getWindowTransitionRadius — a normalised [0,1] hint
-        // already defined per built-in shape, e.g. Square=.16f, SharpSquare=0f,
-        // Cupertino=.45f, most others default 1f) scaled to the icon's actual
-        // half-min-dimension, then lerps to 0 (square) over the same progress —
-        // reproducing the rounded-icon-shape-morphing-to-square reveal seen on
-        // frames ~100-113 of the reference recording.
+        // Every frame this reads the FLOATING ICON'S OWN LIVE, ANIMATING position
+        // and scale (set up in block 5a below — AGGRESSIVE_EASE-driven translate
+        // toward screen centre, EXAGGERATED_EASE-driven scale-up) and centres the
+        // splash on it. This is precisely what makes the splash visibly travel
+        // toward the screen centre WHILE STILL SMALL before flaring out to cover
+        // the edges — that behaviour is a direct consequence of reading
+        // floatingView's live properties, not something to hand-roll separately.
+        // My previous two attempts replaced this with a self-contained lerp that
+        // didn't reproduce it; this version restores the exact original mechanism.
+        //
+        // Crop: starts as a centred SQUARE (screenW x screenW) and reveals to the
+        // full rectangle (screenW x screenH) via ViewOutlineProvider — exactly
+        // SplashLayout.setCrop()'s behaviour, upgraded from setRect to
+        // setRoundRect so it can ALSO carry the corner-radius morph (new,
+        // additive — old code had no rounding at all).
         val splashColor = run {
             val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorBackground))
             val c  = ta.getColor(0, android.graphics.Color.BLACK)
@@ -813,40 +818,22 @@ class LawnchairLauncher : QuickstepLauncher() {
             cornerRadius = 0f
             setColor(splashColor)
         }
+        val initialCropTop = (screenH - screenW) / 2f
+        val cropBounds  = floatArrayOf(initialCropTop, initialCropTop + screenW)
+        val cropRadius  = floatArrayOf(0f)
 
-        // Non-uniform per-axis scale: icon-rect → full-screen-rect, independently
-        // on X and Y (screen aspect ratio means these two ratios differ — a
-        // single uniform scale factor, the old bug, always under-filled or
-        // over-filled one axis).
-        val initScaleX = rect.width().toFloat()  / screenW
-        val initScaleY = rect.height().toFloat() / screenH
-
-        // The splash's CENTER POINT travels from the icon's centre to the
-        // screen's centre as it grows (matches old getOpeningWindowAnimators,
-        // which centred the splash on the floating icon's live, moving
-        // position — the icon visibly moves toward the middle of the screen
-        // before flaring out to cover the edges). With pivot(0,0), translation
-        // is the box's TOP-LEFT corner, so we derive it each frame as
-        // center(t) - size(t)/2. At t=0 this reduces exactly to the icon's
-        // own top-left corner (size(0) == icon size); at t=1 it reduces
-        // exactly to (0,0) (size(1) == full screen) — so the centre-seeking
-        // motion never re-introduces the old under/over-fill bug, it only
-        // changes the PATH taken between those two exact endpoints.
-        val iconCenterX = iconInRoot.left.toFloat() + rect.width()  / 2f
-        val iconCenterY = iconInRoot.top.toFloat()  + rect.height() / 2f
-
-        // Starting on-screen corner radius, derived from the current icon shape.
+        // Starting on-screen corner radius, derived from the CURRENT icon shape
+        // (IconShapeManager.getWindowTransitionRadius — a normalised [0,1] hint
+        // already defined per built-in shape, e.g. Square=.16f, SharpSquare=0f,
+        // Cupertino=.45f, most others default 1f), scaled to the icon's actual
+        // half-min-dimension. Lerps to 0 (square) over the same easePercent used
+        // for the crop reveal — reproducing the rounded-icon-shape-morphing-to-
+        // square look seen on frames ~100-113 of the reference recording. Scale
+        // here is UNIFORM (see above), so a single local radius (on-screen
+        // radius / scale) is correct — no ellipse/Path complexity needed.
         val shapeTransitionRadius = IconShapeManager.getWindowTransitionRadius(this)
         val startRadiusPx = shapeTransitionRadius *
             kotlin.math.min(rect.width(), rect.height()).toFloat() / 2f
-
-        // Local-space radius holders (divided by CURRENT scale each frame so the
-        // ON-SCREEN radius is what actually lerps from startRadiusPx to 0, even
-        // though scaleX and scaleY differ from each other and change every frame).
-        val localRadius = floatArrayOf(
-            if (initScaleX > 0f) startRadiusPx / initScaleX else 0f,
-            if (initScaleY > 0f) startRadiusPx / initScaleY else 0f,
-        )
 
         val splashView = View(this).apply {
             background    = splashBg
@@ -857,25 +844,10 @@ class LawnchairLauncher : QuickstepLauncher() {
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             outlineProvider = object : android.view.ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: android.graphics.Outline) {
-                    val rx = localRadius[0].coerceAtLeast(0f)
-                    val ry = localRadius[1].coerceAtLeast(0f)
-                    if (Utilities.ATLEAST_R && rx != ry) {
-                        // Independent x/y corner radii require a Path — a single
-                        // Outline.setRoundRect radius can't express an ellipse.
-                        val path = android.graphics.Path().apply {
-                            addRoundRect(
-                                0f, 0f, view.width.toFloat(), view.height.toFloat(),
-                                rx, ry, android.graphics.Path.Direction.CW,
-                            )
-                        }
-                        outline.setPath(path)
-                    } else {
-                        // Pre-R fallback (or rx == ry): average the two axes.
-                        // Slightly less precise on very old Android, never wrong.
-                        outline.setRoundRect(
-                            0, 0, view.width, view.height, (rx + ry) / 2f,
-                        )
-                    }
+                    outline.setRoundRect(
+                        0, cropBounds[0].toInt(), view.width, cropBounds[1].toInt(),
+                        cropRadius[0].coerceAtLeast(0f),
+                    )
                 }
             }
         }
@@ -885,13 +857,17 @@ class LawnchairLauncher : QuickstepLauncher() {
         )
         splashView.layout(0, 0, rootView.width, rootView.height)
 
-        // Initial state: scaled to exactly icon size, translated to exactly the
-        // icon's top-left corner (center(0) - size(0)/2 == iconInRoot.left/top,
-        // see derivation above).
-        splashView.scaleX       = initScaleX
-        splashView.scaleY       = initScaleY
-        splashView.translationX = iconInRoot.left.toFloat()
-        splashView.translationY = iconInRoot.top.toFloat()
+        // Initial state: scaled to icon size, translated over the icon —
+        // identical formula to the per-frame update at percent=0.
+        val initScale = kotlin.math.min(
+            rect.width().toFloat()  / screenW,
+            rect.height().toFloat() / screenH,
+        )
+        splashView.scaleX       = initScale
+        splashView.scaleY       = initScale
+        splashView.translationX = iconInRoot.left.toFloat() - (screenW * initScale - rect.width())  / 2f
+        splashView.translationY = iconInRoot.top.toFloat()  - (screenH * initScale - rect.height()) / 2f
+        cropRadius[0] = if (initScale > 0f) startRadiusPx / initScale else 0f
 
         // ── 5. Animators ───────────────────────────────────────────────────
         val anim = AnimatorSet()
@@ -934,10 +910,13 @@ class LawnchairLauncher : QuickstepLauncher() {
             },
         )
 
-        // 5b. Splash grows via its OWN lerp — size icon-rect → full-screen-rect,
-        // AND centre-point icon-centre → screen-centre (see block-4 comment for
-        // why the centre-seeking travel matters). Not derived from the floating
-        // icon's live position.
+        // 5b. Splash tracks the floating icon's LIVE position/scale each frame —
+        // faithful port of AnimationType_old.kt lines 229-271. This is what
+        // makes the splash visibly travel with the icon toward screen centre
+        // (since floatingView itself is animating there via 5a's AGGRESSIVE_EASE
+        // translate) before its own growth (uniform `scale`, tied to
+        // floatingView's EXAGGERATED_EASE scale-up) covers the full screen.
+        val floatingScreenLoc = IntArray(2)
         anim.playTogether(
             ValueAnimator.ofFloat(0f, 1f).apply {
                 duration     = APP_LAUNCH_DURATION
@@ -946,37 +925,47 @@ class LawnchairLauncher : QuickstepLauncher() {
                     val percent     = va.animatedFraction
                     val easePercent = AGGRESSIVE_EASE.getInterpolation(percent)
 
-                    // Independent per-axis size lerp: icon size → full screen size.
-                    val curScaleX = lerpFloat(initScaleX, 1f, easePercent)
-                    val curScaleY = lerpFloat(initScaleY, 1f, easePercent)
+                    // Read current animated position of the floating icon
+                    floatingView.getLocationOnScreen(floatingScreenLoc)
+                    val floatX = floatingScreenLoc[0].toFloat() - rootViewLoc[0]
+                    val floatY = floatingScreenLoc[1].toFloat() - rootViewLoc[1]
 
-                    // Centre point travels icon-centre → screen-centre. With
-                    // pivot(0,0), translation (top-left corner) is then derived
-                    // as centre - size/2, which resolves to iconInRoot.left/top
-                    // at t=0 and exactly (0,0) at t=1 — the travel only changes
-                    // the path between those two fixed endpoints.
-                    val curCenterX = lerpFloat(iconCenterX, screenW / 2f, easePercent)
-                    val curCenterY = lerpFloat(iconCenterY, screenH / 2f, easePercent)
+                    // Current icon dimensions after scale animation
+                    val iconW = rect.width()  * floatingView.scaleX
+                    val iconH = rect.height() * floatingView.scaleY
 
-                    splashView.scaleX       = curScaleX
-                    splashView.scaleY       = curScaleY
-                    splashView.translationX = curCenterX - (screenW * curScaleX) / 2f
-                    splashView.translationY = curCenterY - (screenH * curScaleY) / 2f
+                    // Scale splash to match icon's current screen size (uniform,
+                    // matching the reference algorithm exactly)
+                    val scale  = kotlin.math.min(1f,
+                        kotlin.math.min(iconW / screenW, iconH / screenH))
+                    val scaledW = screenW * scale
+                    val scaledH = screenH * scale
+
+                    // Centre splash on the icon
+                    val offX = (scaledW - iconW) / 2f
+                    val offY = (scaledH - iconH) / 2f
+                    splashView.scaleX       = scale
+                    splashView.scaleY       = scale
+                    splashView.translationX = floatX - offX
+                    splashView.translationY = floatY - offY
 
                     // Alpha 0 → 1 over first ~60 ms (matches old mAlpha FloatProp timing)
                     splashView.alpha = kotlin.math.min(
                         1f, percent * (APP_LAUNCH_DURATION.toFloat() / 60f),
                     )
 
+                    // Crop: centered square → full rectangle (square-to-window morph)
+                    val cropH     = screenH * easePercent + screenW * (1f - easePercent)
+                    cropBounds[0] = initialCropTop * (1f - easePercent)
+                    cropBounds[1] = cropBounds[0] + cropH
+
                     // Corner radius: current icon shape's radius → 0 (square), lerped
-                    // in ON-SCREEN pixels, then converted back to the splash view's
-                    // local (unscaled, full-screen-sized) coordinate space by dividing
-                    // by the CURRENT per-axis scale — this is what keeps the corner
-                    // looking correct (not stretched into a huge/tiny ellipse) even
-                    // though scaleX and scaleY differ and both change every frame.
+                    // in ON-SCREEN pixels, then converted to the splash view's local
+                    // (unscaled, full-screen-sized) coordinate space by dividing by
+                    // the CURRENT (uniform) scale — additive on top of the crop,
+                    // not present in the original reference algorithm.
                     val curRadiusPx = lerpFloat(startRadiusPx, 0f, easePercent)
-                    localRadius[0] = if (curScaleX > 0f) curRadiusPx / curScaleX else 0f
-                    localRadius[1] = if (curScaleY > 0f) curRadiusPx / curScaleY else 0f
+                    cropRadius[0] = if (scale > 0f) curRadiusPx / scale else 0f
                     splashView.invalidateOutline()
                 }
             },

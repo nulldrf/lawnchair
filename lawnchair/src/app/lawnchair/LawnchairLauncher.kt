@@ -784,14 +784,16 @@ class LawnchairLauncher : QuickstepLauncher() {
         // splashView is added at FULL SCREEN SIZE (rootView.width x rootView.height,
         // laid out once) with alpha=0 and pivotX/Y=0.
         //
-        // Its scaleX/scaleY/translationX/translationY are lerped INDEPENDENTLY
-        // and DIRECTLY, every frame, from the icon's exact rect to the full
-        // screen rect — a corner-anchored (pivot 0,0) growth. This is a
+        // Its scaleX/scaleY grow independently (per-axis) from icon size to
+        // full screen size, while its CENTRE POINT travels from the icon's
+        // centre to the screen's centre over the same progress (see the
+        // iconCenterX/Y derivation below) — reproducing the old reference
+        // behaviour where the icon visibly drifts toward the middle of the
+        // screen before flaring out to cover the edges. This is a
         // self-contained interpolation of the splash's own start/end state;
-        // it deliberately does NOT track the floating icon's live position,
-        // because that view is simultaneously animating toward SCREEN CENTRE
-        // (see 5a below), and tracking it would drag the splash off-centre
-        // instead of letting it fill the screen edge-to-edge.
+        // it is NOT derived by tracking the floating icon's live position
+        // (that view has its own, differently-timed fly-to-centre animation
+        // in 5a, and reading its position each frame was the old bug).
         //
         // Corner radius: starts at the current icon shape's windowTransitionRadius
         // (IconShapeManager.getWindowTransitionRadius — a normalised [0,1] hint
@@ -818,6 +820,20 @@ class LawnchairLauncher : QuickstepLauncher() {
         // over-filled one axis).
         val initScaleX = rect.width().toFloat()  / screenW
         val initScaleY = rect.height().toFloat() / screenH
+
+        // The splash's CENTER POINT travels from the icon's centre to the
+        // screen's centre as it grows (matches old getOpeningWindowAnimators,
+        // which centred the splash on the floating icon's live, moving
+        // position — the icon visibly moves toward the middle of the screen
+        // before flaring out to cover the edges). With pivot(0,0), translation
+        // is the box's TOP-LEFT corner, so we derive it each frame as
+        // center(t) - size(t)/2. At t=0 this reduces exactly to the icon's
+        // own top-left corner (size(0) == icon size); at t=1 it reduces
+        // exactly to (0,0) (size(1) == full screen) — so the centre-seeking
+        // motion never re-introduces the old under/over-fill bug, it only
+        // changes the PATH taken between those two exact endpoints.
+        val iconCenterX = iconInRoot.left.toFloat() + rect.width()  / 2f
+        val iconCenterY = iconInRoot.top.toFloat()  + rect.height() / 2f
 
         // Starting on-screen corner radius, derived from the current icon shape.
         val shapeTransitionRadius = IconShapeManager.getWindowTransitionRadius(this)
@@ -870,9 +886,8 @@ class LawnchairLauncher : QuickstepLauncher() {
         splashView.layout(0, 0, rootView.width, rootView.height)
 
         // Initial state: scaled to exactly icon size, translated to exactly the
-        // icon's top-left corner. With pivotX/Y=0 this makes the rendered box
-        // occupy precisely [iconInRoot.left, iconInRoot.top, +iconW, +iconH] —
-        // i.e. exactly the icon's rect, no centering offset needed.
+        // icon's top-left corner (center(0) - size(0)/2 == iconInRoot.left/top,
+        // see derivation above).
         splashView.scaleX       = initScaleX
         splashView.scaleY       = initScaleY
         splashView.translationX = iconInRoot.left.toFloat()
@@ -919,8 +934,10 @@ class LawnchairLauncher : QuickstepLauncher() {
             },
         )
 
-        // 5b. Splash grows via its OWN direct lerp from icon-rect to full-screen-rect.
-        // Not derived from the floating icon's live position — see block-4 comment.
+        // 5b. Splash grows via its OWN lerp — size icon-rect → full-screen-rect,
+        // AND centre-point icon-centre → screen-centre (see block-4 comment for
+        // why the centre-seeking travel matters). Not derived from the floating
+        // icon's live position.
         anim.playTogether(
             ValueAnimator.ofFloat(0f, 1f).apply {
                 duration     = APP_LAUNCH_DURATION
@@ -929,13 +946,22 @@ class LawnchairLauncher : QuickstepLauncher() {
                     val percent     = va.animatedFraction
                     val easePercent = AGGRESSIVE_EASE.getInterpolation(percent)
 
-                    // Direct, independent per-axis lerp: icon rect → full screen rect.
+                    // Independent per-axis size lerp: icon size → full screen size.
                     val curScaleX = lerpFloat(initScaleX, 1f, easePercent)
                     val curScaleY = lerpFloat(initScaleY, 1f, easePercent)
+
+                    // Centre point travels icon-centre → screen-centre. With
+                    // pivot(0,0), translation (top-left corner) is then derived
+                    // as centre - size/2, which resolves to iconInRoot.left/top
+                    // at t=0 and exactly (0,0) at t=1 — the travel only changes
+                    // the path between those two fixed endpoints.
+                    val curCenterX = lerpFloat(iconCenterX, screenW / 2f, easePercent)
+                    val curCenterY = lerpFloat(iconCenterY, screenH / 2f, easePercent)
+
                     splashView.scaleX       = curScaleX
                     splashView.scaleY       = curScaleY
-                    splashView.translationX = lerpFloat(iconInRoot.left.toFloat(), 0f, easePercent)
-                    splashView.translationY = lerpFloat(iconInRoot.top.toFloat(),  0f, easePercent)
+                    splashView.translationX = curCenterX - (screenW * curScaleX) / 2f
+                    splashView.translationY = curCenterY - (screenH * curScaleY) / 2f
 
                     // Alpha 0 → 1 over first ~60 ms (matches old mAlpha FloatProp timing)
                     splashView.alpha = kotlin.math.min(

@@ -74,6 +74,19 @@ import androidx.compose.material3.MaterialTheme
 private const val ICON_PACK_REPO_URL =
     "https://github.com/breezy-weather/breezy-weather-icon-packs/blob/main/README.md"
 
+// Maps a data source's providerName resource id to its stable ScrollKey, so
+// the dashboard search overlay can auto-scroll/highlight the exact switch —
+// even though the "what to show" list is otherwise a fully dynamic loop over
+// smartspaceProvider.dataSources with no per-item structure of its own.
+private fun scrollKeyForProvider(providerNameRes: Int): String? = when (providerNameRes) {
+    R.string.smartspace_battery_status -> ScrollKeys.SS_BATTERY_STATUS
+    R.string.smartspace_torch -> ScrollKeys.SS_FLASHLIGHT
+    R.string.smartspace_now_playing -> ScrollKeys.SS_NOW_PLAYING
+    R.string.smartspace_onboarding -> ScrollKeys.SS_ONBOARDING
+    R.string.smartspace_personality -> ScrollKeys.SS_PERSONALITY
+    else -> null
+}
+
 @Composable
 fun SmartspacePreferences(
     fromWidget: Boolean,
@@ -133,13 +146,23 @@ private fun LawnchairSmartspaceSettings(
                 .asSequence()
                 .filter { it.isAvailable }
                 .filter { it !is WeatherDataProvider }
-                .forEach {
-                    key(it.providerName) {
+                .forEach { dataSource ->
+                    key(dataSource.providerName) {
+                        val itemScrollKey = scrollKeyForProvider(dataSource.providerName)
                         Item { _ ->
-                            SwitchPreference(
-                                adapter = it.enabledPref.getAdapter(),
-                                label = stringResource(id = it.providerName),
-                            )
+                            if (itemScrollKey != null) {
+                                ScrollAnchor(itemScrollKey, scrollState) {
+                                    SwitchPreference(
+                                        adapter = dataSource.enabledPref.getAdapter(),
+                                        label = stringResource(id = dataSource.providerName),
+                                    )
+                                }
+                            } else {
+                                SwitchPreference(
+                                    adapter = dataSource.enabledPref.getAdapter(),
+                                    label = stringResource(id = dataSource.providerName),
+                                )
+                            }
                         }
                     }
                 }

@@ -260,7 +260,7 @@
 	<!-- App Opening Animation -->
     <string name="app_opening_animation">App Opening Animation</string>
     <string name="animation_type_default">Default</string>
-    <string name="animation_type_pie_like">Android Pie</string>
+    <string name="animation_type_pie_like">Android Pie (Emulated)</string>
     <string name="animation_type_reveal">Reveal</string>
     <string name="animation_type_slide_up">Slide Up</string>
     <string name="animation_type_scale_up">Scale Up</string>

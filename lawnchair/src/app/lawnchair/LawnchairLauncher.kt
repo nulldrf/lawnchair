@@ -40,6 +40,7 @@ import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.window.SplashScreen
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
@@ -738,8 +739,38 @@ class LawnchairLauncher : QuickstepLauncher() {
             rect.right  + offsetX, rect.bottom + offsetY,
         )
 
+        // screenW/screenH are the SINGLE source of truth for every size AND
+        // centering target below (scale-to-fill, crop bounds, endTX/endTY,
+        // useUpward's threshold) — they must all agree, or the animation
+        // won't land exactly full-screen at t=1 (see reasoning in the
+        // corner-radius/crop section further down).
+        //
+        // FIX (nav bar inset bug): rootView.height on its own is NOT stable
+        // across navigation modes. In 3-button nav mode, the OS reserves real
+        // layout space for the nav bar, so rootView (being edge-to-edge
+        // otherwise) is already measured SHORTER, excluding it. In gesture
+        // nav mode there's no reserved layout space — rootView spans the
+        // full display height — so rootView.height ends up TALLER by
+        // roughly the nav bar's height than the exact same physical device
+        // would report in button-nav mode. Since screenH/2 is the target the
+        // icon travels toward, a taller screenH in gesture mode pulls that
+        // target further down the screen — this is exactly the "window
+        // appears to move toward the bottom, only without a nav bar" bug.
+        //
+        // Fix: explicitly query the CURRENT navigation-bar bottom inset via
+        // WindowInsetsCompat and subtract it. In 3-button mode this reads ~0
+        // (the space is already excluded from rootView's own measured
+        // height, so nothing changes). In gesture mode it reads the actual
+        // small gesture-handle-reserved inset, bringing screenH back down to
+        // the same effective value 3-button mode already had — restoring
+        // consistent centering in both modes without special-casing either
+        // one.
+        val navBarInsetBottom = ViewCompat.getRootWindowInsets(rootView)
+            ?.getInsets(WindowInsetsCompat.Type.navigationBars())
+            ?.bottom ?: 0
+
         val screenW = rootView.width.toFloat()
-        val screenH = rootView.height.toFloat()
+        val screenH = (rootView.height - navBarInsetBottom).toFloat()
 
         // Translation to bring floating icon centre to screen centre
         val dX = screenW / 2f - iconInRoot.left.toFloat() - rect.width()  / 2f

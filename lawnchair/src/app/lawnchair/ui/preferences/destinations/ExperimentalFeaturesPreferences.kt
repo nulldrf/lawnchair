@@ -106,6 +106,7 @@ fun ExperimentalFeaturesPreferences(
                 }
             }
             Item {
+                ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR, scrollState) {
                 SwitchPreference(
                     checked = hasPermission && enableWallpaperBlur.state.value,
                     onCheckedChange = {
@@ -117,6 +118,7 @@ fun ExperimentalFeaturesPreferences(
                     },
                     label = stringResource(id = R.string.wallpaper_blur),
                 )
+                }
             }
 
             val canBlur = hasPermission && enableWallpaperBlur.state.value

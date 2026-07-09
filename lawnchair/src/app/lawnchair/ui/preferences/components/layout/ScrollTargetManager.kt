@@ -150,6 +150,7 @@ object ScrollKeys {
     const val DECK_LAYOUT            = "exp.deck_layout"
     const val ALWAYS_RELOAD_ICONS    = "exp.reload_icons"
     const val GNC                    = "exp.gnc"
+    const val EXP_WALLPAPER_BLUR     = "exp.wallpaper_blur"
     // Smartspace
     const val SS_MODE                = "ss.mode"
     const val SS_WEATHER_SOURCE      = "ss.weather_source"

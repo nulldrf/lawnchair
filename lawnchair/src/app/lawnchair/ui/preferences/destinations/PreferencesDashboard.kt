@@ -353,7 +353,7 @@ fun PreferencesDashboard(
             if (visible) add(SearchableEntry(label, kw, labelSmartspace, smartIcon, Smartspace, sk))
         }
         s(stringResource(R.string.smartspace_mode_label), "provider google smartspacer lawnchair mode", ScrollKeys.SS_MODE, visible = smartspaceEnabledReactive)
-        s(stringResource(R.string.smartspace_weather), "weather temperature forecast rain sun", visible = smartspaceLawnchairActive)
+        s(stringResource(R.string.smartspace_weather), "weather temperature forecast rain sun", ScrollKeys.SS_WEATHER_SOURCE, visible = smartspaceLawnchairActive)
         s(stringResource(R.string.smartspace_weather_source), "weather source provider open-meteo pirate openweathermap accuweather", ScrollKeys.SS_WEATHER_SOURCE, visible = smartspaceLawnchairActive)
         s(stringResource(R.string.smartspace_battery_status), "battery charging status level indicator", ScrollKeys.SS_BATTERY_STATUS, visible = smartspaceLawnchairActive)
         s(stringResource(R.string.smartspace_torch), "flashlight status torch", ScrollKeys.SS_FLASHLIGHT, visible = smartspaceLawnchairActive)
@@ -495,7 +495,7 @@ fun PreferencesDashboard(
         e(stringResource(R.string.font_picker_label), "font customization typography typeface heading body weight", ScrollKeys.FONT_PICKER, route = ExperimentalFeatures)
         e(stringResource(R.string.workspace_increase_max_grid_size_label), "max grid size 20x20 increase workspace", ScrollKeys.MAX_GRID_SIZE, route = ExperimentalFeatures)
         e(stringResource(R.string.show_deck_layout), "deck layout drawerless no app drawer all apps home", ScrollKeys.DECK_LAYOUT, route = ExperimentalFeatures)
-        e(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted experimental", route = ExperimentalFeatures)
+        e(stringResource(R.string.wallpaper_blur), "blur wallpaper background frosted experimental", ScrollKeys.EXP_WALLPAPER_BLUR, route = ExperimentalFeatures)
         e(stringResource(R.string.always_reload_icons_label), "always reload icons cache refresh icon pack", ScrollKeys.ALWAYS_RELOAD_ICONS, route = ExperimentalFeatures)
         e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation", ScrollKeys.GNC, route = ExperimentalFeatures)
         e(stringResource(R.string.debug_restart_launcher), "restart lawnchair launcher reboot", ScrollKeys.RESTART)

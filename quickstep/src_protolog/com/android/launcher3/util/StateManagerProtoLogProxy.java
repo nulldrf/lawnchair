@@ -16,63 +16,129 @@
 
 package com.android.launcher3.util;
 
-import static com.android.quickstep.util.QuickstepProtoLogGroup.LAUNCHER_STATE_MANAGER;
-import static com.android.quickstep.util.QuickstepProtoLogGroup.isProtoLogInitialized;
-
 import android.window.DesktopModeFlags.DesktopModeFlag;
 
 import androidx.annotation.NonNull;
 
 import com.android.internal.protolog.ProtoLog;
 import com.android.launcher3.Flags;
+import com.android.quickstep.util.QuickstepProtoLogGroup;
+
+import static com.android.quickstep.util.QuickstepProtoLogGroup.LAUNCHER_STATE_MANAGER;
 
 /**
  * Proxy class used for StateManager ProtoLog support.
+ * <p>
+ * NOTE ON DEVICE COMPATIBILITY: on platform versions/OEM builds where
+ * {@code com.android.internal.protolog.common.IProtoLogGroup} doesn't exist (observed on Android 11
+ * devices), any reference to it throws {@code NoClassDefFoundError} at runtime. Two things below
+ * guard against that:
+ * <p>
+ * 1. Every direct reference to {@code ProtoLog.d(...)} / {@code LAUNCHER_STATE_MANAGER} lives
+ * inside the nested {@link ProtoLogCalls} class, never directly in the methods on this outer
+ * class, so ART never needs to resolve {@code IProtoLogGroup} to verify those outer methods.
+ * <p>
+ * 2. {@link #isProtoLogSafe()} wraps {@code QuickstepProtoLogGroup.isProtoLogInitialized()} in a
+ * try/catch, because that method is declared on the enum that itself {@code implements
+ * IProtoLogGroup} -- calling it forces the enum class to link, which fails with the same
+ * {@code NoClassDefFoundError} before the method's own body ever runs.
  */
 public class StateManagerProtoLogProxy {
     private static final DesktopModeFlag ENABLE_STATE_MANAGER_PROTO_LOG =
             new DesktopModeFlag(Flags::enableStateManagerProtoLog, true);
+
+    // Cached result of the first isProtoLogSafe() call. Must only be computed the first time
+    // it's actually needed, inside a try/catch (see below).
+    private static volatile Boolean sProtoLogAvailable = null;
+
+    private static boolean isProtoLogSafe() {
+        Boolean available = sProtoLogAvailable;
+        if (available == null) {
+            try {
+                available = QuickstepProtoLogGroup.isProtoLogInitialized();
+            } catch (Throwable t) {
+                available = false;
+            }
+            sProtoLogAvailable = available;
+        }
+        return available;
+    }
+
     public static void logGoToState(
             @NonNull Object fromState, @NonNull Object toState, @NonNull String trace) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(LAUNCHER_STATE_MANAGER,
-                "StateManager.goToState: fromState: %s, toState: %s, partial trace:\n%s",
-                fromState,
-                toState,
-                trace);
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        ProtoLogCalls.logGoToState(fromState, toState, trace);
     }
 
     public static void logCreateAtomicAnimation(
             @NonNull Object fromState, @NonNull Object toState, @NonNull String trace) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(LAUNCHER_STATE_MANAGER, "StateManager.createAtomicAnimation: "
-                        + "fromState: %s, toState: %s, partial trace:\n%s",
-                fromState,
-                toState,
-                trace);
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        ProtoLogCalls.logCreateAtomicAnimation(fromState, toState, trace);
     }
 
     public static void logOnStateTransitionStart(@NonNull Object state) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(LAUNCHER_STATE_MANAGER, "StateManager.onStateTransitionStart: state: %s", state);
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        ProtoLogCalls.logOnStateTransitionStart(state);
     }
 
     public static void logOnStateTransitionEnd(@NonNull Object state) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(LAUNCHER_STATE_MANAGER, "StateManager.onStateTransitionEnd: state: %s", state);
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        ProtoLogCalls.logOnStateTransitionEnd(state);
     }
 
     public static void logOnRepeatStateSetAborted(@NonNull Object state) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(LAUNCHER_STATE_MANAGER,
-                "StateManager.onRepeatStateSetAborted: state: %s", state);
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        ProtoLogCalls.logOnRepeatStateSetAborted(state);
     }
 
     public static void logCancelAnimation(boolean animationOngoing, @NonNull String trace) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(LAUNCHER_STATE_MANAGER,
-                "StateManager.cancelAnimation: animation ongoing: %b, partial trace:\n%s",
-                animationOngoing,
-                trace);
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        ProtoLogCalls.logCancelAnimation(animationOngoing, trace);
+    }
+
+    /**
+     * Holder for every direct {@code ProtoLog.d(...)} call. See the class-level note above for
+     * why this needs to be a separate class rather than inline in the methods above.
+     */
+    private static class ProtoLogCalls {
+
+        private static void logGoToState(Object fromState, Object toState, String trace) {
+            ProtoLog.d(LAUNCHER_STATE_MANAGER,
+                    "StateManager.goToState: fromState: %s, toState: %s, partial trace:\n%s",
+                    fromState,
+                    toState,
+                    trace);
+        }
+
+        private static void logCreateAtomicAnimation(
+                Object fromState, Object toState, String trace) {
+            ProtoLog.d(LAUNCHER_STATE_MANAGER, "StateManager.createAtomicAnimation: "
+                            + "fromState: %s, toState: %s, partial trace:\n%s",
+                    fromState,
+                    toState,
+                    trace);
+        }
+
+        private static void logOnStateTransitionStart(Object state) {
+            ProtoLog.d(LAUNCHER_STATE_MANAGER, "StateManager.onStateTransitionStart: state: %s",
+                    state);
+        }
+
+        private static void logOnStateTransitionEnd(Object state) {
+            ProtoLog.d(LAUNCHER_STATE_MANAGER, "StateManager.onStateTransitionEnd: state: %s",
+                    state);
+        }
+
+        private static void logOnRepeatStateSetAborted(Object state) {
+            ProtoLog.d(LAUNCHER_STATE_MANAGER,
+                    "StateManager.onRepeatStateSetAborted: state: %s", state);
+        }
+
+        private static void logCancelAnimation(boolean animationOngoing, String trace) {
+            ProtoLog.d(LAUNCHER_STATE_MANAGER,
+                    "StateManager.cancelAnimation: animation ongoing: %b, partial trace:\n%s",
+                    animationOngoing,
+                    trace);
+        }
     }
 }

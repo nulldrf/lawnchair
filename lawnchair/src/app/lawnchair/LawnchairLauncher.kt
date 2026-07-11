@@ -1031,22 +1031,54 @@ class LawnchairLauncher : QuickstepLauncher() {
                          else (APP_LAUNCH_DOWN_DUR_SCALE * APP_LAUNCH_ALPHA_DURATION).toLong()
 
         // Translation starts from the icon's position (floatStartX/Y) and
-        // ends at the screen centre. The 0f→dX approach was wrong because
-        // the view's translationX is already floatStartX, not 0.
-        // endTY uses screenCenterY (already shifted by -topGap, see its
-        // derivation above), not a bare screenH/2 — this is the one value
-        // that needs correcting for the top-gap fix; everything downstream
-        // (the splash's tracked position) derives from floatingView's live
-        // position and inherits the correction automatically.
+        // ends at the screen centre.
+        //
+        // FIX (the actual +53 top-gap bug, confirmed via logged runtime
+        // data): View.TRANSLATION_X/Y is fundamentally an OFFSET from the
+        // view's own layout position — rendered position = left +
+        // translationX (same for Y/top). Animating TRANSLATION_Y directly
+        // with floatStartY/endTY as if they were absolute positions is only
+        // correct when floatingView.top == 0 at the moment those values are
+        // LOCKED IN (animator creation time). rootView.addView() schedules
+        // an ASYNCHRONOUS layout pass (next Choreographer frame, not
+        // synchronous) — so even reading floatingView.top right here,
+        // immediately after addView(), would very likely still read stale
+        // 0, not whatever value the real (deferred) layout pass eventually
+        // assigns. That rules out simply reading left/top once and computing
+        // a fixed delta from it.
+        //
+        // Logged evidence: FINAL splashView.translationY (which tracks
+        // floatingView's REAL rendered position every frame via
+        // getLocationOnScreen — always accurate, unlike a value computed
+        // once at setup) read exactly 53.0, matching dp.insets.top exactly,
+        // on a device where topGap (rootView's own position) measured 0.
+        // The only explanation consistent with an exact dp.insets.top-sized
+        // offset appearing only in the FINAL (post-layout-pass) state is
+        // that floatingView.top becomes 53 via a deferred layout pass
+        // sometime during the animation, silently shifting the rendered
+        // position out from under a TRANSLATION_Y value that assumed top
+        // would stay 0.
+        //
+        // Fix: animate View.X / View.Y instead of View.TRANSLATION_X/Y.
+        // These are the OTHER standard Android View Property constants —
+        // representing the view's final ABSOLUTE rendered position (x = left
+        // + translationX, solved for translationX given a target x) — and
+        // they recompute that conversion fresh on EVERY frame using
+        // whatever left/top the view currently has, not just once at
+        // creation. This is the same self-correcting behaviour that already
+        // makes the earlier `.x = floatStartX` / `.y = floatStartY` calls
+        // robust — extended to the ongoing animated property too, so it
+        // stays correct even if a deferred layout pass changes left/top
+        // mid-animation.
         val endTX = screenW / 2f - rect.width()  / 2f
         val endTY = screenCenterY - rect.height() / 2f
 
         anim.playTogether(
-            ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_X,
+            ObjectAnimator.ofFloat(floatingView, View.X,
                 floatStartX, endTX).apply {
                 duration = xDur; interpolator = AGGRESSIVE_EASE
             },
-            ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_Y,
+            ObjectAnimator.ofFloat(floatingView, View.Y,
                 floatStartY, endTY).apply {
                 duration = yDur; interpolator = AGGRESSIVE_EASE
             },

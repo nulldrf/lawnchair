@@ -22,77 +22,50 @@ import androidx.annotation.NonNull;
 
 import com.android.internal.protolog.ProtoLog;
 import com.android.launcher3.Flags;
-import com.android.quickstep.util.QuickstepProtoLogGroup;
+import com.android.quickstep.util.ProtoLogSafety;
 
 import static com.android.quickstep.util.QuickstepProtoLogGroup.LAUNCHER_STATE_MANAGER;
 
 /**
  * Proxy class used for StateManager ProtoLog support.
  * <p>
- * NOTE ON DEVICE COMPATIBILITY: on platform versions/OEM builds where
- * {@code com.android.internal.protolog.common.IProtoLogGroup} doesn't exist (observed on Android 11
- * devices), any reference to it throws {@code NoClassDefFoundError} at runtime. Two things below
- * guard against that:
- * <p>
- * 1. Every direct reference to {@code ProtoLog.d(...)} / {@code LAUNCHER_STATE_MANAGER} lives
- * inside the nested {@link ProtoLogCalls} class, never directly in the methods on this outer
- * class, so ART never needs to resolve {@code IProtoLogGroup} to verify those outer methods.
- * <p>
- * 2. {@link #isProtoLogSafe()} wraps {@code QuickstepProtoLogGroup.isProtoLogInitialized()} in a
- * try/catch, because that method is declared on the enum that itself {@code implements
- * IProtoLogGroup} -- calling it forces the enum class to link, which fails with the same
- * {@code NoClassDefFoundError} before the method's own body ever runs.
+ * See {@link ProtoLogSafety} for why every direct {@code ProtoLog.d(...)} call below lives inside
+ * the nested {@link ProtoLogCalls} class, and why the guard uses {@link ProtoLogSafety#isSafe()}
+ * rather than calling {@code QuickstepProtoLogGroup.isProtoLogInitialized()} directly.
  */
 public class StateManagerProtoLogProxy {
     private static final DesktopModeFlag ENABLE_STATE_MANAGER_PROTO_LOG =
             new DesktopModeFlag(Flags::enableStateManagerProtoLog, true);
 
-    // Cached result of the first isProtoLogSafe() call. Must only be computed the first time
-    // it's actually needed, inside a try/catch (see below).
-    private static volatile Boolean sProtoLogAvailable = null;
-
-    private static boolean isProtoLogSafe() {
-        Boolean available = sProtoLogAvailable;
-        if (available == null) {
-            try {
-                available = QuickstepProtoLogGroup.isProtoLogInitialized();
-            } catch (Throwable t) {
-                available = false;
-            }
-            sProtoLogAvailable = available;
-        }
-        return available;
-    }
-
     public static void logGoToState(
             @NonNull Object fromState, @NonNull Object toState, @NonNull String trace) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
         ProtoLogCalls.logGoToState(fromState, toState, trace);
     }
 
     public static void logCreateAtomicAnimation(
             @NonNull Object fromState, @NonNull Object toState, @NonNull String trace) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
         ProtoLogCalls.logCreateAtomicAnimation(fromState, toState, trace);
     }
 
     public static void logOnStateTransitionStart(@NonNull Object state) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
         ProtoLogCalls.logOnStateTransitionStart(state);
     }
 
     public static void logOnStateTransitionEnd(@NonNull Object state) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
         ProtoLogCalls.logOnStateTransitionEnd(state);
     }
 
     public static void logOnRepeatStateSetAborted(@NonNull Object state) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
         ProtoLogCalls.logOnRepeatStateSetAborted(state);
     }
 
     public static void logCancelAnimation(boolean animationOngoing, @NonNull String trace) {
-        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !isProtoLogSafe()) return;
+        if (!ENABLE_STATE_MANAGER_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
         ProtoLogCalls.logCancelAnimation(animationOngoing, trace);
     }
 

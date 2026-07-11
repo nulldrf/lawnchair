@@ -17,7 +17,6 @@
 package com.android.quickstep.util;
 
 import static com.android.quickstep.util.QuickstepProtoLogGroup.RECENTS_WINDOW;
-import static com.android.quickstep.util.QuickstepProtoLogGroup.isProtoLogInitialized;
 
 import android.window.DesktopExperienceFlags;
 
@@ -35,6 +34,10 @@ import com.android.launcher3.Flags;
  * <p>
  * When a new Recents Window log needs to be added to the codebase, add it here under a new unique
  * method. Or, if an existing entry needs to be modified, simply update it here.
+ * <p>
+ * See {@link ProtoLogSafety} for why every direct {@code ProtoLog.d(...)} call below lives inside
+ * the nested {@link ProtoLogCalls} class, and why the guard uses {@link ProtoLogSafety#isSafe()}
+ * rather than calling {@code QuickstepProtoLogGroup.isProtoLogInitialized()} directly.
  */
 public class RecentsWindowProtoLogProxy {
     private static final DesktopExperienceFlags.DesktopExperienceFlag
@@ -45,30 +48,58 @@ public class RecentsWindowProtoLogProxy {
                             Flags.FLAG_ENABLE_RECENTS_WINDOW_PROTO_LOG);
 
     public static void logOnStateSetStart(@NonNull String stateName) {
-        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(RECENTS_WINDOW, "onStateSetStart: %s", stateName);
+        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
+        ProtoLogCalls.logOnStateSetStart(stateName);
     }
 
     public static void logOnStateSetEnd(@NonNull String stateName) {
-        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(RECENTS_WINDOW, "onStateSetEnd: %s", stateName);
+        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
+        ProtoLogCalls.logOnStateSetEnd(stateName);
     }
 
     public static void logOnRepeatStateSetAborted(@NonNull String stateName) {
-        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(RECENTS_WINDOW, "onRepeatStateSetAborted: %s", stateName);
+        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
+        ProtoLogCalls.logOnRepeatStateSetAborted(stateName);
     }
 
     public static void logStartRecentsWindow(boolean isShown, boolean windowViewIsNull) {
-        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(RECENTS_WINDOW,
-                "Starting recents window: isShow= %b, windowViewIsNull=%b",
-                isShown,
-                windowViewIsNull);
+        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
+        ProtoLogCalls.logStartRecentsWindow(isShown, windowViewIsNull);
     }
 
     public static void logCleanup(boolean isShown) {
-        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !isProtoLogInitialized()) return;
-        ProtoLog.d(RECENTS_WINDOW, "Cleaning up recents window: isShow= %b", isShown);
+        if (!ENABLE_RECENTS_WINDOW_PROTO_LOG.isTrue() || !ProtoLogSafety.isSafe()) return;
+        ProtoLogCalls.logCleanup(isShown);
+    }
+
+    /**
+     * Holder for every direct {@code ProtoLog.d(...)} call. See the class-level note above (and
+     * {@link ProtoLogSafety}) for why this needs to be a separate class rather than inline in the
+     * methods above.
+     */
+    private static class ProtoLogCalls {
+
+        private static void logOnStateSetStart(String stateName) {
+            ProtoLog.d(RECENTS_WINDOW, "onStateSetStart: %s", stateName);
+        }
+
+        private static void logOnStateSetEnd(String stateName) {
+            ProtoLog.d(RECENTS_WINDOW, "onStateSetEnd: %s", stateName);
+        }
+
+        private static void logOnRepeatStateSetAborted(String stateName) {
+            ProtoLog.d(RECENTS_WINDOW, "onRepeatStateSetAborted: %s", stateName);
+        }
+
+        private static void logStartRecentsWindow(boolean isShown, boolean windowViewIsNull) {
+            ProtoLog.d(RECENTS_WINDOW,
+                    "Starting recents window: isShow= %b, windowViewIsNull=%b",
+                    isShown,
+                    windowViewIsNull);
+        }
+
+        private static void logCleanup(boolean isShown) {
+            ProtoLog.d(RECENTS_WINDOW, "Cleaning up recents window: isShow= %b", isShown);
+        }
     }
 }

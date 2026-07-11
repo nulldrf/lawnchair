@@ -44,6 +44,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material3.AlertDialog
@@ -52,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -140,8 +143,11 @@ import com.android.launcher3.BuildConfig
 import com.android.launcher3.Flags
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
+import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.android.msdl.data.model.MSDLToken
+import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -232,10 +238,6 @@ fun PreferencesDashboard(
     var searchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Y position of the search pill in the layout, captured via onGloballyPositioned.
-    // Used as the slide anchor for the search overlay enter/exit animation so it
-    // appears to originate from and return to the pill rather than appearing from
-    // the top of the screen.
     var searchBarOffsetY by remember { mutableIntStateOf(0) }
 
     val labelGeneral    = stringResource(R.string.general_label)
@@ -265,7 +267,6 @@ fun PreferencesDashboard(
     val deckLayout = prefs2.deckLayout.getAdapter()
     val isSmartspaceEnabled = prefs2.enableSmartspace.firstCached()
 
-    // ── Reactive state used purely to gate search-index visibility ──────────
     val enableFontSelectionAdapter = prefs2.enableFontSelection.getAdapter()
     val fontSelectionEnabled = prefs2.enableFontSelection.asState().value
     val wrapAdaptiveIconsAdapter = prefs.wrapAdaptiveIcons.getAdapter()
@@ -282,17 +283,12 @@ fun PreferencesDashboard(
     val showColorStyle = !(Utilities.ATLEAST_S && accentColorValue == ColorOption.SystemAccent) || !Utilities.ATLEAST_S
     val showColorSpec = (isWallpaperAccent || isCustomAccent) && effectiveColorStyle !is LegacyKdrag
 
-    // Toggle-only adapters (no gating role, just needed so the search row can flip them)
     val allowRotationAdapter = prefs.allowRotation.getAdapter()
     val hapticFeedbackAdapter = prefs2.hapticFeedback.getAdapter()
     val shadowBGIconsAdapter = prefs.shadowBGIcons.getAdapter()
     val treatWhiteAdaptiveIconsAdapter = prefs.treatWhiteAdaptiveIcons.getAdapter()
     val colorizeIconPackBackgroundAdapter = prefs.colorizeIconPackBackground.getAdapter()
 
-    // ── Settings background blur — permission-gated toggle ──────────────────
-    // Replicates GeneralPreferences.kt's own state machine exactly, so tapping
-    // the switch from search shows the same permission dialog it would show
-    // when found manually, rather than a bare switch that silently no-ops.
     val settingsBlurAdapter = prefs.settingsBlurBackground.getAdapter()
     var showSettingsBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
     var settingsBlurManagedFilesChecked by rememberSaveable {
@@ -365,8 +361,6 @@ fun PreferencesDashboard(
     val rememberPositionAdapter = prefs2.rememberPosition.getAdapter()
     val showScrollbarAdapter = prefs2.showScrollbar.getAdapter()
 
-    // ── App Drawer background blur — permission-gated toggle ────────────────
-    // Replicates AppDrawerPreferences.kt's own state machine exactly.
     val drawerBlurBackgroundAdapter = prefs2.drawerBlurBackground.getAdapter()
     var showDrawerBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
     var drawerBlurManagedFilesChecked by rememberSaveable {
@@ -427,9 +421,6 @@ fun PreferencesDashboard(
     val alwaysReloadIconsAdapter = prefs2.alwaysReloadIcons.getAdapter()
     val enableGncAdapter = prefs.enableGnc.getAdapter()
 
-    // ── Wallpaper blur (Experimental Features) — permission-gated toggle ────
-    // Replicates ExperimentalFeaturesPreferences.kt's own state machine exactly
-    // (FileAccessManager-based, distinct from the two blocks above).
     val enableWallpaperBlurAdapter = prefs.enableWallpaperBlur.getAdapter()
     val wallpaperBlurFileAccessManager = remember { FileAccessManager.getInstance(context) }
     val wallpaperBlurAllFilesAccessState by wallpaperBlurFileAccessManager.allFilesAccessState.collectAsStateWithLifecycle()
@@ -464,11 +455,6 @@ fun PreferencesDashboard(
     val smartspaceShowTimeAdapter = prefs2.smartspaceShowTime.getAdapter()
     val smartspaceShowTime = smartspaceShowTimeAdapter.state.value
 
-    // Smartspace's "what to show" list is a dynamic loop over data sources, not
-    // named preferences — so to expose an inline switch for Battery/Torch/Now
-    // playing/Onboarding/Greetings we look each one up by its providerName
-    // resource id, exactly the same way SmartspacePreferences.kt's own loop
-    // matches them, and grab its real enabledPref adapter.
     val smartspaceDataSources = if (smartspaceLawnchairActive) {
         SmartspaceProvider.INSTANCE.get(context).dataSources
     } else {
@@ -631,11 +617,9 @@ fun PreferencesDashboard(
             a(stringResource(R.string.pref_all_apps_show_scrollbar_title), "scrollbar show hide fast scroll", ScrollKeys.DRAWER_SCROLLBAR, toggle = showScrollbarAdapter.toToggle())
         }
 
-        // Dock tab items (search bar - dock)
         fun sd(label: String, kw: String = "", sk: String? = null, visible: Boolean = true, toggle: ToggleAction? = null) {
             if (visible) add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search(SearchRoute.DOCK_SEARCH), sk, toggle))
         }
-        // Drawer tab items (search bar - app drawer)
         fun sa(label: String, kw: String = "", sk: String? = null, visible: Boolean = true, toggle: ToggleAction? = null) {
             if (visible) add(SearchableEntry(label, kw, labelSearchBar, R.drawable.ic_search, Search(SearchRoute.DRAWER_SEARCH), sk, toggle))
         }
@@ -729,12 +713,7 @@ fun PreferencesDashboard(
         searchQuery = ""
     }
 
-    // ── Layout: main content always present, search overlay slides in on top ──
-    // Using a Box + AnimatedVisibility instead of AnimatedContent so the main
-    // PreferenceLayout is never torn down — the search overlay slides from the
-    // pill's measured Y position rather than appearing from the top of the screen.
     Box(modifier = modifier.fillMaxSize()) {
-        // ── Main settings list (always rendered) ──────────────────────────────
         PreferenceLayout(
             label = settingsLabel,
             expandedLabel = expandedLabel,
@@ -765,8 +744,6 @@ fun PreferencesDashboard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Capture the pill's position so the search overlay can animate
-            // from exactly this Y coordinate instead of the top of the screen.
             SettingsSearchBar(
                 onActivate = { searchActive = true },
                 modifier = Modifier
@@ -912,7 +889,6 @@ fun PreferencesDashboard(
             }
         }
 
-        // ── Search overlay (slides from pill position) ────────────────────────
         AnimatedVisibility(
             visible = searchActive,
             enter = slideInVertically(
@@ -936,9 +912,6 @@ fun PreferencesDashboard(
             )
         }
 
-        // ── Permission dialogs for the three permission-gated switches ────────
-        // Rendered as siblings so they overlay everything, including an open
-        // search overlay, if the user flips one of these switches from search.
         if (showSettingsBlurPermissionDialog) {
             WallpaperAccessPermissionDialog(
                 managedFilesChecked = settingsBlurManagedFilesChecked,
@@ -982,6 +955,12 @@ private fun SearchOverlay(
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+
+    // Same haptic-on-toggle behavior every other switch in Lawnchair has
+    // (SwitchPreference.kt), replicated here so the inline search-result
+    // switch feels identical, not just looks identical.
+    val prefs2 = preferenceManager2()
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -1099,15 +1078,6 @@ private fun SearchOverlay(
                     LazyColumn {
                         items(filtered.size) { idx ->
                             val entry = filtered[idx]
-                            // Overlay approach: PreferenceCategory keeps rendering the row
-                            // exactly as it always has (icon, label, breadcrumb, rounded
-                            // first/last corners, tap-to-navigate) — confirmed via its
-                            // source that it has no trailing/end widget slot at all, so a
-                            // Switch overlaid on top never collides with anything else.
-                            // Composed last, the Switch sits above PreferenceCategory for
-                            // both drawing and touch handling, so tapping it flips the
-                            // preference directly without triggering navigation, while
-                            // tapping anywhere else on the row still navigates + scrolls.
                             Box(modifier = Modifier.fillMaxWidth()) {
                                 PreferenceCategory(
                                     label = entry.label,
@@ -1124,9 +1094,39 @@ private fun SearchOverlay(
                                 )
                                 val toggle = entry.toggle
                                 if (toggle != null) {
+                                    // Matches SwitchPreference.kt's own styling exactly: the
+                                    // M3 Expressive check-icon switch (Check/Close thumbContent)
+                                    // with the same checkedIconColor, plus the same haptic-token
+                                    // wrap, so this switch is indistinguishable from every other
+                                    // one in the app.
                                     Switch(
                                         checked = toggle.checked,
-                                        onCheckedChange = toggle.onCheckedChange,
+                                        onCheckedChange = { newValue ->
+                                            if (prefs2.hapticFeedback.firstBlocking()) {
+                                                mMSDLPlayerWrapper.playToken(
+                                                    if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF,
+                                                )
+                                            }
+                                            toggle.onCheckedChange(newValue)
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedIconColor = MaterialTheme.colorScheme.primary,
+                                        ),
+                                        thumbContent = {
+                                            if (toggle.checked) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Check,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Close,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(SwitchDefaults.IconSize),
+                                                )
+                                            }
+                                        },
                                         modifier = Modifier
                                             .align(Alignment.CenterEnd)
                                             .padding(end = 20.dp),

@@ -1163,6 +1163,26 @@ class LawnchairLauncher : QuickstepLauncher() {
         // than popped.
         anim.addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator) {
+                // TEMPORARY DIAGNOSTIC: log splashView's ACTUAL final rendered
+                // state before any cleanup touches it. My symbolic derivation
+                // predicts translationY should be ~0 (true screen top) here
+                // when topGap==0 — if the logged value is NOT ~0, the bug is
+                // in the runtime values themselves (crop/scale/tracking), not
+                // in the coordinate-offset math I already checked. If it IS
+                // ~0 here but the screenshot still shows a gap, the bug is
+                // downstream of this point entirely (grace period, fade-out,
+                // or the crop/outline not actually extending that far).
+                android.util.Log.d(
+                    "PieAnimDebug",
+                    "FINAL splashView: translationX=${splashView.translationX} " +
+                        "translationY=${splashView.translationY} " +
+                        "scaleX=${splashView.scaleX} scaleY=${splashView.scaleY} " +
+                        "alpha=${splashView.alpha} " +
+                        "cropBounds=(${cropBounds[0]}, ${cropBounds[1]}) " +
+                        "cropRadius=${cropRadius[0]} " +
+                        "nativeSize=(${splashView.width}, ${splashView.height})",
+                )
+
                 // floatingView is already invisible (alpha faded to 0 well
                 // before this point), so removing it immediately has no
                 // visual effect either way.

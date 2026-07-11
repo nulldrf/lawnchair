@@ -40,7 +40,6 @@ import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.window.SplashScreen
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
@@ -623,7 +622,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         val callbacks = super.startActivitySafely(v, intent, item)
         if (callbacks != null) {
             when (lastAppOpenAnimationType) {
-                AppOpenAnimationType.PIE      -> playPieLaunchAnimation(v)
+                AppOpenAnimationType.PIE      -> playPieLaunchAnimation(v, intent)
                 AppOpenAnimationType.SLIDE_UP -> playSlideUpLaunchAnimation()
                 AppOpenAnimationType.BLINK    -> playBlinkLaunchAnimation()
                 AppOpenAnimationType.FADE     -> playFadeLaunchAnimation()
@@ -669,6 +668,11 @@ class LawnchairLauncher : QuickstepLauncher() {
     private val APP_LAUNCH_DOWN_DUR_SCALE     = 0.8f
     private val APP_LAUNCH_ALPHA_START_DELAY  = 32L
     private val APP_LAUNCH_ALPHA_DURATION     = 50L
+    // Grace period + graceful fade-out for splashView teardown (see the
+    // "── 6. Cleanup ──" section) — mitigates, but cannot fully eliminate,
+    // the handoff-gap race described there.
+    private val PIE_SPLASH_GRACE_MS: Long = 120L
+    private val PIE_SPLASH_FADEOUT_MS: Long = 120L
     // AGGRESSIVE_EASE = PathInterpolator(0.2f, 0f, 0f, 1f)
     private val AGGRESSIVE_EASE = android.view.animation.PathInterpolator(0.2f, 0.0f, 0.0f, 1.0f)
     // EXAGGERATED_EASE cubic segments: (0.05,0,0.133,0.08,0.166,0.4) + (0.225,0.94,0.5,1,1,1)
@@ -694,7 +698,7 @@ class LawnchairLauncher : QuickstepLauncher() {
      * position the splash (that would drift it toward centre — see fix notes
      * in playPieLaunchAnimation).
      */
-    private fun playPieLaunchAnimation(iconView: View?) {
+    private fun playPieLaunchAnimation(iconView: View?, launchIntent: Intent? = null) {
         val layer = dragLayer ?: return
         val rootView = layer.parent as? ViewGroup ?: return
         val dp = deviceProfile
@@ -739,44 +743,110 @@ class LawnchairLauncher : QuickstepLauncher() {
             rect.right  + offsetX, rect.bottom + offsetY,
         )
 
+        // FIX (top gap on older Android, e.g. Android 11): everything below
+        // is positioned in ROOTVIEW's OWN coordinate frame (origin at
+        // rootView's top-left), not true screen coordinates. If rootView
+        // itself doesn't start at the true top of the display —
+        // rootViewLoc[1] > 0, which can legitimately happen depending on how
+        // status-bar/edge-to-edge insets are handled on a given Android
+        // version — then no scale or translation value computed relative to
+        // rootView's own bounds can ever paint above rootView's own top
+        // edge, because ViewGroups clip their children to their own bounds
+        // by default (clipChildren = true). That's exactly what the
+        // screenshot shows: a gap the height of rootView's own top offset,
+        // with the wallpaper showing through above it.
+        //
+        // Fix: measure the actual offset (already have rootViewLoc for
+        // free), disable clipChildren on rootView for the duration of this
+        // animation so splashView CAN render into that gap via a negative
+        // translationY, and extend the target height to cover the true full
+        // display height (gap + rootView's own height) instead of just
+        // rootView's own height.
+        val topGap = rootViewLoc[1].toFloat().coerceAtLeast(0f)
+        val rootViewClipChildren = rootView.clipChildren
+        if (topGap > 0f) {
+            rootView.clipChildren = false
+        }
+
+        // ── TEMPORARY DIAGNOSTIC LOGGING ────────────────────────────────────
+        // "No changes" after the last fix means topGap is very likely reading
+        // as 0 on this device — the fix's guard never activates, which would
+        // exactly explain a total no-op. Rather than guess a 4th cause blind,
+        // this logs everything needed to actually see what's going on. Search
+        // logcat for "PieAnimDebug" right after tapping an icon, and share the
+        // output — remove this whole block once we've diagnosed it.
+        run {
+            val decorView = window?.decorView
+            val decorLoc = IntArray(2)
+            decorView?.getLocationOnScreen(decorLoc)
+            android.util.Log.d(
+                "PieAnimDebug",
+                "rootViewLoc=(${rootViewLoc[0]}, ${rootViewLoc[1]})  " +
+                    "rootView.size=(${rootView.width}, ${rootView.height})  " +
+                    "topGap=$topGap  " +
+                    "dp.insets=(${dp.insets.left}, ${dp.insets.top}, ${dp.insets.right}, ${dp.insets.bottom})  " +
+                    "decorView.loc=(${decorLoc.getOrNull(0)}, ${decorLoc.getOrNull(1)})  " +
+                    "decorView.size=(${decorView?.width}, ${decorView?.height})",
+            )
+        }
+        // ── END TEMPORARY DIAGNOSTIC LOGGING ────────────────────────────────
+
         // screenW/screenH are the SINGLE source of truth for every size AND
         // centering target below (scale-to-fill, crop bounds, endTX/endTY,
         // useUpward's threshold) — they must all agree, or the animation
         // won't land exactly full-screen at t=1 (see reasoning in the
         // corner-radius/crop section further down).
         //
-        // FIX (nav bar inset bug): rootView.height on its own is NOT stable
-        // across navigation modes. In 3-button nav mode, the OS reserves real
-        // layout space for the nav bar, so rootView (being edge-to-edge
-        // otherwise) is already measured SHORTER, excluding it. In gesture
-        // nav mode there's no reserved layout space — rootView spans the
-        // full display height — so rootView.height ends up TALLER by
-        // roughly the nav bar's height than the exact same physical device
-        // would report in button-nav mode. Since screenH/2 is the target the
-        // icon travels toward, a taller screenH in gesture mode pulls that
-        // target further down the screen — this is exactly the "window
-        // appears to move toward the bottom, only without a nav bar" bug.
+        // FIX (nav bar inset bug, take 2): the previous fix queried insets
+        // reactively via ViewCompat.getRootWindowInsets(rootView) at
+        // animation-setup time. On Android 11 this still read as off — most
+        // likely because getRootWindowInsets() can return null or a stale
+        // value depending on exactly when it's queried relative to the last
+        // insets dispatch (e.g. mid-tap-gesture), silently falling back to
+        // the ?: 0 default and reproducing the original bug with zero actual
+        // correction.
         //
-        // Fix: explicitly query the CURRENT navigation-bar bottom inset via
-        // WindowInsetsCompat and subtract it. In 3-button mode this reads ~0
-        // (the space is already excluded from rootView's own measured
-        // height, so nothing changes). In gesture mode it reads the actual
-        // small gesture-handle-reserved inset, bringing screenH back down to
-        // the same effective value 3-button mode already had — restoring
-        // consistent centering in both modes without special-casing either
-        // one.
-        val navBarInsetBottom = ViewCompat.getRootWindowInsets(rootView)
-            ?.getInsets(WindowInsetsCompat.Type.navigationBars())
-            ?.bottom ?: 0
-
+        // This version uses DeviceProfile.insets instead — Launcher3's own
+        // proactively-maintained Rect, kept in sync via the Activity's own
+        // onApplyWindowInsets/updateInsets lifecycle rather than queried
+        // ad-hoc, matching how insets are handled elsewhere in this codebase
+        // (see the Insettable interface implementations, e.g.
+        // LawnchairFloatingSurfaceView.setInsets). This should be more
+        // reliable across Android versions since it doesn't depend on
+        // dispatch timing at the exact moment of the tap.
+        //
+        // HONEST CAVEAT: I have not been able to verify, from source alone,
+        // whether rootView's own layout already independently excludes
+        // system-bar space in some configurations (which would make
+        // subtracting dp.insets.bottom on top of that a DOUBLE subtraction,
+        // overshooting the other way). If the window now appears to move
+        // toward the TOP instead of the bottom, that's the double-subtraction
+        // case — let me know and I'll remove the subtraction rather than
+        // guess a third variant blind.
         val screenW = rootView.width.toFloat()
-        val screenH = (rootView.height - navBarInsetBottom).toFloat()
+        val screenH = (rootView.height - dp.insets.bottom).toFloat() + topGap
+
+        // True-screen-relative Y centre, converted back to rootView-relative
+        // coordinates (rootview-relative = true-screen-relative - topGap).
+        // Every Y-axis "centre of the screen" target below uses this, not a
+        // bare screenH/2 — see the symbolic verification in the commit notes:
+        // shifting only this one value is sufficient for the splash's
+        // rendered top edge to land at exactly rootview-relative -topGap
+        // (== true screen top) at t=1; it propagates correctly through the
+        // existing offset math without needing separate patches elsewhere.
+        val screenCenterY = screenH / 2f - topGap
+
+        android.util.Log.d(
+            "PieAnimDebug",
+            "screenW=$screenW  screenH=$screenH  screenCenterY=$screenCenterY  " +
+                "iconInRoot.top=${iconInRoot.top}",
+        )
 
         // Translation to bring floating icon centre to screen centre
         val dX = screenW / 2f - iconInRoot.left.toFloat() - rect.width()  / 2f
-        val dY = screenH / 2f - iconInRoot.top.toFloat()  - rect.height() / 2f
+        val dY = screenCenterY - iconInRoot.top.toFloat()  - rect.height() / 2f
 
-        val useUpward = iconInRoot.top.toFloat() > screenH / 2f ||
+        val useUpward = iconInRoot.top.toFloat() > screenCenterY ||
             kotlin.math.abs(dY) < dp.cellHeightPx.toFloat()
 
         // ── 3. Floating icon view (mFloatingView equivalent) ───────────────
@@ -838,7 +908,46 @@ class LawnchairLauncher : QuickstepLauncher() {
         // SplashLayout.setCrop()'s behaviour, upgraded from setRect to
         // setRoundRect so it can ALSO carry the corner-radius morph (new,
         // additive — old code had no rounding at all).
-        val splashColor = run {
+        // FIX (part of the "gap at handoff" issue): splashColor was
+        // previously resolved from `this` (the LAUNCHER's own theme), never
+        // the target app's — meaning even with perfect timing there'd be a
+        // colour-mismatch flash the instant the real app's first frame
+        // appears underneath. Ported from SplashResolver_old.kt's
+        // loadSplash(): resolveActivityInfo → createPackageContext →
+        // ContextThemeWrapper(packageContext, theme), which resolves the
+        // exact theme the target ACTIVITY will actually render with
+        // (respecting per-activity manifest theme overrides). Adapted to
+        // pull a solid colorBackground Int (what GradientDrawable.setColor
+        // needs) instead of the full windowBackground Drawable old code
+        // extracted, since our splash is a plain filled rect, not an
+        // arbitrary-background view.
+        //
+        // Wrapped in runCatching end-to-end: resolveActivityInfo can return
+        // null for intents that don't cleanly resolve, and
+        // createPackageContext can throw NameNotFoundException (e.g. the
+        // package was uninstalled between resolving the Intent and this
+        // call). Either way this can only fall back to the PREVIOUS
+        // behaviour (launcher's own theme) — it cannot regress below what
+        // was already there.
+        val splashColor = runCatching {
+            val activityInfo = launchIntent?.resolveActivityInfo(packageManager, 0)
+            if (activityInfo != null) {
+                val themeRes = if (activityInfo.theme != 0) {
+                    activityInfo.theme
+                } else {
+                    activityInfo.applicationInfo.theme
+                }
+                val packageContext = createPackageContext(activityInfo.packageName, 0)
+                val themedContext = android.view.ContextThemeWrapper(packageContext, themeRes)
+                val ta = themedContext.obtainStyledAttributes(intArrayOf(android.R.attr.colorBackground))
+                val c  = ta.getColor(0, android.graphics.Color.BLACK)
+                ta.recycle()
+                c
+            } else {
+                null
+            }
+        }.getOrNull() ?: run {
+            // Fallback: exactly the previous behaviour (launcher's own theme)
             val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorBackground))
             val c  = ta.getColor(0, android.graphics.Color.BLACK)
             ta.recycle()
@@ -882,11 +991,18 @@ class LawnchairLauncher : QuickstepLauncher() {
                 }
             }
         }
+        // Native canvas height must be at LEAST the extended screenH (which
+        // can now exceed rootView's own original height by topGap) — a View
+        // can never render beyond its own allocated size regardless of what
+        // the outline/crop specifies, so if this stayed at rootView.height
+        // the crop's reveal-to-screenH target would be silently capped
+        // short, undoing the top-gap fix above.
+        val splashNativeHeight = kotlin.math.max(rootView.height, screenH.toInt())
         rootView.addView(
             splashView,
-            android.view.ViewGroup.LayoutParams(rootView.width, rootView.height),
+            android.view.ViewGroup.LayoutParams(rootView.width, splashNativeHeight),
         )
-        splashView.layout(0, 0, rootView.width, rootView.height)
+        splashView.layout(0, 0, rootView.width, splashNativeHeight)
 
         // Initial state: scaled to icon size, translated over the icon —
         // identical formula to the per-frame update at percent=0.
@@ -917,8 +1033,13 @@ class LawnchairLauncher : QuickstepLauncher() {
         // Translation starts from the icon's position (floatStartX/Y) and
         // ends at the screen centre. The 0f→dX approach was wrong because
         // the view's translationX is already floatStartX, not 0.
+        // endTY uses screenCenterY (already shifted by -topGap, see its
+        // derivation above), not a bare screenH/2 — this is the one value
+        // that needs correcting for the top-gap fix; everything downstream
+        // (the splash's tracked position) derives from floatingView's live
+        // position and inherits the correction automatically.
         val endTX = screenW / 2f - rect.width()  / 2f
-        val endTY = screenH / 2f - rect.height() / 2f
+        val endTY = screenCenterY - rect.height() / 2f
 
         anim.playTogether(
             ObjectAnimator.ofFloat(floatingView, View.TRANSLATION_X,
@@ -1016,17 +1137,68 @@ class LawnchairLauncher : QuickstepLauncher() {
         )
 
         // ── 6. Cleanup ─────────────────────────────────────────────────────
+        // FIX (part of the "gap at handoff" issue): previously, splashView
+        // (still fully opaque, still covering the entire screen) and
+        // floatingView were both removeView()'d, AND layer.alpha was reset
+        // to 1.0, all synchronously in the same instant the 500ms animation
+        // ended. On a device where the real app's window hasn't actually
+        // finished compositing by exactly 500ms (more likely on a slower
+        // cold start, e.g. Android 11) — this fake overlay approach has no
+        // way to know the real app is actually ready, since that signal
+        // requires CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS, which
+        // non-system installs don't have — tearing everything down
+        // synchronously reveals whatever IS currently on screen at that
+        // exact instant, which can be a half-drawn frame or (worse) the
+        // launcher's own content popping briefly back into view before the
+        // real app's window is actually composited on top of it. That's
+        // the visible "gap."
+        //
+        // Mitigation (this can only reduce the chance of a visible gap, it
+        // cannot fully eliminate the underlying race without system
+        // permissions we don't have): hold splashView in place, fully
+        // opaque, for a short grace period past the main 500ms animation —
+        // giving the real app extra time to actually finish compositing
+        // underneath — then fade it out gracefully rather than cutting it
+        // instantly, so any still-residual mismatch is smoothed over rather
+        // than popped.
         anim.addListener(object : AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: Animator) {
+                // floatingView is already invisible (alpha faded to 0 well
+                // before this point), so removing it immediately has no
+                // visual effect either way.
                 runCatching { rootView.removeView(floatingView) }
-                runCatching { rootView.removeView(splashView) }
-                splashView.setLayerType(View.LAYER_TYPE_NONE, null)
                 resolvedView?.let {
                     com.android.launcher3.views.FloatingIconViewCompanion
                         .setPropertiesVisible(it, true)
                 }
+
+                // Safe to restore layer's own visibility/layer-type now:
+                // splashView is still on top (added to rootView after
+                // dragLayer, so it draws over it) and still fully opaque,
+                // so this doesn't cause any visible pop on its own.
                 layer.alpha = 1.0f
                 layer.setLayerType(View.LAYER_TYPE_NONE, null)
+
+                splashView.postDelayed({
+                    ObjectAnimator.ofFloat(splashView, View.ALPHA, 1f, 0f).apply {
+                        duration     = PIE_SPLASH_FADEOUT_MS
+                        interpolator = android.view.animation.LinearInterpolator()
+                        addListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(fadeAnim: Animator) {
+                                runCatching { rootView.removeView(splashView) }
+                                splashView.setLayerType(View.LAYER_TYPE_NONE, null)
+                                // Must restore this — we only disabled it to
+                                // let splashView paint into the top-gap area
+                                // above rootView's own bounds during this
+                                // one animation; leaving it off permanently
+                                // would be a real (if usually invisible)
+                                // regression to rootView's normal clipping.
+                                rootView.clipChildren = rootViewClipChildren
+                            }
+                        })
+                        start()
+                    }
+                }, PIE_SPLASH_GRACE_MS)
             }
         })
 

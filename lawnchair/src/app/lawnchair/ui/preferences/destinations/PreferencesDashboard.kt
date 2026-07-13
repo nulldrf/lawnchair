@@ -1078,61 +1078,62 @@ private fun SearchOverlay(
                     LazyColumn {
                         items(filtered.size) { idx ->
                             val entry = filtered[idx]
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                PreferenceCategory(
-                                    label = entry.label,
-                                    description = entry.breadcrumb,
-                                    iconResource = entry.iconResource,
-                                    onNavigate = {
-                                        onClose()
-                                        entry.scrollKey?.let { ScrollTargetManager.set(it) }
-                                        onNavigate(entry.route)
-                                    },
-                                    isSelected = false,
-                                    isFirst = idx == 0,
-                                    isLast = idx == filtered.lastIndex,
-                                )
-                                val toggle = entry.toggle
-                                if (toggle != null) {
-                                    // Matches SwitchPreference.kt's own styling exactly: the
-                                    // M3 Expressive check-icon switch (Check/Close thumbContent)
-                                    // with the same checkedIconColor, plus the same haptic-token
-                                    // wrap, so this switch is indistinguishable from every other
-                                    // one in the app.
-                                    Switch(
-                                        checked = toggle.checked,
-                                        onCheckedChange = { newValue ->
-                                            if (prefs2.hapticFeedback.firstBlocking()) {
-                                                mMSDLPlayerWrapper.playToken(
-                                                    if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF,
-                                                )
-                                            }
-                                            toggle.onCheckedChange(newValue)
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedIconColor = MaterialTheme.colorScheme.primary,
-                                        ),
-                                        thumbContent = {
-                                            if (toggle.checked) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Check,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(SwitchDefaults.IconSize),
-                                                )
-                                            } else {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Close,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(SwitchDefaults.IconSize),
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .padding(end = 20.dp),
-                                    )
-                                }
-                            }
+                            val toggle = entry.toggle
+                            // The switch is now a real PreferenceTemplate endWidget (via
+                            // PreferenceCategory's new optional endWidget param), not an
+                            // overlay — so it shares the same weighted Row as the title/
+                            // description column. That column shrinks to fit whatever the
+                            // switch actually needs, at any font scale, and the row's
+                            // background/ripple correctly extends the full width, including
+                            // under the switch, since there's no separate Box splitting them.
+                            PreferenceCategory(
+                                label = entry.label,
+                                description = entry.breadcrumb,
+                                iconResource = entry.iconResource,
+                                onNavigate = {
+                                    onClose()
+                                    entry.scrollKey?.let { ScrollTargetManager.set(it) }
+                                    onNavigate(entry.route)
+                                },
+                                isSelected = false,
+                                isFirst = idx == 0,
+                                isLast = idx == filtered.lastIndex,
+                                endWidget = if (toggle != null) {
+                                    {
+                                        Switch(
+                                            checked = toggle.checked,
+                                            onCheckedChange = { newValue ->
+                                                if (prefs2.hapticFeedback.firstBlocking()) {
+                                                    mMSDLPlayerWrapper.playToken(
+                                                        if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF,
+                                                    )
+                                                }
+                                                toggle.onCheckedChange(newValue)
+                                            },
+                                            colors = SwitchDefaults.colors(
+                                                checkedIconColor = MaterialTheme.colorScheme.primary,
+                                            ),
+                                            thumbContent = {
+                                                if (toggle.checked) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Check,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(SwitchDefaults.IconSize),
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Close,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(SwitchDefaults.IconSize),
+                                                    )
+                                                }
+                                            },
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                            )
                         }
                     }
                 }

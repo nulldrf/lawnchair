@@ -50,6 +50,13 @@ fun PreferenceCategory(
     description: String? = null,
     isFirst: Boolean = false,
     isLast: Boolean = false,
+    // Optional trailing slot (e.g. an inline Switch). Forwarded straight to
+    // PreferenceTemplate's own endWidget, so it shares the same Row as the
+    // title/description column — which is weighted — meaning the text
+    // naturally lays out within whatever space remains, at any font scale,
+    // instead of relying on an approximate reserved-padding guess. Every
+    // existing caller is unaffected since this defaults to null.
+    endWidget: (@Composable () -> Unit)? = null,
 ) {
     val shape = preferenceGroupItemShape(PreferenceGroupItemPosition(isFirst, isLast))
 
@@ -85,6 +92,7 @@ fun PreferenceCategory(
                 )
             }
         },
+        endWidget = endWidget,
     )
 }
 

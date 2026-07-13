@@ -170,29 +170,25 @@ fun CreateBackupScreen(
         }
 
         PreferenceGroup(heading = stringResource(id = R.string.what_to_backup)) {
-            Item {
-                FlagSwitchPreference(
-                    flags = contents,
-                    setFlags = viewModel::setBackupContents,
-                    mask = LawnchairBackup.INCLUDE_LAYOUT_AND_SETTINGS,
-                    label = stringResource(id = R.string.backup_content_layout_and_settings),
-                )
-            }
-            Item {
-                FlagSwitchPreference(
-                    flags = contents,
-                    setFlags = {
-                        if (it.hasFlag(LawnchairBackup.INCLUDE_WALLPAPER) && !hasWallpaperPermission) {
-                            showPermissionDialog = true
-                        } else {
-                            viewModel.setBackupContents(it)
-                        }
-                    },
-                    mask = LawnchairBackup.INCLUDE_WALLPAPER,
-                    label = stringResource(id = R.string.backup_content_wallpaper),
-                    enabled = !hasLiveWallpaper,
-                )
-            }
+            FlagSwitchPreference(
+                flags = contents,
+                setFlags = viewModel::setBackupContents,
+                mask = LawnchairBackup.INCLUDE_LAYOUT_AND_SETTINGS,
+                label = stringResource(id = R.string.backup_content_layout_and_settings),
+            )
+            FlagSwitchPreference(
+                flags = contents,
+                setFlags = {
+                    if (it.hasFlag(LawnchairBackup.INCLUDE_WALLPAPER) && !hasWallpaperPermission) {
+                        showPermissionDialog = true
+                    } else {
+                        viewModel.setBackupContents(it)
+                    }
+                },
+                mask = LawnchairBackup.INCLUDE_WALLPAPER,
+                label = stringResource(id = R.string.backup_content_wallpaper),
+                enabled = !hasLiveWallpaper,
+            )
         }
         Box(
             modifier = Modifier

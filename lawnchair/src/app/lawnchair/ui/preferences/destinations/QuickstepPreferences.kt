@@ -1,8 +1,9 @@
 package app.lawnchair.ui.preferences.destinations
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -20,6 +21,7 @@ import app.lawnchair.ui.preferences.components.RecentsQuickAction
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
+import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +29,8 @@ import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.theme.LawnchairTheme
+import app.lawnchair.ui.util.preview.PreferenceGroupPreviewContainer
 import app.lawnchair.ui.util.preview.PreviewLawnchair
 import app.lawnchair.util.isOnePlusStock
 import com.android.launcher3.R
@@ -80,13 +84,11 @@ fun QuickstepPreferences(
         val recentsTranslucentBackground by prefs.recentsTranslucentBackground.observeAsState()
     val scrollState = rememberPreferenceScrollState()
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
-            Item {
-                ScrollAnchor(ScrollKeys.QS_TRANSLUCENT, scrollState) {
-                SwitchPreference(
-                    adapter = prefs.recentsTranslucentBackground.getAdapter(),
-                    label = stringResource(id = R.string.translucent_background),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.QS_TRANSLUCENT, scrollState) {
+            SwitchPreference(
+                adapter = prefs.recentsTranslucentBackground.getAdapter(),
+                label = stringResource(id = R.string.translucent_background),
+            )
             }
             Item(
                 key = "recents_translucent_background_alpha",
@@ -113,13 +115,11 @@ fun QuickstepPreferences(
             description = stringResource(id = (R.string.window_corner_radius_description)),
             showDescription = overrideWindowCornerRadius,
         ) {
-            Item {
-                ScrollAnchor(ScrollKeys.QS_CORNER_RADIUS, scrollState) {
-                SwitchPreference(
-                    adapter = prefs.overrideWindowCornerRadius.getAdapter(),
-                    label = stringResource(id = R.string.override_window_corner_radius_label),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.QS_CORNER_RADIUS, scrollState) {
+            SwitchPreference(
+                adapter = prefs.overrideWindowCornerRadius.getAdapter(),
+                label = stringResource(id = R.string.override_window_corner_radius_label),
+            )
             }
             Item(
                 "window_corner_radius",
@@ -138,31 +138,31 @@ fun QuickstepPreferences(
             PreferenceGroup(
                 heading = stringResource(id = R.string.taskbar_label),
             ) {
-                Item {
-                    ScrollAnchor(ScrollKeys.QS_TASKBAR, scrollState) {
-                    SwitchPreference(
-                        adapter = prefs2.enableTaskbarOnPhone.getAdapter(),
-                        label = stringResource(id = R.string.enable_taskbar_experimental),
-                    )
-                    }
+                                ScrollAnchor(ScrollKeys.QS_TASKBAR, scrollState) {
+                SwitchPreference(
+                    adapter = prefs2.enableTaskbarOnPhone.getAdapter(),
+                    label = stringResource(id = R.string.enable_taskbar_experimental),
+                )
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @PreviewLawnchair
 @Composable
 private fun QuickSwitchIgnoredWarning(
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.padding(horizontal = 16.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.errorContainer,
-    ) {
+    LawnchairTheme {
         WarningPreference(
             text = stringResource(id = R.string.quickswitch_ignored_warning),
+            modifier = modifier.padding(horizontal = 16.dp),
+            standalone = true,
+            colors = ListItemDefaults.segmentedColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+            ),
         )
     }
 }

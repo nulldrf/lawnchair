@@ -64,6 +64,7 @@ private enum class ContentType {
     FONT,
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FontSelection(
     fontPref: BasePreferenceManager.FontPref,
@@ -150,7 +151,7 @@ fun FontSelection(
                         cutBottom = customFonts.isNotEmpty(),
                     ) {
                         PreferenceTemplate(
-                            modifier = Modifier.clickable {
+                            onClick = {
                                 val intent = Intent(Intent.ACTION_GET_CONTENT)
                                 intent.addCategory(Intent.CATEGORY_OPENABLE)
                                 intent.type = "*/*"
@@ -215,8 +216,10 @@ private fun FontSelectionItem(
     val selected = family.variants.any { it.value == adapter.state.value }
     PreferenceTemplate(
         modifier = modifier.clickable { adapter.onChange(family.default) },
+        modifier = modifier,
+        onClick = { adapter.onChange(family.default) },
         title = {
-            Box(modifier = Modifier.height(52.dp)) {
+            Box {
                 Text(
                     text = family.displayName,
                     modifier = Modifier
@@ -241,7 +244,6 @@ private fun FontSelectionItem(
                 {
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.padding(end = 8.dp),
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
@@ -254,8 +256,6 @@ private fun FontSelectionItem(
             }
             else -> null
         },
-        applyPaddings = false,
-        verticalPadding = 0.dp,
     )
 }
 
@@ -268,6 +268,12 @@ private val VariantButtonContentPadding = PaddingValues(
 
 private fun removeFamilyPrefix(familyName: CharSequence, fontName: CharSequence): String =
     fontName.removePrefix(familyName).trim().toString()
+private fun removeFamilyPrefix(
+    familyName: CharSequence,
+    fontName: CharSequence,
+): String {
+    return fontName.removePrefix(familyName).trim().toString()
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -280,8 +286,7 @@ private fun VariantDropdown(
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .wrapContentWidth()
-            .padding(end = 16.dp),
+            .wrapContentWidth(),
     ) {
         val selectedFont = adapter.state.value
         var showVariants by remember { mutableStateOf(false) }
@@ -296,7 +301,6 @@ private fun VariantDropdown(
         TextButton(
             onClick = { showVariants = true },
             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            contentPadding = VariantButtonContentPadding,
             shapes = ButtonDefaults.shapes(),
         ) {
             AndroidText(

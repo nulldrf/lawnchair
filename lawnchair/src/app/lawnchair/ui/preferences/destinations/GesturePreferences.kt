@@ -30,72 +30,56 @@ fun GesturePreferences(
         modifier = modifier,
     ) {
         PreferenceGroup {
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_DOUBLE_TAP, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.doubleTapGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_double_tap),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_DOUBLE_TAP, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.doubleTapGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_double_tap),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_SWIPE_UP, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.swipeUpGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_swipe_up),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_SWIPE_UP, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.swipeUpGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_swipe_up),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_SWIPE_DOWN, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.swipeDownGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_swipe_down),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_SWIPE_DOWN, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.swipeDownGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_swipe_down),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_2F_UP, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.twoFingerSwipeUpGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_two_finger_swipe_up),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_2F_UP, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.twoFingerSwipeUpGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_two_finger_swipe_up),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_2F_DOWN, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.twoFingerSwipeDownGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_two_finger_swipe_down),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_2F_DOWN, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.twoFingerSwipeDownGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_two_finger_swipe_down),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_HOME, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.homePressGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_home_tap),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_HOME, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.homePressGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_home_tap),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_BACK, scrollState) {
-                GestureHandlerPreference(
-                    adapter = prefs.backPressGestureHandler.getAdapter(),
-                    label = stringResource(id = R.string.gesture_back_tap),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_BACK, scrollState) {
+            GestureHandlerPreference(
+                adapter = prefs.backPressGestureHandler.getAdapter(),
+                label = stringResource(id = R.string.gesture_back_tap),
+            )
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.sleep_mode_label)) {
-            Item {
-                ScrollAnchor(ScrollKeys.GESTURE_SLEEP_MODE, scrollState) {
-                ListPreference(
-                    adapter = prefs.sleepMode.getAdapter(),
-                    entries = SleepMode.entries(),
-                    label = stringResource(id = R.string.sleep_mode_label),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.GESTURE_SLEEP_MODE, scrollState) {
+            ListPreference(
+                adapter = prefs.sleepMode.getAdapter(),
+                entries = SleepMode.entries(),
+                label = stringResource(id = R.string.sleep_mode_label),
+            )
             }
         }
     }

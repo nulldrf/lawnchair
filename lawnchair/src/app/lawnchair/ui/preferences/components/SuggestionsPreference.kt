@@ -11,7 +11,6 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
-import app.lawnchair.ui.preferences.components.layout.PreferenceGroupScope
 import app.lawnchair.ui.preferences.components.layout.PreferenceScrollState
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
@@ -20,7 +19,7 @@ import com.android.launcher3.R
 
 @SuppressLint("WrongConstant")
 @Composable
-fun PreferenceGroupScope.SuggestionsPreference(
+fun SuggestionsPreference(
     scrollState: PreferenceScrollState = rememberPreferenceScrollState(),
 ) {
     val context = LocalContext.current
@@ -30,30 +29,26 @@ fun PreferenceGroupScope.SuggestionsPreference(
     val suggestionSettingsAvailable = hasPkgUsagePermission && canResolveToSuggestionPreference
 
     if (suggestionSettingsAvailable) {
-        Item {
-            ScrollAnchor(ScrollKeys.DRAWER_SUGGESTIONS, scrollState) {
-                ClickablePreference(
-                    label = stringResource(id = R.string.suggestion_pref_screen_title),
-                    onClick = {
-                        context.startActivity(intent)
-                    },
-                )
-            }
+                ScrollAnchor(ScrollKeys.DRAWER_SUGGESTIONS, scrollState) {
+            ClickablePreference(
+                label = stringResource(id = R.string.suggestion_pref_screen_title),
+                onClick = {
+                    context.startActivity(intent)
+                },
+            )
         }
     } else if (suggestionSettingsAvailable || LawnchairApp.isRecentsEnabled) {
         /* On some devices, the Suggestions activity could not be found or PACKAGE_USAGE_STATS is
           not granted. And on some devices (non-Google especially), the suggestions preference shows
           nothing at all */
 
-        Item {
-            ScrollAnchor(ScrollKeys.DRAWER_SUGGESTIONS, scrollState) {
-                val prefs2 = preferenceManager2()
-                val showRecentAppsInDrawer = prefs2.showSuggestedAppsInDrawer.getAdapter()
-                SwitchPreference(
-                    label = stringResource(id = R.string.show_suggested_apps_at_drawer_top),
-                    adapter = showRecentAppsInDrawer,
-                )
-            }
+                ScrollAnchor(ScrollKeys.DRAWER_SUGGESTIONS, scrollState) {
+            val prefs2 = preferenceManager2()
+            val showRecentAppsInDrawer = prefs2.showSuggestedAppsInDrawer.getAdapter()
+            SwitchPreference(
+                label = stringResource(id = R.string.show_suggested_apps_at_drawer_top),
+                adapter = showRecentAppsInDrawer,
+            )
         }
     }
 }

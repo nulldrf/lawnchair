@@ -101,27 +101,21 @@ fun AppDrawerPreferences(
         }
         val hiddenApps = prefs2.hiddenApps.getAdapter().state.value
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
-            Item {
-                ScrollAnchor(ScrollKeys.HIDDEN_APPS, scrollState) {
-                NavigationActionPreference(
-                    label = stringResource(id = R.string.hidden_apps_label),
-                    destination = AppDrawerHiddenApps,
-                    subtitle = resources.getQuantityString(R.plurals.apps_count, hiddenApps.size, hiddenApps.size),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.HIDDEN_APPS, scrollState) {
+            NavigationActionPreference(
+                label = stringResource(id = R.string.hidden_apps_label),
+                destination = AppDrawerHiddenApps,
+                subtitle = resources.getQuantityString(R.plurals.apps_count, hiddenApps.size, hiddenApps.size),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_SEARCH_ENTRY, scrollState) {
-                    SearchBarPreference(SearchRoute.DRAWER_SEARCH, showLabel = false)
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_SEARCH_ENTRY, scrollState) {
+                SearchBarPreference(SearchRoute.DRAWER_SEARCH, showLabel = false)
             }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_SEARCH_AT_BOTTOM, scrollState) {
-                SwitchPreference(
-                    label = stringResource(id = R.string.pref_app_drawer_search_bar_at_bottom),
-                    adapter = prefs2.appDrawerSearchBarAtBottom.getAdapter(),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_SEARCH_AT_BOTTOM, scrollState) {
+            SwitchPreference(
+                label = stringResource(id = R.string.pref_app_drawer_search_bar_at_bottom),
+                adapter = prefs2.appDrawerSearchBarAtBottom.getAdapter(),
+            )
             }
             SuggestionsPreference(scrollState = scrollState)
             AppDrawerHapticFeedbackPreference(scrollState = scrollState)
@@ -161,93 +155,74 @@ fun AppDrawerPreferences(
         }
 
         PreferenceGroup(heading = stringResource(R.string.style)) {
-            Item { ScrollAnchor(ScrollKeys.DRAWER_BG_COLOR, scrollState) { ColorPreference(preference = prefs2.appDrawerBackgroundColor) } }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_BG_OPACITY, scrollState) {
-                SliderPreference(
-                    label = stringResource(id = R.string.background_opacity),
-                    adapter = prefs.drawerOpacity.getAdapter(),
-                    step = 0.1f,
-                    valueRange = 0F..1F,
-                    showAsPercentage = true,
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_BG_COLOR, scrollState) { ColorPreference(preference = prefs2.appDrawerBackgroundColor) } 
+                        ScrollAnchor(ScrollKeys.DRAWER_BG_OPACITY, scrollState) {
+            SliderPreference(
+                label = stringResource(id = R.string.background_opacity),
+                adapter = prefs.drawerOpacity.getAdapter(),
+                step = 0.1f,
+                valueRange = 0F..1F,
+                showAsPercentage = true,
+            )
             }
-            Item { ScrollAnchor(ScrollKeys.DRAWER_TAB_BG_COLOR, scrollState) { ColorPreference(preference = prefs2.workProfileTabBackgroundColor) } }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_TAB_CONTAINER_BG, scrollState) {
-                SwitchPreference(
-                    label = stringResource(id = R.string.work_profile_tab_container_background_label),
-                    adapter = prefs2.workProfileTabContainerBackground.getAdapter(),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_TAB_BG_COLOR, scrollState) { ColorPreference(preference = prefs2.workProfileTabBackgroundColor) } 
+                        ScrollAnchor(ScrollKeys.DRAWER_TAB_CONTAINER_BG, scrollState) {
+            SwitchPreference(
+                label = stringResource(id = R.string.work_profile_tab_container_background_label),
+                adapter = prefs2.workProfileTabContainerBackground.getAdapter(),
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_SEARCH_BAR_BG, scrollState) {
-                SwitchPreference(
-                    label = stringResource(id = R.string.pref_all_apps_search_bar_background),
-                    adapter = prefs2.appDrawerSearchBarBackground.getAdapter(),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_SEARCH_BAR_BG, scrollState) {
+            SwitchPreference(
+                label = stringResource(id = R.string.pref_all_apps_search_bar_background),
+                adapter = prefs2.appDrawerSearchBarBackground.getAdapter(),
+            )
             }
             // ── App drawer icon text colour (new) ────────────────────────────
             // Default = Lawnchair automatic (honours luminance-based heuristic).
             // Any other pick overrides the automatic logic with the chosen colour.
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_TEXT_COLOR, scrollState) {
-                    ColorPreference(preference = prefs2.drawerIconTextColor)
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_TEXT_COLOR, scrollState) {
+                ColorPreference(preference = prefs2.drawerIconTextColor)
             }
             // ── HokoBlur ────────────────────────────────────────────────────────
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_BLUR, scrollState) {
-                SwitchPreference(
-                    checked = drawerBlurBackgroundAdapter.state.value,
-                    onCheckedChange = { checked ->
-                        if (checked && !drawerBlurPermissionsGranted) {
-                            showDrawerBlurPermissionDialog = true
-                        } else {
-                            drawerBlurBackgroundAdapter.onChange(checked)
-                        }
-                    },
-                    label = stringResource(id = R.string.drawer_hoko_blur_label),
-                    description = stringResource(id = R.string.drawer_hoko_blur_description),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_BLUR, scrollState) {
+            SwitchPreference(
+                checked = drawerBlurBackgroundAdapter.state.value,
+                onCheckedChange = { checked ->
+                    if (checked && !drawerBlurPermissionsGranted) {
+                        showDrawerBlurPermissionDialog = true
+                    } else {
+                        drawerBlurBackgroundAdapter.onChange(checked)
+                    }
+                },
+                label = stringResource(id = R.string.drawer_hoko_blur_label),
+                description = stringResource(id = R.string.drawer_hoko_blur_description),
+            )
             }
-            Item(
-                key = "drawer_hoko_blur_intensity",
-                visible = drawerBlurBackgroundAdapter.state.value,
-            ) {
-                SliderPreference(
-                    label = stringResource(id = R.string.drawer_hoko_blur_intensity_label),
-                    adapter = prefs2.drawerBlurIntensity.getAdapter(),
-                    step = 5f,
-                    valueRange = 10f..150f,
-                )
-            }
+                        SliderPreference(
+                label = stringResource(id = R.string.drawer_hoko_blur_intensity_label),
+                adapter = prefs2.drawerBlurIntensity.getAdapter(),
+                step = 5f,
+                valueRange = 10f..150f,
+            )
         }
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {
             val drawerColumnsAdapter = prefs2.drawerColumns.getAdapter()
             val drawerColumnsUnfoldedAdapter = prefs2.drawerColumnsUnfolded.getAdapter()
             if (isFoldable) {
-                Item {
-                    SliderPreference(
-                        label = stringResource(id = R.string.state_folded, stringResource(id = R.string.app_drawer_columns)),
-                        adapter = drawerColumnsAdapter,
-                        step = 1,
-                        valueRange = 3..10,
-                    )
-                }
-                Item {
-                    SliderPreference(
-                        label = stringResource(id = R.string.state_unfolded, stringResource(id = R.string.app_drawer_columns)),
-                        adapter = drawerColumnsUnfoldedAdapter,
-                        step = 1,
-                        valueRange = 3..10,
-                    )
-                }
-                Item(
+                SliderPreference(
+                    label = stringResource(id = R.string.state_folded, stringResource(id = R.string.app_drawer_columns)),
+                    adapter = drawerColumnsAdapter,
+                    step = 1,
+                    valueRange = 3..10,
+                )
+                SliderPreference(
+                    label = stringResource(id = R.string.state_unfolded, stringResource(id = R.string.app_drawer_columns)),
+                    adapter = drawerColumnsUnfoldedAdapter,
+                    step = 1,
+                    valueRange = 3..10,
+                )
+                ExpandAndShrink(
                     visible = drawerColumnsAdapter.state.value > drawerColumnsUnfoldedAdapter.state.value,
                 ) {
                     WarningPreference(
@@ -255,14 +230,12 @@ fun AppDrawerPreferences(
                     )
                 }
             } else {
-                Item {
-                    SliderPreference(
-                        label = stringResource(id = R.string.app_drawer_columns),
-                        adapter = drawerColumnsAdapter,
-                        step = 1,
-                        valueRange = 3..10,
-                    )
-                }
+                                SliderPreference(
+                    label = stringResource(id = R.string.app_drawer_columns),
+                    adapter = drawerColumnsAdapter,
+                    step = 1,
+                    valueRange = 3..10,
+                )
             }
         }
 
@@ -279,37 +252,31 @@ fun AppDrawerPreferences(
         }
 
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_COLUMNS, scrollState) {
-                    SliderPreference(
-                        label = stringResource(id = R.string.app_drawer_columns),
-                        adapter = prefs2.drawerColumns.getAdapter(),
-                        step = 1,
-                        valueRange = 3..10,
-                    )
-                }
-            }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_ROW_HEIGHT, scrollState) {
-                    SliderPreference(
-                        adapter = prefs2.drawerCellHeightFactor.getAdapter(),
-                        label = stringResource(id = R.string.row_height_label),
-                        valueRange = 0.3F..1.5F,
-                        step = 0.1F,
-                        showAsPercentage = true,
-                    )
-                }
-            }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_INDENT, scrollState) {
+                        ScrollAnchor(ScrollKeys.DRAWER_COLUMNS, scrollState) {
                 SliderPreference(
-                    adapter = prefs2.drawerLeftRightMarginFactor.getAdapter(),
-                    label = stringResource(id = R.string.app_drawer_indent_label),
-                    valueRange = 0.0F..1.5F,
-                    step = 0.05F,
+                    label = stringResource(id = R.string.app_drawer_columns),
+                    adapter = prefs2.drawerColumns.getAdapter(),
+                    step = 1,
+                    valueRange = 3..10,
+                )
+            }
+                        ScrollAnchor(ScrollKeys.DRAWER_ROW_HEIGHT, scrollState) {
+                SliderPreference(
+                    adapter = prefs2.drawerCellHeightFactor.getAdapter(),
+                    label = stringResource(id = R.string.row_height_label),
+                    valueRange = 0.3F..1.5F,
+                    step = 0.1F,
                     showAsPercentage = true,
                 )
-                }
+            }
+                        ScrollAnchor(ScrollKeys.DRAWER_INDENT, scrollState) {
+            SliderPreference(
+                adapter = prefs2.drawerLeftRightMarginFactor.getAdapter(),
+                label = stringResource(id = R.string.app_drawer_indent_label),
+                valueRange = 0.0F..1.5F,
+                step = 0.05F,
+                showAsPercentage = true,
+            )
             }
             Item {
                 ScrollAnchor(ScrollKeys.DRAWER_TOP_PADDING, scrollState) {
@@ -322,28 +289,45 @@ fun AppDrawerPreferences(
                 )
                 }
             }
+            SliderPreference(
+                adapter = prefs2.drawerCellHeightFactor.getAdapter(),
+                label = stringResource(id = R.string.row_height_label),
+                valueRange = 0.3F..1.5F,
+                step = 0.1F,
+                showAsPercentage = true,
+            )
+            SliderPreference(
+                adapter = prefs2.drawerLeftRightMarginFactor.getAdapter(),
+                label = stringResource(id = R.string.app_drawer_indent_label),
+                valueRange = 0.0F..1.5F,
+                step = 0.05F,
+                showAsPercentage = true,
+            )
+            SliderPreference(
+                adapter = prefs2.drawerPaddingTopFactor.getAdapter(),
+                label = stringResource(id = R.string.top_padding_label),
+                valueRange = 1.0F..2.0F,
+                step = 0.05F,
+                showAsPercentage = true,
+            )
         }
 
         val showDrawerLabels = prefs2.showIconLabelsInDrawer.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.icons)) {
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_ICON_SIZE, scrollState) {
-                SliderPreference(
-                    label = stringResource(id = R.string.icon_sizes),
-                    adapter = prefs2.drawerIconSizeFactor.getAdapter(),
-                    step = 0.1f,
-                    valueRange = 0.5F..1.5F,
-                    showAsPercentage = true,
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_ICON_SIZE, scrollState) {
+            SliderPreference(
+                label = stringResource(id = R.string.icon_sizes),
+                adapter = prefs2.drawerIconSizeFactor.getAdapter(),
+                step = 0.1f,
+                valueRange = 0.5F..1.5F,
+                showAsPercentage = true,
+            )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_SHOW_LABELS, scrollState) {
-                SwitchPreference(
-                    adapter = showDrawerLabels,
-                    label = stringResource(id = R.string.show_labels),
-                )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_SHOW_LABELS, scrollState) {
+            SwitchPreference(
+                adapter = showDrawerLabels,
+                label = stringResource(id = R.string.show_labels),
+            )
             }
             Item(
                 "drawer_icon_label_size",
@@ -359,9 +343,8 @@ fun AppDrawerPreferences(
                 )
                 }
             }
-            Item(
-                "drawer_label_twoline",
-                showDrawerLabels.state.value,
+            ExpandAndShrink(
+                visible = showDrawerLabels.state.value,
             ) {
                 ScrollAnchor(ScrollKeys.DRAWER_TWO_LINE, scrollState) {
                 SwitchPreference(
@@ -373,22 +356,18 @@ fun AppDrawerPreferences(
         }
 
         PreferenceGroup(heading = stringResource(id = R.string.advanced)) {
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_REMEMBER, scrollState) {
-                    SwitchPreference(
-                        label = stringResource(id = R.string.pref_all_apps_remember_position_title),
-                        description = stringResource(id = R.string.pref_all_apps_remember_position_description),
-                        adapter = prefs2.rememberPosition.getAdapter(),
-                    )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_REMEMBER, scrollState) {
+                SwitchPreference(
+                    label = stringResource(id = R.string.pref_all_apps_remember_position_title),
+                    description = stringResource(id = R.string.pref_all_apps_remember_position_description),
+                    adapter = prefs2.rememberPosition.getAdapter(),
+                )
             }
-            Item {
-                ScrollAnchor(ScrollKeys.DRAWER_SCROLLBAR, scrollState) {
-                    SwitchPreference(
-                        label = stringResource(id = R.string.pref_all_apps_show_scrollbar_title),
-                        adapter = prefs2.showScrollbar.getAdapter(),
-                    )
-                }
+                        ScrollAnchor(ScrollKeys.DRAWER_SCROLLBAR, scrollState) {
+                SwitchPreference(
+                    label = stringResource(id = R.string.pref_all_apps_show_scrollbar_title),
+                    adapter = prefs2.showScrollbar.getAdapter(),
+                )
             }
         }
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
+import app.lawnchair.backup.ui.restoreNovaBackupOpener
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
@@ -46,6 +47,23 @@ fun BackupAndRestorePreference(
                 )
                 }
             }
+            NavigationActionPreference(
+                label = stringResource(R.string.create_backup),
+                subtitle = stringResource(R.string.create_backup_description),
+                destination = CreateBackup,
+            )
+            ClickablePreference(
+                label = stringResource(R.string.restore_backup),
+                subtitle = stringResource(R.string.restore_backup_description),
+                onClick = restoreBackupOpener(),
+            )
+        }
+        PreferenceGroup {
+            ClickablePreference(
+                label = stringResource(R.string.restore_nova_backup),
+                subtitle = stringResource(R.string.restore_nova_backup_description),
+                onClick = restoreNovaBackupOpener(),
+            )
         }
     }
 }

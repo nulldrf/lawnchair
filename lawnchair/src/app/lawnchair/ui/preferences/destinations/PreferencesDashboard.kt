@@ -1,3 +1,19 @@
+/*
+ * Copyright 2021, Lawnchair
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package app.lawnchair.ui.preferences.destinations
 
 import android.Manifest
@@ -51,6 +67,7 @@ import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -110,6 +127,7 @@ import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
+import app.lawnchair.ui.OverflowMenuGrouped
 import app.lawnchair.ui.preferences.components.AnnouncementPreference
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
 import app.lawnchair.ui.preferences.components.controls.PreferenceCategory
@@ -118,12 +136,19 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.ScrollTargetManager
+import app.lawnchair.ui.preferences.components.layout.ClickableIcon
+import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
+import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
+import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
+import app.lawnchair.ui.preferences.components.layout.ProvideDescriptionTextStyle
 import app.lawnchair.ui.preferences.data.liveinfo.SyncLiveInformation
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.navigation.About
 import app.lawnchair.ui.preferences.navigation.AppDrawer
 import app.lawnchair.ui.preferences.navigation.BackupAndRestore
 import app.lawnchair.ui.preferences.navigation.CreateBackup
+import app.lawnchair.ui.preferences.navigation.DebugMenu
 import app.lawnchair.ui.preferences.navigation.Dock
 import app.lawnchair.ui.preferences.navigation.ExperimentalFeatures
 import app.lawnchair.ui.preferences.navigation.Extras
@@ -939,6 +964,103 @@ fun PreferencesDashboard(
                 managedFilesChecked = wallpaperBlurAllFilesAccessState != FileAccessState.Denied,
                 onDismiss = { showWallpaperBlurPermissionDialog = false },
                 onPermissionRequest = { wallpaperBlurFileAccessManager.refresh() },
+        val deckLayout = prefs2.deckLayout.getAdapter()
+        PreferenceGroup {
+            PreferenceCategory(
+                label = stringResource(R.string.general_label),
+                description = stringResource(R.string.general_description),
+                iconResource = R.drawable.ic_general,
+                onNavigate = { onNavigate(General) },
+                isSelected = currentRoute is General,
+            )
+
+            PreferenceCategory(
+                label = stringResource(R.string.home_screen_label),
+                description = stringResource(R.string.home_screen_description),
+                iconResource = R.drawable.ic_home_screen,
+                onNavigate = { onNavigate(HomeScreen) },
+                isSelected = currentRoute is HomeScreen,
+            )
+
+            val isSmartspaceEnabled = prefs2.enableSmartspace.firstCached()
+            PreferenceCategory(
+                label = stringResource(id = R.string.smartspace_widget),
+                description = stringResource(R.string.smartspace_widget_description),
+                iconResource = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off,
+                onNavigate = { onNavigate(Smartspace) },
+                isSelected = currentRoute is Smartspace,
+            )
+
+            PreferenceCategory(
+                label = stringResource(R.string.dock_label),
+                description = stringResource(R.string.dock_description),
+                iconResource = R.drawable.ic_dock,
+                onNavigate = { onNavigate(Dock) },
+                isSelected = currentRoute is Dock,
+            )
+
+            ExpandAndShrink(
+                visible = !deckLayout.state.value,
+            ) {
+                PreferenceCategory(
+                    label = stringResource(R.string.app_drawer_label),
+                    description = stringResource(R.string.app_drawer_description),
+                    iconResource = R.drawable.ic_apps,
+                    onNavigate = { onNavigate(AppDrawer) },
+                    isSelected = currentRoute is AppDrawer,
+                )
+            }
+
+            PreferenceCategory(
+                label = stringResource(R.string.search_bar_label),
+                description = stringResource(R.string.drawer_search_description),
+                iconResource = R.drawable.ic_search,
+                onNavigate = { onNavigate(Search()) },
+                isSelected = currentRoute is Search,
+            )
+
+            PreferenceCategory(
+                label = stringResource(R.string.folders_label),
+                description = stringResource(R.string.folders_description),
+                iconResource = R.drawable.ic_folder,
+                onNavigate = { onNavigate(Folders) },
+                isSelected = currentRoute is Folders,
+            )
+
+            PreferenceCategory(
+                label = stringResource(id = R.string.gestures_label),
+                description = stringResource(R.string.gestures_description),
+                iconResource = R.drawable.ic_gestures,
+                onNavigate = { onNavigate(Gestures) },
+                isSelected = currentRoute is Gestures,
+            )
+
+            ExpandAndShrink(
+                visible = LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG,
+            ) {
+                PreferenceCategory(
+                    label = stringResource(id = R.string.quickstep_label),
+                    description = stringResource(id = R.string.quickstep_description),
+                    iconResource = R.drawable.ic_quickstep,
+                    onNavigate = { onNavigate(Quickstep) },
+                    isSelected = currentRoute is Quickstep,
+                )
+            }
+
+            PreferenceCategory(
+                label = stringResource(R.string.backup_and_restore_label),
+                description = stringResource(R.string.backup_and_restore_description),
+                iconResource = R.drawable.backup_restore,
+                onNavigate = { onNavigate(BackupAndRestore) },
+                isSelected = currentRoute is BackupAndRestore,
+            )
+
+            PreferenceCategory(
+                label = stringResource(R.string.about_label),
+                description = aboutDescrption,
+                iconResource = R.drawable.ic_about,
+                onNavigate = { onNavigate(About) },
+                isSelected = currentRoute is About,
             )
         }
     }
@@ -1143,6 +1265,7 @@ private fun SearchOverlay(
 }
 
 // ── Tap-to-activate search bar pill ──────────────────────────────────────────
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SettingsSearchBar(
     onActivate: () -> Unit,

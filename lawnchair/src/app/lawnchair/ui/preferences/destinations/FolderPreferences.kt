@@ -23,11 +23,6 @@ import androidx.compose.ui.res.stringResource
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
-import app.lawnchair.ui.preferences.components.layout.ScrollKeys
-import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
@@ -36,6 +31,9 @@ import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.navigation.GeneralIconShape
 import com.android.launcher3.R
 
@@ -49,7 +47,7 @@ fun FolderPreferences(
         modifier = modifier,
     ) {
         val context = LocalContext.current
-    val scrollState = rememberPreferenceScrollState()
+        val scrollState = rememberPreferenceScrollState()
         val prefs = preferenceManager()
         val prefs2 = preferenceManager2()
         val folderIconShapeAdapter = prefs2.folderShape.getAdapter()
@@ -58,77 +56,74 @@ fun FolderPreferences(
             ?.label?.invoke()
             ?: stringResource(id = R.string.custom)
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
-                        ScrollAnchor(ScrollKeys.FOLDER_SHAPE, scrollState) {
-            NavigationActionPreference(
-                label = stringResource(id = R.string.folder_shape_label),
-                destination = GeneralIconShape(ShapeRoute.FOLDER_SHAPE),
-                subtitle = folderIconShapeSubtitle,
-                endWidget = {
-                    IconShapePreview(iconShape = folderIconShapeAdapter.state.value)
-                },
-            )
+            ScrollAnchor(ScrollKeys.FOLDER_SHAPE, scrollState) {
+                NavigationActionPreference(
+                    label = stringResource(id = R.string.folder_shape_label),
+                    destination = GeneralIconShape(ShapeRoute.FOLDER_SHAPE),
+                    subtitle = folderIconShapeSubtitle,
+                    endWidget = {
+                        IconShapePreview(iconShape = folderIconShapeAdapter.state.value)
+                    },
+                )
             }
-                        ScrollAnchor(ScrollKeys.FOLDER_ICON_BG_COLOR, scrollState) {
+            ScrollAnchor(ScrollKeys.FOLDER_ICON_BG_COLOR, scrollState) {
                 ColorPreference(preference = prefs2.folderColor)
             }
-                        ScrollAnchor(ScrollKeys.FOLDER_PREVIEW_OPACITY, scrollState) {
-            SliderPreference(
-                label = stringResource(id = R.string.folder_preview_bg_opacity_label),
-                adapter = prefs2.folderPreviewBackgroundOpacity.getAdapter(),
-                step = 0.1F,
-                valueRange = 0F..1F,
-                showAsPercentage = true,
-            )
+            ScrollAnchor(ScrollKeys.FOLDER_PREVIEW_OPACITY, scrollState) {
+                SliderPreference(
+                    label = stringResource(id = R.string.folder_preview_bg_opacity_label),
+                    adapter = prefs2.folderPreviewBackgroundOpacity.getAdapter(),
+                    step = 0.1F,
+                    valueRange = 0F..1F,
+                    showAsPercentage = true,
+                )
             }
-                        ScrollAnchor(ScrollKeys.FOLDER_BG_OPACITY, scrollState) {
-            SliderPreference(
-                label = stringResource(id = R.string.folder_bg_opacity_label),
-                adapter = prefs2.folderBackgroundOpacity.getAdapter(),
-                step = 0.1F,
-                valueRange = 0F..1F,
-                showAsPercentage = true,
-            )
+            ScrollAnchor(ScrollKeys.FOLDER_BG_OPACITY, scrollState) {
+                SliderPreference(
+                    label = stringResource(id = R.string.folder_bg_opacity_label),
+                    adapter = prefs2.folderBackgroundOpacity.getAdapter(),
+                    step = 0.1F,
+                    valueRange = 0F..1F,
+                    showAsPercentage = true,
+                )
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {
-                        ScrollAnchor(ScrollKeys.FOLDER_MAX_COLUMNS, scrollState) {
-            SliderPreference(
-                label = stringResource(id = R.string.max_folder_columns),
-                adapter = prefs2.folderColumns.getAdapter(),
-                step = 1,
-                valueRange = 2..5,
-            )
+            ScrollAnchor(ScrollKeys.FOLDER_MAX_COLUMNS, scrollState) {
+                SliderPreference(
+                    label = stringResource(id = R.string.max_folder_columns),
+                    adapter = prefs2.folderColumns.getAdapter(),
+                    step = 1,
+                    valueRange = 2..5,
+                )
             }
-                        ScrollAnchor(ScrollKeys.FOLDER_MAX_ROWS, scrollState) {
-            SliderPreference(
-                label = stringResource(id = R.string.max_folder_rows),
-                adapter = prefs.folderRows.getAdapter(),
-                step = 1,
-                valueRange = 2..5,
-            )
+            ScrollAnchor(ScrollKeys.FOLDER_MAX_ROWS, scrollState) {
+                SliderPreference(
+                    label = stringResource(id = R.string.max_folder_rows),
+                    adapter = prefs.folderRows.getAdapter(),
+                    step = 1,
+                    valueRange = 2..5,
+                )
             }
         }
 
         val homeScreenLabelsAdapter = prefs2.showIconLabelsOnHomeScreenFolder.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.icons)) {
-                        ScrollAnchor(ScrollKeys.FOLDER_SHOW_LABELS, scrollState) {
-            SwitchPreference(
-                adapter = homeScreenLabelsAdapter,
-                label = stringResource(id = R.string.show_labels),
-            )
-            }
-            Item(
-                "label_size",
-                homeScreenLabelsAdapter.state.value,
-            ) {
-                ScrollAnchor(ScrollKeys.FOLDER_LABEL_SIZE, scrollState) {
-                SliderPreference(
-                    label = stringResource(id = R.string.label_size),
-                    adapter = prefs2.homeIconLabelFolderSizeFactor.getAdapter(),
-                    step = 0.1f,
-                    valueRange = 0.5F..1.5F,
-                    showAsPercentage = true,
+            ScrollAnchor(ScrollKeys.FOLDER_SHOW_LABELS, scrollState) {
+                SwitchPreference(
+                    adapter = homeScreenLabelsAdapter,
+                    label = stringResource(id = R.string.show_labels),
                 )
+            }
+            ExpandAndShrink(visible = homeScreenLabelsAdapter.state.value) {
+                ScrollAnchor(ScrollKeys.FOLDER_LABEL_SIZE, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.label_size),
+                        adapter = prefs2.homeIconLabelFolderSizeFactor.getAdapter(),
+                        step = 0.1f,
+                        valueRange = 0.5F..1.5F,
+                        showAsPercentage = true,
+                    )
                 }
             }
         }

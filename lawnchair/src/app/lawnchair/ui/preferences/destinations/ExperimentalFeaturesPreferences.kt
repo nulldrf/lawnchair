@@ -13,11 +13,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
-import app.lawnchair.ui.preferences.components.layout.ScrollKeys
-import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
@@ -26,6 +21,9 @@ import app.lawnchair.ui.preferences.components.controls.WarningPreference
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.util.FileAccessManager
 import app.lawnchair.util.FileAccessState
 import app.lawnchair.util.isGestureNavContractCompatible
@@ -65,39 +63,39 @@ fun ExperimentalFeaturesPreferences(
             modifier = Modifier,
             heading = stringResource(R.string.workspace_label),
         ) {
-                        ScrollAnchor(ScrollKeys.FONT_PICKER, scrollState) {
-            SwitchPreference(
-                adapter = prefs2.enableFontSelection.getAdapter(),
-                label = stringResource(id = R.string.font_picker_label),
-                description = stringResource(id = R.string.font_picker_description),
-            )
+            ScrollAnchor(ScrollKeys.FONT_PICKER, scrollState) {
+                SwitchPreference(
+                    adapter = prefs2.enableFontSelection.getAdapter(),
+                    label = stringResource(id = R.string.font_picker_label),
+                    description = stringResource(id = R.string.font_picker_description),
+                )
             }
-                        ScrollAnchor(ScrollKeys.MAX_GRID_SIZE, scrollState) {
-            SwitchPreference(
-                adapter = prefs.workspaceIncreaseMaxGridSize.getAdapter(),
-                label = stringResource(id = R.string.workspace_increase_max_grid_size_label),
-                description = stringResource(id = R.string.workspace_increase_max_grid_size_description),
-            )
+            ScrollAnchor(ScrollKeys.MAX_GRID_SIZE, scrollState) {
+                SwitchPreference(
+                    adapter = prefs.workspaceIncreaseMaxGridSize.getAdapter(),
+                    label = stringResource(id = R.string.workspace_increase_max_grid_size_label),
+                    description = stringResource(id = R.string.workspace_increase_max_grid_size_description),
+                )
             }
-                        ScrollAnchor(ScrollKeys.DECK_LAYOUT, scrollState) {
-            SwitchPreference(
-                adapter = prefs2.showDeckLayout.getAdapter(),
-                label = stringResource(R.string.show_deck_layout),
-                description = stringResource(R.string.show_deck_layout_description),
-            )
+            ScrollAnchor(ScrollKeys.DECK_LAYOUT, scrollState) {
+                SwitchPreference(
+                    adapter = prefs2.showDeckLayout.getAdapter(),
+                    label = stringResource(R.string.show_deck_layout),
+                    description = stringResource(R.string.show_deck_layout_description),
+                )
             }
-                        ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR, scrollState) {
-            SwitchPreference(
-                checked = hasPermission && enableWallpaperBlur.state.value,
-                onCheckedChange = {
-                    if (!hasPermission) {
-                        showPermissionDialog = true
-                    } else {
-                        enableWallpaperBlur.onChange(it)
-                    }
-                },
-                label = stringResource(id = R.string.wallpaper_blur),
-            )
+            ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR, scrollState) {
+                SwitchPreference(
+                    checked = hasPermission && enableWallpaperBlur.state.value,
+                    onCheckedChange = {
+                        if (!hasPermission) {
+                            showPermissionDialog = true
+                        } else {
+                            enableWallpaperBlur.onChange(it)
+                        }
+                    },
+                    label = stringResource(id = R.string.wallpaper_blur),
+                )
             }
 
             val canBlur = hasPermission && enableWallpaperBlur.state.value
@@ -142,26 +140,25 @@ fun ExperimentalFeaturesPreferences(
             heading = stringResource(R.string.internal_label),
             description = stringResource(R.string.internal_description),
         ) {
-                        ScrollAnchor(ScrollKeys.ALWAYS_RELOAD_ICONS, scrollState) {
-            SwitchPreference(
-                adapter = alwaysReloadIconsAdapter,
-                label = stringResource(id = R.string.always_reload_icons_label),
-                description = stringResource(id = R.string.always_reload_icons_description),
-            )
+            ScrollAnchor(ScrollKeys.ALWAYS_RELOAD_ICONS, scrollState) {
+                SwitchPreference(
+                    adapter = alwaysReloadIconsAdapter,
+                    label = stringResource(id = R.string.always_reload_icons_label),
+                    description = stringResource(id = R.string.always_reload_icons_description),
+                )
             }
-                        WarningPreference(stringResource(R.string.always_reload_icons_warning))
+            WarningPreference(stringResource(R.string.always_reload_icons_warning))
 
-                        ScrollAnchor(ScrollKeys.GNC, scrollState) {
-            SwitchPreference(
-                adapter = enableGncAdapter,
-                label = stringResource(id = R.string.gesturenavcontract_label),
-                description = stringResource(id = R.string.gesturenavcontract_description),
-                enabled = Utilities.ATLEAST_Q,
-            )
+            ScrollAnchor(ScrollKeys.GNC, scrollState) {
+                SwitchPreference(
+                    adapter = enableGncAdapter,
+                    label = stringResource(id = R.string.gesturenavcontract_label),
+                    description = stringResource(id = R.string.gesturenavcontract_description),
+                    enabled = Utilities.ATLEAST_Q,
+                )
             }
-            Item(
-                "gesturenavcontract_warning",
-                enableGncAdapter.state.value && !isGestureNavContractCompatible,
+            ExpandAndShrink(
+                visible = enableGncAdapter.state.value && !isGestureNavContractCompatible,
             ) {
                 WarningPreference(stringResource(R.string.gesturenavcontract_warning_incompatibility))
             }

@@ -20,10 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import app.lawnchair.preferences2.PreferenceManager2
-import com.patrykmichalik.opto.core.firstBlocking
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -63,7 +60,6 @@ fun <T> ReorderablePreferenceGroup(
     }
 
     val view = LocalView.current
-    val context = LocalContext.current
 
     Column(modifier) {
         PreferenceGroupHeading(
@@ -86,10 +82,6 @@ fun <T> ReorderablePreferenceGroup(
                     }
                 },
                 onMove = {
-                    isAnyDragging = true
-                    if (Utilities.ATLEAST_U &&
-                        PreferenceManager2.getInstance(context).hapticFeedback.firstBlocking()
-                    ) {
                     if (Utilities.ATLEAST_U) {
                         view.performHapticFeedback(HapticFeedbackConstantsCompat.SEGMENT_FREQUENT_TICK)
                     }

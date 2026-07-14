@@ -1,7 +1,6 @@
 package app.lawnchair.ui.preferences.components.search
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,16 +79,11 @@ fun DockSearchPreference(
         if (hotseatEnabled) {
             Column {
                 PreferenceGroup {
-                    Item {
-                        ScrollAnchor(ScrollKeys.DOCK_SEARCH_MODE, scrollState) {
+                    ScrollAnchor(ScrollKeys.DOCK_SEARCH_MODE, scrollState) {
                         HotseatModePreference(
                             adapter = hotseatModeAdapter,
                         )
-                        }
                     }
-                    HotseatModePreference(
-                        adapter = hotseatModeAdapter,
-                    )
                 }
                 ExpandAndShrink(visible = hotseatModeAdapter.state.value != DisabledHotseat) {
                     Column {
@@ -107,8 +102,7 @@ fun DockSearchPreference(
                         PreferenceGroup(
                             heading = stringResource(R.string.search_bar_settings),
                         ) {
-                            Item {
-                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_PROVIDER, scrollState) {
+                            ScrollAnchor(ScrollKeys.DOCK_SEARCH_PROVIDER, scrollState) {
                                 NavigationActionPreference(
                                     label = stringResource(R.string.search_provider),
                                     destination = DockSearchProvider,
@@ -118,31 +112,18 @@ fun DockSearchPreference(
                                             .name,
                                     ),
                                 )
-                                }
                             }
-                            NavigationActionPreference(
-                                label = stringResource(R.string.search_provider),
-                                destination = DockSearchProvider,
-                                subtitle = stringResource(
-                                    id = QsbSearchProvider.values()
-                                        .first { it == hotseatQsbProviderAdapter }
-                                        .name,
-                                ),
-                            )
                         }
                         PreferenceGroup(
                             heading = stringResource(R.string.style),
                         ) {
-                            Item {
-                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_ACCENT, scrollState) {
+                            ScrollAnchor(ScrollKeys.DOCK_SEARCH_ACCENT, scrollState) {
                                 SwitchPreference(
                                     adapter = themeQsbAdapter,
                                     label = stringResource(id = R.string.apply_accent_color_label),
                                 )
-                                }
                             }
-                            Item {
-                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_RADIUS, scrollState) {
+                            ScrollAnchor(ScrollKeys.DOCK_SEARCH_RADIUS, scrollState) {
                                 SliderPreference(
                                     label = stringResource(id = R.string.corner_radius_label),
                                     adapter = qsbCornerAdapter,
@@ -150,10 +131,8 @@ fun DockSearchPreference(
                                     valueRange = 0F..1F,
                                     showAsPercentage = true,
                                 )
-                                }
                             }
-                            Item {
-                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_OPACITY, scrollState) {
+                            ScrollAnchor(ScrollKeys.DOCK_SEARCH_OPACITY, scrollState) {
                                 SliderPreference(
                                     label = stringResource(id = R.string.qsb_hotseat_background_transparency),
                                     adapter = qsbAlphaAdapter,
@@ -161,10 +140,8 @@ fun DockSearchPreference(
                                     valueRange = 0..100,
                                     showUnit = "%",
                                 )
-                                }
                             }
-                            Item {
-                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_STROKE_WIDTH, scrollState) {
+                            ScrollAnchor(ScrollKeys.DOCK_SEARCH_STROKE_WIDTH, scrollState) {
                                 SliderPreference(
                                     label = stringResource(id = R.string.qsb_hotseat_stroke_width),
                                     adapter = qsbHotseatStrokeWidth,
@@ -172,33 +149,7 @@ fun DockSearchPreference(
                                     valueRange = 0f..10f,
                                     showUnit = "vw",
                                 )
-                                }
                             }
-                            SwitchPreference(
-                                adapter = themeQsbAdapter,
-                                label = stringResource(id = R.string.apply_accent_color_label),
-                            )
-                            SliderPreference(
-                                label = stringResource(id = R.string.corner_radius_label),
-                                adapter = qsbCornerAdapter,
-                                step = 0.05F,
-                                valueRange = 0F..1F,
-                                showAsPercentage = true,
-                            )
-                            SliderPreference(
-                                label = stringResource(id = R.string.qsb_hotseat_background_transparency),
-                                adapter = qsbAlphaAdapter,
-                                step = 5,
-                                valueRange = 0..100,
-                                showUnit = "%",
-                            )
-                            SliderPreference(
-                                label = stringResource(id = R.string.qsb_hotseat_stroke_width),
-                                adapter = qsbHotseatStrokeWidth,
-                                step = 1f,
-                                valueRange = 0f..10f,
-                                showUnit = "vw",
-                            )
                             if (qsbHotseatStrokeWidth.state.value > 0f) {
                                 ColorPreference(preference = prefs2.strokeColorStyle)
                             }

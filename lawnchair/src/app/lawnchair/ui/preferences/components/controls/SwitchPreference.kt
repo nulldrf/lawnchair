@@ -44,9 +44,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.theme.LawnchairTheme
 import app.lawnchair.ui.util.preview.PreferenceGroupPreviewContainer
 import app.lawnchair.ui.util.preview.PreviewLawnchair
-import app.lawnchair.preferences2.preferenceManager2
 import com.android.launcher3.util.MSDLPlayerWrapper
-import com.patrykmichalik.opto.core.firstBlocking
 import com.google.android.msdl.data.model.MSDLToken
 
 @Composable
@@ -85,14 +83,10 @@ fun SwitchPreference(
     onClick: (() -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val context = LocalContext.current
-    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
-    val prefs2 = preferenceManager2()
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
 
     val wrappedOnCheckedChange: (Boolean) -> Unit = { newValue ->
-        if (prefs2.hapticFeedback.firstBlocking()) {
-            mMSDLPlayerWrapper.playToken(if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF)
-        }
+        mMSDLPlayerWrapper.playToken(if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF)
         onCheckedChange(newValue)
     }
 

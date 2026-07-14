@@ -109,21 +109,6 @@ fun MainSwitchPreference(
             checkedIconColor = MaterialTheme.colorScheme.primary,
         )
 
-        PreferenceTemplate(
-            modifier = Modifier
-                .clickable(
-                    enabled = enabled,
-                    indication = ripple(),
-                    interactionSource = interactionSource,
-                ) {
-                    onCheckedChange(!checked)
-                },
-            contentModifier = Modifier
-                .fillMaxHeight()
-                .padding(vertical = 24.dp)
-                .padding(start = 16.dp),
-            title = { Text(text = label, style = MaterialTheme.typography.titleMedium) },
-            endWidget = {
     Column(
         modifier.padding(horizontal = contentPadding),
     ) {

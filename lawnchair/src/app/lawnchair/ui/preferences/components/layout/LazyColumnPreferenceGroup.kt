@@ -18,12 +18,13 @@ package app.lawnchair.ui.preferences.components.layout
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -35,10 +36,14 @@ fun LazyListScope.preferenceGroupItems(
     count: Int,
     isFirstChild: Boolean,
     showDividers: Boolean = true,
-    heading: @Composable (() -> String)? = null,
+    heading:
+    @Composable()
+    (() -> String)? = null,
     key: ((index: Int) -> Any)? = null,
     contentType: (index: Int) -> Any? = { null },
-    itemContent: @Composable (LazyItemScope.(index: Int) -> Unit),
+    itemContent:
+    @Composable()
+    (LazyItemScope.(index: Int) -> Unit),
 ) {
     item {
         if (!isFirstChild) {
@@ -46,17 +51,6 @@ fun LazyListScope.preferenceGroupItems(
         }
         PreferenceGroupHeading(heading?.let { it() })
     }
-    items(count, key, contentType) { index ->
-        // 4dp gap between items — matches Arrangement.spacedBy(4.dp) used in
-        // PreferenceGroup so the spacing is consistent across the settings UI.
-        if (showDividers && index > 0) {
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-        PreferenceGroupItem(
-            cutTop = index > 0,
-            cutBottom = index < count - 1,
-        ) {
-            itemContent(index)
     items(count, key, contentType) {
         PreferenceGroupItem(cutTop = it > 0, cutBottom = it < count - 1) {
             Column {
@@ -77,10 +71,14 @@ inline fun <T> LazyListScope.preferenceGroupItems(
     items: List<T>,
     isFirstChild: Boolean,
     showDividers: Boolean = true,
-    noinline heading: @Composable (() -> String)? = null,
+    noinline heading:
+    @Composable()
+    (() -> String)? = null,
     noinline key: ((index: Int, item: T) -> Any)? = null,
     noinline contentType: (index: Int) -> Any? = { null },
-    crossinline itemContent: @Composable (LazyItemScope.(index: Int, item: T) -> Unit),
+    crossinline itemContent:
+    @Composable()
+    (LazyItemScope.(index: Int, item: T) -> Unit),
 ) {
     preferenceGroupItems(
         items.size,
@@ -101,12 +99,7 @@ fun PreferenceGroupItem(
     cutBottom: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    // Large corner (28dp) on exposed ends, small corner (4dp) on inner joins —
-    // matches preferenceGroupItemShape(largeCorner=24dp, smallCorner=4dp) used
-    // by PreferenceGroup so all card groups look identical.
     val shape = remember(cutTop, cutBottom) {
-        val top = if (cutTop) 4.dp else 28.dp
-        val bottom = if (cutBottom) 4.dp else 28.dp
         val top = if (cutTop) 0.dp else 16.dp
         val bottom = if (cutBottom) 0.dp else 16.dp
         RoundedCornerShape(top, top, bottom, bottom)

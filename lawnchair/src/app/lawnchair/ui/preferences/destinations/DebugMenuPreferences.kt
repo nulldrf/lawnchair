@@ -15,7 +15,6 @@ import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.preferenceManager2
-import app.lawnchair.settings.ui.LawnchairSettingsActivity
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
@@ -27,6 +26,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.data.liveinfo.model.LiveInformation
 import app.lawnchair.ui.preferences.navigation.FeatureFlags
+import com.android.launcher3.settings.SettingsActivity
 import com.android.launcher3.settings.SettingsActivity.DEVELOPER_OPTIONS_KEY
 import com.android.launcher3.settings.SettingsActivity.EXTRA_FRAGMENT_HIGHLIGHT_KEY
 import com.android.systemui.shared.system.BlurUtils
@@ -58,11 +58,11 @@ fun DebugMenuPreferences(
     ) {
         MainSwitchPreference(adapter = enableDebug, label = "Show debug menu") {
             PreferenceGroup {
-                                ClickablePreference(
+                ClickablePreference(
                     label = "Feature flags (Views)",
                     onClick = {
                         try {
-                            Intent(context, LawnchairSettingsActivity::class.java)
+                            Intent(context, SettingsActivity::class.java)
                                 .putExtra(
                                     EXTRA_FRAGMENT_HIGHLIGHT_KEY,
                                     DEVELOPER_OPTIONS_KEY,
@@ -78,17 +78,17 @@ fun DebugMenuPreferences(
                         }
                     },
                 )
-                                ClickablePreference(
+                ClickablePreference(
                     label = "Feature flags (Compose)",
                     onClick = {
                         navController.navigate(FeatureFlags)
                     },
                 )
-                                ClickablePreference(
+                ClickablePreference(
                     label = "Crash launcher",
                     onClick = { throw RuntimeException("User triggered crash") },
                 )
-                                ClickablePreference(
+                ClickablePreference(
                     label = "Reset live information",
                     onClick = {
                         runBlocking {

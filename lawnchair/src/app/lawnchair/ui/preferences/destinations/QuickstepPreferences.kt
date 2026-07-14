@@ -89,11 +89,7 @@ fun QuickstepPreferences(
                 adapter = prefs.recentsTranslucentBackground.getAdapter(),
                 label = stringResource(id = R.string.translucent_background),
             )
-            }
-            Item(
-                key = "recents_translucent_background_alpha",
-                visible = recentsTranslucentBackground,
-            ) {
+            ExpandAndShrink(visible = recentsTranslucentBackground) {
                 SliderPreference(
                     adapter = prefs.recentsTranslucentBackgroundAlpha.getAdapter(),
                     label = stringResource(id = R.string.translucent_background_alpha),
@@ -120,11 +116,7 @@ fun QuickstepPreferences(
                 adapter = prefs.overrideWindowCornerRadius.getAdapter(),
                 label = stringResource(id = R.string.override_window_corner_radius_label),
             )
-            }
-            Item(
-                "window_corner_radius",
-                overrideWindowCornerRadius,
-            ) {
+            ExpandAndShrink(visible = overrideWindowCornerRadius) {
                 SliderPreference(
                     label = stringResource(id = R.string.window_corner_radius_label),
                     adapter = prefs.windowCornerRadius.getAdapter(),
@@ -143,7 +135,6 @@ fun QuickstepPreferences(
                     adapter = prefs2.enableTaskbarOnPhone.getAdapter(),
                     label = stringResource(id = R.string.enable_taskbar_experimental),
                 )
-                }
             }
         }
     }

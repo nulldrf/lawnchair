@@ -38,6 +38,7 @@ import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
+import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.FontPreference
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.NotificationDotsPreference

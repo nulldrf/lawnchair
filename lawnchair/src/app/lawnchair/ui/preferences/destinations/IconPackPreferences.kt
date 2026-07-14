@@ -145,41 +145,37 @@ fun IconPackPreferences(
 
         // ── Icon pack selection ──────────────────────────────────────────────
         PreferenceGroup(heading = stringResource(id = R.string.icon_pack)) {
-            Item {
-                IconPackGrid(adapter = iconPackAdapter)
-            }
+            IconPackGrid(adapter = iconPackAdapter)
         }
 
         // ── Themed icons ─────────────────────────────────────────────────────
         PreferenceGroup(heading = stringResource(id = R.string.themed_icon_title)) {
-            Item {
-                ListPreference(
-                    enabled = themedIconsAvailable,
-                    label = stringResource(id = R.string.themed_icon_title),
-                    entries = ThemedIconsState.entries.map {
-                        ListPreferenceEntry(
-                            value = it,
-                            label = { stringResource(id = it.labelResourceId) },
-                        )
-                    },
-                    value = ThemedIconsState.getForSettings(
-                        themedIcons = themedIconsEnabled,
-                        drawerThemedIcons = drawerThemedIconsEnabled,
-                    ),
-                    onValueChange = {
-                        themedIconsAdapter.onChange(newValue = it.themedIcons)
-                        drawerThemedIconsAdapter.onChange(newValue = it.drawerThemedIcons)
-                        iconPackAdapter.onChange(newValue = iconPackAdapter.state.value)
-                        themedIconPackAdapter.onChange(newValue = themedIconPackAdapter.state.value)
-                    },
-                    description = if (!themedIconsAvailable) {
-                        stringResource(id = R.string.lawnicons_not_installed_description)
-                    } else {
-                        null
-                    },
-                )
-            }
-            Item(visible = themedIconsEnabled) {
+            ListPreference(
+                enabled = themedIconsAvailable,
+                label = stringResource(id = R.string.themed_icon_title),
+                entries = ThemedIconsState.entries.map {
+                    ListPreferenceEntry(
+                        value = it,
+                        label = { stringResource(id = it.labelResourceId) },
+                    )
+                },
+                value = ThemedIconsState.getForSettings(
+                    themedIcons = themedIconsEnabled,
+                    drawerThemedIcons = drawerThemedIconsEnabled,
+                ),
+                onValueChange = {
+                    themedIconsAdapter.onChange(newValue = it.themedIcons)
+                    drawerThemedIconsAdapter.onChange(newValue = it.drawerThemedIcons)
+                    iconPackAdapter.onChange(newValue = iconPackAdapter.state.value)
+                    themedIconPackAdapter.onChange(newValue = themedIconPackAdapter.state.value)
+                },
+                description = if (!themedIconsAvailable) {
+                    stringResource(id = R.string.lawnicons_not_installed_description)
+                } else {
+                    null
+                },
+            )
+            ExpandAndShrink(visible = themedIconsEnabled) {
                 SwitchPreference(
                     label = stringResource(id = R.string.force_monochrome_label),
                     description = stringResource(id = R.string.force_monochrome_description),
@@ -192,9 +188,7 @@ fun IconPackPreferences(
         // and at least one themed icon pack is installed.
         if (themedIconsAvailable && themedIconsEnabled) {
             PreferenceGroup(heading = stringResource(id = R.string.themed_icon_pack)) {
-                Item {
-                    IconPackGrid(adapter = themedIconPackAdapter)
-                }
+                IconPackGrid(adapter = themedIconPackAdapter)
             }
         }
     }

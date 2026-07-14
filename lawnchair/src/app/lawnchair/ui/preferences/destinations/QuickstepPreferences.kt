@@ -23,8 +23,6 @@ import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
@@ -135,6 +133,7 @@ fun QuickstepPreferences(
                     adapter = prefs2.enableTaskbarOnPhone.getAdapter(),
                     label = stringResource(id = R.string.enable_taskbar_experimental),
                 )
+				}
             }
         }
     }

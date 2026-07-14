@@ -364,12 +364,10 @@ private fun ShapeGridContent(
     val navController = LocalNavController.current
 
     PreferenceGroup(heading = stringResource(id = R.string.presets)) {
-        Item {
-            ShapeGrid(
-                entries = entries,
-                shapeAdapter = shapeAdapter,
-            )
-        }
+        ShapeGrid(
+            entries = entries,
+            shapeAdapter = shapeAdapter,
+        )
     }
 
     // Custom shape option — shown after the presets grid.
@@ -377,37 +375,31 @@ private fun ShapeGridContent(
     // create/edit button, matching the visual language of the presets grid.
     if (customIconShape != null) {
         PreferenceGroup(heading = stringResource(id = R.string.custom)) {
-            Item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    ShapeCard(
-                        iconShape = customIconShape,
-                        label = stringResource(id = R.string.custom),
-                        selected = IconShape.isCustomShape(shapeAdapter.state.value),
-                        modifier = Modifier.size(80.dp),
-                        onClick = { shapeAdapter.onChange(customIconShape) },
-                    )
-                }
-            }
-            Item {
-                ModifyCustomIconShapePreference(
-                    customIconShape = customIconShape,
-                    currentTab = currentTab,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ShapeCard(
+                    iconShape = customIconShape,
+                    label = stringResource(id = R.string.custom),
+                    selected = IconShape.isCustomShape(shapeAdapter.state.value),
+                    modifier = Modifier.size(80.dp),
+                    onClick = { shapeAdapter.onChange(customIconShape) },
                 )
             }
+            ModifyCustomIconShapePreference(
+                customIconShape = customIconShape,
+                currentTab = currentTab,
+            )
         }
     } else {
         PreferenceGroup(heading = stringResource(id = R.string.custom)) {
-            Item {
-                ModifyCustomIconShapePreference(
-                    customIconShape = null,
-                    currentTab = currentTab,
-                )
-            }
+            ModifyCustomIconShapePreference(
+                customIconShape = null,
+                currentTab = currentTab,
+            )
         }
     }
 }

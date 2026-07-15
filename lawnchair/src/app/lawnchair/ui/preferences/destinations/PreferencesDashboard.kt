@@ -1149,6 +1149,7 @@ private fun SettingsSearchBar(
 }
 
 // ── Set default launcher card ─────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -1162,6 +1163,7 @@ fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
                     .let { context.startActivity(it) }
                 (context as? Activity)?.finish()
             },
+        shapes = ListItemDefaults.shapes().copy(shape = MaterialTheme.shapes.large),
         colors = ListItemDefaults.segmentedColors(
             containerColor = MaterialTheme.colorScheme.primary,
         ),

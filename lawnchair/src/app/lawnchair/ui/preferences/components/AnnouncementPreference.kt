@@ -186,6 +186,7 @@ private fun AnnouncementItemContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AnnouncementPreferenceItemContent(
     text: String,
@@ -208,6 +209,7 @@ private fun AnnouncementPreferenceItemContent(
                     }
                 }
             },
+        shapes = ListItemDefaults.shapes().copy(shape = MaterialTheme.shapes.large),
         colors = ListItemDefaults.segmentedColors(
             containerColor = MaterialTheme.colorScheme.primary,
         ),

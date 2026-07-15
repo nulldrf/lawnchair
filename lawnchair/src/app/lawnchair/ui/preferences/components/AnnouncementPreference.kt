@@ -12,11 +12,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -149,7 +148,6 @@ private fun AnnouncementItemContent(
                     onDragEnd = {
                         val width = itemWidth.value.toFloat()
                         if (abs(offsetX.value) > width * 0.35f) {
-                            // Crossed threshold — fly off screen then dismiss
                             coroutineScope.launch {
                                 val target = if (offsetX.value > 0) width else -width
                                 offsetX.animateTo(
@@ -162,7 +160,6 @@ private fun AnnouncementItemContent(
                                 onClose()
                             }
                         } else {
-                            // Didn't cross threshold — spring back
                             coroutineScope.launch {
                                 offsetX.animateTo(
                                     targetValue = 0f,
@@ -180,17 +177,12 @@ private fun AnnouncementItemContent(
                 )
             },
     ) {
-        Surface(
+        AnnouncementPreferenceItemContent(
+            text = text,
+            url = url,
+            icon = icon,
             modifier = Modifier.padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.primary,
-        ) {
-            AnnouncementPreferenceItemContent(
-                text = text,
-                url = url,
-                icon = icon,
-            )
-        }
+        )
     }
 }
 
@@ -216,6 +208,9 @@ private fun AnnouncementPreferenceItemContent(
                     }
                 }
             },
+        colors = ListItemDefaults.segmentedColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+        ),
         title = {},
         description = {
             Text(

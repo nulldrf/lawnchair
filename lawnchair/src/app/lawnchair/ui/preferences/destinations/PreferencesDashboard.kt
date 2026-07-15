@@ -68,6 +68,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -1151,35 +1152,35 @@ private fun SettingsSearchBar(
 @Composable
 fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    Surface(
-        modifier = modifier.padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primary,
-    ) {
-        PreferenceTemplate(
-            modifier = Modifier.fillMaxWidth().clickable {
+    PreferenceTemplate(
+        modifier = modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clickable {
                 Intent(Settings.ACTION_HOME_SETTINGS)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .let { context.startActivity(it) }
                 (context as? Activity)?.finish()
             },
-            title = {},
-            description = {
-                Text(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = stringResource(id = R.string.set_default_launcher_tip),
-                    color = MaterialTheme.colorScheme.background,
-                )
-            },
-            startWidget = {
-                Icon(
-                    imageVector = Icons.Rounded.TipsAndUpdates,
-                    tint = MaterialTheme.colorScheme.background,
-                    contentDescription = null,
-                )
-            },
-        )
-    }
+        colors = ListItemDefaults.segmentedColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+        ),
+        title = {},
+        description = {
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = stringResource(id = R.string.set_default_launcher_tip),
+                color = MaterialTheme.colorScheme.background,
+            )
+        },
+        startWidget = {
+            Icon(
+                imageVector = Icons.Rounded.TipsAndUpdates,
+                tint = MaterialTheme.colorScheme.background,
+                contentDescription = null,
+            )
+        },
+    )
 }
 
 @Composable

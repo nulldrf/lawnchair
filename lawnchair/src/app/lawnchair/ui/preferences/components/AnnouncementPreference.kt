@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -210,7 +211,7 @@ private fun AnnouncementPreferenceItemContent(
                     }
                 }
             },
-        shapes = ListItemDefaults.shapes().copy(shape = MaterialTheme.shapes.large),
+        shapes = ListItemDefaults.shapes().copy(shape = RoundedCornerShape(28.dp)),
         colors = ListItemDefaults.segmentedColors(
             containerColor = MaterialTheme.colorScheme.primary,
         ),

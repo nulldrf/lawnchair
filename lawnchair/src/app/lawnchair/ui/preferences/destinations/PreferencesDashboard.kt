@@ -1163,7 +1163,7 @@ fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
                     .let { context.startActivity(it) }
                 (context as? Activity)?.finish()
             },
-        shapes = ListItemDefaults.shapes().copy(shape = MaterialTheme.shapes.large),
+        shapes = ListItemDefaults.shapes().copy(shape = RoundedCornerShape(28.dp)),
         colors = ListItemDefaults.segmentedColors(
             containerColor = MaterialTheme.colorScheme.primary,
         ),

@@ -47,6 +47,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -920,6 +921,7 @@ fun PreferencesDashboard(
 }
 
 // ── Full-screen search overlay ────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SearchOverlay(
     query: String,
@@ -1050,7 +1052,16 @@ private fun SearchOverlay(
                     )
                 }
                 else -> {
-                    LazyColumn {
+                    // Match PreferenceGroup's own margins/spacing (see
+                    // PreferenceGroup.kt: Column(Modifier.padding(horizontal = 16.dp),
+                    // verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)))
+                    // so search-result rows get the same side margins and gap as every
+                    // other segmented-card list in Settings, instead of stretching
+                    // edge-to-edge with zero spacing.
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+                    ) {
                         items(filtered.size) { idx ->
                             val entry = filtered[idx]
                             val toggle = entry.toggle

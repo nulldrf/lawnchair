@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -222,6 +222,14 @@ fun rememberPreferenceScrollState(): PreferenceScrollState {
  *    has settled (~800ms after mount), so the user can see which setting was
  *    navigated to.  Uses [MaterialTheme.colorScheme.primary] so it respects
  *    the current dynamic-color theme in both light and dark mode.
+ *
+ *    The flash is painted via [Modifier.drawWithContent] — content is drawn
+ *    first, then the tint on top — instead of [Modifier.drawBehind]. Preference
+ *    rows now render through M3's SegmentedListItem (see PreferenceTemplate),
+ *    which paints its own opaque container color. drawBehind paints *before*
+ *    the child, so the flash would end up hidden underneath that opaque card
+ *    and never be visible. Drawing on top keeps it visible regardless of the
+ *    row's own background.
  */
 @Composable
 fun ScrollAnchor(
@@ -254,7 +262,11 @@ fun ScrollAnchor(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .drawBehind {
+            .drawWithContent {
+                // Draw the row (its own opaque segmented-card background and
+                // all) first, then tint on top — so the flash is always
+                // visible, never hidden underneath the card.
+                drawContent()
                 if (alpha.value > 0f) {
                     drawRect(color = primaryColor, alpha = alpha.value * 0.18f)
                 }

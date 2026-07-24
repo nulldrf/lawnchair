@@ -98,7 +98,7 @@ private val SeamCorner = 4.dp
 // Corner radius while pressed — matches the "pill" press-morph language every
 // other SegmentedListItem in this app already uses (see MainSwitchPreference's
 // pressedShape = CircleShape; 28.dp reads as fully rounded on a normal-height row).
-private val PressedCorner = 28.dp
+private val PressedCorner = ExposedCorner
 
 /**
  * A single row inside a continuous, seamed preference "card": rounded at

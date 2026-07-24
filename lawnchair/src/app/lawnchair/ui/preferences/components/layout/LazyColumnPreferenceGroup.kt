@@ -16,21 +16,27 @@
 
 package app.lawnchair.ui.preferences.components.layout
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 fun LazyListScope.preferenceGroupItems(
     count: Int,
     isFirstChild: Boolean,
@@ -82,7 +88,34 @@ inline fun <T> LazyListScope.preferenceGroupItems(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+// Corner radius at an exposed (non-cut) end of the continuous card, and at an
+// inner seam where two rows in the same group meet.
+private val ExposedCorner = 16.dp
+private val SeamCorner = 4.dp
+
+// Corner radius while pressed — matches the "pill" press-morph language every
+// other SegmentedListItem in this app already uses (see MainSwitchPreference's
+// pressedShape = CircleShape; 28.dp reads as fully rounded on a normal-height row).
+private val PressedCorner = 28.dp
+
+/**
+ * A single row inside a continuous, seamed preference "card": rounded at
+ * group-exposed ends, square at inner seams — matching [PreferenceGroup]'s
+ * card language for lazy-list contexts.
+ *
+ * Background/color come from here (unlike a standalone [PreferenceTemplate],
+ * which is transparent and expects a parent to paint the card), since a
+ * continuous card's background must be drawn once per row, not per group.
+ *
+ * Press feedback uses [detectTapGestures]'s `onPress` — the standard idiom
+ * for observing press state on a container without stealing the gesture from
+ * a nested clickable: `onPress` never consumes the pointer change, and
+ * [androidx.compose.foundation.gestures.PressGestureScope.tryAwaitRelease]
+ * correctly cooperates with ancestor scrollables (it returns false and we
+ * reset [pressed] if the LazyColumn ends up claiming the gesture as a scroll
+ * instead of a tap), unlike a raw Initial-pass-only observer which doesn't
+ * participate in that arbitration and can silently never fire.
+ */
 @Composable
 fun PreferenceGroupItem(
     modifier: Modifier = Modifier,
@@ -90,28 +123,39 @@ fun PreferenceGroupItem(
     cutBottom: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    // Map the cutTop/cutBottom boundary flags onto a representative (index, count)
-    // pair. ListItemDefaults.segmentedShapes only cares about first/middle/last/
-    // single-item status, not the literal count, so any pair with the same
-    // boundary status produces an identical shape — this keeps every call site
-    // (About.kt, ChangesDialog.kt, FontSelectionPreference.kt, and the bulk
-    // preferenceGroupItems() helper above) visually consistent with the rest of
-    // the segmented-list system without needing to thread real index/count
-    // through every caller.
-    val (index, count) = when {
-        !cutTop && !cutBottom -> 0 to 1 // standalone item
-        !cutTop && cutBottom -> 0 to 2 // first of a group
-        cutTop && !cutBottom -> 1 to 2 // last of a group
-        else -> 1 to 3 // middle of a group
-    }
-    val shapes = ListItemDefaults.segmentedShapes(index = index, count = count)
-    val colors = ListItemDefaults.segmentedColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    var pressed by remember { mutableStateOf(false) }
+
+    val restingTop = if (cutTop) SeamCorner else ExposedCorner
+    val restingBottom = if (cutBottom) SeamCorner else ExposedCorner
+
+    val topCorner by animateDpAsState(
+        targetValue = if (pressed) PressedCorner else restingTop,
+        label = "preferenceGroupItemTopCorner",
     )
+    val bottomCorner by animateDpAsState(
+        targetValue = if (pressed) PressedCorner else restingBottom,
+        label = "preferenceGroupItemBottomCorner",
+    )
+
     Surface(
-        modifier = modifier.padding(horizontal = 16.dp),
-        shape = shapes.shape,
-        color = colors.containerColor,
+        modifier = modifier
+            .padding(horizontal = 16.dp)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        tryAwaitRelease()
+                        pressed = false
+                    },
+                )
+            },
+        shape = RoundedCornerShape(
+            topStart = topCorner,
+            topEnd = topCorner,
+            bottomStart = bottomCorner,
+            bottomEnd = bottomCorner,
+        ),
+        color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         content()
     }

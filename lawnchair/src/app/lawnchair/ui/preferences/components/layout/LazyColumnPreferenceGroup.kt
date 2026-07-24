@@ -17,7 +17,8 @@
 package app.lawnchair.ui.preferences.components.layout
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 
@@ -141,13 +143,26 @@ fun PreferenceGroupItem(
         modifier = modifier
             .padding(horizontal = 16.dp)
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        pressed = true
-                        tryAwaitRelease()
-                        pressed = false
-                    },
-                )
+                awaitEachGesture {
+                    // requireUnconsumed = false + Final pass: the content()
+                    // row's own clickable (e.g. ContributorRow, AppItem) runs
+                    // on the default Main pass and consumes the down there —
+                    // Main resolves child-before-parent, so by the time this
+                    // ancestor node would see the event on Main, it's already
+                    // consumed and awaitFirstDown()'s default
+                    // requireUnconsumed = true silently ignores it forever.
+                    // Final runs after Main has resolved, and passing
+                    // requireUnconsumed = false means we observe the down
+                    // regardless of who already consumed it — purely passive,
+                    // we never call change.consume() ourselves, so the child's
+                    // real click handling is completely unaffected.
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+                    pressed = true
+                    do {
+                        val event = awaitPointerEvent(pass = PointerEventPass.Final)
+                    } while (event.changes.any { it.pressed })
+                    pressed = false
+                }
             },
         shape = RoundedCornerShape(
             topStart = topCorner,

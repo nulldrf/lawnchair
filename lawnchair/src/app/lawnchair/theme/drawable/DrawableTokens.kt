@@ -7,6 +7,7 @@ import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
 import androidx.appcompat.content.res.AppCompatResources
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.theme.color.tokens.AllAppsTabColors
 import app.lawnchair.theme.color.tokens.ColorTokens
 import com.android.launcher3.R

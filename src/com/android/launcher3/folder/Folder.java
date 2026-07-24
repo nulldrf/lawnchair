@@ -138,7 +138,6 @@ import java.util.stream.Stream;
 
 import com.patrykmichalik.opto.core.PreferenceExtensionsKt;
 import app.lawnchair.preferences2.PreferenceManager2;
-import app.lawnchair.theme.ThemeProvider;
 import app.lawnchair.theme.color.ColorOption;
 import app.lawnchair.theme.color.tokens.ColorTokens;
 import app.lawnchair.theme.drawable.DrawableTokens;
@@ -296,13 +295,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     private @NonNull GradientDrawable mBackground;
 
-    // Re-resolves the open-folder background color whenever the app's theme
-    // changes. DrawableTokens.RoundRectFolder is otherwise only resolved once
-    // in onFinishInflate(), so accent/wallpaper/style changes never reach an
-    // already-inflated Folder view.
-    private final ThemeProvider.ColorSchemeChangeListener mColorSchemeChangeListener =
-            this::refreshBackgroundColor;
-
     PreferenceManager2 preferenceManager2;
 
     /**
@@ -338,20 +330,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         return mBackground;
     }
 
-    /**
-     * Re-resolves {@link DrawableTokens#RoundRectFolder} against the current
-     * ColorScheme and swaps it in as the folder's background, preserving the
-     * alpha set from the folder background opacity preference. Called on initial
-     * inflate and whenever {@link ThemeProvider} reports a theme change.
-     */
-    private void refreshBackgroundColor() {
-        int previousAlpha = mBackground.getAlpha();
-        mBackground = DrawableTokens.RoundRectFolder.resolve(getContext());
-        mBackground.setCallback(this);
-        mBackground.setAlpha(previousAlpha);
-        invalidate();
-    }
-
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
@@ -359,7 +337,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         final int paddingLeftRight = dp.folderContentPaddingLeftRight;
 
         mBackground = DrawableTokens.RoundRectFolder.resolve(getContext());
-        mBackground.setCallback(this);
+        mBackground.setColor(LawnchairUtilsKt.resolveFolderBackgroundColor(getContext()));
         var alpha = LawnchairUtilsKt.getFolderBackgroundAlpha(getContext());
         mBackground.setAlpha(alpha);
 
@@ -392,10 +370,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         if (Utilities.ATLEAST_O) {
             mFolderName.setHighlightColor(ColorUtils.setAlphaComponent(accentColor, 82));
         }
-
-        // Lawnchair: apply the workspace icon text colour preference to the
-        // open-folder title field so it matches icon labels on the home screen.
-        LawnchairUtilsKt.overrideWorkspaceTextColor(mFolderName);
 
         if (Utilities.ATLEAST_R) {
             mKeyboardInsetAnimationCallback = new KeyboardInsetAnimationCallback(this);
@@ -666,14 +640,12 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         requestFocus();
         super.onAttachedToWindow();
         mFolderName.addOnFocusChangeListener(this);
-        ThemeProvider.INSTANCE.get(getContext()).addListener(mColorSchemeChangeListener);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mFolderName.removeOnFocusChangeListener(this);
-        ThemeProvider.INSTANCE.get(getContext()).removeListener(mColorSchemeChangeListener);
     }
 
     @Override
@@ -726,10 +698,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             mFolderName.setText("");
             mFolderName.setHint(R.string.folder_hint_text);
         }
-        // Lawnchair: re-apply the workspace icon text colour preference every
-        // time the folder title is rebound (e.g. after a model reload or theme
-        // change) so the colour always reflects the current preference value.
-        LawnchairUtilsKt.overrideWorkspaceTextColor(mFolderName);
     }
 
     /**
@@ -1124,12 +1092,15 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mActivityContext.getDragController().removeDropTarget(this);
         clearFocus();
         if (mFolderIcon != null) {
+            // Settle first-page preview before revealing the icon to avoid a rearrange flash.
+            if (wasAnimated) {
+                mFolderIcon.onFolderClose(mContent.getCurrentPage());
+            }
             mFolderIcon.setVisibility(View.VISIBLE);
             mFolderIcon.setIconVisible(true);
             mFolderIcon.mFolderName.setTextVisibility(true);
             if (wasAnimated) {
                 mFolderIcon.animateBgShadowAndStroke();
-                mFolderIcon.onFolderClose(mContent.getCurrentPage());
                 if (mFolderIcon.hasDot()) {
                     mFolderIcon.animateDotScale(0f, 1f);
                 }
@@ -1176,6 +1147,14 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         }
         SCALE_PROPERTY.set(launcher.getWorkspace(), 1f);
         SCALE_PROPERTY.set(launcher.getHotseat(), 1f);
+        // Clear any stuck workspace/hotseat RenderEffect if we are not in a depth-blur state.
+        // Expressive folder open/close can race with All Apps depth blur and leave icons blurred.
+        if (Utilities.ATLEAST_S
+                && launcher.getStateManager().getState().getDepth(launcher) == 0f) {
+            for (View target : launcher.getDepthBlurTargets()) {
+                target.setRenderEffect(null);
+            }
+        }
     }
 
     @Override

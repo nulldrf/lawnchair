@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.theme.color.ColorOption
+import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.colorpreference.pickers.CustomColorPicker
 import app.lawnchair.ui.preferences.components.colorpreference.pickers.WallpaperColorGrid
 import app.lawnchair.ui.preferences.components.layout.BottomSpacer
@@ -69,7 +70,7 @@ fun ColorSelection(
     val adapter = preference.getAdapter()
     val appliedColor = adapter.state.value
     val context = LocalContext.current
-
+    val navController = LocalNavController.current
     val selectedColor = remember { mutableIntStateOf(appliedColor.forCustomPicker(context)) }
     val selectedColorApplied = remember {
         derivedStateOf {
@@ -97,28 +98,27 @@ fun ColorSelection(
         label = label,
         modifier = modifier,
         bottomBar = {
-            if (pagerState.currentPage == 1) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.End,
+            if (pagerState.currentPage == 0) {
+                BottomSpacer()
+                return@PreferenceLayout
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End,
+            ) {
+                Button(
+                    enabled = !selectedColorApplied.value,
+                    onClick = {
+                        adapter.onChange(newValue = ColorOption.CustomColor(selectedColor.intValue))
+                        navController.popBackStack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(all = 16.dp),
+                    shapes = ButtonDefaults.shapes(),
                 ) {
-                    Button(
-                        enabled = !selectedColorApplied.value,
-                        onClick = {
-                            adapter.onChange(
-                                newValue = ColorOption.CustomColor(selectedColor.intValue),
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(all = 16.dp),
-                        shapes = ButtonDefaults.shapes(),
-                    ) {
-                        Text(text = stringResource(id = R.string.action_apply))
-                    }
-                    BottomSpacer()
+                    Text(text = stringResource(id = R.string.action_apply))
                 }
-            } else {
                 BottomSpacer()
             }
         },

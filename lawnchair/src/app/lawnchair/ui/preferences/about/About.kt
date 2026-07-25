@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -229,7 +230,7 @@ fun About(
             }
         }
         item {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(ListItemDefaults.SegmentedGap))
         }
         item {
             PreferenceGroupItem(

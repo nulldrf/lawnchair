@@ -1065,6 +1065,21 @@ private fun SearchOverlay(
                         items(filtered.size) { idx ->
                             val entry = filtered[idx]
                             val toggle = entry.toggle
+                            val resultCount = filtered.size
+                            // Mirrors PreferenceGroupItem's cutTop/cutBottom → index/count
+                            // mapping (see LazyColumnPreferenceGroup.kt) so search results
+                            // read as one connected grouped list: only the very first and
+                            // very last result get rounded corners (top and bottom
+                            // respectively), results in between stay square, and a single
+                            // result is fully rounded on every corner. `filtered` is
+                            // recomputed on every keystroke, so this is derived fresh per
+                            // item rather than baked into a fixed default.
+                            val itemShapes = when {
+                                resultCount == 1 -> ListItemDefaults.segmentedShapes(index = 0, count = 1)
+                                idx == 0 -> ListItemDefaults.segmentedShapes(index = 0, count = 2)
+                                idx == resultCount - 1 -> ListItemDefaults.segmentedShapes(index = 1, count = 2)
+                                else -> ListItemDefaults.segmentedShapes(index = 1, count = 3)
+                            }
                             // The switch is now a real PreferenceTemplate endWidget (via
                             // PreferenceCategory's new optional endWidget param), not an
                             // overlay — so it shares the same weighted Row as the title/
@@ -1082,6 +1097,7 @@ private fun SearchOverlay(
                                     onNavigate(entry.route)
                                 },
                                 isSelected = false,
+                                shapes = itemShapes,
                                 endWidget = if (toggle != null) {
                                     {
                                         Switch(

@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
@@ -52,6 +54,21 @@ fun PreferenceCategory(
     // instead of relying on an approximate reserved-padding guess. Every
     // existing caller is unaffected since this defaults to null.
     endWidget: (@Composable () -> Unit)? = null,
+    // Optional shape override. PreferenceTemplate itself defaults to
+    // ListItemDefaults.segmentedShapes(index = 0, count = 1) — i.e. every
+    // single card always rendered as an independent "standalone" item.
+    // That's fine for the main dashboard's PreferenceGroup category list
+    // (fixed count, each entry genuinely is its own standalone card), but a
+    // dynamically-sized list — like settings search results, whose length
+    // changes with every keystroke — needs a *real* per-position shape:
+    // the first result rounded on top, the last rounded on bottom, middle
+    // results square, and a lone result fully rounded on all sides. That's
+    // exactly the index/count scheme PreferenceGroupItem already computes
+    // from cutTop/cutBottom (see LazyColumnPreferenceGroup.kt); this param
+    // lets a caller like the search overlay compute and pass the same thing.
+    // Defaults to PreferenceTemplate's own standalone shape, so every
+    // existing call site (the main dashboard list) is completely unaffected.
+    shapes: ListItemShapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
 ) {
     PreferenceTemplate(
         title = {
@@ -79,6 +96,7 @@ fun PreferenceCategory(
             }
         },
         endWidget = endWidget,
+        shapes = shapes,
         onClick = onNavigate,
     )
 }

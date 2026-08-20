@@ -188,7 +188,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                 // fully opaque and defeating HokoBlur. Instead, extract the token's alpha and
                 // multiply it by bgAlphaState so the bar fades in correctly AND stays at 54%
                 // transparency at rest. Non-blur path is unchanged.
-                val (backgroundColor, backgroundAlpha) = if (supportBlur) {
+                val (backgroundColor, scrollAlpha) = if (supportBlur) {
                     val resolved = ColorTokens.SearchboxHighlightBlur.resolveColor(context)
                     // Strip the pre-baked alpha byte; pass only RGB so copy(alpha=…) works cleanly.
                     val opaqueColor = resolved or 0xFF000000.toInt()
@@ -199,9 +199,16 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     ColorTokens.SearchboxHighlight.resolveColor(context) to (bgAlphaState * 100).toInt()
                 }
 
-                val backgroundAlpha by animateIntAsState(
+                // Hides the highlight box while focused/typing, independent of
+                // the scroll-driven fade above.
+                val focusAlpha by animateIntAsState(
                     if (isFocused || !queryEmpty) 0 else 100,
                 )
+
+                // Two independent signals gate the same box: only show it when
+                // neither the scroll position nor the focus/typing state wants
+                // it hidden.
+                val backgroundAlpha = (scrollAlpha * focusAlpha) / 100
 
                 // Ignore other theme attributes to preserve existing behavior
                 val style = buildQsbStyle(

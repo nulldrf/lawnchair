@@ -128,7 +128,6 @@ import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.os.Process;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -202,7 +201,6 @@ import com.android.launcher3.logging.StartupLatencyLogger;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.ItemInstallQueue;
-import com.android.launcher3.model.ModelUtils;
 import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.AppInfo;
@@ -238,7 +236,6 @@ import com.android.launcher3.util.ItemInflater;
 import com.android.launcher3.util.KeyboardShortcutsDelegate;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.OnboardingPrefs;
-import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.PluginManagerWrapper;
@@ -1379,9 +1376,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     protected void completeAddShortcut(Intent data, int container, int screenId, int cellX,
             int cellY, PendingRequestArgs args) {
-        if (args.getRequestCode() != REQUEST_CREATE_SHORTCUT
-                || args.getPendingIntent() == null
-                || args.getPendingIntent().getComponent() == null) {
+        if (args.getRequestCode() != REQUEST_CREATE_SHORTCUT) {
             return;
         }
 
@@ -1402,20 +1397,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
 
         if (info == null) {
-            // Legacy shortcuts are only supported for the primary profile.
-            info = Process.myUserHandle().equals(args.user)
-                    ? ModelUtils.fromLegacyShortcutIntent(this, data) : null;
-
-            if (info == null) {
-                Log.e(TAG, "Unable to parse a valid shortcut result");
-                return;
-            }
-
-            if (!new PackageManagerHelper(this).hasPermissionForActivity(
-                    info.intent, args.getPendingIntent().getComponent().getPackageName())) {
-                Log.e(TAG, "Ignoring shortcut intent failing activity permission validation");
-                return;
-            }
+            Log.e(TAG, "Unable to parse a valid shortcut result");
+            return;
         }
 
         if (container < 0) {

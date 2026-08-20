@@ -145,7 +145,7 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
                 .put(Favorites.OPTIONS, options)
                 .put(Favorites.RESTORED, status);
 
-        if (itemType == Favorites.ITEM_TYPE_SHORTCUT || !getMatchingLookupFlag().useLowRes()) {
+        if (!getMatchingLookupFlag().useLowRes()) {
             writer.putIcon(bitmap, user);
         }
     }

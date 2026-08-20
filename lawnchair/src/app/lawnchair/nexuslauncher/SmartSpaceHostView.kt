@@ -9,7 +9,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
-import androidx.core.view.HapticFeedbackConstantsCompat
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.preferences2.PreferenceManager2
 import com.patrykmichalik.opto.core.firstBlocking
@@ -19,15 +18,19 @@ import com.android.launcher3.Launcher
 import com.android.launcher3.R
 import com.android.launcher3.logging.StatsLogManager.EventEnum
 import com.android.launcher3.qsb.QsbWidgetHostView
+import com.android.launcher3.util.MSDLPlayerWrapper
 import com.android.launcher3.views.BaseDragLayer.TouchCompleteListener
 import com.android.launcher3.views.OptionsPopupView
 import com.android.launcher3.views.OptionsPopupView.OptionItem
+import com.google.android.msdl.data.model.MSDLToken
 
 sealed class SmartSpaceHostView(context: Context) :
     QsbWidgetHostView(context),
     OnLongClickListener,
     TouchCompleteListener {
     private val mLauncher: Launcher by unsafeLazy { Launcher.getLauncher(context) }
+
+    private val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(mLauncher)
 
     @Suppress("LeakingThis")
     private val mLongPressHelper: CheckLongPressHelper = CheckLongPressHelper(this, this)
@@ -41,7 +44,7 @@ sealed class SmartSpaceHostView(context: Context) :
             return false
         }
         if (PreferenceManager2.getInstance(view.context).hapticFeedback.firstBlocking()) {
-            performHapticFeedback(HapticFeedbackConstantsCompat.LONG_PRESS)
+            mMSDLPlayerWrapper.playToken(MSDLToken.LONG_PRESS)
         }
         val pos = Rect()
         mLauncher.dragLayer.getDescendantRectRelativeToSelf(this, pos)

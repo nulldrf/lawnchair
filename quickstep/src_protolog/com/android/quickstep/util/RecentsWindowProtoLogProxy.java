@@ -22,6 +22,7 @@ import android.window.DesktopExperienceFlags;
 
 import androidx.annotation.NonNull;
 
+import androidx.annotation.RequiresApi;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.protolog.common.IProtoLogGroup;
 import com.android.launcher3.Flags;
@@ -39,6 +40,7 @@ import com.android.launcher3.Flags;
  * the nested {@link ProtoLogCalls} class, and why the guard uses {@link ProtoLogSafety#isSafe()}
  * rather than calling {@code QuickstepProtoLogGroup.isProtoLogInitialized()} directly.
  */
+@RequiresApi(31) // LC-Note: IProtoLogGroup only available to Android 11 Releases 41, or Android 12.0 for us. DO NOT call anything related to this or ProtoLog 
 public class RecentsWindowProtoLogProxy {
     private static final DesktopExperienceFlags.DesktopExperienceFlag
             ENABLE_RECENTS_WINDOW_PROTO_LOG =

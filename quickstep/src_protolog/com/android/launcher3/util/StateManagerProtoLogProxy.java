@@ -20,6 +20,7 @@ import android.window.DesktopModeFlags.DesktopModeFlag;
 
 import androidx.annotation.NonNull;
 
+import androidx.annotation.RequiresApi;
 import com.android.internal.protolog.ProtoLog;
 import com.android.launcher3.Flags;
 import com.android.quickstep.util.ProtoLogSafety;
@@ -33,6 +34,7 @@ import static com.android.quickstep.util.QuickstepProtoLogGroup.LAUNCHER_STATE_M
  * the nested {@link ProtoLogCalls} class, and why the guard uses {@link ProtoLogSafety#isSafe()}
  * rather than calling {@code QuickstepProtoLogGroup.isProtoLogInitialized()} directly.
  */
+@RequiresApi(31) // LC-Note: IProtoLogGroup only available to Android 11 Releases 41, or Android 12.0 for us. DO NOT call anything related to this or ProtoLog 
 public class StateManagerProtoLogProxy {
     private static final DesktopModeFlag ENABLE_STATE_MANAGER_PROTO_LOG =
             new DesktopModeFlag(Flags::enableStateManagerProtoLog, true);

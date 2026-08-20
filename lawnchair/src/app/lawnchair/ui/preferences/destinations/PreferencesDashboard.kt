@@ -1149,8 +1149,16 @@ private fun SettingsSearchBar(
     onActivate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val prefs2 = preferenceManager2()
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
     Surface(
-        onClick = onActivate,
+        onClick = {
+            if (prefs2.hapticFeedback.firstBlocking()) {
+                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+            }
+            onActivate()
+        },
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -1180,11 +1188,16 @@ private fun SettingsSearchBar(
 @Composable
 fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val prefs2 = preferenceManager2()
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
     PreferenceTemplate(
         modifier = modifier
             .padding(horizontal = 16.dp)
             .fillMaxWidth()
             .clickable {
+                if (prefs2.hapticFeedback.firstBlocking()) {
+                    mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+                }
                 Intent(Settings.ACTION_HOME_SETTINGS)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .let { context.startActivity(it) }

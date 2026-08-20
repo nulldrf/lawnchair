@@ -77,6 +77,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.DragSource;
 import com.android.launcher3.DropTarget.DragObject;
+import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.InsettableFrameLayout;
@@ -183,6 +184,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     protected RecyclerViewFastScroller mTouchHandler;
 
     private boolean mIsSearching;
+    private boolean mSearchExitInProgress;
     boolean showFastScroller;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
@@ -409,6 +411,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!mSearchTransitionController.isRunning() && goingToSearch == isSearching()) {
             return;
         }
+        mSearchExitInProgress = !goingToSearch;
         mFastScroller.setVisibility(goingToSearch ? INVISIBLE : VISIBLE);
         if (goingToSearch) {
             mWorkManager.onActivePageChanged(SEARCH);
@@ -427,12 +430,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             }
             if (goingToSearch) {
                 mSearchUiDelegate.onAnimateToSearchStateCompleted();
+                mSearchExitInProgress = false;
             } else {
                 setSearchResults(null);
                 if (mViewPager != null) {
                     mViewPager.setCurrentPage(previousPage);
                 }
                 onActivePageChanged(previousPage);
+                mSearchExitInProgress = false;
             }
         });
     }
@@ -780,8 +785,34 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mTabsProtectionAlpha = tabsAlpha;
             invalidateHeader();
         }
-        if (mSearchUiManager.getEditText() == null) return;
-        mSearchUiManager.setBackgroundVisibility(true, 1f);
+        if (mSearchUiManager.getEditText() == null) {
+            return;
+        }
+
+        boolean bgVisible = mSearchUiManager.getBackgroundVisibility();
+        if (scrolledOffset == 0) {
+            if (!isSearching()) {
+                bgVisible = true;
+            }
+            // LC-Note: Match Pixel Launcher behavior by focusing
+            // and showing the keyboard on scroll to top
+            if (PreferenceCacheExtensionsKt.firstCached(pref2.getAutoShowKeyboardInDrawer())) {
+                boolean isControllerAnimating = mAllAppsTransitionController != null
+                        && (mAllAppsTransitionController.getProgress() > 0f
+                        || mAllAppsTransitionController.getAllAppScale().isAnimating());
+                boolean isSearchTransitioning = mSearchTransitionController.isRunning()
+                        || mSearchExitInProgress;
+                if (!isControllerAnimating && !isSearchTransitioning) {
+                    ExtendedEditText editText = mSearchUiManager.getEditText();
+                    if (editText != null && !editText.isFocused()) {
+                        editText.showKeyboard();
+                    }
+                }
+            }
+        } else if (scrolledOffset > mHeaderThreshold) {
+            bgVisible = false;
+        }
+        mSearchUiManager.setBackgroundVisibility(bgVisible, 1 - prog);
     }
 
     protected int getHeaderColor(float blendRatio) {

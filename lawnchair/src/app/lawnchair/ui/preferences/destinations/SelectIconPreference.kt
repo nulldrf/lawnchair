@@ -42,6 +42,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.data.iconoverride.IconOverride
 import app.lawnchair.data.iconoverride.IconOverrideRepository
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.icons.iconpack.IconPackProvider
 import app.lawnchair.icons.picker.IconEntry
 import app.lawnchair.icons.picker.IconPickerItem
@@ -59,7 +60,10 @@ import app.lawnchair.util.requireSystemService
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
 import com.android.launcher3.util.ComponentKey
+import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
+import com.google.android.msdl.data.model.MSDLToken
+import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,6 +73,8 @@ private const val TAG = "SelectIconPreference"
 @Composable
 fun SelectIconPreference(componentKey: ComponentKey) {
     val context = LocalContext.current
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
+    val prefs2 = preferenceManager2()
     val label = remember(componentKey) {
         resolveAppLabel(context.requireSystemService(), componentKey)
     }
@@ -304,6 +310,9 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                 label = iconPack.name,
                 icon = remember(iconPack) { iconPack.icon.toBitmap() },
                 onClick = {
+                    if (prefs2.hapticFeedback.firstBlocking()) {
+                        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+                    }
                     if (iconPack.packageName.isEmpty()) {
                         navController.navigate(IconPicker())
                     } else {

@@ -38,6 +38,7 @@ import app.lawnchair.hotseat.HotseatMode
 import app.lawnchair.icons.CustomAdaptiveIconDrawable
 import app.lawnchair.icons.shape.IconShape
 import app.lawnchair.icons.shape.IconShapeManager
+import app.lawnchair.predictions.PredictionMode
 import app.lawnchair.preferences.PreferenceManager as LawnchairPreferenceManager
 import app.lawnchair.qsb.providers.QsbSearchProvider
 import app.lawnchair.search.algorithms.LawnchairSearchAlgorithm
@@ -134,7 +135,6 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = HotseatMode.fromString(context.getString(R.string.config_default_hotseat_mode)),
         parse = { HotseatMode.fromString(it) },
         save = { it.toString() },
-        onSet = { reloadHelper.restart() },
     )
 
     val iconShape = preference(
@@ -242,6 +242,13 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = ColorOption.fromString(context.getString(R.string.config_default_hotseat_bg_color)),
     )
 
+    val hotseatBackgroundCornerRadius = preference(
+        key = floatPreferencesKey(name = "hotseat_bg_corner_radius"),
+        defaultValue = context.resources.getDimension(R.dimen.bg_round_rect_radius) /
+            context.resources.displayMetrics.density, // This should hopefully match corner of all devices
+        onSet = { reloadHelper.recreate() },
+    )
+
     val appDrawerBackgroundColor = preference(
         key = stringPreferencesKey(name = "app_drawer_bg_color"),
         parse = ColorOption::fromString,
@@ -308,10 +315,6 @@ class PreferenceManager2 @Inject constructor(
     val isHotseatEnabled = preference(
         key = booleanPreferencesKey(name = "pref_show_hotseat"),
         defaultValue = context.resources.getBoolean(R.bool.config_default_show_hotseat),
-        onSet = {
-            reloadHelper.recreate()
-            reloadHelper.reloadGrid()
-        },
     )
 
     val hotseatQsbProvider = preference(
@@ -321,7 +324,6 @@ class PreferenceManager2 @Inject constructor(
         } ?: QsbSearchProvider.resolveDefault(context),
         parse = { QsbSearchProvider.fromId(it) },
         save = { it.id },
-        onSet = { reloadHelper.recreate() },
     )
 
     val hotseatQsbForceWebsite = preference(
@@ -404,6 +406,23 @@ class PreferenceManager2 @Inject constructor(
 
     val legacyPopupOptionsMigrated = preference(
         key = booleanPreferencesKey(name = "legacy_popup_options_migrated"),
+        defaultValue = false,
+    )
+
+    val enableGlobalPrediction = preference(
+        key = booleanPreferencesKey(name = "enable_global_prediction"),
+        defaultValue = true,
+    )
+
+    val predictionMode = preference(
+        key = stringPreferencesKey(name = "prediction_mode"),
+        defaultValue = PredictionMode.fromString(context.getString(R.string.config_default_prediction_mode)),
+        parse = { PredictionMode.fromString(it) },
+        save = { it.toString() },
+    )
+
+    val lawnchairPredictorUseWeightedUsageStats = preference(
+        key = booleanPreferencesKey(name = "lawnchair_prediction_use_weighted_usage"),
         defaultValue = false,
     )
 
@@ -1001,7 +1020,6 @@ class PreferenceManager2 @Inject constructor(
     val enableLabelInDock = preference(
         key = booleanPreferencesKey(name = "enable_label_dock"),
         defaultValue = false,
-        onSet = { reloadHelper.reloadGrid() },
     )
 
     // -----------------------------------------------------------------------
@@ -1079,9 +1097,9 @@ class PreferenceManager2 @Inject constructor(
     val autoUpdaterNightly = preference(
         key = booleanPreferencesKey(name = "enable_nightly_auto_updater"),
         defaultValue = if (BuildConfig.APPLICATION_ID.contains("nightly")) {
-            false
-        } else {
             context.resources.getBoolean(R.bool.config_default_enable_nightly_auto_updater)
+        } else {
+            false
         },
     )
 
@@ -1111,6 +1129,33 @@ class PreferenceManager2 @Inject constructor(
                 L3ThemeManager.INSTANCE.get(context)
                 LauncherAppState.getInstance(context).model.reloadIfActive()
             }
+            .launchIn(scope)
+
+        hotseatMode.get()
+            .drop(1)
+            .distinctUntilChanged()
+            .onEach { reloadHelper.restart() }
+            .launchIn(scope)
+
+        isHotseatEnabled.get()
+            .drop(1)
+            .distinctUntilChanged()
+            .onEach {
+                reloadHelper.recreate()
+                reloadHelper.reloadGrid()
+            }
+            .launchIn(scope)
+
+        hotseatQsbProvider.get()
+            .drop(1)
+            .distinctUntilChanged()
+            .onEach { reloadHelper.recreate() }
+            .launchIn(scope)
+
+        enableLabelInDock.get()
+            .drop(1)
+            .distinctUntilChanged()
+            .onEach { reloadHelper.reloadGrid() }
             .launchIn(scope)
     }
 

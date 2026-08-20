@@ -123,6 +123,15 @@ fun HotseatBackgroundSettings(
         ScrollAnchor(ScrollKeys.DOCK_BG_COLOR, scrollState) {
             ColorPreference(preference = prefs2.hotseatBackgroundColor)
         }
+        // No ScrollKeys entry for this yet — added straight, matching upstream,
+        // rather than inventing a deep-link key that doesn't exist elsewhere.
+        SliderPreference(
+            label = stringResource(id = R.string.hotseat_bg_corner_radius),
+            adapter = prefs2.hotseatBackgroundCornerRadius.getAdapter(),
+            step = 1f,
+            valueRange = 0f..100f,
+            showUnit = "dp",
+        )
         ScrollAnchor(ScrollKeys.DOCK_BG_OPACITY, scrollState) {
             SliderPreference(
                 label = stringResource(id = R.string.hotseat_bg_alpha),
@@ -177,6 +186,7 @@ fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2, scrollSta
     val hotseatColumnsAdapter = prefs.hotseatColumns.getAdapter()
     val hotseatColumnsUnfoldedAdapter = prefs.hotseatColumnsUnfolded.getAdapter()
     val hotseatRowsAdapter = prefs.hotseatRows.getAdapter()
+    val dockPagesAdapter = prefs.dockPages.getAdapter()
 
     PreferenceGroup(heading = stringResource(id = R.string.grid)) {
         if (isFoldable) {
@@ -235,6 +245,12 @@ fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2, scrollSta
             step = 1,
             valueRange = 1..2,
         )
+        SliderPreference(
+            label = stringResource(id = R.string.dock_pages),
+            adapter = dockPagesAdapter,
+            step = 1,
+            valueRange = 1..5,
+        )
     }
 }
 
@@ -246,11 +262,15 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
         val primary = MaterialTheme.colorScheme.primary
         val shape = RoundedCornerShape(28.dp)
 
+        val hotseatRows = prefs.hotseatRows
+        val dockPages = prefs.dockPages
+
         val adapters = listOf(
             prefs2.hotseatMode.getAdapter(),
             prefs.hotseatColumns.getAdapter(),
             prefs.hotseatColumnsUnfolded.getAdapter(),
-            prefs.hotseatRows.getAdapter(),
+            hotseatRows.getAdapter(),
+            dockPages.getAdapter(),
             prefs2.themedHotseatQsb.getAdapter(),
             prefs.hotseatQsbCornerRadius.getAdapter(),
             prefs.hotseatQsbAlpha.getAdapter(),
@@ -265,6 +285,7 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
             prefs.hotseatBGVerticalInsetBottom.getAdapter(),
             prefs2.pageIndicatorHeightFactor.getAdapter(),
             prefs2.hotseatBackgroundColor.getAdapter(),
+            prefs2.hotseatBackgroundCornerRadius.getAdapter(),
             prefs.hotseatBGAlpha.getAdapter(),
         )
 
@@ -286,7 +307,9 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
                     DummyLauncherBox(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clipToBottomPercentage(0.3f),
+                            // Show more of the preview when 2 hotseat rows are
+                            // enabled so the second row isn't cut off
+                            .clipToBottomPercentage(if (hotseatRows.getAdapter().state.value >= 2) 0.4f else 0.3f),
                     ) {
                         WallpaperPreview(
                             wallpaper = wallpaper,

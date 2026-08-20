@@ -15,6 +15,8 @@ import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
+import app.lawnchair.ui.preferences.components.controls.ListPreference
+import app.lawnchair.ui.preferences.components.controls.ListPreferenceEntry
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
@@ -29,7 +31,7 @@ import app.lawnchair.util.FileAccessState
 import app.lawnchair.util.isGestureNavContractCompatible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
-import com.android.launcher3.util.MSDLPlayerWrapper
+import com.google.android.msdl.data.model.FeedbackLevel
 
 @Composable
 fun ExperimentalFeaturesPreferences(
@@ -39,7 +41,6 @@ fun ExperimentalFeaturesPreferences(
     val scrollState = rememberPreferenceScrollState()
     val prefs2 = preferenceManager2()
 
-    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
     PreferenceLayout(
         label = stringResource(id = R.string.experimental_features_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
@@ -134,6 +135,7 @@ fun ExperimentalFeaturesPreferences(
 
         val alwaysReloadIconsAdapter = prefs2.alwaysReloadIcons.getAdapter()
         val enableGncAdapter = prefs.enableGnc.getAdapter()
+        val vibrationFeedbackLevelAdapter = prefs.vibrationFeedbackLevel.getAdapter()
 
         PreferenceGroup(
             modifier = Modifier,
@@ -162,6 +164,24 @@ fun ExperimentalFeaturesPreferences(
             ) {
                 WarningPreference(stringResource(R.string.gesturenavcontract_warning_incompatibility))
             }
+            ListPreference(
+                adapter = vibrationFeedbackLevelAdapter,
+                entries = listOf(
+                    ListPreferenceEntry(FeedbackLevel.NO_FEEDBACK.ordinal) {
+                        stringResource(R.string.vibration_feedback_no_feedback_choice)
+                    },
+                    ListPreferenceEntry(FeedbackLevel.MINIMAL.ordinal) {
+                        stringResource(R.string.vibration_feedback_minimal_choice)
+                    },
+                    ListPreferenceEntry(FeedbackLevel.DEFAULT.ordinal) {
+                        stringResource(R.string.vibration_feedback_default_choice)
+                    },
+                    ListPreferenceEntry(FeedbackLevel.EXPRESSIVE.ordinal) {
+                        stringResource(R.string.vibration_feedback_expressive_choice)
+                    },
+                ),
+                label = stringResource(R.string.vibration_feedback_level_label),
+            )
         }
     }
 }

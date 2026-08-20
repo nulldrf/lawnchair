@@ -29,15 +29,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.PreferenceAdapter
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.components.layout.PreferenceDivider
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.util.LocalBottomSheetHandler
 import app.lawnchair.views.overlay.AppOpenAnimationType
 import app.lawnchair.views.overlay.FullScreenOverlayMode
+import com.android.launcher3.util.MSDLPlayerWrapper
+import com.google.android.msdl.data.model.MSDLToken
+import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.launch
 
 // ── App-close overlay options (GNC path) ─────────────────────────────────────
@@ -61,6 +66,9 @@ fun OverlayHandlerPreference(
 ) {
     val scope = rememberCoroutineScope()
     val bottomSheetHandler = LocalBottomSheetHandler.current
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
+    val prefs2 = preferenceManager2()
+
     val currentConfig = adapter.state.value
 
     fun onSelect(option: FullScreenOverlayMode) {
@@ -72,6 +80,9 @@ fun OverlayHandlerPreference(
         modifier = modifier,
         description = { Text(text = stringResource(currentConfig.labelRes)) },
         onClick = {
+            if (prefs2.hapticFeedback.firstBlocking()) {
+                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+            }
             bottomSheetHandler.show {
                 ModalBottomSheetContent(
                     title = { Text(label) },
@@ -90,6 +101,9 @@ fun OverlayHandlerPreference(
                             PreferenceTemplate(
                                 title = { Text(text = stringResource(option.labelRes)) },
                                 onClick = {
+                                    if (prefs2.hapticFeedback.firstBlocking()) {
+                                        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
+                                    }
                                     bottomSheetHandler.hide()
                                     onSelect(option)
                                 },

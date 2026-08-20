@@ -21,6 +21,7 @@ import static com.android.quickstep.util.QuickstepProtoLogGroup.OVERVIEW_COMMAND
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import androidx.annotation.RequiresApi;
 import com.android.internal.protolog.ProtoLog;
 import com.android.quickstep.util.ProtoLogSafety;
 
@@ -32,6 +33,7 @@ import com.android.quickstep.util.ProtoLogSafety;
  * {@link ProtoLogSafety#isSafe()} rather than calling
  * {@code QuickstepProtoLogGroup.isProtoLogInitialized()} directly.
  */
+@RequiresApi(31) // Because this class uses ProtoLog which requires API level 31
 public class OverviewCommandHelperProtoLogProxy {
 
     public static void logCommandQueueFull(@NonNull Object type, @NonNull Object commandQueue) {

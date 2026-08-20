@@ -95,11 +95,13 @@ class SearchResultRightLeftIcon(context: Context, attrs: AttributeSet?) :
         } else {
             resources.getDimensionPixelSize(R.dimen.search_result_row_height)
         }
-        val layoutParams = LayoutParams(
-            LayoutParams.MATCH_PARENT,
-            heightRes,
-        )
-        this.layoutParams = layoutParams
+        // Reuse the existing LayoutParams instance (already set by the inflater
+        // from XML) rather than constructing a new one — this preserves whatever
+        // LayoutParams subtype the parent actually expects. (upstream e3db1f1)
+        val params = this.layoutParams
+        params.width = LayoutParams.MATCH_PARENT
+        params.height = heightRes
+        this.layoutParams = params
 
         // Give textRows the exact same pixel height as the card so that
         // gravity="center_vertical" has real space to work with. MATCH_PARENT

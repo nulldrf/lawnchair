@@ -50,7 +50,6 @@ import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.AppDrawerHapticFeedbackPreference
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
-import app.lawnchair.ui.preferences.components.SuggestionsPreference
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreference
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
@@ -64,6 +63,7 @@ import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.navigation.AppDrawerHiddenApps
+import app.lawnchair.ui.preferences.navigation.Predictions
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.R
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -117,7 +117,10 @@ fun AppDrawerPreferences(
                     adapter = prefs2.appDrawerSearchBarAtBottom.getAdapter(),
                 )
             }
-            SuggestionsPreference(scrollState = scrollState)
+            NavigationActionPreference(
+                label = stringResource(R.string.suggestion_pref_screen_title),
+                destination = Predictions,
+            )
             AppDrawerHapticFeedbackPreference(scrollState = scrollState)
         }
 

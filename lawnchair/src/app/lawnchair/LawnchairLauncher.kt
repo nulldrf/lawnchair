@@ -202,7 +202,7 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
         }.launchIn(scope = lifecycleScope)
 
-        preferenceManager2.statusBarClock.get().onEach {
+        preferenceManager2.statusBarClock.get().distinctUntilChanged().onEach {
             with(launcher.stateManager) {
                 if (it) {
                     addStateListener(statusBarClockListener)
@@ -211,7 +211,7 @@ class LawnchairLauncher : QuickstepLauncher() {
                     LawnchairApp.instance.restoreClockInStatusBar()
                 }
             }
-        }
+        }.launchIn(scope = lifecycleScope)
         preferenceManager2.rememberPosition.get().onEach {
             with(launcher.stateManager) {
                 if (it) addStateListener(rememberPositionStateListener)

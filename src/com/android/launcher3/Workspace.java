@@ -1507,7 +1507,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     public void showPageIndicatorAtCurrentScroll() {
         if (mPageIndicator != null) {
-            mPageIndicator.setScroll(getScrollX(), computeMaxScroll());
+            // LC-Note: Use wrap-aware scroll for continuous infinite-scroll indicator animation.
+            mPageIndicator.setScroll(getScrollForPageIndicator(), computeMaxScroll());
             var isHotseatEnabled = PreferenceCacheExtensionsKt.firstCached(mPreferenceManager2.isHotseatEnabled());
             mPageIndicator.setVisibility(isHotseatEnabled ? VISIBLE : INVISIBLE);
         }
@@ -2679,6 +2680,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         }
     }
 
+    /** LC-Note: isDragWidget() being unused is intended to make placing widget on dock possible */
     private boolean isDragWidget(DragObject d) {
         return (d.dragInfo instanceof LauncherAppWidgetInfo ||
                 d.dragInfo instanceof PendingAddWidgetInfo);
@@ -2846,9 +2848,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     private boolean shouldUseHotseatAsDropLayout(DragObject dragObject) {
+        // LC-Note: isDragWidget(dragObject) being removed is intended to make placing widget on dock possible 
+        
         if (mLauncher.getHotseat() == null
-                || mLauncher.getHotseat().getShortcutsAndWidgets() == null
-                || isDragWidget(dragObject)) {
+                || mLauncher.getHotseat().getShortcutsAndWidgets() == null) {
             return false;
         }
         View hotseatIcons = mLauncher.getHotseat().getPagedView();

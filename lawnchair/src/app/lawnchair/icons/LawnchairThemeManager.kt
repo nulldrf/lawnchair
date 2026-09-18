@@ -13,6 +13,7 @@ import com.android.launcher3.concurrent.annotations.Ui
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.graphics.ThemeManager
+import com.android.launcher3.icons.mono.MonoIconThemeController
 import com.android.launcher3.util.DaggerSingletonTracker
 import com.android.launcher3.util.LooperExecutor
 import javax.inject.Inject
@@ -42,26 +43,12 @@ constructor(
     iconControllerFactory,
     lifecycle,
 ) {
-    // -----------------------------------------------------------------------
-    // Prefs whose values are folded into the IconState cache key.
-    //
-    // Upstream prefs (wrapAdaptiveIcons … forceIconMonochrome) and the mod's
-    // two colorize prefs are all tracked here so that any change triggers
-    // verifyIconState() → onThemeChanged() → full icon reload via the same
-    // fast path used by shape changes.
-    //
-    // colorizedBackgrounds and treatWhiteAdaptiveIcons are mod additions:
-    //   - "Smart icon backgrounds" (pref_colorizedLegacyTreatment)
-    //   - "Recolor white adaptive backgrounds" (pref_enableWhiteOnlyTreatment)
-    // -----------------------------------------------------------------------
     private val statePrefs1 = listOf(
         prefs1.wrapAdaptiveIcons,
         prefs1.transparentIconBackground,
         prefs1.shadowBGIcons,
         prefs1.coloredBackgroundLightness,
         prefs1.forceIconMonochrome,
-        prefs1.colorizedBackgrounds,
-        prefs1.treatWhiteAdaptiveIcons,
     )
 
     private val prefListener = PreferenceChangeListener {
@@ -113,11 +100,8 @@ constructor(
             IconShape.Circle
         }
 
-        // All tracked prefs (including the mod's colorize prefs) are serialised into the
-        // shape key so that toggling any of them produces a different IconState and triggers
-        // onThemeChanged() → full icon reload, with no manual SharedPreferences listener needed.
         val currentPrefs1State = prefs1State()
-        val appShapeKey    = currentAppShape.getHashString()    + currentPrefs1State
+        val appShapeKey = currentAppShape.getHashString() + currentPrefs1State
         val folderShapeKey = currentFolderShape.getHashString() + currentPrefs1State
         val combinedKey = "$appShapeKey:$folderShapeKey"
 
@@ -135,15 +119,26 @@ constructor(
                 PathShapeDelegate(currentFolderShape)
             }
 
+        val themeController = iconControllerFactory.createThemeController()?.let {
+            if (prefs1.forceIconMonochrome.get()) {
+                FORCED_MONO_THEME_CONTROLLER
+            } else {
+                MONO_THEME_CONTROLLER
+            }
+        }
+
         return IconState(
             iconMask = combinedKey,
             folderRadius = 1f,
             shapeRadius = 1f,
-            themeController = iconControllerFactory.createThemeController(),
+            themeController = themeController,
             iconShape = appShape,
             folderShape = folderShape,
         )
     }
 }
 
+// Reuse controllers to allow the equality check in verifyIconState.
+private val MONO_THEME_CONTROLLER = MonoIconThemeController()
+private val FORCED_MONO_THEME_CONTROLLER = MonoIconThemeController(shouldForceThemeIcon = true)
 private const val TAG = "LawnchairThemeManager"

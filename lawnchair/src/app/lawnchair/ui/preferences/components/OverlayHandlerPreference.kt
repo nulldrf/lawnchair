@@ -20,6 +20,7 @@ import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.components.layout.PreferenceDivider
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.util.LocalBottomSheetHandler
+import app.lawnchair.views.overlay.AppOpenAnimationType
 import app.lawnchair.views.overlay.FullScreenOverlayMode
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
@@ -66,6 +67,80 @@ fun OverlayHandlerPreference(
                 ) {
                     LazyColumn {
                         itemsIndexed(overlayOptions) { index, option ->
+                            if (index > 0) {
+                                PreferenceDivider(startIndent = 40.dp)
+                            }
+                            val selected = currentConfig == option
+                            PreferenceTemplate(
+                                title = { Text(text = stringResource(option.labelRes)) },
+                                onClick = {
+                                    mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
+                                    bottomSheetHandler.hide()
+                                    onSelect(option)
+                                },
+                                startWidget = {
+                                    RadioButton(
+                                        selected = selected,
+                                        onClick = null,
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+    )
+}
+
+// ── App-open animation options ────────────────────────────────────────────────
+
+val appOpenAnimationOptions = listOf(
+    AppOpenAnimationType.DEFAULT,
+    AppOpenAnimationType.PIE,
+    AppOpenAnimationType.REVEAL,
+    AppOpenAnimationType.SLIDE_UP,
+    AppOpenAnimationType.SCALE_UP,
+    AppOpenAnimationType.BLINK,
+    AppOpenAnimationType.FADE,
+)
+
+@Composable
+fun AppOpenAnimationPreference(
+    adapter: PreferenceAdapter<AppOpenAnimationType>,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    val bottomSheetHandler = LocalBottomSheetHandler.current
+    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
+
+    val currentConfig = adapter.state.value
+
+    fun onSelect(option: AppOpenAnimationType) {
+        scope.launch {
+            adapter.onChange(option)
+        }
+    }
+
+    PreferenceTemplate(
+        title = { Text(text = label) },
+        modifier = modifier,
+        description = { Text(text = stringResource(currentConfig.labelRes)) },
+        onClick = {
+            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+            bottomSheetHandler.show {
+                ModalBottomSheetContent(
+                    title = { Text(label) },
+                    buttons = {
+                        OutlinedButton(onClick = { bottomSheetHandler.hide() }) {
+                            Text(text = stringResource(id = AndroidR.string.cancel))
+                        }
+                    },
+                ) {
+                    LazyColumn {
+                        itemsIndexed(appOpenAnimationOptions) { index, option ->
                             if (index > 0) {
                                 PreferenceDivider(startIndent = 40.dp)
                             }

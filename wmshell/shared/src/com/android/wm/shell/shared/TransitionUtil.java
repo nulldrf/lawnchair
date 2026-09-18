@@ -52,7 +52,7 @@ import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.TransitionInfo;
 
-import org.chickenhook.restrictionbypass.RestrictionBypass;
+import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
 import java.util.function.Predicate;
 
@@ -436,8 +436,13 @@ public class TransitionUtil {
             return change.isAllowEnterPip();
         }
         try {
-            return (Boolean) RestrictionBypass.getMethod(
-                    TransitionInfo.Change.class, "getAllowEnterPip").invoke(change);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return (Boolean) HiddenApiBypass.invoke(
+                    TransitionInfo.Change.class, change, "getAllowEnterPip");
+            }
+            // No hidden-API restrictions before P
+            return (Boolean) TransitionInfo.Change.class
+                    .getMethod("getAllowEnterPip").invoke(change);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Unable to read allowEnterPip from transition change", e);
         }

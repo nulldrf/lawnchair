@@ -28,11 +28,11 @@ dependencies {
     ksp libs.dagger.hilt.compiler
     implementation libs.androidx.core.animation
     implementation libs.androidx.dynamicanimation
+	implementation libs.hiddenapi.bypass
     compileOnly projects.iconloaderlib
     compileOnly projects.msdllib
     compileOnly projects.flags
     compileOnly projects.utils
-    compileOnly libs.chickenhook.restrictionbypass
 }
 
 ksp {

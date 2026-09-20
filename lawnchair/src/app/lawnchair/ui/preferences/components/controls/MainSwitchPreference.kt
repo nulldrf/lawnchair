@@ -123,8 +123,8 @@ fun MainSwitchPreference(
             onClick = { wrappedOnCheckedChange(!checked) },
             selected = checked,
             shapes = ListItemDefaults.shapes().copy(
-                shape = MaterialTheme.shapes.medium,
-                selectedShape = MaterialTheme.shapes.extraLarge,
+                shape = CircleShape,
+                selectedShape = CircleShape,
                 pressedShape = CircleShape,
                 focusedShape = CircleShape,
                 hoveredShape = CircleShape,
@@ -158,9 +158,14 @@ fun MainSwitchPreference(
                 )
             },
             colors = ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                // Matches AOSP's settingslib_expressive_color_main_switch_bar_bg.xml selector:
+                // the bar background does NOT change between checked/unchecked in stock AOSP —
+                // only enabled vs disabled differs. So containerColor and selectedContainerColor
+                // are intentionally the same value here (primaryContainer), and disabled uses
+                // onSurface at 12% alpha, matching the selector's disabled-state item exactly.
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
             ),
         ) {
             Text(text = label, style = MaterialTheme.typography.titleMedium)

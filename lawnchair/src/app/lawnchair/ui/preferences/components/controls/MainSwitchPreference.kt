@@ -157,7 +157,7 @@ fun MainSwitchPreference(
                     },
                 )
             },
-            colors = ListItemDefaults.colors(
+            colors = ListItemDefaults.segmentedColors(
                 // Matches AOSP's settingslib_expressive_color_main_switch_bar_bg.xml selector:
                 // the bar background does NOT change between checked/unchecked in stock AOSP —
                 // only enabled vs disabled differs. So containerColor and selectedContainerColor
@@ -166,6 +166,12 @@ fun MainSwitchPreference(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                // Matches the companion settingslib_expressive_color_main_switch_text.xml
+                // selector: label text is onPrimaryContainer while enabled (again, unchanged
+                // between checked/unchecked), and onSurface at 38% alpha while disabled.
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
             ),
         ) {
             Text(text = label, style = MaterialTheme.typography.titleMedium)

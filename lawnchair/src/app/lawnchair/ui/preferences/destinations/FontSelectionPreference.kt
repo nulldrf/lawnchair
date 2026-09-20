@@ -5,16 +5,18 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDropDown
@@ -22,6 +24,8 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -61,7 +65,6 @@ import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
 
 private enum class ContentType {
-    ADD_BUTTON,
     FONT,
 }
 
@@ -120,90 +123,112 @@ fun FontSelection(
         }
     }
 
-    PreferenceSearchScaffold(
-        value = searchQuery,
-        onValueChange = { searchQuery = it },
-        modifier = modifier,
-        placeholder = {
-            Text(
-                text = stringResource(id = R.string.label_search),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        actions = {
-            OverflowMenu {
-                DropdownMenuItem(
-                    onClick = {
-                        mMSDLPlayerWrapper.playToken(MSDLToken.SUCCESS)
-                        fontPref.set(fontPref.defaultValue)
-                        hideMenu()
-                    },
-                    text = {
-                        Text(text = stringResource(id = R.string.action_reset))
-                    },
+    val lazyListState = rememberLazyListState()
+
+    // Official Material 3 recipe for a scroll-aware extended FAB: stay
+    // expanded while scrolling up (or once there's nothing left to scroll
+    // up to, i.e. already at the top), collapse to the icon-only pill the
+    // moment the list scrolls down.
+    val fabExpanded by remember {
+        derivedStateOf {
+            lazyListState.lastScrolledBackward || !lazyListState.canScrollBackward
+        }
+    }
+
+    fun launchAddFont() {
+        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+        val intent = Intent(Intent.ACTION_GET_CONTENT)
+        intent.addCategory(Intent.CATEGORY_OPENABLE)
+        intent.type = "*/*"
+        request.launch(intent)
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        PreferenceSearchScaffold(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxSize(),
+            placeholder = {
+                Text(
+                    text = stringResource(id = R.string.label_search),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        },
-    ) { padding ->
-        PreferenceLazyColumn(padding) {
-            if (!hasFilter) {
-                item(contentType = { ContentType.ADD_BUTTON }) {
-                    PreferenceGroupItem(
-                        modifier = Modifier.padding(top = 8.dp),
-                        cutBottom = customFonts.isNotEmpty(),
-                    ) {
-                        PreferenceTemplate(
-                            onClick = {
-                                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
-                                val intent = Intent(Intent.ACTION_GET_CONTENT)
-                                intent.addCategory(Intent.CATEGORY_OPENABLE)
-                                intent.type = "*/*"
-                                request.launch(intent)
-                            },
-                            title = { Text(stringResource(id = R.string.pref_fonts_add_fonts)) },
-                            description = { Text(stringResource(id = R.string.pref_fonts_add_fonts_summary)) },
-                            startWidget = {
-                                Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
-                            },
-                        )
+            },
+            actions = {
+                OverflowMenu {
+                    DropdownMenuItem(
+                        onClick = {
+                            mMSDLPlayerWrapper.playToken(MSDLToken.SUCCESS)
+                            fontPref.set(fontPref.defaultValue)
+                            hideMenu()
+                        },
+                        text = {
+                            Text(text = stringResource(id = R.string.action_reset))
+                        },
+                    )
+                }
+            },
+        ) { padding ->
+            PreferenceLazyColumn(padding, state = lazyListState) {
+                if (!hasFilter) {
+                    itemsIndexed(
+                        items = customFonts,
+                        key = { _, family -> family.toString() },
+                        contentType = { _, _ -> ContentType.FONT },
+                    ) { index, family ->
+                        PreferenceGroupItem(
+                            // The first custom font is now the top of its own
+                            // card (rounded), since the Add-fonts row that
+                            // used to sit above it is gone — replaced by the
+                            // FAB. Every item after it still connects upward.
+                            cutTop = index != 0,
+                            cutBottom = index != customFonts.lastIndex,
+                        ) {
+                            PreferenceDivider(startIndent = 40.dp)
+                            FontSelectionItem(
+                                adapter = adapter,
+                                family = family,
+                                onDelete = {
+                                    val selected = family.variants.any { it.value == adapter.state.value }
+                                    if (selected) {
+                                        fontPref.set(fontPref.defaultValue)
+                                    }
+                                    (family.default as? FontCache.TTFFont)?.delete()
+                                },
+                            )
+                        }
                     }
                 }
-                itemsIndexed(
-                    items = customFonts,
+                preferenceGroupItems(
+                    filteredItems,
+                    isFirstChild = false,
                     key = { _, family -> family.toString() },
-                    contentType = { _, _ -> ContentType.FONT },
-                ) { index, family ->
-                    PreferenceGroupItem(
-                        cutTop = true,
-                        cutBottom = index != customFonts.lastIndex,
-                    ) {
-                        PreferenceDivider(startIndent = 40.dp)
-                        FontSelectionItem(
-                            adapter = adapter,
-                            family = family,
-                            onDelete = {
-                                val selected = family.variants.any { it.value == adapter.state.value }
-                                if (selected) {
-                                    fontPref.set(fontPref.defaultValue)
-                                }
-                                (family.default as? FontCache.TTFFont)?.delete()
-                            },
-                        )
-                    }
+                    contentType = { ContentType.FONT },
+                ) { _, family ->
+                    FontSelectionItem(
+                        adapter = adapter,
+                        family = family,
+                    )
                 }
-            }
-            preferenceGroupItems(
-                filteredItems,
-                isFirstChild = false,
-                key = { _, family -> family.toString() },
-                contentType = { ContentType.FONT },
-            ) { _, family ->
-                FontSelectionItem(
-                    adapter = adapter,
-                    family = family,
-                )
+                // Clearance so the last row in the list isn't hidden behind
+                // the floating Add-fonts FAB.
+                item {
+                    Spacer(modifier = Modifier.height(88.dp))
+                }
             }
         }
+
+        ExtendedFloatingActionButton(
+            onClick = ::launchAddFont,
+            expanded = fabExpanded,
+            icon = { Icon(imageVector = Icons.Rounded.Add, contentDescription = null) },
+            text = { Text(text = stringResource(id = R.string.pref_fonts_add_fonts)) },
+            containerColor = FloatingActionButtonDefaults.containerColor,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+        )
     }
 }
 

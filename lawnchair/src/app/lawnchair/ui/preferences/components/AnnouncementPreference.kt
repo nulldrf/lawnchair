@@ -10,14 +10,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,7 +40,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences2.asState
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
-import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.data.liveinfo.model.Announcement
 import app.lawnchair.ui.util.addIf
@@ -185,7 +186,6 @@ private fun AnnouncementItemContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AnnouncementPreferenceItemContent(
     text: String,
@@ -197,9 +197,18 @@ private fun AnnouncementPreferenceItemContent(
     val hasLink = !url.isNullOrBlank()
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
 
-    PreferenceTemplate(
+    // A true pill: RoundedCornerShape(percent = 50) rounds each corner to
+    // 50% of the shorter side, so it stays a full capsule whether the text
+    // is one short word or wraps across several lines — no fixed dp radius
+    // to look "correct" at one height and wrong at another.
+    //
+    // No fillMaxWidth(): letting width follow content means a short
+    // announcement stays a compact pill instead of stretching edge-to-edge
+    // and looking oversized. A longer announcement still can't overflow the
+    // screen — the surrounding column caps the available width, so the text
+    // wraps and the pill grows to fit exactly what's written, nothing more.
+    Surface(
         modifier = modifier
-            .fillMaxWidth()
             .addIf(hasLink) {
                 clickable {
                     mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
@@ -210,24 +219,24 @@ private fun AnnouncementPreferenceItemContent(
                     }
                 }
             },
-        shapes = ListItemDefaults.shapes().copy(shape = RoundedCornerShape(28.dp)),
-        colors = ListItemDefaults.segmentedColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-        ),
-        title = {},
-        description = {
-            Text(
-                modifier = Modifier.fillMaxWidth(),
-                text = text,
-                color = MaterialTheme.colorScheme.background,
-            )
-        },
-        startWidget = {
+        shape = RoundedCornerShape(percent = 50),
+        color = MaterialTheme.colorScheme.primary,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
                 imageVector = icon,
                 tint = MaterialTheme.colorScheme.background,
                 contentDescription = null,
+                modifier = Modifier.size(20.dp),
             )
-        },
-    )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = text,
+                color = MaterialTheme.colorScheme.background,
+            )
+        }
+    }
 }

@@ -71,6 +71,7 @@ import app.lawnchair.ui.preferences.components.layout.NestedScrollStretch
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import androidx.compose.ui.graphics.Color
+import app.lawnchair.ui.theme.preferenceGroupColor
 import app.lawnchair.util.Constants
 import app.lawnchair.util.getThemedIconPacksInstalled
 import app.lawnchair.util.isPackageInstalled
@@ -292,31 +293,37 @@ fun IconPackGrid(
         if (index != -1) lazyListState.scrollToItem(index)
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val itemWidth = getIconPackItemWidth(
-            availableWidth = maxWidth.value - padding.value,
-            minimumWidth = 80f,
-            gutterWidth = padding.value,
-        )
-        NestedScrollStretch {
-            LazyRow(
-                state = lazyListState,
-                horizontalArrangement = Arrangement.spacedBy(padding),
-                contentPadding = PaddingValues(horizontal = padding),
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .fillMaxWidth(),
-            ) {
-                items(iconPacks, { it.packageName }) { item ->
-                    IconPackItem(
-                        item = item,
-                        selected = item.packageName == adapter.state.value,
-                        modifier = Modifier.width(itemWidth.dp),
-                        onClick = {
-                            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_HIGH_EMPHASIS)
-                            adapter.onChange(item.packageName)
-                        },
-                    )
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = preferenceGroupColor(),
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val itemWidth = getIconPackItemWidth(
+                availableWidth = maxWidth.value - padding.value,
+                minimumWidth = 80f,
+                gutterWidth = padding.value,
+            )
+            NestedScrollStretch {
+                LazyRow(
+                    state = lazyListState,
+                    horizontalArrangement = Arrangement.spacedBy(padding),
+                    contentPadding = PaddingValues(horizontal = padding),
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth(),
+                ) {
+                    items(iconPacks, { it.packageName }) { item ->
+                        IconPackItem(
+                            item = item,
+                            selected = item.packageName == adapter.state.value,
+                            modifier = Modifier.width(itemWidth.dp),
+                            onClick = {
+                                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_HIGH_EMPHASIS)
+                                adapter.onChange(item.packageName)
+                            },
+                        )
+                    }
                 }
             }
         }

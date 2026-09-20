@@ -27,7 +27,6 @@ import android.graphics.Path as AndroidPath
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -103,6 +102,7 @@ import app.lawnchair.ui.preferences.components.invariantDeviceProfile
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.navigation.GeneralCustomIconShapeCreator
+import app.lawnchair.ui.theme.preferenceGroupColor
 import com.android.launcher3.R
 import kotlinx.coroutines.launch
 
@@ -374,19 +374,25 @@ private fun ShapeGridContent(
     // create/edit button, matching the visual language of the presets grid.
     if (customIconShape != null) {
         PreferenceGroup(heading = stringResource(id = R.string.custom)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = preferenceGroupColor(),
             ) {
-                ShapeCard(
-                    iconShape = customIconShape,
-                    label = stringResource(id = R.string.custom),
-                    selected = IconShape.isCustomShape(shapeAdapter.state.value),
-                    modifier = Modifier.size(80.dp),
-                    onClick = { shapeAdapter.onChange(customIconShape) },
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ShapeCard(
+                        iconShape = customIconShape,
+                        label = stringResource(id = R.string.custom),
+                        selected = IconShape.isCustomShape(shapeAdapter.state.value),
+                        modifier = Modifier.size(80.dp),
+                        onClick = { shapeAdapter.onChange(customIconShape) },
+                    )
+                }
             }
             ModifyCustomIconShapePreference(
                 customIconShape = customIconShape,
@@ -421,22 +427,28 @@ private fun ShapeGrid(
         if (index != -1) lazyListState.scrollToItem(index)
     }
 
-    LazyRow(
-        state = lazyListState,
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = preferenceGroupColor(),
     ) {
-        items(entries, key = { it.value.key }) { entry ->
-            ShapeCard(
-                iconShape = entry.value,
-                label = entry.label(),
-                selected = entry.value == selectedShape,
-                modifier = Modifier.size(72.dp),
-                onClick = { shapeAdapter.onChange(entry.value) },
-            )
+        LazyRow(
+            state = lazyListState,
+            contentPadding = PaddingValues(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+        ) {
+            items(entries, key = { it.value.key }) { entry ->
+                ShapeCard(
+                    iconShape = entry.value,
+                    label = entry.label(),
+                    selected = entry.value == selectedShape,
+                    modifier = Modifier.size(72.dp),
+                    onClick = { shapeAdapter.onChange(entry.value) },
+                )
+            }
         }
     }
 }
@@ -528,14 +540,17 @@ private fun ModifyCustomIconShapePreference(
 
     val icon = if (created) Icons.Rounded.Edit else Icons.Rounded.Add
 
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { navController.navigate(route = route) },
-        contentAlignment = Alignment.Center,
+    Surface(
+        onClick = { navController.navigate(route = route) },
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = preferenceGroupColor(),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CompositionLocalProvider(

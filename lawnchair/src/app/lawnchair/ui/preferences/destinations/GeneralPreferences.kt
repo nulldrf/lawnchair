@@ -120,13 +120,6 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                     description = stringResource(id = R.string.home_screen_rotation_description),
                 )
             }
-            ScrollAnchor(ScrollKeys.HAPTIC_FEEDBACK, scrollState) {
-                SwitchPreference(
-                    adapter = prefs2.hapticFeedback.getAdapter(),
-                    label = stringResource(id = R.string.haptic_feedback_label),
-                    description = stringResource(id = R.string.haptic_feedback_description),
-                )
-            }
         }
 
         // ── Updater & live information ──────────────────────────────────────────
@@ -137,6 +130,18 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                     label = stringResource(id = R.string.auto_updater_label),
                     description = stringResource(id = R.string.auto_updater_description),
                 )
+        }
+
+        // ── Auto-updater (nightly builds only) ────────────────────────────────
+        if (BuildConfig.APPLICATION_ID.contains("nightly")) {
+            PreferenceGroup(heading = stringResource(id = R.string.updater)) {
+                Item {
+                    SwitchPreference(
+                        adapter = prefs2.autoUpdaterNightly.getAdapter(),
+                        label = stringResource(id = R.string.auto_updater_label),
+                        description = stringResource(id = R.string.auto_updater_description),
+                    )
+                }
             }
             SwitchPreference(
                 adapter = liveInfoManager.enabled.getAdapter(),

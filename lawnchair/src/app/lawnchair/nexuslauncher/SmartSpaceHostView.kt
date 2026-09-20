@@ -10,8 +10,6 @@ import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
 import app.lawnchair.LawnchairLauncher
-import app.lawnchair.preferences2.PreferenceManager2
-import com.patrykmichalik.opto.core.firstBlocking
 import app.lawnchair.util.unsafeLazy
 import com.android.launcher3.CheckLongPressHelper
 import com.android.launcher3.Launcher
@@ -43,9 +41,7 @@ sealed class SmartSpaceHostView(context: Context) :
         if (!hasSettings(view.context)) {
             return false
         }
-        if (PreferenceManager2.getInstance(view.context).hapticFeedback.firstBlocking()) {
-            mMSDLPlayerWrapper.playToken(MSDLToken.LONG_PRESS)
-        }
+        mMSDLPlayerWrapper.playToken(MSDLToken.LONG_PRESS)
         val pos = Rect()
         mLauncher.dragLayer.getDescendantRectRelativeToSelf(this, pos)
         val centerPos = RectF()

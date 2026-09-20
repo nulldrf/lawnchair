@@ -195,7 +195,6 @@ private fun AnnouncementPreferenceItemContent(
 ) {
     val context = LocalContext.current
     val hasLink = !url.isNullOrBlank()
-    val prefs2 = preferenceManager2()
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
 
     PreferenceTemplate(
@@ -203,9 +202,7 @@ private fun AnnouncementPreferenceItemContent(
             .fillMaxWidth()
             .addIf(hasLink) {
                 clickable {
-                    if (prefs2.hapticFeedback.firstBlocking()) {
-                        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
-                    }
+                    mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
                     val webpage = Uri.parse(url)
                     val intent = Intent(Intent.ACTION_VIEW, webpage)
                     if (intent.resolveActivity(context.packageManager) != null) {

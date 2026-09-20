@@ -57,7 +57,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
-import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.DummyLauncherBox
 import app.lawnchair.ui.preferences.components.DummyLauncherLayout
@@ -79,7 +78,6 @@ import com.android.launcher3.R
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.google.android.msdl.data.model.MSDLToken
-import com.patrykmichalik.opto.core.firstBlocking
 
 data class IconPackInfo(
     val name: String,
@@ -283,7 +281,6 @@ fun IconPackGrid(
     modifier: Modifier = Modifier,
 ) {
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
-    val prefs2 = preferenceManager2()
     val preferenceInteractor = LocalPreferenceInteractor.current
     val iconPacks by preferenceInteractor.iconPacks.collectAsStateWithLifecycle()
     val lazyListState = rememberLazyListState()
@@ -316,9 +313,7 @@ fun IconPackGrid(
                         selected = item.packageName == adapter.state.value,
                         modifier = Modifier.width(itemWidth.dp),
                         onClick = {
-                            if (prefs2.hapticFeedback.firstBlocking()) {
-                                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_HIGH_EMPHASIS)
-                            }
+                            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_HIGH_EMPHASIS)
                             adapter.onChange(item.packageName)
                         },
                     )

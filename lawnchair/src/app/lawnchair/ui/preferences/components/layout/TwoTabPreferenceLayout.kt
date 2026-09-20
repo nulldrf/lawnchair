@@ -25,11 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
-import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
-import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.launch
 
 @Composable
@@ -45,7 +43,6 @@ fun TwoTabPreferenceLayout(
     defaultPage: Int = 0,
 ) {
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
-    val prefs2 = preferenceManager2()
     PreferenceLayout(
         label = label,
         modifier = modifier,
@@ -87,9 +84,7 @@ fun TwoTabPreferenceLayout(
 
                 Surface(
                     onClick = {
-                        if (prefs2.hapticFeedback.firstBlocking()) {
-                            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
-                        }
+                        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
                         scope.launch { pagerState.animateScrollToPage(index) }
                     },
                     modifier = Modifier

@@ -33,14 +33,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.theme.LawnchairTheme
 import app.lawnchair.ui.util.preview.PreviewLawnchair
 import com.android.launcher3.R
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
-import com.patrykmichalik.opto.core.firstBlocking
 
 @Composable
 fun PreferenceCategory(
@@ -74,7 +72,6 @@ fun PreferenceCategory(
     shapes: ListItemShapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
 ) {
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
-    val prefs2 = preferenceManager2()
     PreferenceTemplate(
         title = {
             Text(
@@ -103,9 +100,7 @@ fun PreferenceCategory(
         endWidget = endWidget,
         shapes = shapes,
         onClick = {
-            if (prefs2.hapticFeedback.firstBlocking()) {
-                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
-            }
+            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
             onNavigate()
         },
     )

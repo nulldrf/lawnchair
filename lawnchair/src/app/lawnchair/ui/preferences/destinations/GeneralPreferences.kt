@@ -130,18 +130,6 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                     label = stringResource(id = R.string.auto_updater_label),
                     description = stringResource(id = R.string.auto_updater_description),
                 )
-        }
-
-        // ── Auto-updater (nightly builds only) ────────────────────────────────
-        if (BuildConfig.APPLICATION_ID.contains("nightly")) {
-            PreferenceGroup(heading = stringResource(id = R.string.updater)) {
-                Item {
-                    SwitchPreference(
-                        adapter = prefs2.autoUpdaterNightly.getAdapter(),
-                        label = stringResource(id = R.string.auto_updater_label),
-                        description = stringResource(id = R.string.auto_updater_description),
-                    )
-                }
             }
             SwitchPreference(
                 adapter = liveInfoManager.enabled.getAdapter(),

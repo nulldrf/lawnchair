@@ -167,7 +167,6 @@ import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.msdl.data.model.MSDLToken
-import com.patrykmichalik.opto.core.firstBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -304,7 +303,6 @@ fun PreferencesDashboard(
     val showColorSpec = (isWallpaperAccent || isCustomAccent) && effectiveColorStyle !is LegacyKdrag
 
     val allowRotationAdapter = prefs.allowRotation.getAdapter()
-    val hapticFeedbackAdapter = prefs2.hapticFeedback.getAdapter()
     val shadowBGIconsAdapter = prefs.shadowBGIcons.getAdapter()
     val treatWhiteAdaptiveIconsAdapter = prefs.treatWhiteAdaptiveIcons.getAdapter()
     val colorizeIconPackBackgroundAdapter = prefs.colorizeIconPackBackground.getAdapter()
@@ -496,7 +494,6 @@ fun PreferencesDashboard(
             if (visible) add(SearchableEntry(label, kw, labelGeneral, R.drawable.ic_general, General, sk, toggle))
         }
         g(stringResource(R.string.home_screen_rotation_label), "rotate allow home screen rotation", ScrollKeys.HOME_ROTATION, toggle = allowRotationAdapter.toToggle())
-        g(stringResource(R.string.haptic_feedback_label), "vibrate touch feedback", ScrollKeys.HAPTIC_FEEDBACK, toggle = hapticFeedbackAdapter.toToggle())
         g(stringResource(R.string.icon_style_label), "icon packs apply theme", ScrollKeys.ICON_STYLE)
         g(stringResource(R.string.transparent_background_icons_label), "transparent icon background themed adaptive", ScrollKeys.TRANSPARENT_ICON_BG, toggle = transparentIconBackgroundAdapter.toToggle())
         g(stringResource(R.string.icon_shape_label), "circle square rounded squircle octagon teardrop shape", ScrollKeys.ICON_SHAPE)
@@ -936,7 +933,6 @@ private fun SearchOverlay(
     // Same haptic-on-toggle behavior every other switch in Lawnchair has
     // (SwitchPreference.kt), replicated here so the inline search-result
     // switch feels identical, not just looks identical.
-    val prefs2 = preferenceManager2()
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -1103,11 +1099,9 @@ private fun SearchOverlay(
                                         Switch(
                                             checked = toggle.checked,
                                             onCheckedChange = { newValue ->
-                                                if (prefs2.hapticFeedback.firstBlocking()) {
-                                                    mMSDLPlayerWrapper.playToken(
-                                                        if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF,
-                                                    )
-                                                }
+                                                mMSDLPlayerWrapper.playToken(
+                                                    if (newValue) MSDLToken.SWITCH_ON else MSDLToken.SWITCH_OFF,
+                                                )
                                                 toggle.onCheckedChange(newValue)
                                             },
                                             colors = SwitchDefaults.colors(
@@ -1150,13 +1144,10 @@ private fun SettingsSearchBar(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val prefs2 = preferenceManager2()
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
     Surface(
         onClick = {
-            if (prefs2.hapticFeedback.firstBlocking()) {
-                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
-            }
+            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
             onActivate()
         },
         modifier = modifier.fillMaxWidth(),
@@ -1188,16 +1179,13 @@ private fun SettingsSearchBar(
 @Composable
 fun PreferencesSetDefaultLauncherCard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val prefs2 = preferenceManager2()
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
     PreferenceTemplate(
         modifier = modifier
             .padding(horizontal = 16.dp)
             .fillMaxWidth()
             .clickable {
-                if (prefs2.hapticFeedback.firstBlocking()) {
-                    mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
-                }
+                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
                 Intent(Settings.ACTION_HOME_SETTINGS)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     .let { context.startActivity(it) }

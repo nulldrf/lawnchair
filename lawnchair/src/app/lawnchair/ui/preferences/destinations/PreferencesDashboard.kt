@@ -70,6 +70,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -770,6 +771,21 @@ fun PreferencesDashboard(
                     },
             )
 
+            val showAppDrawerCategory = !deckLayout.state.value
+            val showQuickstepCategory = LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG
+            val categoryCount = 10 +
+                (if (showAppDrawerCategory) 1 else 0) +
+                (if (showQuickstepCategory) 1 else 0)
+
+            fun categoryShape(index: Int): ListItemShapes = when {
+                categoryCount == 1 -> ListItemDefaults.segmentedShapes(index = 0, count = 1)
+                index == 0 -> ListItemDefaults.segmentedShapes(index = 0, count = 2)
+                index == categoryCount - 1 -> ListItemDefaults.segmentedShapes(index = 1, count = 2)
+                else -> ListItemDefaults.segmentedShapes(index = 1, count = 3)
+            }
+
+            var categoryIndex = 0
+
             PreferenceGroup {
                 PreferenceCategory(
                     label = labelGeneral,
@@ -777,6 +793,7 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_general,
                     onNavigate = { onNavigate(General) },
                     isSelected = currentRoute is General,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelHomeScreen,
@@ -784,6 +801,7 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_home_screen,
                     onNavigate = { onNavigate(HomeScreen) },
                     isSelected = currentRoute is HomeScreen,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelSmartspace,
@@ -791,6 +809,7 @@ fun PreferencesDashboard(
                     iconResource = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off,
                     onNavigate = { onNavigate(Smartspace) },
                     isSelected = currentRoute is Smartspace,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelDock,
@@ -798,22 +817,26 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_dock,
                     onNavigate = { onNavigate(Dock) },
                     isSelected = currentRoute is Dock,
+                    shapes = categoryShape(categoryIndex++),
                 )
-                ExpandAndShrink(visible = !deckLayout.state.value) {
+                ExpandAndShrink(visible = showAppDrawerCategory) {
                     PreferenceCategory(
                         label = labelAppDrawer,
                         description = descAppDrawer,
                         iconResource = R.drawable.ic_apps,
                         onNavigate = { onNavigate(AppDrawer) },
                         isSelected = currentRoute is AppDrawer,
+                        shapes = categoryShape(categoryIndex),
                     )
                 }
+                if (showAppDrawerCategory) categoryIndex++
                 PreferenceCategory(
                     label = labelSearchBar,
                     description = descSearchBar,
                     iconResource = R.drawable.ic_search,
                     onNavigate = { onNavigate(Search()) },
                     isSelected = currentRoute is Search,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelFolders,
@@ -821,6 +844,7 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_folder,
                     onNavigate = { onNavigate(Folders) },
                     isSelected = currentRoute is Folders,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelGestures,
@@ -828,22 +852,26 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_gestures,
                     onNavigate = { onNavigate(Gestures) },
                     isSelected = currentRoute is Gestures,
+                    shapes = categoryShape(categoryIndex++),
                 )
-                ExpandAndShrink(visible = LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG) {
+                ExpandAndShrink(visible = showQuickstepCategory) {
                     PreferenceCategory(
                         label = labelQuickstep,
                         description = descQuickstep,
                         iconResource = R.drawable.ic_quickstep,
                         onNavigate = { onNavigate(Quickstep) },
                         isSelected = currentRoute is Quickstep,
+                        shapes = categoryShape(categoryIndex),
                     )
                 }
+                if (showQuickstepCategory) categoryIndex++
                 PreferenceCategory(
                     label = labelBackup,
                     description = descBackup,
                     iconResource = R.drawable.backup_restore,
                     onNavigate = { onNavigate(BackupAndRestore) },
                     isSelected = currentRoute is BackupAndRestore,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelExtras,
@@ -851,6 +879,7 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_extras,
                     onNavigate = { onNavigate(Extras) },
                     isSelected = currentRoute is Extras,
+                    shapes = categoryShape(categoryIndex++),
                 )
                 PreferenceCategory(
                     label = labelAbout,
@@ -858,6 +887,7 @@ fun PreferencesDashboard(
                     iconResource = R.drawable.ic_about,
                     onNavigate = { onNavigate(About) },
                     isSelected = currentRoute is About,
+                    shapes = categoryShape(categoryIndex++),
                 )
             }
         }

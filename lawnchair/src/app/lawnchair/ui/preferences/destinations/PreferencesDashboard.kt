@@ -777,6 +777,7 @@ fun PreferencesDashboard(
                 (if (showAppDrawerCategory) 1 else 0) +
                 (if (showQuickstepCategory) 1 else 0)
 
+            @Composable
             fun categoryShape(index: Int): ListItemShapes = when {
                 categoryCount == 1 -> ListItemDefaults.segmentedShapes(index = 0, count = 1)
                 index == 0 -> ListItemDefaults.segmentedShapes(index = 0, count = 2)

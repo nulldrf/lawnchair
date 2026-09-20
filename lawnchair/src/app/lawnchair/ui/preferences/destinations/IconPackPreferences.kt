@@ -70,7 +70,7 @@ import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.NestedScrollStretch
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
-import app.lawnchair.ui.theme.preferenceGroupColor
+import androidx.compose.ui.graphics.Color
 import app.lawnchair.util.Constants
 import app.lawnchair.util.getThemedIconPacksInstalled
 import app.lawnchair.util.isPackageInstalled
@@ -350,6 +350,10 @@ private fun getIconPackItemWidth(
  * Fixed [height] of 96dp ensures every card in the row is the same size
  * regardless of pack name length. The name is capped at one line with
  * ellipsis overflow so a long name can never push a card taller.
+ *
+ * Unselected items are transparent so they sit flush inside the single
+ * outer [PreferenceGroup] card; only the selected pack gets its own
+ * [MaterialTheme.colorScheme.primaryContainer] highlight box.
  */
 @Composable
 fun IconPackItem(
@@ -361,7 +365,7 @@ fun IconPackItem(
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.large,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else preferenceGroupColor(),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         modifier = modifier.height(96.dp),
     ) {
         Column(

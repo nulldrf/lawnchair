@@ -103,7 +103,6 @@ import app.lawnchair.ui.preferences.components.invariantDeviceProfile
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.navigation.GeneralCustomIconShapeCreator
-import app.lawnchair.ui.theme.preferenceGroupColor
 import com.android.launcher3.R
 import kotlinx.coroutines.launch
 
@@ -452,7 +451,8 @@ private fun ShapeGrid(
  * shape name — keeping the grid clean while remaining discoverable.
  *
  * Selected state: [MaterialTheme.colorScheme.primaryContainer] background.
- * Unselected state: [preferenceGroupColor] background.
+ * Unselected state: transparent — the item sits flush inside the
+ * single outer [PreferenceGroup] card instead of getting its own box.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -484,7 +484,7 @@ private fun ShapeCard(
             color = if (selected) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                preferenceGroupColor()
+                Color.Transparent
             },
             modifier = modifier.combinedClickable(
                 onClick = onClick,

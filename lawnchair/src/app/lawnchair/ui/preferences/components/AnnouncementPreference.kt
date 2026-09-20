@@ -6,12 +6,12 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,7 +42,6 @@ import app.lawnchair.preferences2.asState
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
 import app.lawnchair.ui.preferences.data.liveinfo.model.Announcement
-import app.lawnchair.ui.util.addIf
 import com.android.launcher3.R
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
@@ -198,39 +197,37 @@ private fun AnnouncementPreferenceItemContent(
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
 
     // A true pill: RoundedCornerShape(percent = 50) rounds each corner to
-    // 50% of the shorter side, so it stays a full capsule whether the text
-    // is one short word or wraps across several lines — no fixed dp radius
-    // to look "correct" at one height and wrong at another.
+    // 50% of the shorter side, so it stays a full capsule regardless of
+    // height — no fixed dp radius to look "correct" at one height and
+    // wrong at another.
     //
-    // No fillMaxWidth(): letting width follow content means a short
-    // announcement stays a compact pill instead of stretching edge-to-edge
-    // and looking oversized. A longer announcement still can't overflow the
-    // screen — the surrounding column caps the available width, so the text
-    // wraps and the pill grows to fit exactly what's written, nothing more.
+    // Surface's own onClick (rather than a plain .clickable in the modifier
+    // chain) is what bounds the press/long-press ripple to `shape` — a
+    // .clickable added to the incoming modifier draws its ripple in the
+    // full rectangular layout bounds, ignoring the pill clip entirely.
     Surface(
-        modifier = modifier
-            .addIf(hasLink) {
-                clickable {
-                    mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
-                    val webpage = Uri.parse(url)
-                    val intent = Intent(Intent.ACTION_VIEW, webpage)
-                    if (intent.resolveActivity(context.packageManager) != null) {
-                        context.startActivity(intent)
-                    }
-                }
-            },
+        onClick = {
+            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
+            val webpage = Uri.parse(url)
+            val intent = Intent(Intent.ACTION_VIEW, webpage)
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+            }
+        },
+        enabled = hasLink,
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.primary,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 tint = MaterialTheme.colorScheme.background,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(24.dp),
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(

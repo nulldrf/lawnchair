@@ -35,12 +35,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +65,9 @@ import app.lawnchair.ui.preferences.components.layout.preferenceGroupItems
 import com.android.launcher3.R
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 private enum class ContentType {
     FONT,
@@ -129,10 +134,29 @@ fun FontSelection(
     // expanded while scrolling up (or once there's nothing left to scroll
     // up to, i.e. already at the top), collapse to the icon-only pill the
     // moment the list scrolls down.
-    val fabExpanded by remember {
+    val scrollExpanded by remember {
         derivedStateOf {
             lazyListState.lastScrolledBackward || !lazyListState.canScrollBackward
         }
+    }
+
+    // Reading scrollExpanded straight into the FAB's `expanded` param made
+    // the collapse look laggy and let the text visibly overshoot past the
+    // icon: a quick flick (or a one-frame direction hiccup right as a fling
+    // starts) flips the raw boolean back and forth, which restarts the
+    // FAB's own collapse animation mid-transition instead of letting it
+    // finish. Expanding stays instant; collapsing waits briefly so a
+    // flicker gets cancelled by collectLatest rather than restarting.
+    var fabExpanded by remember { mutableStateOf(true) }
+    LaunchedEffect(lazyListState) {
+        snapshotFlow { scrollExpanded }
+            .distinctUntilChanged()
+            .collectLatest { expanded ->
+                if (!expanded) {
+                    delay(120)
+                }
+                fabExpanded = expanded
+            }
     }
 
     fun launchAddFont() {

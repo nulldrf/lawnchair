@@ -47,7 +47,7 @@ import app.lawnchair.icons.picker.IconEntry
 import app.lawnchair.icons.picker.IconPickerItem
 import app.lawnchair.icons.picker.IconType
 import app.lawnchair.ui.preferences.LocalNavController
-import app.lawnchair.ui.preferences.destinations.IconPackInfo
+import app.lawnchair.ui.preferences.destinations.icons.IconPackInfo
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.AppItem
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference

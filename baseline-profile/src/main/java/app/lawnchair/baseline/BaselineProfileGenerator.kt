@@ -3,14 +3,14 @@ package app.lawnchair.baseline
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Direction
-import androidx.test.uiautomator.UiObject2
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.Until
 import org.junit.Rule
 import org.junit.Test
@@ -46,10 +46,10 @@ class BaselineProfileGenerator {
 
             // Profile every top-level Compose settings screen in dashboard order.
             openDashboardCategory("General") {
-                scrollCurrentScreen()
                 openSubScreen("Icon shape")
                 openSubScreen("Accent color")
                 openSubScreen("Color style")
+                scrollCurrentScreen()
             }
             openDashboardCategory("Home screen")
             openDashboardCategory("At a Glance")
@@ -58,8 +58,8 @@ class BaselineProfileGenerator {
             openDashboardCategory("Search bar") {
                 scrollCurrentScreen()
                 // Profile the second tab ("App drawer") in TwoTabPreferenceLayout.
-                device.wait(Until.findObject(By.text("App drawer")), 1_500)?.click()
-                device.waitForIdle()
+                clickTextIfPresent("App drawer", timeoutMs = 1_500)
+                settleTransition()
                 scrollCurrentScreen()
             }
             openDashboardCategory("Folders")
@@ -88,18 +88,10 @@ class BaselineProfileGenerator {
     }
 
     private fun MacrobenchmarkScope.swipeUpAppDrawer() {
-        val centerX = device.displayWidth / 2
-        device.swipe(
-            centerX,
-            device.displayHeight * 3 / 4,
-            centerX,
-            device.displayHeight / 4,
-            20,
-        )
-        device.waitForIdle()
+        swipeDownContent()
         scrollCurrentScreen()
         device.pressBack()
-        device.waitForIdle()
+        settleTransition()
     }
 
     private fun MacrobenchmarkScope.openSettingsDashboard() {
@@ -113,27 +105,30 @@ class BaselineProfileGenerator {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("lawnchair://settings/$path"))
             .setPackage(packageName)
         startActivityAndWait(intent)
-        device.waitForIdle()
+        settleTransition()
     }
 
     private fun MacrobenchmarkScope.exerciseSettingsSearch() {
-        val searchBar = device.wait(Until.findObject(By.text("Search settings")), 2_000) ?: return
-        searchBar.click()
-        device.waitForIdle()
+        if (!clickTextIfPresent("Search settings", timeoutMs = 2_000)) return
+        settleTransition()
 
-        val input = device.wait(Until.findObject(By.focused(true)), 1_500)
-            ?: device.findObject(By.clazz("android.widget.EditText"))
-        if (input != null) {
-            input.text = "icon"
-            device.waitForIdle()
-            scrollCurrentScreen()
+        try {
+            val input = device.wait(Until.findObject(By.focused(true)), 1_500)
+                ?: device.findObject(By.clazz("android.widget.EditText"))
+            if (input != null) {
+                input.text = "icon"
+                settleTransition()
+                scrollCurrentScreen()
+            }
+        } catch (_: StaleObjectException) {
+            // Compose may recompose the search field during focus transition.
         }
 
         // Dismiss IME and SearchOverlay until PreferencesDashboard is visible again.
         repeat(3) {
             if (device.hasObject(By.text("General"))) return
             device.pressBack()
-            device.waitForIdle()
+            settleTransition()
         }
     }
 
@@ -141,41 +136,62 @@ class BaselineProfileGenerator {
         label: String,
         onScreen: MacrobenchmarkScope.() -> Unit = { scrollCurrentScreen() },
     ) {
-        val item = findObjectScrollingDown(label) ?: return
-        item.click()
-        device.waitForIdle()
+        if (!clickTextScrollingDown(label)) return
+        settleTransition()
         onScreen()
         device.pressBack()
-        device.waitForIdle()
+        settleTransition()
     }
 
     private fun MacrobenchmarkScope.openSubScreen(label: String) {
-        val item = findObjectScrollingDown(label) ?: return
-        item.click()
-        device.waitForIdle()
+        if (!clickTextScrollingDown(label)) return
+        settleTransition()
         scrollCurrentScreen()
         device.pressBack()
-        device.waitForIdle()
+        settleTransition()
     }
 
-    private fun MacrobenchmarkScope.findObjectScrollingDown(label: String): UiObject2? {
-        device.wait(Until.findObject(By.text(label)), 1_500)?.let { return it }
+    private fun MacrobenchmarkScope.clickTextScrollingDown(label: String): Boolean {
+        if (clickTextIfPresent(label, timeoutMs = 1_500)) return true
         repeat(4) {
-            val scrollable = device.findObject(By.scrollable(true)) ?: return null
-            scrollable.setGestureMargin(device.displayWidth / 5)
-            val scrolled = scrollable.scroll(Direction.DOWN, 0.7f)
-            device.waitForIdle()
-            device.findObject(By.text(label))?.let { return it }
-            if (!scrolled) return null
+            swipeDownContent()
+            if (clickTextIfPresent(label, timeoutMs = 500)) return true
         }
-        return null
+        return false
+    }
+
+    private fun MacrobenchmarkScope.clickTextIfPresent(label: String, timeoutMs: Long): Boolean {
+        repeat(2) {
+            val target = device.wait(Until.findObject(By.text(label)), timeoutMs) ?: return false
+            try {
+                target.click()
+                return true
+            } catch (_: StaleObjectException) {
+                settleTransition()
+            }
+        }
+        return false
     }
 
     private fun MacrobenchmarkScope.scrollCurrentScreen() {
-        val scrollable = device.findObject(By.scrollable(true)) ?: return
-        scrollable.setGestureMargin(device.displayWidth / 5)
-        scrollable.scroll(Direction.DOWN, 0.6f)
+        swipeDownContent()
+    }
+
+    private fun MacrobenchmarkScope.swipeDownContent() {
+        val centerX = device.displayWidth / 2
+        device.swipe(
+            centerX,
+            device.displayHeight * 3 / 4,
+            centerX,
+            device.displayHeight / 4,
+            15,
+        )
         device.waitForIdle()
+    }
+
+    private fun MacrobenchmarkScope.settleTransition() {
+        device.waitForIdle()
+        SystemClock.sleep(300)
     }
 
     private companion object {

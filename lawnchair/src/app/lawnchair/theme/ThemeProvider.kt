@@ -11,6 +11,7 @@ import androidx.core.graphics.ColorUtils
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.theme.color.AndroidColor
+import app.lawnchair.theme.color.Cmf
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
@@ -19,6 +20,7 @@ import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.MonetColorSchemeCompat2025
 import app.lawnchair.theme.color.SystemColorScheme
 import app.lawnchair.theme.color.TonalSpot
+import app.lawnchair.theme.color.resolveEffectiveSpec
 import app.lawnchair.ui.theme.getSystemAccent
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.Utilities
@@ -30,6 +32,7 @@ import com.android.launcher3.util.DaggerSingletonTracker
 import com.android.launcher3.util.SafeCloseable
 import com.android.systemui.monet.SpecVersion
 import com.android.systemui.monet.Style
+import com.materialkolor.dynamiccolor.ColorSpec
 import com.patrykmichalik.opto.core.onEach
 import dev.kdrag0n.colorkt.Color
 import dev.kdrag0n.colorkt.conversion.ConversionGraph.convert
@@ -64,6 +67,9 @@ class ThemeProvider @Inject constructor(
     @Volatile
     private var colorSpec: SpecVersion = preferenceManager2.colorSpec.firstCached()
 
+    @Volatile
+    private var colorSpecFallback: SpecVersion = preferenceManager2.colorSpecFallback.firstCached()
+
     // Cache for SPEC_2021 / LegacyKdrag — keyed by (seedColor, Style, SpecVersion).
     // Value type is the kdrag0n ColorScheme abstract class.
     private val colorSchemeMap = ConcurrentHashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
@@ -76,11 +82,19 @@ class ThemeProvider @Inject constructor(
     // Cache for the kdrag0n ZCAM engine — keyed by seedColor alone.
     private val kdragColorSchemeMap = ConcurrentHashMap<Int, ColorScheme>()
 
-    // Cache for SPEC_2025 — keyed by (seedColor, Style, isDark).
-    // isDark is part of the key because DynamicScheme bakes dark/light into palette
-    // generation — surface tones and chroma multipliers differ per mode.
+    private data class Scheme2025Key(
+        val seedColor: Int,
+        val secondarySeedColor: Int?,
+        val style: Style,
+        val specVersion: ColorSpec.SpecVersion,
+        val isDark: Boolean,
+    )
+
+    // Cache for SPEC_2025 / SPEC_2026 — keyed by (seedColor, secondarySeedColor, Style,
+    // specVersion, isDark). isDark is part of the key because DynamicScheme bakes dark/light
+    // into palette generation — surface tones and chroma multipliers differ per mode.
     // Typed as MonetColorSchemeCompat2025 directly; no kdrag0n type involved.
-    private val colorSchemeMap2025 = ConcurrentHashMap<Triple<Int, Style, Boolean>, MonetColorSchemeCompat2025>()
+    private val colorSchemeMap2025 = ConcurrentHashMap<Scheme2025Key, MonetColorSchemeCompat2025>()
 
     private val listeners = CopyOnWriteArrayList<ColorSchemeChangeListener>()
     private var overlayChangedReceiver: BroadcastReceiver? = null
@@ -89,15 +103,19 @@ class ThemeProvider @Inject constructor(
         object : WallpaperManagerCompat.OnColorsChangedListener {
             override fun onColorsChanged() {
                 when (val current = accentColor) {
-                    is ColorOption.WallpaperPrimary -> notifyColorSchemeChanged()
+                    is ColorOption.WallpaperPrimary -> {
+                        colorSchemeMap2025.clear()
+                        notifyColorSchemeChanged()
+                    }
                     is ColorOption.WallpaperDerived -> {
                         val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
                             ?: return
-                        // Clear 2025 cache so the new seed is always computed fresh —
+                        // Clear 2025/2026 cache so the new seed is always computed fresh —
                         // avoids stale MonetColorSchemeCompat2025 being served if the
                         // cache was hit before freshWallpaperPrimary was read.
                         colorSchemeMap2025.clear()
                         freshWallpaperPrimary = newPrimary
+                        freshWallpaperSecondary = wallpaperManager.wallpaperColors?.secondaryColor
                         notifyColorSchemeChanged()
                         if (newPrimary != current.wallpaperPrimary) {
                             coroutineScope.launch {
@@ -120,6 +138,9 @@ class ThemeProvider @Inject constructor(
 
     @Volatile
     private var freshWallpaperPrimary: Int? = null
+
+    @Volatile
+    private var freshWallpaperSecondary: Int? = null
 
     init {
         val storedAccent = accentColor
@@ -145,7 +166,8 @@ class ThemeProvider @Inject constructor(
         preferenceManager2.accentColor.onEach(launchIn = coroutineScope) {
             accentColor = it
             freshWallpaperPrimary = null
-            // Clear 2025 cache so the next colorScheme2025() call always uses
+            freshWallpaperSecondary = null
+            // Clear 2025/2026 cache so the next colorScheme2025() call always uses
             // the newly committed accent color rather than a cached stale entry.
             colorSchemeMap2025.clear()
             notifyColorSchemeChanged()
@@ -159,9 +181,21 @@ class ThemeProvider @Inject constructor(
         }
         preferenceManager2.colorSpec.onEach(launchIn = coroutineScope) {
             colorSpec = it
+            if (it != SpecVersion.SPEC_2026 && colorStyle is Cmf) {
+                colorStyle = TonalSpot
+                coroutineScope.launch {
+                    preferenceManager2.colorStyle.set(TonalSpot)
+                }
+            }
             colorSchemeMap.clear()
             colorSchemeMap2025.clear()
             if (Utilities.ATLEAST_S) seedSystemColorScheme()
+            notifyColorSchemeChanged()
+        }
+        preferenceManager2.colorSpecFallback.onEach(launchIn = coroutineScope) {
+            colorSpecFallback = it
+            colorSchemeMap.clear()
+            colorSchemeMap2025.clear()
             notifyColorSchemeChanged()
         }
 
@@ -175,6 +209,7 @@ class ThemeProvider @Inject constructor(
                     if (newPrimary != null) {
                         colorSchemeMap2025.clear()
                         freshWallpaperPrimary = newPrimary
+                        freshWallpaperSecondary = colors.secondaryColor?.toArgb()
                         notifyColorSchemeChanged()
                         if (newPrimary != current.wallpaperPrimary) {
                             coroutineScope.launch {
@@ -245,32 +280,58 @@ class ThemeProvider @Inject constructor(
     val colorScheme: ColorScheme
         get() = resolveColorScheme(accentColor)
 
+    /** Public accessor so Java callers (e.g. AccentColorExtractor) can gate on spec. */
+    val activeColorSpec: SpecVersion get() = colorSpec
+
     /**
-     * Returns the SPEC_2025 [MonetColorSchemeCompat2025] (plain type, no kdrag0n).
+     * Returns the SPEC_2025 / SPEC_2026 [MonetColorSchemeCompat2025] (plain type, no kdrag0n).
      *
-     * Returns null when accentColor is SystemAccent — the system palette is
-     * always rendered via the legacy path. [Theme.kt] checks for null and falls
-     * back to [colorScheme] in that case.
+     * Returns null when:
+     * - [accentColor] is [ColorOption.SystemAccent] (always uses the system palette),
+     * - [colorStyle] is [LegacyKdrag] (always uses ZCAM),
+     * - the effective spec resolves to [SpecVersion.SPEC_2021], or
+     * - [colorStyle] has no 2025/2026 implementation.
+     *
+     * Callers fall back to [colorScheme] when null is returned.
      *
      * [isDark] is required because [DynamicScheme] bakes dark/light into palette
      * generation — surface tones and chroma multipliers differ per mode.
      */
-    /** Public accessor so Java callers (e.g. AccentColorExtractor) can gate on spec. */
-    val activeColorSpec: SpecVersion get() = colorSpec
-
     fun colorScheme2025(isDark: Boolean): MonetColorSchemeCompat2025? =
         resolveColorScheme2025(accentColor, isDark)
 
-    private fun resolveColorScheme(accentColor: ColorOption): ColorScheme =
+    private fun effectiveColorStyle(style: ColorStyle = colorStyle): ColorStyle =
+        if (colorSpec != SpecVersion.SPEC_2026 && style is Cmf) TonalSpot else style
+
+    private fun resolveSecondarySeedForCmf(primarySeed: Int, accentColor: ColorOption): Int? =
         when (accentColor) {
+            is ColorOption.WallpaperPrimary -> wallpaperManager.wallpaperColors?.secondaryColor
+            is ColorOption.WallpaperDerived -> {
+                val liveSecondary = freshWallpaperSecondary ?: wallpaperManager.wallpaperColors?.secondaryColor
+                val livePrimary = freshWallpaperPrimary
+                    ?: wallpaperManager.wallpaperColors?.primaryColor
+                    ?: accentColor.wallpaperPrimary
+                when {
+                    liveSecondary != null && liveSecondary != primarySeed -> liveSecondary
+                    livePrimary != primarySeed -> livePrimary
+                    else -> liveSecondary
+                }
+            }
+            else -> null
+        }
+
+    private fun resolveColorScheme(accentColor: ColorOption): ColorScheme {
+        val activeStyle = effectiveColorStyle()
+        val effectiveSpec = resolveEffectiveSpec(colorSpec, colorSpecFallback, activeStyle)
+        return when (accentColor) {
             is ColorOption.SystemAccent -> systemColorScheme
 
             is ColorOption.WallpaperPrimary -> {
                 val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
                 getLegacyColorScheme(
                     wallpaperPrimary ?: ColorOption.LawnchairBlue.color,
-                    colorStyle,
-                    colorSpec,
+                    activeStyle,
+                    effectiveSpec,
                 )
             }
 
@@ -278,35 +339,43 @@ class ThemeProvider @Inject constructor(
                 val fresh = freshWallpaperPrimary
                 val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
                            else accentColor.color
-                getLegacyColorScheme(seed, colorStyle, colorSpec)
+                getLegacyColorScheme(seed, activeStyle, effectiveSpec)
             }
 
             is ColorOption.CustomColor -> {
-                val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-                getLegacyColorScheme(accentColor.color, effectiveStyle, colorSpec)
+                val effectiveStyle = if (activeStyle is LegacyKdrag) TonalSpot else activeStyle
+                getLegacyColorScheme(accentColor.color, effectiveStyle, effectiveSpec)
             }
 
-            else -> getLegacyColorScheme(ColorOption.LawnchairBlue.color, colorStyle, colorSpec)
+            else -> getLegacyColorScheme(ColorOption.LawnchairBlue.color, activeStyle, effectiveSpec)
         }
+    }
 
     private fun resolveColorScheme2025(accentColor: ColorOption, isDark: Boolean): MonetColorSchemeCompat2025? {
+        val activeStyle = effectiveColorStyle()
+
         // LegacyKdrag always routes to the ZCAM engine regardless of active spec version.
         // Returning null here lets the caller fall back to resolveColorScheme(), which
         // correctly dispatches to KdragMonetColorScheme. Without this guard, LegacyKdrag
         // would pass the styleHasNo2025Variant check below (because its style placeholder
         // is TONAL_SPOT) and silently produce a SPEC_2025 TonalSpot scheme instead of ZCAM.
-        if (colorStyle is LegacyKdrag) return null
+        if (activeStyle is LegacyKdrag) return null
 
-        // These ColorStyle subtypes have no SPEC_2025 implementation — DynamicScheme's own
+        // Respect effective spec (handles SPEC_2021 directly, as well as SPEC_2026 falling
+        // back to SPEC_2021 for non-CMF styles when the user came from SPEC_2021).
+        val effectiveSpec = resolveEffectiveSpec(colorSpec, colorSpecFallback, activeStyle)
+        if (effectiveSpec == SpecVersion.SPEC_2021) return null
+
+        // These ColorStyle subtypes have no SPEC_2025/2026 implementation — DynamicScheme's own
         // maybeFallbackSpecVersion forces them to SPEC_2021 tone logic internally,
         // but they'd still run through the materialkolor HCT engine instead of the
         // original CAM16 ColorScheme.kt engine, producing colors that don't match
         // the rest of the SPEC_2021 UI. Returning null here routes them through
         // resolveColorScheme (the legacy kdrag0n path) instead, exactly like
         // SystemAccent and LegacyKdrag already do.
-        // NOTE: intentionally checked against the sealed subtype (not colorStyle.style) so
+        // NOTE: intentionally checked against the sealed subtype (not activeStyle.style) so
         // that any future ColorStyle that shares a Style enum value can't silently bypass this.
-        val styleHasNo2025Variant = when (colorStyle) {
+        val styleHasNo2025Variant = when (activeStyle) {
             is app.lawnchair.theme.color.Rainbow,
             is app.lawnchair.theme.color.FruitSalad,
             is app.lawnchair.theme.color.Content,
@@ -315,32 +384,37 @@ class ThemeProvider @Inject constructor(
         }
         if (styleHasNo2025Variant) return null
 
+        val mkSpec = if (effectiveSpec == SpecVersion.SPEC_2026) {
+            ColorSpec.SpecVersion.SPEC_2026
+        } else {
+            ColorSpec.SpecVersion.SPEC_2025
+        }
+
         return when (accentColor) {
-            // SystemAccent always uses the system palette — no 2025 override.
+            // SystemAccent always uses the system palette — no 2025/2026 override.
             is ColorOption.SystemAccent -> null
 
             is ColorOption.WallpaperPrimary -> {
-                val wallpaperPrimary = wallpaperManager.wallpaperColors?.primaryColor
-                get2025ColorScheme(
-                    wallpaperPrimary ?: ColorOption.LawnchairBlue.color,
-                    colorStyle,
-                    isDark,
-                )
+                val seed = wallpaperManager.wallpaperColors?.primaryColor
+                    ?: ColorOption.LawnchairBlue.color
+                val secondarySeed = if (activeStyle is Cmf) resolveSecondarySeedForCmf(seed, accentColor) else null
+                get2025ColorScheme(seed, activeStyle, isDark, mkSpec, secondarySeed)
             }
 
             is ColorOption.WallpaperDerived -> {
                 val fresh = freshWallpaperPrimary
                 val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
                            else accentColor.color
-                get2025ColorScheme(seed, colorStyle, isDark)
+                val secondarySeed = if (activeStyle is Cmf) resolveSecondarySeedForCmf(seed, accentColor) else null
+                get2025ColorScheme(seed, activeStyle, isDark, mkSpec, secondarySeed)
             }
 
             is ColorOption.CustomColor -> {
-                // LegacyKdrag is already returned null above; colorStyle is safe to use directly.
-                get2025ColorScheme(accentColor.color, colorStyle, isDark)
+                // LegacyKdrag is already returned null above; activeStyle is safe to use directly.
+                get2025ColorScheme(accentColor.color, activeStyle, isDark, mkSpec, null)
             }
 
-            else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, colorStyle, isDark)
+            else -> get2025ColorScheme(ColorOption.LawnchairBlue.color, activeStyle, isDark, mkSpec, null)
         }
     }
 
@@ -352,7 +426,8 @@ class ThemeProvider @Inject constructor(
                 cachedSystemColorScheme = it
             }
         } else {
-            val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
+            val activeStyle = effectiveColorStyle()
+            val effectiveStyle = if (activeStyle is LegacyKdrag) TonalSpot else activeStyle
             getLegacyColorScheme(
                 context.getSystemAccent(darkTheme = false),
                 effectiveStyle,
@@ -376,18 +451,21 @@ class ThemeProvider @Inject constructor(
         }
     }
 
-    /** Returns a cached [MonetColorSchemeCompat2025] for the SPEC_2025 path. */
+    /** Returns a cached [MonetColorSchemeCompat2025] for the SPEC_2025 / SPEC_2026 path. */
     private fun get2025ColorScheme(
         colorInt: Int,
         colorStyle: ColorStyle,
         isDark: Boolean,
+        specVersion: ColorSpec.SpecVersion = ColorSpec.SpecVersion.SPEC_2025,
+        secondaryColorInt: Int? = null,
     ): MonetColorSchemeCompat2025 {
         // LegacyKdrag is intercepted upstream in resolveColorScheme2025() before this
         // function is ever called, so this branch is unreachable in normal operation.
         // Kept as a defensive fallback in case of future call-site changes.
         val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-        return colorSchemeMap2025.computeIfAbsent(Triple(colorInt, effectiveStyle.style, isDark)) {
-            MonetColorSchemeCompat2025(colorInt, effectiveStyle.style, isDark)
+        val key = Scheme2025Key(colorInt, secondaryColorInt, effectiveStyle.style, specVersion, isDark)
+        return colorSchemeMap2025.computeIfAbsent(key) {
+            MonetColorSchemeCompat2025(colorInt, effectiveStyle.style, isDark, specVersion, secondaryColorInt)
         }
     }
 

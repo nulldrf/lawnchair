@@ -384,7 +384,7 @@ public class DynamicColor(
                     .setIsBackground(this.isBackground)
                     .setPalette { s: DynamicScheme ->
                         val palette =
-                            if (s.specVersion ==
+                            if (s.specVersion >=
                                 specVersion
                             ) {
                                 extendedColor.palette
@@ -393,7 +393,7 @@ public class DynamicColor(
                             }
                         palette?.invoke(s) ?: extendedColor.palette(s)
                     }.setTone { s: DynamicScheme ->
-                        val tone = if (s.specVersion ==
+                        val tone = if (s.specVersion >=
                             specVersion
                         ) {
                             extendedColor.tone
@@ -402,7 +402,7 @@ public class DynamicColor(
                         }
                         tone?.invoke(s) ?: extendedColor.tone(s)
                     }.setChromaMultiplier { s: DynamicScheme ->
-                        val chromaMultiplier = if (s.specVersion == specVersion) {
+                        val chromaMultiplier = if (s.specVersion >= specVersion) {
                             extendedColor.chromaMultiplier
                         } else {
                             this.chromaMultiplier
@@ -410,7 +410,7 @@ public class DynamicColor(
                         if (chromaMultiplier != null) chromaMultiplier(s) else 1.0
                     }.setBackground { s: DynamicScheme ->
                         val background =
-                            if (s.specVersion ==
+                            if (s.specVersion >=
                                 specVersion
                             ) {
                                 extendedColor.background
@@ -420,7 +420,7 @@ public class DynamicColor(
                         background?.invoke(s)
                     }.setSecondBackground { s: DynamicScheme ->
                         val secondBackground =
-                            if (s.specVersion == specVersion) {
+                            if (s.specVersion >= specVersion) {
                                 extendedColor.secondBackground
                             } else {
                                 this.secondBackground
@@ -428,7 +428,7 @@ public class DynamicColor(
                         secondBackground?.invoke(s)
                     }.setContrastCurve { s: DynamicScheme ->
                         val contrastCurve =
-                            if (s.specVersion ==
+                            if (s.specVersion >=
                                 specVersion
                             ) {
                                 extendedColor.contrastCurve
@@ -438,7 +438,7 @@ public class DynamicColor(
                         contrastCurve?.invoke(s)
                     }.setToneDeltaPair { s: DynamicScheme ->
                         val toneDeltaPair =
-                            if (s.specVersion ==
+                            if (s.specVersion >=
                                 specVersion
                             ) {
                                 extendedColor.toneDeltaPair
@@ -448,7 +448,7 @@ public class DynamicColor(
                         toneDeltaPair?.invoke(s)
                     }.setOpacity { s: DynamicScheme ->
                         val opacity =
-                            if (s.specVersion ==
+                            if (s.specVersion >=
                                 specVersion
                             ) {
                                 extendedColor.opacity

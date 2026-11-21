@@ -42,10 +42,15 @@ const val MIN_CHROMA = 5
  *             Expressive hue-rotation tables for secondary/tertiary.
  *             Low-contrast themes (contrastLevel < 0) are not supported
  *             in this spec; use SPEC_2021 if you need them.
+ *
+ * SPEC_2026 — Material 3 2026 spec adding the CMF (Color, Material, Finish)
+ *             dual-source color style. Non-CMF styles fall back to the
+ *             user's previous spec (SPEC_2025 or SPEC_2021).
  */
 enum class SpecVersion {
     SPEC_2021,
     SPEC_2025,
+    SPEC_2026,
 }
 
 // ---------------------------------------------------------------------------
@@ -481,6 +486,18 @@ enum class Style(
             n2 = TonalSpec(HueAdd(15.0), ChromaConstant(12.0)),
         ),
     ),
+    CMF(
+        // Fallback single-source approximation matching SchemeCmf chroma ratios
+        // (1.0x / 0.5x / 0.75x / 0.2x / 0.2x); real SPEC_2026 rendering uses
+        // materialkolor's SchemeCmf + ColorSpec2026.
+        CoreSpec(
+            a1 = TonalSpec(HueSource(), ChromaSource()),
+            a2 = TonalSpec(HueSource(), ChromaMultiple(0.5)),
+            a3 = TonalSpec(HueSource(), ChromaMultiple(0.75)),
+            n1 = TonalSpec(HueSource(), ChromaMultiple(0.2)),
+            n2 = TonalSpec(HueSource(), ChromaMultiple(0.2)),
+        ),
+    ),
     RAINBOW(
         CoreSpec(
             a1 = TonalSpec(HueSource(), ChromaConstant(48.0)),
@@ -543,7 +560,7 @@ enum class Style(
      * If no 2025 override is defined the 2021 spec is used for both versions.
      */
     internal fun getCoreSpec(specVersion: SpecVersion): CoreSpec = when (specVersion) {
-        SpecVersion.SPEC_2025 -> coreSpec2025 ?: coreSpec
+        SpecVersion.SPEC_2025, SpecVersion.SPEC_2026 -> coreSpec2025 ?: coreSpec
         SpecVersion.SPEC_2021 -> coreSpec
     }
 }

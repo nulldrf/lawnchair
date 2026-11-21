@@ -2,6 +2,7 @@ package app.lawnchair.theme.color
 
 import androidx.annotation.StringRes
 import com.android.launcher3.R
+import com.android.systemui.monet.SpecVersion
 import com.android.systemui.monet.Style
 
 /**
@@ -21,6 +22,7 @@ sealed class ColorStyle(
             "spritz" -> Spritz
             "vibrant" -> Vibrant
             "expressive" -> Expressive
+            "cmf" -> Cmf
             "rainbow" -> Rainbow
             "fruit_salad" -> FruitSalad
             "content" -> Content
@@ -37,12 +39,37 @@ sealed class ColorStyle(
             TonalSpot,
             Vibrant,
             Expressive,
+            Cmf,
             Rainbow,
             FruitSalad,
             Content,
             Monochromatic,
             LegacyKdrag,
         )
+    }
+}
+
+/**
+ * Resolves the effective [SpecVersion] to apply for a given [colorStyle].
+ *
+ * Spec 2026 only defines the [Cmf] variant; all other styles fall back to the
+ * user's previous non-2026 spec ([fallbackSpec] — either [SpecVersion.SPEC_2021]
+ * or [SpecVersion.SPEC_2025], defaulting to [SpecVersion.SPEC_2025]).
+ */
+fun resolveEffectiveSpec(
+    colorSpec: SpecVersion,
+    fallbackSpec: SpecVersion,
+    colorStyle: ColorStyle,
+): SpecVersion {
+    val safeFallback = if (fallbackSpec == SpecVersion.SPEC_2021) {
+        SpecVersion.SPEC_2021
+    } else {
+        SpecVersion.SPEC_2025
+    }
+    return when {
+        colorStyle is Cmf && colorSpec == SpecVersion.SPEC_2026 -> SpecVersion.SPEC_2026
+        colorSpec == SpecVersion.SPEC_2026 -> safeFallback
+        else -> colorSpec
     }
 }
 
@@ -76,6 +103,18 @@ object Expressive : ColorStyle(
     descriptionResourceId = R.string.color_style_expressive_description,
 ) {
     override fun toString() = "expressive"
+}
+
+/**
+ * Color, Material, Finish (CMF) — Material 3 Spec 2026 variant supporting dual source colors.
+ * Only shown and active when [SpecVersion.SPEC_2026] is selected.
+ */
+object Cmf : ColorStyle(
+    style = Style.CMF,
+    nameResourceId = R.string.color_style_cmf,
+    descriptionResourceId = R.string.color_style_cmf_description,
+) {
+    override fun toString() = "cmf"
 }
 
 object Rainbow : ColorStyle(

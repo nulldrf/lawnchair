@@ -1,6 +1,5 @@
 package app.lawnchair.ui.preferences.destinations
 
-import android.app.WallpaperManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,16 +42,22 @@ import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
+import app.lawnchair.theme.color.Cmf
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.MonetColorSchemeCompat
+import app.lawnchair.theme.color.MonetColorSchemeCompat2025
+import app.lawnchair.theme.color.Spec2025CompatColorScheme
+import app.lawnchair.theme.color.resolveEffectiveSpec
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayoutLazyColumn
+import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.R
 import com.android.systemui.monet.SpecVersion
 import com.android.systemui.monet.Style
+import com.materialkolor.dynamiccolor.ColorSpec
 import dev.kdrag0n.colorkt.Color as KdragColor
 import dev.kdrag0n.monet.theme.ColorScheme as KdragColorScheme
 import dev.kdrag0n.monet.theme.toComposeColor
@@ -67,36 +72,66 @@ fun ColorStyleScreen(
 
     val currentStyle = styleAdapter.state.value
     val currentSpec = prefs2.colorSpec.asState().value
+    val fallbackSpec = prefs2.colorSpecFallback.asState().value
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     val accentColorValue = prefs2.accentColor.asState().value
     val fallbackSeed = MaterialTheme.colorScheme.primary.toArgb()
-    val rawWallpaperSeed: Int = remember(accentColorValue) {
+    val wallpaperColors = remember(accentColorValue) {
+        WallpaperManagerCompat.INSTANCE.get(context).wallpaperColors
+    }
+    val rawWallpaperSeed: Int = remember(accentColorValue, wallpaperColors) {
         when (accentColorValue) {
             is ColorOption.CustomColor -> accentColorValue.color
             is ColorOption.WallpaperPrimary ->
-                WallpaperManager.getInstance(context)
-                    .getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-                    ?.primaryColor
-                    ?.toArgb()
-                    ?: fallbackSeed
+                wallpaperColors?.primaryColor ?: fallbackSeed
             is ColorOption.WallpaperDerived -> accentColorValue.color
             else -> fallbackSeed
         }
     }
-
-    val styles = remember(showLegacyKdrag) {
-        ColorStyle.values().filter { it !is LegacyKdrag || showLegacyKdrag }
+    val rawWallpaperSecondarySeed: Int? = remember(accentColorValue, wallpaperColors, rawWallpaperSeed) {
+        when (accentColorValue) {
+            is ColorOption.WallpaperPrimary -> wallpaperColors?.secondaryColor
+            is ColorOption.WallpaperDerived -> {
+                val liveSecondary = wallpaperColors?.secondaryColor
+                val livePrimary = wallpaperColors?.primaryColor ?: accentColorValue.wallpaperPrimary
+                when {
+                    liveSecondary != null && liveSecondary != rawWallpaperSeed -> liveSecondary
+                    livePrimary != rawWallpaperSeed -> livePrimary
+                    else -> liveSecondary
+                }
+            }
+            else -> null
+        }
     }
 
-    val allPreviewColors = remember(rawWallpaperSeed, isDark, showLegacyKdrag, currentSpec) {
+    val styles = remember(showLegacyKdrag, currentSpec) {
+        ColorStyle.values().filter { style ->
+            when (style) {
+                is LegacyKdrag -> showLegacyKdrag
+                is Cmf -> currentSpec == SpecVersion.SPEC_2026
+                else -> true
+            }
+        }
+    }
+
+    val allPreviewColors = remember(
+        rawWallpaperSeed,
+        rawWallpaperSecondarySeed,
+        isDark,
+        showLegacyKdrag,
+        currentSpec,
+        fallbackSpec,
+    ) {
         styles.associateWith { style ->
+            val cardSpec = resolveEffectiveSpec(currentSpec, fallbackSpec, style)
             buildStylePreviewColors(
                 style = style,
                 rawWallpaperSeed = rawWallpaperSeed,
+                rawWallpaperSecondarySeed = rawWallpaperSecondarySeed,
                 isDark = isDark,
-                specVersion = currentSpec,
+                specVersion = cardSpec,
             )
         }
     }
@@ -109,19 +144,24 @@ fun ColorStyleScreen(
             items = styles,
             key = { it.toString() },
         ) { style ->
-            // Show the current spec as a badge on styles that support both specs
-            // (Spritz, TonalSpot, Vibrant, Expressive). Others always use 2021.
-            // LegacyKdrag uses TonalSpot as a placeholder style value — exclude it
-            // from spec badges since it uses its own ZCAM engine regardless of spec.
+            // Show the effective spec as a badge on styles that support spec variants:
+            // - CMF (Spec 2026 only) always displays "2026"
+            // - Spritz, TonalSpot, Vibrant, Expressive display the active or fallback spec ("2025" / "2021")
+            // - LegacyKdrag (ZCAM) and 2021-only styles show no spec badge.
             val specBadgeStyles = setOf(Style.SPRITZ, Style.TONAL_SPOT, Style.VIBRANT, Style.EXPRESSIVE)
-            val showSpecBadge = specBadgeStyles.contains(style.style) && style !is LegacyKdrag
+            val cardSpec = resolveEffectiveSpec(currentSpec, fallbackSpec, style)
+            val badgeSpec = when {
+                style is Cmf -> SpecVersion.SPEC_2026
+                specBadgeStyles.contains(style.style) && style !is LegacyKdrag -> cardSpec
+                else -> null
+            }
 
             ColorStyleCard(
                 style = style,
                 isSelected = style == currentStyle,
                 previewColors = allPreviewColors.getValue(style),
                 onClick = { styleAdapter.onChange(style) },
-                specBadge = if (showSpecBadge) currentSpec else null,
+                specBadge = badgeSpec,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
@@ -185,9 +225,10 @@ private fun ColorStyleCard(
                         style = MaterialTheme.typography.titleSmall,
                         color = previewColors.onCardBackground,
                     )
-                    // Spec badge — shows the currently active spec version
+                    // Spec badge — shows the effective spec version for this style
                     if (specBadge != null) {
                         val badgeLabel = when (specBadge) {
+                            SpecVersion.SPEC_2026 -> "2026"
                             SpecVersion.SPEC_2025 -> "2025"
                             else -> "2021"
                         }
@@ -283,11 +324,21 @@ private data class StylePreviewColors(
 private fun buildStylePreviewColors(
     style: ColorStyle,
     rawWallpaperSeed: Int,
+    rawWallpaperSecondarySeed: Int? = null,
     isDark: Boolean,
     specVersion: SpecVersion = SpecVersion.SPEC_2021,
 ): StylePreviewColors {
     val scheme: KdragColorScheme = when (style) {
         is LegacyKdrag -> KdragMonetColorScheme(rawWallpaperSeed)
+        is Cmf -> Spec2025CompatColorScheme(
+            MonetColorSchemeCompat2025(
+                seedColor = rawWallpaperSeed,
+                style = Style.CMF,
+                isDark = isDark,
+                specVersion = ColorSpec.SpecVersion.SPEC_2026,
+                secondarySeedColor = rawWallpaperSecondarySeed,
+            ),
+        )
         else -> MonetColorSchemeCompat(rawWallpaperSeed, style.style, specVersion)
     }
 

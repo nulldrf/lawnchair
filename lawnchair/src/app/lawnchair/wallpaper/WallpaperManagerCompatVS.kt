@@ -40,7 +40,14 @@ internal class WallpaperManagerCompatVS(context: Context) : WallpaperManagerComp
             // One UI returns no WallpaperColors to third-party apps, which made every
             // wallpaper-based color setting silently fall back to the default blue.
             // Samsung still exposes the seed it computed for the current wallpaper.
-            this.wallpaperColors = getSamsungSeedColor()?.let { WallpaperColorsCompat(it, 0) }
+            val samsungSeeds = getSamsungSeedColors()
+            this.wallpaperColors = samsungSeeds?.firstOrNull()?.let { primary ->
+                WallpaperColorsCompat(
+                    primaryColor = primary,
+                    colorHints = 0,
+                    secondaryColor = samsungSeeds.getOrNull(1),
+                )
+            }
             return
         }
         val platformHints = wallpaperManager
@@ -53,18 +60,22 @@ internal class WallpaperManagerCompatVS(context: Context) : WallpaperManagerComp
         if ((platformHints and WallpaperColors.HINT_SUPPORTS_DARK_THEME) != 0) {
             hints = hints or HINT_SUPPORTS_DARK_THEME
         }
-        this.wallpaperColors = WallpaperColorsCompat(wallpaperColors.primaryColor.toArgb(), hints)
+        this.wallpaperColors = WallpaperColorsCompat(
+            primaryColor = wallpaperColors.primaryColor.toArgb(),
+            colorHints = hints,
+            secondaryColor = wallpaperColors.secondaryColor?.toArgb(),
+        )
     }
 
     /**
      * One UI's hidden `WallpaperManager.getSeedColors(int which)`, which returns the seed
      * colors Samsung extracted from the wallpaper. Returns null on other builds.
      */
-    private fun getSamsungSeedColor(): Int? = try {
+    private fun getSamsungSeedColors(): List<Int>? = try {
         val seeds = WallpaperManager::class.java
             .getMethod("getSeedColors", Int::class.javaPrimitiveType)
             .invoke(wallpaperManager, WallpaperManager.FLAG_SYSTEM) as? IntArray
-        seeds?.firstOrNull { it != 0 }
+        seeds?.filter { it != 0 }?.takeIf { it.isNotEmpty() }
     } catch (_: Exception) {
         null
     }

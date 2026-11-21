@@ -42,7 +42,11 @@ import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.ThemeProvider
+import app.lawnchair.theme.color.Cmf
 import app.lawnchair.theme.color.ColorOption
+import app.lawnchair.theme.color.LegacyKdrag
+import app.lawnchair.theme.color.TonalSpot
+import app.lawnchair.theme.color.resolveEffectiveSpec
 import app.lawnchair.theme.toComposeColorScheme
 import app.lawnchair.theme.toComposeColorScheme2025
 import com.android.systemui.monet.SpecVersion
@@ -95,34 +99,45 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
 
     val context = LocalContext.current
     val preferenceManager2 = preferenceManager2()
-    val accentColor by preferenceManager2.accentColor.asState()
-    val colorStyle  by preferenceManager2.colorStyle.asState()
-    val colorSpec   by preferenceManager2.colorSpec.asState()
+    val accentColor       by preferenceManager2.accentColor.asState()
+    val colorStyle        by preferenceManager2.colorStyle.asState()
+    val colorSpec         by preferenceManager2.colorSpec.asState()
+    val colorSpecFallback by preferenceManager2.colorSpecFallback.asState()
 
     val isSystemAccent = accentColor == ColorOption.SystemAccent
+    val effectiveStyle = if (colorSpec != SpecVersion.SPEC_2026 && colorStyle is Cmf) {
+        TonalSpot
+    } else {
+        colorStyle
+    }
+    val effectiveSpec = resolveEffectiveSpec(colorSpec, colorSpecFallback, effectiveStyle)
 
-    // Styles with no SPEC_2025 implementation. DynamicScheme's own
+    // Styles with no SPEC_2025/2026 implementation. DynamicScheme's own
     // maybeFallbackSpecVersion forces these to SPEC_2021 tone logic internally,
     // but routing them through the materialkolor HCT engine would still produce
     // colors that don't match the rest of the SPEC_2021 UI (different engine,
     // different rounding). They must use the legacy CAM16 ColorScheme.kt engine
     // instead, exactly as if the user had picked SPEC_2021 themselves.
-    val styleHasNo2025Variant = colorStyle.style in setOf(
+    val styleHasNo2025Variant = effectiveStyle.style in setOf(
         com.android.systemui.monet.Style.RAINBOW,
         com.android.systemui.monet.Style.FRUIT_SALAD,
         com.android.systemui.monet.Style.CONTENT,
         com.android.systemui.monet.Style.MONOCHROMATIC,
     )
 
-    // Three-way routing:
-    //   1. User picked SPEC_2021                         → legacy engine
-    //   2. User picked SPEC_2025 + a 2025-capable style   → materialkolor engine
-    //   3. User picked SPEC_2025 + a non-2025-capable style → legacy engine
-    //      (silently behaves as if SPEC_2021 were selected, for this style only)
-    val useSpec2025 = colorSpec == SpecVersion.SPEC_2025 && !isSystemAccent && !styleHasNo2025Variant
+    // Routing:
+    //   1. Effective spec is SPEC_2021                    → legacy engine
+    //   2. Effective spec is SPEC_2025 + 2025-capable     → materialkolor SPEC_2025
+    //   3. Effective spec is SPEC_2026 + CMF              → materialkolor SPEC_2026 (SchemeCmf)
+    //   4. SystemAccent, LegacyKdrag, or non-2025 style   → legacy / ZCAM / system engine
+    val useMaterialKolor =
+        (effectiveSpec == SpecVersion.SPEC_2025 || effectiveSpec == SpecVersion.SPEC_2026) &&
+            !isSystemAccent &&
+            !styleHasNo2025Variant &&
+            effectiveStyle !is LegacyKdrag
 
-    if (useSpec2025) {
-        val scheme2025 = remember(accentColor, colorStyle, colorSpec, darkTheme) {
+    if (useMaterialKolor) {
+        val scheme2025 = remember(accentColor, effectiveStyle, colorSpec, colorSpecFallback, darkTheme) {
             ThemeProvider.INSTANCE.get(context).colorScheme2025(isDark = darkTheme)
         }
         if (scheme2025 != null) {
@@ -131,8 +146,8 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     }
 
     // Legacy path: SPEC_2021, SystemAccent, LegacyKdrag, or a style with no
-    // SPEC_2025 implementation. Uses the kdrag0n ColorScheme engine.
-    val colorScheme = remember(accentColor, colorStyle, if (isSystemAccent) null else colorSpec) {
+    // SPEC_2025/2026 implementation. Uses the kdrag0n ColorScheme engine.
+    val colorScheme = remember(accentColor, effectiveStyle, if (isSystemAccent) null else effectiveSpec) {
         ThemeProvider.INSTANCE.get(context).colorScheme
     }
     return colorScheme.toComposeColorScheme(isDark = darkTheme)

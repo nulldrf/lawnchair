@@ -5,6 +5,7 @@ import androidx.annotation.IntDef
 data class WallpaperColorsCompat(
     val primaryColor: Int,
     @ColorsHints val colorHints: Int,
+    val secondaryColor: Int? = null,
 ) {
 
     companion object {

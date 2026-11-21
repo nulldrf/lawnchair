@@ -211,11 +211,16 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             accentColorValue is ColorOption.WallpaperDerived
         val isCustomAccent = accentColorValue is ColorOption.CustomColor
 
-        val currentColorStyle = prefs2.colorStyle.asState().value
-        val effectiveColorStyle = if (!isWallpaperAccent && currentColorStyle is LegacyKdrag) {
-            TonalSpot
-        } else {
-            currentColorStyle
+        val colorStyleAdapter = prefs2.colorStyle.getAdapter()
+        val currentColorStyle = colorStyleAdapter.state.value
+        val colorSpecValue by prefs2.colorSpec.asState()
+        val colorSpecAdapter = prefs2.colorSpec.getAdapter()
+        val colorSpecFallbackAdapter = prefs2.colorSpecFallback.getAdapter()
+
+        val effectiveColorStyle = when {
+            !isWallpaperAccent && currentColorStyle is LegacyKdrag -> TonalSpot
+            colorSpecValue != SpecVersion.SPEC_2026 && currentColorStyle is app.lawnchair.theme.color.Cmf -> TonalSpot
+            else -> currentColorStyle
         }
         val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
 
@@ -226,13 +231,10 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
         val showColorSpec = (isWallpaperAccent || isCustomAccent) &&
             effectiveColorStyle !is LegacyKdrag
 
-        // Use asState() directly so Compose tracks the preference as reactive
-        // state — prevents stale reads when the user changes the value quickly.
-        val colorSpecValue by prefs2.colorSpec.asState()
-        val colorSpecAdapter = prefs2.colorSpec.getAdapter()
         val colorSpecEntries = listOf(
             SpecVersion.SPEC_2021 to stringResource(id = R.string.color_spec_2021),
             SpecVersion.SPEC_2025 to stringResource(id = R.string.color_spec_2025),
+            SpecVersion.SPEC_2026 to stringResource(id = R.string.color_spec_2026),
         )
 
         PreferenceGroup(heading = stringResource(id = R.string.colors)) {
@@ -255,7 +257,20 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                         description = stringResource(id = R.string.color_spec_description),
                         entries = colorSpecEntries,
                         currentValue = colorSpecValue,
-                        onValueChange = { colorSpecAdapter.onChange(it) },
+                        onValueChange = { newSpec ->
+                            if (newSpec == SpecVersion.SPEC_2026 && colorSpecValue != SpecVersion.SPEC_2026) {
+                                // Remember whichever non-2026 spec was active so non-CMF styles
+                                // fall back to it while Spec 2026 is selected.
+                                colorSpecFallbackAdapter.onChange(colorSpecValue)
+                            } else if (newSpec != SpecVersion.SPEC_2026) {
+                                colorSpecFallbackAdapter.onChange(newSpec)
+                                // CMF is Spec 2026 only — restore to Tonal Spot when leaving 2026.
+                                if (currentColorStyle is app.lawnchair.theme.color.Cmf) {
+                                    colorStyleAdapter.onChange(TonalSpot)
+                                }
+                            }
+                            colorSpecAdapter.onChange(newSpec)
+                        },
                     )
                 }
             }

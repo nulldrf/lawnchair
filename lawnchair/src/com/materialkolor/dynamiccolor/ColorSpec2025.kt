@@ -28,7 +28,7 @@ import kotlin.math.min
 /**
  * [ColorSpec] implementation for the 2025 spec.
  */
-public class ColorSpec2025 : ColorSpec2021() {
+public open class ColorSpec2025 : ColorSpec2021() {
     // Surfaces [S]
     public override fun background(): DynamicColor {
         // Remapped to surface for 2025 spec.
@@ -1865,7 +1865,7 @@ public class ColorSpec2025 : ColorSpec2021() {
 
             // This can avoid the awkward tones for background colors including the access fixed
             // colors. Accent fixed dim colors should not be adjusted.
-            if (color.isBackground && !color.name.endsWith("_fixed_dim")) {
+            if (scheme.platform == Platform.PHONE && color.isBackground && !color.name.endsWith("_fixed_dim")) {
                 selfTone = if (selfTone >= 57) {
                     selfTone.coerceIn(65.0, 100.0)
                 } else {
@@ -1896,11 +1896,16 @@ public class ColorSpec2025 : ColorSpec2021() {
 
             // This can avoid the awkward tones for background colors including the access
             // fixed colors. Accent fixed dim colors should not be adjusted.
-            if (color.isBackground && !color.name.endsWith("_fixed_dim")) {
-                answer = if (answer >= 57) {
-                    answer.coerceIn(65.0, 100.0)
-                } else {
-                    answer.coerceIn(0.0, 49.0)
+            when {
+                scheme.platform == Platform.PHONE && color.isBackground && !color.name.endsWith("_fixed_dim") -> {
+                    answer = if (answer >= 57) {
+                        answer.coerceIn(65.0, 100.0)
+                    } else {
+                        answer.coerceIn(0.0, 49.0)
+                    }
+                }
+                scheme.platform == Platform.WATCH && color.isBackground && 50 <= answer && answer < 60 -> {
+                    answer = if (Contrast.ratioOfTones(49.0, bgTone) >= desiredRatio) 49.0 else 60.0
                 }
             }
 

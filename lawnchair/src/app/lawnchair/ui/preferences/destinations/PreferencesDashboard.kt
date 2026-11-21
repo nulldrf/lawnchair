@@ -66,6 +66,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.TipsAndUpdates
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -76,7 +78,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -718,7 +719,10 @@ fun PreferencesDashboard(
                 Text("You are using a development build, which may contain bugs and broken features. Use at your own risk!")
             },
             confirmButton = {
-                TextButton(onClick = { showDebugDialog = false }) {
+                Button(
+                    onClick = { showDebugDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(android.R.string.ok))
                 }
             },

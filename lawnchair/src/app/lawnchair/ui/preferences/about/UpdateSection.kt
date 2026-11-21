@@ -12,8 +12,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -113,7 +113,7 @@ fun UpdateSection(
                     text = { Text(stringResource(R.string.major_update_description, "$currentMajor", "$apkMajor")) },
                     icon = { Icon(Icons.Rounded.Warning, null) },
                     confirmButton = {
-                        TextButton(
+                        Button(
                             onClick = {
                                 showMajorDialog = false
                                 onForceInstall(updateState.file)
@@ -124,7 +124,7 @@ fun UpdateSection(
                         }
                     },
                     dismissButton = {
-                        TextButton(
+                        OutlinedButton(
                             onClick = {
                                 showMajorDialog = false
                                 onDismissMajorUpdate(updateState.file)

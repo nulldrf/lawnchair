@@ -34,7 +34,6 @@ import app.lawnchair.qsb.LawnQsbLayout
 import app.lawnchair.qsb.LawnQsbUi
 import app.lawnchair.qsb.QsbActions
 import app.lawnchair.qsb.buildQsbStyle
-import app.lawnchair.qsb.getHotseatBackgroundColor
 import app.lawnchair.qsb.providers.Google
 import app.lawnchair.qsb.providers.PixelSearch
 import app.lawnchair.qsb.providers.QsbSearchProvider
@@ -226,11 +225,8 @@ private fun DockSearchBarPreview(
                 style = buildQsbStyle(
                     context = context,
                     themed = themed,
-                    backgroundColor = getHotseatBackgroundColor(
-                        context,
-                        themed,
-                        getThemedQsbBackgroundColor(),
-                    ),
+                    // Match LawnQsbLayout on the home screen (uses QsbFillColor regardless of themed state).
+                    backgroundColor = getPreviewQsbBackgroundColor(),
                     cornerRadius = cornerRadiusFactor,
                     backgroundAlpha = transparency,
                     strokeWidth = strokeWidth,
@@ -273,8 +269,8 @@ private fun HotseatModePreference(
 }
 
 @Composable
-private fun getThemedQsbBackgroundColor(): Int {
-    return ColorTokens.ColorBackground.resolveColor(
+private fun getPreviewQsbBackgroundColor(): Int {
+    return ColorTokens.QsbFillColor.resolveColor(
         LocalContext.current,
         if (isSelectedThemeDark) UiColorMode.Dark else UiColorMode.Light,
     )

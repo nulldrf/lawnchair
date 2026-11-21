@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
@@ -11,8 +12,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -267,7 +269,7 @@ private fun VisualMediaSetting(
             title = { Text(stringResource(R.string.permissions_photos_videos_full)) },
             text = { Text(stringResource(R.string.permissions_photos_videos_full_description, stringResource(id = R.string.derived_app_name))) },
             confirmButton = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
                             context.openAppPermissionSettings()
@@ -277,7 +279,7 @@ private fun VisualMediaSetting(
                         shapes = ButtonDefaults.shapes(),
                     ) { Text(stringResource(R.string.permissions_photos_videos_grant_full)) }
 
-                    TextButton(
+                    FilledTonalButton(
                         onClick = {
                             permissionState.launchMultiplePermissionRequest()
                             showPartialAccessDialog = false
@@ -286,7 +288,7 @@ private fun VisualMediaSetting(
                         shapes = ButtonDefaults.shapes(),
                     ) { Text(stringResource(R.string.permissions_photos_videos_manage_selected)) }
 
-                    TextButton(
+                    OutlinedButton(
                         onClick = { showPartialAccessDialog = false },
                         modifier = Modifier.fillMaxWidth(),
                         shapes = ButtonDefaults.shapes(),

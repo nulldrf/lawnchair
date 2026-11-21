@@ -23,8 +23,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,7 +87,7 @@ fun PermissionDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            OutlinedButton(
                 onClick = onDismiss,
                 shapes = ButtonDefaults.shapes(),
             ) { Text(stringResource(android.R.string.cancel)) }
@@ -172,7 +172,7 @@ fun WallpaperAccessPermissionDialog(
                         }
                     },
                     confirmButton = {
-                        TextButton(
+                        OutlinedButton(
                             onClick = onDismiss,
                             shapes = ButtonDefaults.shapes(),
                         ) { Text(stringResource(android.R.string.cancel)) }

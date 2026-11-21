@@ -4,6 +4,7 @@ import android.R as AndroidR
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -60,7 +61,10 @@ fun OverlayHandlerPreference(
                 ModalBottomSheetContent(
                     title = { Text(label) },
                     buttons = {
-                        OutlinedButton(onClick = { bottomSheetHandler.hide() }) {
+                        OutlinedButton(
+                            onClick = { bottomSheetHandler.hide() },
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
                             Text(text = stringResource(id = AndroidR.string.cancel))
                         }
                     },
@@ -134,7 +138,10 @@ fun AppOpenAnimationPreference(
                 ModalBottomSheetContent(
                     title = { Text(label) },
                     buttons = {
-                        OutlinedButton(onClick = { bottomSheetHandler.hide() }) {
+                        OutlinedButton(
+                            onClick = { bottomSheetHandler.hide() },
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
                             Text(text = stringResource(id = AndroidR.string.cancel))
                         }
                     },

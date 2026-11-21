@@ -32,12 +32,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -344,7 +346,11 @@ private fun ApiKeyPreference(
     } else "*".repeat(minOf(currentKey.length, 32))
 
     Column(modifier = modifier) {
-        ClickablePreference(label = "$label — $masked", onClick = { inputValue = adapter.state.value; showDialog = true })
+        ClickablePreference(
+            label = label,
+            subtitle = masked,
+            onClick = { inputValue = adapter.state.value; showDialog = true },
+        )
     }
     if (showDialog) {
         AlertDialog(
@@ -360,12 +366,20 @@ private fun ApiKeyPreference(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { adapter.onChange(inputValue.trim()); showDialog = false }) {
+                Button(
+                    onClick = { adapter.onChange(inputValue.trim()); showDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(android.R.string.ok))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text(stringResource(android.R.string.cancel)) }
+                OutlinedButton(
+                    onClick = { showDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
             },
         )
     }
@@ -405,12 +419,20 @@ private fun CityPreference(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { adapter.onChange(inputValue.trim()); showDialog = false }) {
+                Button(
+                    onClick = { adapter.onChange(inputValue.trim()); showDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(android.R.string.ok))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text(stringResource(android.R.string.cancel)) }
+                OutlinedButton(
+                    onClick = { showDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
             },
         )
     }
@@ -464,12 +486,20 @@ private fun IconPackPreference(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ICON_PACK_REPO_URL))) }) {
+                Button(
+                    onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ICON_PACK_REPO_URL))) },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.smartspace_weather_icon_pack_get_more))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text(stringResource(android.R.string.cancel)) }
+                OutlinedButton(
+                    onClick = { showDialog = false },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
             },
         )
     }

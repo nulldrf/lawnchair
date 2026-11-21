@@ -814,11 +814,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
 
-        boolean bgVisible = mSearchUiManager.getBackgroundVisibility();
         if (scrolledOffset == 0) {
-            if (!isSearching()) {
-                bgVisible = true;
-            }
             // LC-Note: Match Pixel Launcher behavior by focusing
             // and showing the keyboard on scroll to top
             if (PreferenceCacheExtensionsKt.firstCached(pref2.getAutoShowKeyboardInDrawer())) {
@@ -834,10 +830,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     }
                 }
             }
-        } else if (scrolledOffset > mHeaderThreshold) {
-            bgVisible = false;
         }
-        mSearchUiManager.setBackgroundVisibility(bgVisible, 1 - prog);
+        // Keep the search bar background fixed while scrolling the app drawer.
+        mSearchUiManager.setBackgroundVisibility(true, 1f);
     }
 
     protected int getHeaderColor(float blendRatio) {

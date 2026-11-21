@@ -128,6 +128,7 @@ import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.os.Process;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -201,6 +202,7 @@ import com.android.launcher3.logging.StartupLatencyLogger;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.ItemInstallQueue;
+import com.android.launcher3.model.ModelUtils;
 import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.AppInfo;
@@ -212,7 +214,6 @@ import com.android.launcher3.model.data.PredictedContainerInfo;
 import com.android.launcher3.model.data.WorkspaceData;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.notification.NotificationListener;
-import com.android.launcher3.pm.LegacyShortcutHelper;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.popup.PopupDataProvider;
@@ -236,6 +237,7 @@ import com.android.launcher3.util.ItemInflater;
 import com.android.launcher3.util.KeyboardShortcutsDelegate;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.OnboardingPrefs;
+import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.PluginManagerWrapper;
@@ -1376,29 +1378,32 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     protected void completeAddShortcut(Intent data, int container, int screenId, int cellX,
             int cellY, PendingRequestArgs args) {
-        if (args.getRequestCode() != REQUEST_CREATE_SHORTCUT) {
+        if (args.getRequestCode() != REQUEST_CREATE_SHORTCUT
+                || args.getPendingIntent() == null
+                || args.getPendingIntent().getComponent() == null) {
             return;
         }
 
         int[] cellXY = mTmpAddItemCellCoordinates;
         CellLayout layout = getCellLayout(container, screenId);
 
-        // Primary path: modern apps (targetSdkVersion >= 26 / Oreo) return a PinItemRequest via
-        // LauncherApps.EXTRA_PIN_ITEM_REQUEST embedded in the result Intent.
         WorkspaceItemInfo info = PinRequestHelper.createWorkspaceItemFromPinItemRequest(
                     this, PinRequestHelper.getPinItemRequest(data), 0);
-
-        // Fallback path: legacy apps return old-style Intent.EXTRA_SHORTCUT_* extras instead
-        // of a PinItemRequest. AOSP Launcher3 removed this fallback in Android 14 (commit
-        // 84b48d8), breaking widely-used apps such as Android Settings shortcut widgets, Chrome
-        // deep links, and Shortcut Maker. We restore it here via LegacyShortcutHelper.
-        if (info == null && data != null) {
-            info = LegacyShortcutHelper.createWorkspaceItemFromLegacyIntent(this, data);
-        }
-
         if (info == null) {
-            Log.e(TAG, "Unable to parse a valid shortcut result");
-            return;
+            // Legacy shortcuts are only supported for the primary profile.
+            info = Process.myUserHandle().equals(args.user)
+                    ? ModelUtils.fromLegacyShortcutIntent(this, data) : null;
+
+            if (info == null) {
+                Log.e(TAG, "Unable to parse a valid shortcut result");
+                return;
+            }
+
+            if (!new PackageManagerHelper(this).hasPermissionForActivity(
+                    info.intent, args.getPendingIntent().getComponent().getPackageName())) {
+                Log.e(TAG, "Ignoring shortcut intent failing activity permission validation");
+                return;
+            }
         }
 
         if (container < 0) {

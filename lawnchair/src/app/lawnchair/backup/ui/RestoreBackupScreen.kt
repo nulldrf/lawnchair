@@ -89,7 +89,7 @@ fun RestoreBackupScreen(
         label = stringResource(id = R.string.restore_backup),
         modifier = modifier,
         backArrowVisible = !LocalIsExpandedScreen.current,
-        scrollState = if (isPortrait) null else scrollState,
+        scrollState = scrollState,
     ) {
         when (uiState) {
             is RestoreBackupUiState.Success -> RestoreBackupOptions(isPortrait, uiState.backup)

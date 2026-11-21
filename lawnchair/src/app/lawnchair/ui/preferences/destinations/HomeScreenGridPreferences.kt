@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,9 +60,6 @@ fun HomeScreenGridPreferences(
         label = stringResource(id = R.string.home_screen_grid),
         modifier = modifier,
         isExpandedScreen = true,
-        // No outer scroll — the screen manages its own fixed-height preview
-        // area plus an independently scrollable controls area below it.
-        scrollState = null,
     ) {
         val prefs = preferenceManager()
         val columnsAdapter = prefs.workspaceColumns.getAdapter()
@@ -95,19 +91,6 @@ fun HomeScreenGridPreferences(
 
         val maxGridSize = if (increaseMaxGridSize.state.value) 20 else 10
 
-        // NOTE: PreferenceLayout always renders inside StretchNestedScrollView,
-        // which measures its Compose content with UNSPECIFIED (unbounded) height
-        // regardless of the `scrollState` parameter passed in — PreferenceColumn
-        // never actually applies verticalScroll() itself. That means
-        // BoxWithConstraints + weight(1f) (upstream's split-height approach)
-        // receives infinite maxHeight here and weight(1f) silently collapses to
-        // zero, producing a blank screen below the mockup.
-        //
-        // Fix: drop the bounded-height split entirely and let the screen flow
-        // naturally inside the outer NestedScrollView, same as every other
-        // screen in this fork. The mockup gets a sensible fixed-fraction size
-        // instead of a computed previewMaxHeight, and the controls + apply
-        // button are just regular content — no inner weight()/heightIn(min=).
         Column(modifier = Modifier.fillMaxWidth()) {
             // ── Phone-frame mockup ───────────────────────────────────────────
             GridMockup(
@@ -244,9 +227,8 @@ private fun GridMockup(
     val phoneShape = RoundedCornerShape(28.dp)
     val borderColor = primary.copy(alpha = 0.25f)
     // Fixed width fraction — same pattern as every other mockup in this fork.
-    // No previewMaxHeight needed: DummyLauncherBox's internal aspectRatio()
-    // derives height from width alone, so this stays gap-free without relying
-    // on a bounded parent height (which StretchNestedScrollView never provides).
+    // DummyLauncherBox's internal aspectRatio() derives height from width alone,
+    // so this stays gap-free inside a scrollable column.
     val widthFraction = if (isPortrait) 0.65f else 0.45f
 
     Box(

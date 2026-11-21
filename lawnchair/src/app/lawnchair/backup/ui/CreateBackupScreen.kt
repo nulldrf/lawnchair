@@ -115,7 +115,7 @@ fun CreateBackupScreen(
         modifier = modifier,
         isExpandedScreen = true,
         backArrowVisible = !LocalIsExpandedScreen.current,
-        scrollState = if (isPortrait) null else scrollState,
+        scrollState = scrollState,
     ) {
         DisposableEffect(contents, hasLiveWallpaper, hasWallpaperPermission) {
             val canBackupWallpaper = hasLiveWallpaper || !hasWallpaperPermission

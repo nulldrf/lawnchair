@@ -4,18 +4,24 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
-import androidx.core.widget.NestedScrollView
-import com.google.android.material.appbar.AppBarLayout
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 // ── Stable scroll key constants ───────────────────────────────────────────────
@@ -209,28 +215,15 @@ fun rememberPreferenceScrollState(): PreferenceScrollState {
 /**
  * Wraps [content] and, if [key] matches the pending scroll target:
  *
- * 1. **Scrolls** to this item via [NestedScrollView.smoothScrollTo] after a
- *    300ms postDelayed (navigation shared-axis transition is ~300ms).
- *    We pass `y - gap` directly — no custom maxScroll clamp.  Our previous
- *    clamp using `child.measuredHeight` was stale: [EagerLazyListScope] adds
- *    items lazily after the first frame, so the child height keeps growing
- *    after [onGloballyPositioned] fires.  [NestedScrollView.smoothScrollTo]
- *    calls `clamp()` internally on every frame of the animation, so it always
- *    respects the final content height even if it grew after we posted.
+ * 1. **Scrolls** to this item in pure Compose via [LocalPreferenceColumnScrollState]
+ *    (collapsing any enclosing [LocalPreferenceTopBarState] first) or falls back to
+ *    [BringIntoViewRequester] if hosted inside another scrollable container.
  *
  * 2. **Highlights** the item with a brief primary-color flash once the scroll
- *    has settled (~800ms after mount), so the user can see which setting was
- *    navigated to.  Uses [MaterialTheme.colorScheme.primary] so it respects
- *    the current dynamic-color theme in both light and dark mode.
- *
- *    The flash is painted via [Modifier.drawWithContent] — content is drawn
- *    first, then the tint on top — instead of [Modifier.drawBehind]. Preference
- *    rows now render through M3's SegmentedListItem (see PreferenceTemplate),
- *    which paints its own opaque container color. drawBehind paints *before*
- *    the child, so the flash would end up hidden underneath that opaque card
- *    and never be visible. Drawing on top keeps it visible regardless of the
- *    row's own background.
+ *    has settled, drawn on top via [Modifier.drawWithContent] so it stays visible
+ *    over opaque [SegmentedListItem] card backgrounds.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScrollAnchor(
     key: String,
@@ -244,16 +237,43 @@ fun ScrollAnchor(
         return
     }
 
-    val view = LocalView.current
+    val scrollState = LocalPreferenceColumnScrollState.current
+    val topBarState = LocalPreferenceTopBarState.current
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val density = LocalDensity.current
     val primaryColor = MaterialTheme.colorScheme.primary
-    val hasScheduled = remember { booleanArrayOf(false) }
 
-    // Drives the highlight overlay.
+    var itemYInRoot by remember { mutableFloatStateOf(0f) }
+    var isPositioned by remember { mutableStateOf(false) }
+
+    // Drives the scroll + highlight overlay sequentially in pure Compose.
     val alpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        // 300ms postDelayed + ~450ms smooth scroll animation + safety margin.
-        delay(800)
+    LaunchedEffect(isPositioned) {
+        if (!isPositioned) return@LaunchedEffect
+
+        // Wait for the navigation shared-axis transition (~300ms) to settle.
+        delay(300)
+
+        // Collapse the LargeTopAppBar so the full scroll range is available.
+        topBarState?.scrollBehavior?.state?.let { barState ->
+            if (barState.heightOffsetLimit < 0f) {
+                barState.heightOffset = barState.heightOffsetLimit
+            }
+        }
+        // Let Compose finish a layout pass with the collapsed top bar before reading coordinates.
+        withFrameNanos {}
+        withFrameNanos {}
+
+        val gapPx = with(density) { 24.dp.toPx() }
+        if (scrollState != null) {
+            val topEdge = (topBarState?.topBarBottomInRoot ?: 0f) + gapPx
+            val delta = itemYInRoot - topEdge
+            val target = (scrollState.value + delta).toInt().coerceIn(0, scrollState.maxValue)
+            scrollState.animateScrollTo(target, tween(450))
+        } else {
+            bringIntoViewRequester.bringIntoView()
+        }
+
         alpha.animateTo(1f, tween(180))
         delay(600)
         alpha.animateTo(0f, tween(600))
@@ -262,6 +282,7 @@ fun ScrollAnchor(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
             .drawWithContent {
                 // Draw the row (its own opaque segmented-card background and
                 // all) first, then tint on top — so the flash is always
@@ -272,45 +293,8 @@ fun ScrollAnchor(
                 }
             }
             .onGloballyPositioned { coords ->
-                if (!hasScheduled[0]) {
-                    hasScheduled[0] = true
-                    val y = coords.positionInRoot().y.toInt()
-                    val gap = (24f * density.density).toInt()
-
-                    // Step 1: wait for navigation transition to settle (300ms),
-                    // then collapse AppBar so NestedScrollView has its full range.
-                    view.postDelayed({
-                        if (!view.isAttachedToWindow) return@postDelayed
-
-                        // Walk up to find NestedScrollView and CoordinatorLayout.
-                        var nsv: NestedScrollView? = null
-                        var p: android.view.ViewParent? = view.parent
-                        while (p != null) {
-                            if (p is NestedScrollView && nsv == null) nsv = p
-                            if (p is androidx.coordinatorlayout.widget.CoordinatorLayout) {
-                                for (i in 0 until p.childCount) {
-                                    val child = p.getChildAt(i)
-                                    if (child is AppBarLayout) {
-                                        child.setExpanded(false, false)
-                                        break
-                                    }
-                                }
-                                break
-                            }
-                            p = p.parent
-                        }
-
-                        // Step 2: wait one more frame for the AppBar collapse layout
-                        // pass AND for EagerLazyListScope to finish adding items,
-                        // then scroll. Using postOnAnimation ensures the View tree
-                        // has fully remeasured before we read getScrollRange().
-                        nsv?.postOnAnimation {
-                            if (view.isAttachedToWindow) {
-                                nsv.smoothScrollTo(0, maxOf(0, y - gap))
-                            }
-                        }
-                    }, 300L)
-                }
+                itemYInRoot = coords.positionInRoot().y
+                if (!isPositioned) isPositioned = true
             },
     ) {
         content()

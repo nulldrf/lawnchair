@@ -21,6 +21,7 @@ jobs:
 
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Free runner disk space
@@ -92,6 +93,43 @@ jobs:
           name: baseline-prof
           path: src/main/generated/baselineProfiles/baseline-prof.txt
           if-no-files-found: error
+
+      - name: Create or update Baseline Profile PR
+        if: >-
+          github.ref_name != 'baseline-profile/update' &&
+          (github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          if [ -z "$(git status --porcelain src/main/generated/baselineProfiles/baseline-prof.txt)" ]; then
+            echo "No baseline profile changes to commit."
+            exit 0
+          fi
+
+          BRANCH="baseline-profile/update"
+          RULES=$(wc -l < src/main/generated/baselineProfiles/baseline-prof.txt | tr -d ' ')
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "$BRANCH"
+          git add src/main/generated/baselineProfiles/baseline-prof.txt
+          git commit -m "perf(baseline-profile): regenerate baseline profile ($RULES rules)"
+          git push --force origin "$BRANCH"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --base "$BASE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH" \
+              --title "perf(baseline-profile): regenerate baseline profile" \
+              --body "Automatically regenerated \`src/main/generated/baselineProfiles/baseline-prof.txt\` (**${RULES} rules**) from [workflow run ${GITHUB_RUN_ID}](${RUN_URL})."
+          else
+            gh pr edit "$EXISTING_PR" \
+              --body "Automatically regenerated \`src/main/generated/baselineProfiles/baseline-prof.txt\` (**${RULES} rules**) from [workflow run ${GITHUB_RUN_ID}](${RUN_URL})."
+          fi
 
       - name: Upload failure diagnostics
         if: failure()

@@ -1,8 +1,10 @@
 package app.lawnchair.ui.preferences.components.layout
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
@@ -15,6 +17,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
 
@@ -28,6 +32,7 @@ fun ConnectedButtonGroup(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    minHeight: Dp = 48.dp,
 ) {
     val context = LocalContext.current
     val msdlPlayer = remember(context) { MSDLPlayerWrapper.INSTANCE.get(context) }
@@ -51,8 +56,10 @@ fun ConnectedButtonGroup(
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                 modifier = Modifier
                     .weight(1f)
+                    .heightIn(min = minHeight)
                     .semantics { role = Role.RadioButton },
             ) {
                 Text(

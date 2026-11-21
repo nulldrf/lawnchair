@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.not
 import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.controls.SliderPreference
@@ -29,6 +28,9 @@ import app.lawnchair.ui.preferences.components.controls.WarningPreference
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import com.android.launcher3.R
 
 @Composable
@@ -39,25 +41,32 @@ fun AdvancedIconPreferences(
     val prefs2 = preferenceManager2()
 
     val wrapAdaptiveIcons = prefs.wrapAdaptiveIcons.getAdapter()
+    val colorizedBackgrounds = prefs.colorizedBackgrounds.getAdapter()
+    val transparentIconBackground = prefs.transparentIconBackground.getAdapter()
     val alwaysReloadIcons = prefs2.alwaysReloadIcons.getAdapter()
+    val scrollState = rememberPreferenceScrollState()
 
     PreferenceLayout(
         label = stringResource(id = R.string.advanced_icon_settings_title),
         modifier = modifier,
     ) {
         PreferenceGroup {
-            SwitchPreference(
-                adapter = alwaysReloadIcons,
-                label = stringResource(id = R.string.always_reload_icons_label),
-                description = stringResource(id = R.string.always_reload_icons_description),
-            )
+            ScrollAnchor(ScrollKeys.ALWAYS_RELOAD_ICONS, scrollState) {
+                SwitchPreference(
+                    adapter = alwaysReloadIcons,
+                    label = stringResource(id = R.string.always_reload_icons_label),
+                    description = stringResource(id = R.string.always_reload_icons_description),
+                )
+            }
             ExpandAndShrink(visible = alwaysReloadIcons.state.value) {
                 WarningPreference(stringResource(R.string.always_reload_icons_warning))
             }
-            SwitchPreference(
-                adapter = prefs.shadowBGIcons.getAdapter(),
-                label = stringResource(id = R.string.shadow_bg_icons_label),
-            )
+            ScrollAnchor(ScrollKeys.SHADOW_ICONS, scrollState) {
+                SwitchPreference(
+                    adapter = prefs.shadowBGIcons.getAdapter(),
+                    label = stringResource(id = R.string.shadow_bg_icons_label),
+                )
+            }
         }
 
         PreferenceGroup(
@@ -65,19 +74,50 @@ fun AdvancedIconPreferences(
             description = stringResource(id = (R.string.adaptive_icon_background_description)),
             showDescription = wrapAdaptiveIcons.state.value,
         ) {
-            SwitchPreference(
-                adapter = wrapAdaptiveIcons,
-                label = stringResource(id = R.string.reshape_unthemed_icons_title),
-                description = stringResource(id = R.string.reshape_unthemed_icons_description),
-            )
-            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value) {
-                SliderPreference(
-                    label = stringResource(id = R.string.background_lightness_label),
-                    adapter = prefs.coloredBackgroundLightness.getAdapter(),
-                    valueRange = 0F..1F,
-                    step = 0.1f,
-                    showAsPercentage = true,
+            ScrollAnchor(ScrollKeys.AUTO_ADAPTIVE, scrollState) {
+                SwitchPreference(
+                    adapter = wrapAdaptiveIcons,
+                    label = stringResource(id = R.string.reshape_unthemed_icons_title),
+                    description = stringResource(id = R.string.reshape_unthemed_icons_description),
                 )
+            }
+            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value && !transparentIconBackground.state.value) {
+                ScrollAnchor(ScrollKeys.BACKGROUND_LIGHTNESS, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.background_lightness_label),
+                        adapter = prefs.coloredBackgroundLightness.getAdapter(),
+                        valueRange = 0F..1F,
+                        step = 0.1f,
+                        showAsPercentage = true,
+                    )
+                }
+            }
+            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value) {
+                ScrollAnchor(ScrollKeys.COLORIZED_BG, scrollState) {
+                    SwitchPreference(
+                        adapter = colorizedBackgrounds,
+                        label = stringResource(id = R.string.colorized_backgrounds_label),
+                        description = stringResource(id = R.string.colorized_backgrounds_description),
+                    )
+                }
+            }
+            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value && colorizedBackgrounds.state.value) {
+                ScrollAnchor(ScrollKeys.TREAT_WHITE_ADAPTIVE, scrollState) {
+                    SwitchPreference(
+                        adapter = prefs.treatWhiteAdaptiveIcons.getAdapter(),
+                        label = stringResource(id = R.string.treat_white_adaptive_icons_label),
+                        description = stringResource(id = R.string.treat_white_adaptive_icons_description),
+                    )
+                }
+            }
+            ExpandAndShrink(visible = colorizedBackgrounds.state.value) {
+                ScrollAnchor(ScrollKeys.COLORIZE_ICON_PACK_BG, scrollState) {
+                    SwitchPreference(
+                        adapter = prefs.colorizeIconPackBackground.getAdapter(),
+                        label = stringResource(id = R.string.colorize_icon_pack_background_label),
+                        description = stringResource(id = R.string.colorize_icon_pack_background_description),
+                    )
+                }
             }
         }
     }

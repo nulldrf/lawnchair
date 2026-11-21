@@ -1,7 +1,6 @@
 package app.lawnchair.ui.preferences.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,8 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,10 +30,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.ui.preferences.components.layout.ConnectedButtonGroup
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 
@@ -330,20 +326,11 @@ private fun ThemePreviewMockup(currentTheme: String) {
 }
 
 // ---------------------------------------------------------------------------
-// Segmented control (generalised from TwoTabPreferenceLayout to support N tabs)
+// Theme selector (Material 3 Expressive connected button group)
 // ---------------------------------------------------------------------------
 
 /**
- * A pill-style segmented control that works with any number of options.
- *
- * The selected segment animates to the primary colour with fully-rounded
- * corners, while unselected segments use [MaterialTheme.colorScheme.surfaceVariant]
- * and softer corners — identical to the animation style used in
- * [TwoTabPreferenceLayout], but not coupled to a HorizontalPager.
- *
- * @param options       Ordered list of (value, display label) pairs.
- * @param selectedOption The value that is currently selected.
- * @param onOptionSelected Called with the new value when the user taps a segment.
+ * Connected button group selector for theme options.
  */
 @Composable
 fun ThemeSegmentedControl(
@@ -352,56 +339,11 @@ fun ThemeSegmentedControl(
     onOptionSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val primary         = MaterialTheme.colorScheme.primary
-    val onPrimary       = MaterialTheme.colorScheme.onPrimary
-    val surfaceVariant  = MaterialTheme.colorScheme.surfaceVariant
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        options.forEach { (value, label) ->
-            val isSelected = selectedOption == value
-
-            // Animate container/content colours and corner radius independently
-            // so each segment transitions smoothly without affecting its neighbours.
-            val containerColor by animateColorAsState(
-                targetValue = if (isSelected) primary else surfaceVariant,
-                animationSpec = tween(durationMillis = 300),
-                label = "segment_container_$value",
-            )
-            val contentColor by animateColorAsState(
-                targetValue = if (isSelected) onPrimary else onSurfaceVariant,
-                animationSpec = tween(durationMillis = 300),
-                label = "segment_content_$value",
-            )
-            // Active pill gets fully-rounded ends; inactive gets a modest rounding.
-            val cornerRadius by animateDpAsState(
-                targetValue = if (isSelected) 50.dp else 16.dp,
-                animationSpec = tween(durationMillis = 300),
-                label = "segment_corner_$value",
-            )
-
-            Surface(
-                onClick = { onOptionSelected(value) },
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                shape = RoundedCornerShape(cornerRadius),
-                color = containerColor,
-                contentColor = contentColor,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    )
-                }
-            }
-        }
-    }
+    val selectedIndex = options.indexOfFirst { it.first == selectedOption }.coerceAtLeast(0)
+    ConnectedButtonGroup(
+        options = options.map { it.second },
+        selectedIndex = selectedIndex,
+        onSelect = { index -> onOptionSelected(options[index].first) },
+        modifier = modifier,
+    )
 }

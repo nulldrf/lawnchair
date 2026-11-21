@@ -1,33 +1,17 @@
 package app.lawnchair.ui.preferences.components.layout
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
-import com.android.launcher3.util.MSDLPlayerWrapper
-import com.google.android.msdl.data.model.MSDLToken
 import kotlinx.coroutines.launch
 
 @Composable
@@ -42,7 +26,6 @@ fun TwoTabPreferenceLayout(
     isExpandedScreen: Boolean = LocalIsExpandedScreen.current,
     defaultPage: Int = 0,
 ) {
-    val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
     PreferenceLayout(
         label = label,
         modifier = modifier,
@@ -55,53 +38,14 @@ fun TwoTabPreferenceLayout(
         )
         val scope = rememberCoroutineScope()
 
-        // Maps pager position from 0f (first tab) to 1f (second tab).
-        val pageProgress = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
-            .coerceIn(0f, 1f)
-
-        val inactiveCorner: Dp = 16.dp
-        val activeCorner: Dp = 50.dp
-
-        val primary = MaterialTheme.colorScheme.primary
-        val onPrimary = MaterialTheme.colorScheme.onPrimary
-        val surface = MaterialTheme.colorScheme.surfaceVariant
-        val onSurface = MaterialTheme.colorScheme.onSurfaceVariant
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf(firstPageLabel, secondPageLabel).forEachIndexed { index, pageLabel ->
-                val tabProgress = if (index == 0) 1f - pageProgress else pageProgress
-
-                val cornerRadius = lerp(inactiveCorner, activeCorner, tabProgress)
-                val containerColor = lerp(surface, primary, tabProgress)
-                val contentColor = lerp(onSurface, onPrimary, tabProgress)
-
-                Surface(
-                    onClick = {
-                        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
-                        scope.launch { pagerState.animateScrollToPage(index) }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(cornerRadius),
-                    color = containerColor,
-                    contentColor = contentColor,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = pageLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (tabProgress > 0.5f) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    }
-                }
-            }
-        }
+        ConnectedButtonGroup(
+            options = listOf(firstPageLabel, secondPageLabel),
+            selectedIndex = pagerState.targetPage,
+            onSelect = { index ->
+                scope.launch { pagerState.animateScrollToPage(index) }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
 
         HorizontalPager(
             state = pagerState,

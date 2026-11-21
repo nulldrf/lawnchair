@@ -2,11 +2,7 @@ package app.lawnchair.ui.preferences.components.colorpreference
 
 import android.content.Context
 import android.graphics.Color
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,12 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -51,6 +44,7 @@ import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.colorpreference.pickers.CustomColorPicker
 import app.lawnchair.ui.preferences.components.colorpreference.pickers.WallpaperColorGrid
 import app.lawnchair.ui.preferences.components.layout.BottomSpacer
+import app.lawnchair.ui.preferences.components.layout.ConnectedButtonGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.theme.isSelectedThemeDark
 import com.android.launcher3.R
@@ -137,7 +131,7 @@ fun ColorSelection(
             Spacer(modifier = Modifier.height(16.dp))
 
             ColorTabRow(
-                selectedPage = pagerState.currentPage,
+                selectedPage = pagerState.targetPage,
                 onSelectPage = { scope.launch { pagerState.animateScrollToPage(it) } },
             )
 
@@ -256,7 +250,7 @@ private fun SelectionIndicator(
 }
 
 // ---------------------------------------------------------------------------
-// Tab row
+// Tab row (Material 3 Expressive connected button group)
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -264,70 +258,15 @@ private fun ColorTabRow(
     selectedPage: Int,
     onSelectPage: (Int) -> Unit,
 ) {
-    val tabs = listOf(
-        stringResource(id = R.string.presets),
-        stringResource(id = R.string.custom),
+    ConnectedButtonGroup(
+        options = listOf(
+            stringResource(id = R.string.presets),
+            stringResource(id = R.string.custom),
+        ),
+        selectedIndex = selectedPage,
+        onSelect = onSelectPage,
+        modifier = Modifier.padding(horizontal = 16.dp),
     )
-    val primary = MaterialTheme.colorScheme.primary
-    val onPrimary = MaterialTheme.colorScheme.onPrimary
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val outline = MaterialTheme.colorScheme.outline
-
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .wrapContentWidth()
-                .padding(horizontal = 32.dp),
-        ) {
-            tabs.forEachIndexed { index, label ->
-                val isSelected = selectedPage == index
-
-                val containerColor by animateColorAsState(
-                    targetValue = if (isSelected) primary else ComposeColor.Transparent,
-                    animationSpec = tween(250),
-                    label = "tab_bg_$index",
-                )
-                val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) onPrimary else onSurface,
-                    animationSpec = tween(250),
-                    label = "tab_fg_$index",
-                )
-                val cornerRadius by animateDpAsState(
-                    targetValue = if (isSelected) 50.dp else 16.dp,
-                    animationSpec = tween(250),
-                    label = "tab_corner_$index",
-                )
-                val borderColor by animateColorAsState(
-                    targetValue = if (isSelected) ComposeColor.Transparent else outline,
-                    animationSpec = tween(250),
-                    label = "tab_border_$index",
-                )
-
-                Surface(
-                    onClick = { onSelectPage(index) },
-                    modifier = Modifier
-                        .width(140.dp)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(cornerRadius),
-                    color = containerColor,
-                    contentColor = contentColor,
-                    border = BorderStroke(1.dp, borderColor),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

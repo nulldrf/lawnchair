@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
 import android.util.Log
-import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -21,7 +20,6 @@ import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.Themes
 import com.android.launcher3.widget.LauncherWidgetHolder
-import com.google.android.material.progressindicator.CircularProgressIndicator
 import kotlin.math.min
 
 @SuppressLint("ViewConstructor")
@@ -57,12 +55,7 @@ class LauncherPreviewView(
      */
     private var renderer: LauncherPreviewRenderer? = null
 
-    private val spinner = CircularProgressIndicator(context).apply {
-        val themedContext = ContextThemeWrapper(context, Themes.getActivityThemeRes(context))
-        val textColor = Themes.getAttrColor(themedContext, R.attr.workspaceTextColor)
-        isIndeterminate = true
-        setIndicatorColor(textColor)
-        trackCornerRadius = 1000
+    private val spinner = createContainedLoadingIndicator(context).apply {
         alpha = 0f
         animate()
             .alpha(1f)

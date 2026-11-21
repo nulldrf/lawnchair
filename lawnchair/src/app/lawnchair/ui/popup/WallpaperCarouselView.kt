@@ -13,7 +13,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
@@ -23,6 +22,7 @@ import app.lawnchair.launcher
 import app.lawnchair.util.decodeSampledBitmapFromFile
 import app.lawnchair.util.observeOnce
 import app.lawnchair.views.component.IconFrame
+import app.lawnchair.views.createContainedLoadingIndicator
 import com.android.launcher3.R
 import com.android.launcher3.util.Themes
 import java.io.File
@@ -47,7 +47,7 @@ class WallpaperCarouselView @JvmOverloads constructor(
         setIcon(R.drawable.ic_tick)
         setBackgroundWithRadius(Themes.getColorAccent(context), 100F)
     }
-    private val loadingView = ProgressBar(context).apply { isIndeterminate = true }
+    private val loadingView = createContainedLoadingIndicator(context)
     private val viewScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     init {
@@ -180,8 +180,7 @@ class WallpaperCarouselView @JvmOverloads constructor(
         }
     }
 
-    private fun createLoadingSpinner() = ProgressBar(context).apply {
-        isIndeterminate = true
+    private fun createLoadingSpinner() = createContainedLoadingIndicator(context).apply {
         layoutParams = FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER
         }

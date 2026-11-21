@@ -1,4 +1,4 @@
-﻿package app.lawnchair.ui.preferences.components
+package app.lawnchair.ui.preferences.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeLayoutSettings(
     modifier: Modifier = Modifier,
@@ -85,7 +87,7 @@ fun HomeLayoutSettings(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CircularProgressIndicator(
+                    ContainedLoadingIndicator(
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                     if (loadingMessage.isNotEmpty()) {
@@ -159,6 +161,7 @@ fun HomeLayoutSettings(
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PreviewLayout(
     modifier: Modifier = Modifier,
@@ -205,7 +208,7 @@ fun PreviewLayout(
                     .fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                ContainedLoadingIndicator()
             }
         } else {
             if (topQsb) {

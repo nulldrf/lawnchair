@@ -64,6 +64,7 @@ import app.lawnchair.ui.popup.LawnchairShortcut
 import app.lawnchair.util.getThemedIconPacksInstalled
 import app.lawnchair.util.unsafeLazy
 import app.lawnchair.views.LawnchairFloatingSurfaceView
+import app.lawnchair.views.createContainedLoadingIndicator
 import app.lawnchair.views.overlay.AppOpenAnimationType
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.BaseActivity
@@ -1645,28 +1646,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         val density = resources.displayMetrics.density
         val indicatorSize = (72 * density).toInt()
 
-        // M3 Expressive "Contained loading indicator" via ContextThemeWrapper.
-        // Falls back to plain ProgressBar if Material alpha library is unavailable.
-        val indicator: View = try {
-            val cls = Class.forName(
-                "com.google.android.material.loadingindicator.LoadingIndicator")
-            val styleId = resources.getIdentifier(
-                "Widget_Material3_LoadingIndicator_Contained", "style", packageName)
-            val ctx = if (styleId != 0) android.view.ContextThemeWrapper(this, styleId)
-                      else this
-            cls.getConstructor(android.content.Context::class.java)
-                .newInstance(ctx) as View
-        } catch (_: Exception) {
-            val ta = obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary))
-            val primaryColor = ta.getColor(0, android.graphics.Color.BLUE)
-            ta.recycle()
-            android.widget.ProgressBar(this, null,
-                android.R.attr.progressBarStyle).apply {
-                isIndeterminate = true
-                indeterminateTintList =
-                    android.content.res.ColorStateList.valueOf(primaryColor)
-            }
-        }
+        val indicator = createContainedLoadingIndicator(this, containerSizePx = indicatorSize)
 
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))

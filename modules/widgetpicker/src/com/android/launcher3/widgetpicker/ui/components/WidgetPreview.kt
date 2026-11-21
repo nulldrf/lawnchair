@@ -33,7 +33,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -146,6 +147,7 @@ fun WidgetPreview(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PlaceholderWidgetPreview(size: DpSize, widgetRadius: Dp) {
     Box(
@@ -158,7 +160,7 @@ private fun PlaceholderWidgetPreview(size: DpSize, widgetRadius: Dp) {
                     shape = RoundedCornerShape(widgetRadius),
                 ),
     ) {
-        CircularProgressIndicator(color = WidgetPickerTheme.colors.widgetPlaceholderContent)
+        ContainedLoadingIndicator()
     }
 }
 

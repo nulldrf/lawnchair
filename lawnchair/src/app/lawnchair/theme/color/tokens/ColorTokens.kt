@@ -197,6 +197,8 @@ object ColorTokens {
 
     // Material 3 Expressive
     @JvmField val ExpressiveAllApps = DayNightColorToken(Accent1_100, Accent1_800).setAlpha(0.5f)
+    @JvmField val LoadingIndicatorContainer = DayNightColorToken(Accent1_100, Accent1_700)
+    @JvmField val LoadingIndicatorActive = DayNightColorToken(Accent1_900, Accent1_100)
 
     @JvmField val BottomSheetBackgroundColorBlurFallback = DayNightColorToken(Neutral1_50, Neutral1_900)
 

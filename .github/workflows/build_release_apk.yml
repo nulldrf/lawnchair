@@ -18,6 +18,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
       - name: Write sign info
         run: |
             echo "${{ secrets.KEYSTORE }}" | base64 -d > ${{ github.workspace }}/key.jks

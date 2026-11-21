@@ -62,7 +62,20 @@ jobs:
 
       - name: Generate Baseline Profile
         run: |
+          cat > /tmp/maven-mirror.init.gradle << 'EOF'
+          gradle.beforeSettings { settings ->
+              [settings.pluginManagement.repositories, settings.dependencyResolutionManagement.repositories].each { repos ->
+                  repos.all { repo ->
+                      if (repo instanceof MavenArtifactRepository &&
+                          repo.url.toString().startsWith("https://repo.maven.apache.org/maven2")) {
+                          repo.url = URI.create("https://maven-central.storage-download.googleapis.com/maven2/")
+                      }
+                  }
+              }
+          }
+          EOF
           ./gradlew :copyBaselineProfileIntoSrc \
+            --init-script /tmp/maven-mirror.init.gradle \
             --no-configuration-cache \
             -Pandroid.testoptions.manageddevices.emulator.gpu="swiftshader_indirect" \
             -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \

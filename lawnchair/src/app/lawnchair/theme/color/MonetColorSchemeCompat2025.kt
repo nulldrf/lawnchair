@@ -4,6 +4,7 @@ import androidx.annotation.ColorInt
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.hct.Hct
 import com.materialkolor.scheme.DynamicScheme
+import com.materialkolor.scheme.SchemeCmf
 import com.materialkolor.scheme.SchemeContent
 import com.materialkolor.scheme.SchemeExpressive
 import com.materialkolor.scheme.SchemeFruitSalad
@@ -15,23 +16,28 @@ import com.materialkolor.scheme.SchemeVibrant
 import com.android.systemui.monet.Style
 
 /**
- * Holds a materialkolor [DynamicScheme] for the SPEC_2025 path.
+ * Holds a materialkolor [DynamicScheme] for the SPEC_2025 / SPEC_2026 path.
  *
  * Uses the canonical HCT-based palette generation from materialkolor/material-color-utilities,
  * which gives exact [TonalPalette.tone(t)] lookups at any integer tone 0–100 with no sparse
  * grid, no nearest-key fallback, and no CIE Lab luminance workarounds.
  *
  * [DynamicScheme] also pre-computes every Material role as an ARGB [Int] property via
- * [MaterialDynamicColors] and [ColorSpec2025], so [toComposeColorScheme2025] simply reads
- * those values directly — no tone arithmetic in Lawnchair at all.
+ * [MaterialDynamicColors] and [ColorSpec2025] / [ColorSpec2026], so [toComposeColorScheme2025]
+ * simply reads those values directly — no tone arithmetic in Lawnchair at all.
  *
  * Intentionally does NOT extend [dev.kdrag0n.monet.theme.ColorScheme]. This is a plain
  * data holder. The SPEC_2021 / LegacyKdrag path continues to use the existing
  * [MonetColorSchemeCompat] which extends the kdrag0n class.
  *
- * [isDark] is part of construction because [DynamicScheme] / [ColorSpec2025] bakes dark/light
- * mode into palette generation (surface tones differ, chroma multipliers differ per mode).
- * The cache in [ThemeProvider] therefore keys on (seedColor, Style, isDark).
+ * [isDark] is part of construction because [DynamicScheme] / [ColorSpec2025] / [ColorSpec2026]
+ * bakes dark/light mode into palette generation (surface tones differ, chroma multipliers differ
+ * per mode). The cache in [ThemeProvider] therefore keys on (seedColor, secondarySeedColor,
+ * Style, specVersion, isDark).
+ *
+ * When [style] is [Style.CMF], builds a [SchemeCmf] pinned to [ColorSpec.SpecVersion.SPEC_2026]
+ * with `[seedColor, secondarySeedColor]` (dual-source when [secondarySeedColor] is provided,
+ * single-source otherwise).
  *
  * Styles that have no SPEC_2025 variant ([Style.RAINBOW], [Style.FRUIT_SALAD],
  * [Style.MONOCHROMATIC], [Style.CONTENT]) are handled by [maybeFallbackSpecVersion] inside
@@ -41,13 +47,15 @@ class MonetColorSchemeCompat2025(
     @ColorInt val seedColor: Int,
     val style: Style = Style.TONAL_SPOT,
     val isDark: Boolean = false,
+    val specVersion: ColorSpec.SpecVersion = ColorSpec.SpecVersion.SPEC_2025,
+    @ColorInt val secondarySeedColor: Int? = null,
 ) {
-    val scheme: DynamicScheme = buildScheme(seedColor, style, isDark)
+    val scheme: DynamicScheme = buildScheme(seedColor, style, isDark, specVersion, secondarySeedColor)
 
     /**
      * Builds a [SparseIntArray] mapping Android system color resource IDs to ARGB ints
-     * from this SPEC_2025 [DynamicScheme].  Called by [AccentColorExtractor] to apply
-     * the 2025 palette to widget contexts without Java needing to touch [TonalPalette].
+     * from this SPEC_2025 / SPEC_2026 [DynamicScheme]. Called by [AccentColorExtractor] to apply
+     * the palette to widget contexts without Java needing to touch [TonalPalette].
      *
      * Shade keys (0–1000) from the legacy Monet system map to Material tones (100–0):
      *   materialTone = (1000 - shade) / 10
@@ -84,11 +92,30 @@ class MonetColorSchemeCompat2025(
             @ColorInt seedColor: Int,
             style: Style,
             isDark: Boolean,
+            specVersion: ColorSpec.SpecVersion,
+            @ColorInt secondarySeedColor: Int?,
         ): DynamicScheme {
             val sourceHct = Hct.fromInt(seedColor)
-			android.util.Log.d("HCT_DEBUG", "hue=${sourceHct.hue} chroma=${sourceHct.chroma} tone=${sourceHct.tone}")
-            val spec = ColorSpec.SpecVersion.SPEC_2025
             val contrast = 0.0
+
+            if (style == Style.CMF) {
+                val sourceColorHctList = listOfNotNull(
+                    sourceHct,
+                    secondarySeedColor?.let { Hct.fromInt(it) },
+                )
+                return SchemeCmf(
+                    sourceColorHctList = sourceColorHctList,
+                    isDark = isDark,
+                    contrastLevel = contrast,
+                    specVersion = ColorSpec.SpecVersion.SPEC_2026,
+                )
+            }
+
+            val spec = if (specVersion == ColorSpec.SpecVersion.SPEC_2026) {
+                ColorSpec.SpecVersion.SPEC_2025
+            } else {
+                specVersion
+            }
 
             return when (style) {
                 Style.VIBRANT       -> SchemeVibrant(sourceHct, isDark, contrast, spec)

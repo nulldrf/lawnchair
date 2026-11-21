@@ -335,6 +335,14 @@ fun <T> ColorSwatch(
 private fun buildScheme(seedColor: Int, colorStyle: ColorStyle?): ColorScheme =
     when (colorStyle) {
         is LegacyKdrag -> KdragMonetColorScheme(seedColor)
+        is app.lawnchair.theme.color.Cmf -> app.lawnchair.theme.color.Spec2025CompatColorScheme(
+            app.lawnchair.theme.color.MonetColorSchemeCompat2025(
+                seedColor = seedColor,
+                style = com.android.systemui.monet.Style.CMF,
+                isDark = false,
+                specVersion = com.materialkolor.dynamiccolor.ColorSpec.SpecVersion.SPEC_2026,
+            ),
+        )
         null -> MonetColorSchemeCompat(seedColor, com.android.systemui.monet.Style.TONAL_SPOT)
         else -> MonetColorSchemeCompat(seedColor, colorStyle.style)
     }

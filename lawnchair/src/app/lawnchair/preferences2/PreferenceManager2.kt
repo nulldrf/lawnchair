@@ -229,17 +229,39 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = SpecVersion.SPEC_2021,
         parse = { value ->
             when (value) {
+                "spec_2026" -> SpecVersion.SPEC_2026
                 "spec_2025" -> SpecVersion.SPEC_2025
                 else -> SpecVersion.SPEC_2021
             }
         },
         save = { specVersion ->
             when (specVersion) {
+                SpecVersion.SPEC_2026 -> "spec_2026"
                 SpecVersion.SPEC_2025 -> "spec_2025"
                 SpecVersion.SPEC_2021 -> "spec_2021"
             }
         },
         onSet = { reloadHelper.recreate() },
+    )
+
+    // Tracks the last non-2026 spec (SPEC_2021 or SPEC_2025) so that when SPEC_2026
+    // is active, all non-CMF styles fall back to whichever spec the user used before.
+    // Defaults to SPEC_2025 since 2025 and 2026 share the same base spec.
+    val colorSpecFallback = preference(
+        key = stringPreferencesKey("color_spec_fallback"),
+        defaultValue = SpecVersion.SPEC_2025,
+        parse = { value ->
+            when (value) {
+                "spec_2021" -> SpecVersion.SPEC_2021
+                else -> SpecVersion.SPEC_2025
+            }
+        },
+        save = { specVersion ->
+            when (specVersion) {
+                SpecVersion.SPEC_2021 -> "spec_2021"
+                else -> "spec_2025"
+            }
+        },
     )
 
     val strokeColorStyle = preference(

@@ -54,12 +54,6 @@ fun ExperimentalFeaturesPreferences(
         val hasPermission = wallpaperAccessState != FileAccessState.Denied
         var showPermissionDialog by remember { mutableStateOf(false) }
 
-        val folderIconShapeAdapter = prefs2.folderShape.getAdapter()
-        val folderIconShapeSubtitle = iconShapeEntries(context)
-            .firstOrNull { it.value == folderIconShapeAdapter.state.value }
-            ?.label?.invoke()
-            ?: stringResource(id = R.string.custom)
-
         PreferenceGroup(
             modifier = Modifier,
             heading = stringResource(R.string.workspace_label),
@@ -101,21 +95,25 @@ fun ExperimentalFeaturesPreferences(
 
             val canBlur = hasPermission && enableWallpaperBlur.state.value
             ExpandAndShrink(visible = canBlur) {
-                SliderPreference(
-                    label = stringResource(id = R.string.wallpaper_background_blur),
-                    adapter = prefs.wallpaperBlur.getAdapter(),
-                    step = 5,
-                    valueRange = 0..100,
-                    showUnit = "%",
-                )
+                ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR_AMOUNT, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.wallpaper_background_blur),
+                        adapter = prefs.wallpaperBlur.getAdapter(),
+                        step = 5,
+                        valueRange = 0..100,
+                        showUnit = "%",
+                    )
+                }
             }
             ExpandAndShrink(visible = canBlur) {
-                SliderPreference(
-                    label = stringResource(id = R.string.wallpaper_background_blur_factor),
-                    adapter = prefs.wallpaperBlurFactorThreshold.getAdapter(),
-                    step = 1F,
-                    valueRange = 0F..10F,
-                )
+                ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR_FACTOR, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.wallpaper_background_blur_factor),
+                        adapter = prefs.wallpaperBlurFactorThreshold.getAdapter(),
+                        step = 1F,
+                        valueRange = 0F..10F,
+                    )
+                }
             }
         }
         if (showPermissionDialog) {
@@ -154,24 +152,26 @@ fun ExperimentalFeaturesPreferences(
             ) {
                 WarningPreference(stringResource(R.string.gesturenavcontract_warning_incompatibility))
             }
-            ListPreference(
-                adapter = vibrationFeedbackLevelAdapter,
-                entries = listOf(
-                    ListPreferenceEntry(FeedbackLevel.NO_FEEDBACK.ordinal) {
-                        stringResource(R.string.vibration_feedback_no_feedback_choice)
-                    },
-                    ListPreferenceEntry(FeedbackLevel.MINIMAL.ordinal) {
-                        stringResource(R.string.vibration_feedback_minimal_choice)
-                    },
-                    ListPreferenceEntry(FeedbackLevel.DEFAULT.ordinal) {
-                        stringResource(R.string.vibration_feedback_default_choice)
-                    },
-                    ListPreferenceEntry(FeedbackLevel.EXPRESSIVE.ordinal) {
-                        stringResource(R.string.vibration_feedback_expressive_choice)
-                    },
-                ),
-                label = stringResource(R.string.vibration_feedback_level_label),
-            )
+            ScrollAnchor(ScrollKeys.VIBRATION_FEEDBACK_LEVEL, scrollState) {
+                ListPreference(
+                    adapter = vibrationFeedbackLevelAdapter,
+                    entries = listOf(
+                        ListPreferenceEntry(FeedbackLevel.NO_FEEDBACK.ordinal) {
+                            stringResource(R.string.vibration_feedback_no_feedback_choice)
+                        },
+                        ListPreferenceEntry(FeedbackLevel.MINIMAL.ordinal) {
+                            stringResource(R.string.vibration_feedback_minimal_choice)
+                        },
+                        ListPreferenceEntry(FeedbackLevel.DEFAULT.ordinal) {
+                            stringResource(R.string.vibration_feedback_default_choice)
+                        },
+                        ListPreferenceEntry(FeedbackLevel.EXPRESSIVE.ordinal) {
+                            stringResource(R.string.vibration_feedback_expressive_choice)
+                        },
+                    ),
+                    label = stringResource(R.string.vibration_feedback_level_label),
+                )
+            }
         }
     }
 }

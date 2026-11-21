@@ -15,20 +15,8 @@ import com.hoko.blur.HokoBlur
 import kotlin.math.min
 
 /**
- * Computes and caches a HokoBlur-blurred wallpaper bitmap used as the
- * settings background.
- *
- * Mirrors [app.lawnchair.allapps.DrawerWallpaperBlurHelper]'s engine:
- *  - Reads the wallpaper via [WallpaperManager.getWallpaperFile] first (bypasses
- *    WallpaperManager's internal drawable cache, which can return stale
- *    pre-rotation pixels after a rotate), falling back to [WallpaperManager.getDrawable]
- *    for OEM ROMs where [getWallpaperFile] returns null.
- *  - Cache key is `(blurIntensity, screenWidth, screenHeight)`, so a rotation
- *    that swaps width/height is automatically a cache miss and forces a
- *    correct-sized recompute — instead of the previously-cached bitmap being
- *    stretched/squished into the new settings frame dimensions.
- *
- * Live wallpapers return null from both calls; no blur is shown for them.
+ * Computes and caches a blurred wallpaper bitmap for settings screens,
+ * keyed by blur intensity and screen dimensions.
  */
 object SettingsWallpaperBlurHelper {
 
@@ -53,11 +41,8 @@ object SettingsWallpaperBlurHelper {
     }
 
     /**
-     * Returns a HokoBlur-blurred copy of the current wallpaper sized to the
-     * current screen bounds, or null if the wallpaper cannot be retrieved
-     * (e.g. live wallpaper) or blurring fails.
-     *
-     * Safe to call from any thread. Heavy — always call from a background thread.
+     * Returns a blurred copy of the current wallpaper for the current screen bounds,
+     * or null for live wallpapers or failures. Call from a background thread.
      */
     @JvmStatic
     @SuppressLint("MissingPermission")
@@ -72,13 +57,11 @@ object SettingsWallpaperBlurHelper {
             return null
         }
 
-        // Fast path: return cached result when intensity and dimensions all match.
         getCachedBitmap(blurEnabled = true, blurIntensity, w, h)?.let { return it }
 
         val wm = WallpaperManager.getInstance(context)
 
-        // Attempt 1: getWallpaperFile() — bypasses WallpaperManager's own
-        // drawable cache so we always get pixels at the correct orientation.
+        // Read the raw wallpaper file first to avoid stale cached drawables after rotation.
         val src: Bitmap = runCatching {
             val pfd = wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM)
             if (pfd == null) {
@@ -100,7 +83,7 @@ object SettingsWallpaperBlurHelper {
             }
         }.getOrElse { e -> Log.e(TAG, "getWallpaperFile() threw: $e"); null }
 
-            // Attempt 2: getDrawable() fallback.
+            // Fall back to WallpaperManager.drawable when getWallpaperFile() is unavailable.
             ?: runCatching {
                 val drawable = wm.drawable ?: run {
                     Log.e(TAG, "getDrawable() null — likely live wallpaper")
@@ -115,7 +98,6 @@ object SettingsWallpaperBlurHelper {
 
             ?: return null
 
-        // Apply HokoBlur on the source bitmap.
         val clamped = blurIntensity.coerceIn(10, 150)
         val hokoRadius = min(clamped, 25)
         val sampleFactor = (clamped / 25f).coerceAtLeast(1f)
@@ -147,10 +129,7 @@ object SettingsWallpaperBlurHelper {
         return blurred
     }
 
-    /**
-     * Drops the cached bitmap, forcing a recompute on the next [getBlurredBitmap] call.
-     * Called when blur intensity changes or screen rotates.
-     */
+    /** Clears the cached bitmap so the next call recomputes it. */
     @JvmStatic
     fun clearCache() {
         cachedBitmap = null
@@ -159,13 +138,7 @@ object SettingsWallpaperBlurHelper {
         cachedHeight = -1
     }
 
-    /**
-     * Exposed (not private, unlike the drawer helper) so call sites — namely
-     * [app.lawnchair.ui.preferences.destinations.PreferencesDashboard]'s
-     * `SearchOverlay` — can read the same bounds reactively and key their own
-     * recomposition/cache lookups off them, keeping the Compose side and this
-     * object's internal cache in sync on rotation.
-     */
+    /** Returns the current window bounds so callers can key cache lookups on screen size. */
     @JvmStatic
     @Suppress("DEPRECATION")
     fun screenBounds(context: Context): Rect {

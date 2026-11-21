@@ -23,6 +23,10 @@ import app.lawnchair.ui.preferences.components.controls.MainSwitchPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.TwoTargetSwitchPreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
+import app.lawnchair.ui.preferences.components.layout.PreferenceScrollState
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.navigation.SearchProviderPreference
 import app.lawnchair.util.FileAccessManager
 import com.android.launcher3.R
@@ -33,6 +37,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 @Composable
 fun DrawerSearchPreference(
     modifier: Modifier = Modifier,
+    scrollState: PreferenceScrollState = rememberPreferenceScrollState(),
 ) {
     val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
@@ -48,20 +53,28 @@ fun DrawerSearchPreference(
     ) {
         PreferenceGroup(heading = stringResource(R.string.general_label)) {
             if (hiddenApps.isNotEmpty()) {
-                HiddenAppsInSearchPreference()
+                ScrollAnchor(ScrollKeys.DS_HIDDEN_APPS, scrollState) {
+                    HiddenAppsInSearchPreference()
+                }
             }
-            SwitchPreference(
-                adapter = prefs2.autoShowKeyboardInDrawer.getAdapter(),
-                label = stringResource(id = R.string.pref_search_auto_show_keyboard),
-            )
-            SearchProvider(
-                context = context,
-            )
-            SwitchPreference(
-                label = stringResource(R.string.allapps_match_qsb_style_label),
-                description = stringResource(R.string.allapps_match_qsb_style_description),
-                adapter = prefs2.matchHotseatQsbStyle.getAdapter(),
-            )
+            ScrollAnchor(ScrollKeys.DS_AUTO_KEYBOARD, scrollState) {
+                SwitchPreference(
+                    adapter = prefs2.autoShowKeyboardInDrawer.getAdapter(),
+                    label = stringResource(id = R.string.pref_search_auto_show_keyboard),
+                )
+            }
+            ScrollAnchor(ScrollKeys.DS_ALGORITHM, scrollState) {
+                SearchProvider(
+                    context = context,
+                )
+            }
+            ScrollAnchor(ScrollKeys.DS_MATCH_QSB, scrollState) {
+                SwitchPreference(
+                    label = stringResource(R.string.allapps_match_qsb_style_label),
+                    description = stringResource(R.string.allapps_match_qsb_style_description),
+                    adapter = prefs2.matchHotseatQsbStyle.getAdapter(),
+                )
+            }
         }
 
         val searchAlgorithm = preferenceManager2().searchAlgorithm.getAdapter().state.value
@@ -71,15 +84,17 @@ fun DrawerSearchPreference(
                 val canDisable = searchAlgorithm != LawnchairSearchAlgorithm.APP_SEARCH
                 val adapter = prefs.searchResultApps.getAdapter()
 
-                TwoTargetSwitchPreference(
-                    checked = if (canDisable) adapter.state.value else true,
-                    onCheckedChange = if (canDisable) adapter::onChange else ({}),
-                    enabled = canDisable,
-                    label = stringResource(R.string.search_pref_result_apps_and_shortcuts_title),
-                    onClick = {
-                        navController.navigate(SearchProviderPreference(SearchProviderId.APPS))
-                    },
-                )
+                ScrollAnchor(ScrollKeys.DS_APPS_SHORTCUTS, scrollState) {
+                    TwoTargetSwitchPreference(
+                        checked = if (canDisable) adapter.state.value else true,
+                        onCheckedChange = if (canDisable) adapter::onChange else ({}),
+                        enabled = canDisable,
+                        label = stringResource(R.string.search_pref_result_apps_and_shortcuts_title),
+                        onClick = {
+                            navController.navigate(SearchProviderPreference(SearchProviderId.APPS))
+                        },
+                    )
+                }
             }
             when (searchAlgorithm) {
                 LawnchairSearchAlgorithm.LOCAL_SEARCH -> {
@@ -87,11 +102,12 @@ fun DrawerSearchPreference(
                         prefs = prefs,
                         prefs2 = prefs2,
                         context = context,
+                        scrollState = scrollState,
                     )
                 }
 
                 LawnchairSearchAlgorithm.ASI_SEARCH -> {
-                    ASISearchSettings(prefs)
+                    ASISearchSettings(prefs, scrollState)
                 }
             }
         }
@@ -99,23 +115,34 @@ fun DrawerSearchPreference(
 }
 
 @Composable
-private fun ASISearchSettings(prefs: PreferenceManager) {
-    SwitchPreference(
-        adapter = prefs.searchResultShortcuts.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_shortcuts_title),
-    )
-    SwitchPreference(
-        adapter = prefs.searchResultPeople.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_people_title),
-    )
-    SwitchPreference(
-        adapter = prefs.searchResultPixelTips.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_tips_title),
-    )
-    SwitchPreference(
-        adapter = prefs.searchResultSettings.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_settings_title),
-    )
+private fun ASISearchSettings(
+    prefs: PreferenceManager,
+    scrollState: PreferenceScrollState,
+) {
+    ScrollAnchor(ScrollKeys.DS_SHORTCUTS, scrollState) {
+        SwitchPreference(
+            adapter = prefs.searchResultShortcuts.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_shortcuts_title),
+        )
+    }
+    ScrollAnchor(ScrollKeys.DS_PEOPLE, scrollState) {
+        SwitchPreference(
+            adapter = prefs.searchResultPeople.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_people_title),
+        )
+    }
+    ScrollAnchor(ScrollKeys.DS_TIPS, scrollState) {
+        SwitchPreference(
+            adapter = prefs.searchResultPixelTips.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_tips_title),
+        )
+    }
+    ScrollAnchor(ScrollKeys.DS_SETTINGS, scrollState) {
+        SwitchPreference(
+            adapter = prefs.searchResultSettings.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_settings_title),
+        )
+    }
 }
 
 @Composable
@@ -151,66 +178,79 @@ private fun LocalSearchSettings(
     prefs: PreferenceManager,
     prefs2: PreferenceManager2,
     context: Context,
+    scrollState: PreferenceScrollState,
 ) {
     val navController = LocalNavController.current
     val webSuggestionProvider =
         stringResource(prefs2.webSuggestionProvider.getAdapter().state.value.label)
 
-    TwoTargetSwitchPreference(
-        adapter = prefs.searchResultStartPageSuggestion.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_web_title),
-        description = if (webSuggestionProvider == stringResource(CustomWebSearchProvider.label)) {
-            webSuggestionProvider
-        } else {
-            stringResource(
-                id = R.string.search_pref_result_web_provider_description,
-                webSuggestionProvider,
-            )
-        },
-        onClick = {
-            navController.navigate(SearchProviderPreference(SearchProviderId.WEB))
-        },
-    )
+    ScrollAnchor(ScrollKeys.DS_WEB, scrollState) {
+        TwoTargetSwitchPreference(
+            adapter = prefs.searchResultStartPageSuggestion.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_web_title),
+            description = if (webSuggestionProvider == stringResource(CustomWebSearchProvider.label)) {
+                webSuggestionProvider
+            } else {
+                stringResource(
+                    id = R.string.search_pref_result_web_provider_description,
+                    webSuggestionProvider,
+                )
+            },
+            onClick = {
+                navController.navigate(SearchProviderPreference(SearchProviderId.WEB))
+            },
+        )
+    }
     val peopleAdapter = prefs.searchResultPeople.getAdapter()
     val peopleEnabled = rememberPermissionState(android.Manifest.permission.READ_CONTACTS).status.isGranted
-    TwoTargetSwitchPreference(
-        checked = peopleEnabled && peopleAdapter.state.value,
-        onCheckedChange = peopleAdapter::onChange,
-        switchEnabled = peopleEnabled,
-        label = stringResource(id = R.string.search_pref_result_people_title),
-        description = stringResource(id = R.string.search_pref_result_contacts_description),
-        onClick = {
-            navController.navigate(SearchProviderPreference(SearchProviderId.CONTACTS))
-        },
-    )
+    ScrollAnchor(ScrollKeys.DS_PEOPLE, scrollState) {
+        TwoTargetSwitchPreference(
+            checked = peopleEnabled && peopleAdapter.state.value,
+            onCheckedChange = peopleAdapter::onChange,
+            switchEnabled = peopleEnabled,
+            label = stringResource(id = R.string.search_pref_result_people_title),
+            description = stringResource(id = R.string.search_pref_result_contacts_description),
+            onClick = {
+                navController.navigate(SearchProviderPreference(SearchProviderId.CONTACTS))
+            },
+        )
+    }
     val filesAdapter = prefs.searchResultFilesToggle.getAdapter()
     val filesEnabled = remember { FileAccessManager.getInstance(context) }.hasAnyPermission.collectAsStateWithLifecycle().value
-    TwoTargetSwitchPreference(
-        checked = filesEnabled && filesAdapter.state.value,
-        onCheckedChange = filesAdapter::onChange,
-        switchEnabled = filesEnabled,
-        label = stringResource(R.string.search_pref_result_files_title),
-        description = stringResource(R.string.search_pref_result_files_description),
-        onClick = {
-            navController.navigate(SearchProviderPreference(SearchProviderId.FILES))
-        },
-    )
-    TwoTargetSwitchPreference(
-        adapter = prefs.searchResultSettingsEntry.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_settings_title),
-        onClick = {
-            navController.navigate(SearchProviderPreference(SearchProviderId.SETTINGS))
-        },
-    )
-    TwoTargetSwitchPreference(
-        adapter = prefs.searchResulRecentSuggestion.getAdapter(),
-        label = stringResource(id = R.string.search_pref_result_history_title),
-        onClick = {
-            navController.navigate(SearchProviderPreference(SearchProviderId.HISTORY))
-        },
-    )
-    SwitchPreference(
-        adapter = prefs.searchResultCalculator.getAdapter(),
-        label = stringResource(R.string.all_apps_search_result_calculator),
-    )
+    ScrollAnchor(ScrollKeys.DS_FILES, scrollState) {
+        TwoTargetSwitchPreference(
+            checked = filesEnabled && filesAdapter.state.value,
+            onCheckedChange = filesAdapter::onChange,
+            switchEnabled = filesEnabled,
+            label = stringResource(R.string.search_pref_result_files_title),
+            description = stringResource(R.string.search_pref_result_files_description),
+            onClick = {
+                navController.navigate(SearchProviderPreference(SearchProviderId.FILES))
+            },
+        )
+    }
+    ScrollAnchor(ScrollKeys.DS_SETTINGS, scrollState) {
+        TwoTargetSwitchPreference(
+            adapter = prefs.searchResultSettingsEntry.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_settings_title),
+            onClick = {
+                navController.navigate(SearchProviderPreference(SearchProviderId.SETTINGS))
+            },
+        )
+    }
+    ScrollAnchor(ScrollKeys.DS_HISTORY, scrollState) {
+        TwoTargetSwitchPreference(
+            adapter = prefs.searchResulRecentSuggestion.getAdapter(),
+            label = stringResource(id = R.string.search_pref_result_history_title),
+            onClick = {
+                navController.navigate(SearchProviderPreference(SearchProviderId.HISTORY))
+            },
+        )
+    }
+    ScrollAnchor(ScrollKeys.DS_CALCULATOR, scrollState) {
+        SwitchPreference(
+            adapter = prefs.searchResultCalculator.getAdapter(),
+            label = stringResource(R.string.all_apps_search_result_calculator),
+        )
+    }
 }

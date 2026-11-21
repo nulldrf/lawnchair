@@ -26,7 +26,7 @@ fun AppDrawerHapticFeedbackPreference(
     val isSupported = remember { isDrawerHapticFeedbackSupported(context) }
 
     if (isSupported) {
-                ScrollAnchor(ScrollKeys.DRAWER_HAPTIC_FEEDBACK, scrollState) {
+        ScrollAnchor(ScrollKeys.DRAWER_HAPTIC_FEEDBACK, scrollState) {
             SwitchPreference(
                 adapter = preferenceManager2().appDrawerHapticFeedback.getAdapter(),
                 label = stringResource(id = R.string.app_drawer_haptic_feedback_label),

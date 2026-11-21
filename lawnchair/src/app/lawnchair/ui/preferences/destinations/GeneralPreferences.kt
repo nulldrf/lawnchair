@@ -103,10 +103,10 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
         label = stringResource(id = R.string.general_label),
         modifier = modifier,
     ) {
-        // ── Theme ─────────────────────────────────────────────────────────────
-        ThemePreference()
+        ScrollAnchor(ScrollKeys.THEME, scrollState) {
+            ThemePreference()
+        }
 
-        // ── Rotation & Haptic feedback ────────────────────────────────────────
         PreferenceGroup {
             ScrollAnchor(ScrollKeys.HOME_ROTATION, scrollState) {
                 SwitchPreference(
@@ -117,23 +117,25 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             }
         }
 
-        // ── Updater & live information ──────────────────────────────────────────
         PreferenceGroup(heading = stringResource(id = R.string.updater)) {
             if (BuildConfig.APPLICATION_ID.contains("nightly")) {
+                ScrollAnchor(ScrollKeys.AUTO_UPDATER, scrollState) {
+                    SwitchPreference(
+                        adapter = prefs2.autoUpdaterNightly.getAdapter(),
+                        label = stringResource(id = R.string.auto_updater_label),
+                        description = stringResource(id = R.string.auto_updater_description),
+                    )
+                }
+            }
+            ScrollAnchor(ScrollKeys.LIVE_INFORMATION, scrollState) {
                 SwitchPreference(
-                    adapter = prefs2.autoUpdaterNightly.getAdapter(),
-                    label = stringResource(id = R.string.auto_updater_label),
-                    description = stringResource(id = R.string.auto_updater_description),
+                    adapter = liveInfoManager.enabled.getAdapter(),
+                    label = stringResource(id = R.string.live_information_label),
+                    description = stringResource(id = R.string.live_information_description),
                 )
             }
-            SwitchPreference(
-                adapter = liveInfoManager.enabled.getAdapter(),
-                label = stringResource(id = R.string.live_information_label),
-                description = stringResource(id = R.string.live_information_description),
-            )
         }
 
-        // ── Fonts ─────────────────────────────────────────────────────────────
         ExpandAndShrink(visible = prefs2.enableFontSelection.asState().value) {
             PreferenceGroup(heading = stringResource(id = R.string.font_label)) {
                 ScrollAnchor(ScrollKeys.FONT_WORKSPACE, scrollState) {
@@ -168,23 +170,24 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                 }
             }
         }
-        // ── Icons ─────────────────────────────────────────────────────────────
         PreferenceGroup(
             modifier = Modifier,
             heading = stringResource(id = R.string.icons),
         ) {
-            ScrollAnchor(ScrollKeys.ICON_STYLE, scrollState) {
+            ScrollAnchor(ScrollKeys.ICON_PACK, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.icon_pack),
                     destination = GeneralIconPack,
                     subtitle = currentIconPackName,
                 )
             }
-            NavigationActionPreference(
-                label = stringResource(id = R.string.themed_icon_title),
-                destination = GeneralThemedIcons,
-                subtitle = themedIconsSubtitle,
-            )
+            ScrollAnchor(ScrollKeys.THEMED_ICONS, scrollState) {
+                NavigationActionPreference(
+                    label = stringResource(id = R.string.themed_icon_title),
+                    destination = GeneralThemedIcons,
+                    subtitle = themedIconsSubtitle,
+                )
+            }
             ScrollAnchor(ScrollKeys.ICON_SHAPE, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.icon_shape_label),
@@ -195,13 +198,14 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                     },
                 )
             }
-            NavigationActionPreference(
-                label = stringResource(id = R.string.advanced_icon_settings_title),
-                destination = GeneralAdvancedIcons,
-            )
+            ScrollAnchor(ScrollKeys.ADVANCED_ICONS, scrollState) {
+                NavigationActionPreference(
+                    label = stringResource(id = R.string.advanced_icon_settings_title),
+                    destination = GeneralAdvancedIcons,
+                )
+            }
         }
 
-        // ── Colors ────────────────────────────────────────────────────────────
         val accentColorAdapter = prefs2.accentColor.getAdapter()
         val accentColorValue = accentColorAdapter.state.value
         val showColorStyle = !(Utilities.ATLEAST_S && accentColorValue == ColorOption.SystemAccent) ||
@@ -224,10 +228,7 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
         }
         val colorStyleSubtitle = stringResource(id = effectiveColorStyle.nameResourceId)
 
-        // Color spec is only meaningful when the accent comes from a wallpaper or a
-        // custom colour — system accent always uses the system Monet pipeline.
-        // Also hide when LegacyKdrag (ZCAM engine) is active — it has its own
-        // algorithm and is unaffected by Material spec versions.
+        // Show color spec only for wallpaper or custom accents when not using LegacyKdrag.
         val showColorSpec = (isWallpaperAccent || isCustomAccent) &&
             effectiveColorStyle !is LegacyKdrag
 
@@ -259,12 +260,11 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                         currentValue = colorSpecValue,
                         onValueChange = { newSpec ->
                             if (newSpec == SpecVersion.SPEC_2026 && colorSpecValue != SpecVersion.SPEC_2026) {
-                                // Remember whichever non-2026 spec was active so non-CMF styles
-                                // fall back to it while Spec 2026 is selected.
+                                // Save the previous non-2026 spec as fallback for non-CMF styles.
                                 colorSpecFallbackAdapter.onChange(colorSpecValue)
                             } else if (newSpec != SpecVersion.SPEC_2026) {
                                 colorSpecFallbackAdapter.onChange(newSpec)
-                                // CMF is Spec 2026 only — restore to Tonal Spot when leaving 2026.
+                                // Reset CMF to Tonal Spot when leaving Spec 2026.
                                 if (currentColorStyle is app.lawnchair.theme.color.Cmf) {
                                     colorStyleAdapter.onChange(TonalSpot)
                                 }
@@ -276,7 +276,6 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             }
         }
 
-        // ── Notification dots ─────────────────────────────────────────────────
         val notificationEnabled by remember { notificationDotsEnabled(context) }.collectAsStateWithLifecycle(initialValue = false)
         val serviceEnabled = notificationServiceEnabled()
         val showNotificationCountAdapter = prefs2.showNotificationCount.getAdapter()
@@ -290,16 +289,22 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             }
             val canDisplayNotificationDot = notificationEnabled && serviceEnabled
             ExpandAndShrink(visible = canDisplayNotificationDot) {
-                ColorPreference(preference = prefs2.notificationDotColor)
+                ScrollAnchor(ScrollKeys.NOTIFICATION_DOT_COLOR, scrollState) {
+                    ColorPreference(preference = prefs2.notificationDotColor)
+                }
             }
             ExpandAndShrink(visible = canDisplayNotificationDot) {
-                SwitchPreference(
-                    adapter = showNotificationCountAdapter,
-                    label = stringResource(id = R.string.show_notification_count),
-                )
+                ScrollAnchor(ScrollKeys.NOTIFICATION_COUNT, scrollState) {
+                    SwitchPreference(
+                        adapter = showNotificationCountAdapter,
+                        label = stringResource(id = R.string.show_notification_count),
+                    )
+                }
             }
             ExpandAndShrink(visible = canDisplayNotificationDot && showNotificationCount) {
-                ColorPreference(preference = prefs2.notificationDotTextColor)
+                ScrollAnchor(ScrollKeys.NOTIFICATION_DOT_TEXT_COLOR, scrollState) {
+                    ColorPreference(preference = prefs2.notificationDotTextColor)
+                }
             }
             ExpandAndShrink(visible = canDisplayNotificationDot && showNotificationCount) {
                 NotificationDotColorContrastWarnings(
@@ -309,15 +314,7 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             }
         }
 
-        // ── Settings background blur ───────────────────────────────────────────
-        // Matches old Lawnchair's Theme → Blur + Blur Intensity pair.
-        // The toggle enables the blurred wallpaper background across all settings
-        // screens; the slider controls intensity (10 = subtle frost, 150 = heavy fog).
-        // Both prefs are read inside PreferenceLayout → SettingsBlurContainer so the
-        // effect is instant on the entire settings stack — no recreate needed.
-        //
-        // On Android 10+ the blur reads wallpaper pixels, so we need the same
-        // storage permissions used by the wallpaper-preview feature.
+        // Settings wallpaper blur requires storage permissions on Android 10+.
         val settingsBlurAdapter = prefs.settingsBlurBackground.getAdapter()
         var showSettingsBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
         var settingsBlurManagedFilesChecked by rememberSaveable {
@@ -361,12 +358,14 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                 )
             }
             ExpandAndShrink(visible = settingsBlurAdapter.state.value) {
-                SliderPreference(
-                    label = stringResource(id = R.string.settings_blur_intensity_label),
-                    adapter = prefs.settingsBlurIntensity.getAdapter(),
-                    valueRange = 10F..150F,
-                    step = 10f,
-                )
+                ScrollAnchor(ScrollKeys.SETTINGS_BLUR_INTENSITY, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.settings_blur_intensity_label),
+                        adapter = prefs.settingsBlurIntensity.getAdapter(),
+                        valueRange = 10F..150F,
+                        step = 10f,
+                    )
+                }
             }
         }
 

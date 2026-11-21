@@ -82,7 +82,7 @@ fun PreferenceScaffold(
     }
     val topBarState = remember(scrollBehavior) { PreferenceTopBarState(scrollBehavior) }
 
-    // ── Settings background blur (pure Compose, matching PreferenceSearchScaffold) ──
+    // Blurred wallpaper background for settings screens.
     val prefs = preferenceManager()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()

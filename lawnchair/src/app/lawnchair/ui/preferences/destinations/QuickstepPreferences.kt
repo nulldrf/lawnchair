@@ -88,20 +88,24 @@ fun QuickstepPreferences(
                 )
             }
             ExpandAndShrink(visible = recentsTranslucentBackground) {
-                SliderPreference(
-                    adapter = prefs.recentsTranslucentBackgroundAlpha.getAdapter(),
-                    label = stringResource(id = R.string.translucent_background_alpha),
-                    step = 0.05f,
-                    valueRange = 0f..0.95f,
-                    showAsPercentage = true,
-                )
+                ScrollAnchor(ScrollKeys.QS_TRANSLUCENT_ALPHA, scrollState) {
+                    SliderPreference(
+                        adapter = prefs.recentsTranslucentBackgroundAlpha.getAdapter(),
+                        label = stringResource(id = R.string.translucent_background_alpha),
+                        step = 0.05f,
+                        valueRange = 0f..0.95f,
+                        showAsPercentage = true,
+                    )
+                }
             }
         }
 
-        QuickActionsPreferences(
-            items = recentActionsPreferences,
-            adapter = prefs.recentActionOrder.getAdapter(),
-        )
+        ScrollAnchor(ScrollKeys.QS_RECENTS_ACTIONS, scrollState) {
+            QuickActionsPreferences(
+                items = recentActionsPreferences,
+                adapter = prefs.recentActionOrder.getAdapter(),
+            )
+        }
 
         val overrideWindowCornerRadius by prefs.overrideWindowCornerRadius.observeAsState()
         PreferenceGroup(
@@ -116,12 +120,14 @@ fun QuickstepPreferences(
                 )
             }
             ExpandAndShrink(visible = overrideWindowCornerRadius) {
-                SliderPreference(
-                    label = stringResource(id = R.string.window_corner_radius_label),
-                    adapter = prefs.windowCornerRadius.getAdapter(),
-                    step = 0,
-                    valueRange = 70..150,
-                )
+                ScrollAnchor(ScrollKeys.QS_CORNER_RADIUS_VALUE, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.window_corner_radius_label),
+                        adapter = prefs.windowCornerRadius.getAdapter(),
+                        step = 0,
+                        valueRange = 70..150,
+                    )
+                }
             }
         }
 

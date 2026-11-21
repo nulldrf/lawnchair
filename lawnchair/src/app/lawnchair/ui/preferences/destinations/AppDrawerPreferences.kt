@@ -92,7 +92,9 @@ fun AppDrawerPreferences(
         val drawerListAdapter = prefs.drawerList.getAdapter()
         val scrollState = rememberPreferenceScrollState()
         Column {
-            DrawerLayoutPreference(drawerListAdapter)
+            ScrollAnchor(ScrollKeys.DRAWER_LAYOUT, scrollState) {
+                DrawerLayoutPreference(drawerListAdapter)
+            }
             ExpandAndShrink(visible = drawerListAdapter.state.value) {
                 ScrollAnchor(ScrollKeys.DRAWER_FOLDERS, scrollState) {
                     AppDrawerFolderPreferenceItem()
@@ -117,19 +119,16 @@ fun AppDrawerPreferences(
                     adapter = prefs2.appDrawerSearchBarAtBottom.getAdapter(),
                 )
             }
-            NavigationActionPreference(
-                label = stringResource(R.string.suggestion_pref_screen_title),
-                destination = Predictions,
-            )
+            ScrollAnchor(ScrollKeys.DRAWER_SUGGESTIONS, scrollState) {
+                NavigationActionPreference(
+                    label = stringResource(R.string.suggestion_pref_screen_title),
+                    destination = Predictions,
+                )
+            }
             AppDrawerHapticFeedbackPreference(scrollState = scrollState)
         }
 
-        // -----------------------------------------------------------------------
-        // Style — background colour, opacity, work tab colours, HokoBlur
-        // -----------------------------------------------------------------------
-        // ── HokoBlur permission state (must live outside PreferenceGroup) ────
-        // Blurring the drawer background reads wallpaper pixels, so we need
-        // the same storage permissions used by the wallpaper-preview feature.
+        // Drawer wallpaper blur requires storage permissions on Android 10+.
         val drawerBlurBackgroundAdapter = prefs2.drawerBlurBackground.getAdapter()
         var showDrawerBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
         var drawerBlurManagedFilesChecked by rememberSaveable {
@@ -185,13 +184,9 @@ fun AppDrawerPreferences(
                     adapter = prefs2.appDrawerSearchBarBackground.getAdapter(),
                 )
             }
-            // ── App drawer icon text colour (new) ────────────────────────────
-            // Default = Lawnchair automatic (honours luminance-based heuristic).
-            // Any other pick overrides the automatic logic with the chosen colour.
             ScrollAnchor(ScrollKeys.DRAWER_TEXT_COLOR, scrollState) {
                 ColorPreference(preference = prefs2.drawerIconTextColor)
             }
-            // ── HokoBlur ────────────────────────────────────────────────────────
             ScrollAnchor(ScrollKeys.DRAWER_BLUR, scrollState) {
                 SwitchPreference(
                     checked = drawerBlurBackgroundAdapter.state.value,
@@ -206,12 +201,16 @@ fun AppDrawerPreferences(
                     description = stringResource(id = R.string.drawer_hoko_blur_description),
                 )
             }
-            SliderPreference(
-                label = stringResource(id = R.string.drawer_hoko_blur_intensity_label),
-                adapter = prefs2.drawerBlurIntensity.getAdapter(),
-                step = 5f,
-                valueRange = 10f..150f,
-            )
+            ExpandAndShrink(visible = drawerBlurBackgroundAdapter.state.value) {
+                ScrollAnchor(ScrollKeys.DRAWER_BLUR_INTENSITY, scrollState) {
+                    SliderPreference(
+                        label = stringResource(id = R.string.drawer_hoko_blur_intensity_label),
+                        adapter = prefs2.drawerBlurIntensity.getAdapter(),
+                        step = 5f,
+                        valueRange = 10f..150f,
+                    )
+                }
+            }
         }
 
         if (showDrawerBlurPermissionDialog) {

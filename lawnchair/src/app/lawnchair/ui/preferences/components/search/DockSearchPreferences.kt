@@ -49,6 +49,7 @@ import app.lawnchair.ui.preferences.components.controls.SliderPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
+import app.lawnchair.ui.preferences.components.layout.PreferenceScrollState
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
@@ -61,6 +62,7 @@ import com.android.launcher3.R
 @Composable
 fun DockSearchPreference(
     modifier: Modifier = Modifier,
+    scrollState: PreferenceScrollState = rememberPreferenceScrollState(),
 ) {
     val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
@@ -74,7 +76,6 @@ fun DockSearchPreference(
     val strokeColorStyleAdapter = prefs2.strokeColorStyle.getAdapter()
     val hotseatQsbProviderAdapter by prefs2.hotseatQsbProvider.getAdapter()
 
-    val scrollState = rememberPreferenceScrollState()
     Crossfade(isHotseatEnabled.state.value, label = "transition", modifier = modifier) { hotseatEnabled ->
         val isLawnchairHotseat = hotseatModeAdapter.state.value == LawnchairHotseat
         if (hotseatEnabled) {
@@ -152,7 +153,9 @@ fun DockSearchPreference(
                                 )
                             }
                             if (qsbHotseatStrokeWidth.state.value > 0f) {
-                                ColorPreference(preference = prefs2.strokeColorStyle)
+                                ScrollAnchor(ScrollKeys.DOCK_SEARCH_STROKE_COLOR, scrollState) {
+                                    ColorPreference(preference = prefs2.strokeColorStyle)
+                                }
                             }
                         }
                     }

@@ -55,8 +55,7 @@ fun TwoTabPreferenceLayout(
         )
         val scope = rememberCoroutineScope()
 
-        // Single source of truth: pager offset drives everything.
-        // Goes 0.0 (fully on page 0) → 1.0 (fully on page 1).
+        // Maps pager position from 0f (first tab) to 1f (second tab).
         val pageProgress = (pagerState.currentPage + pagerState.currentPageOffsetFraction)
             .coerceIn(0f, 1f)
 
@@ -75,7 +74,6 @@ fun TwoTabPreferenceLayout(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             listOf(firstPageLabel, secondPageLabel).forEachIndexed { index, pageLabel ->
-                // progress = 1f when this tab is fully selected, 0f when not
                 val tabProgress = if (index == 0) 1f - pageProgress else pageProgress
 
                 val cornerRadius = lerp(inactiveCorner, activeCorner, tabProgress)

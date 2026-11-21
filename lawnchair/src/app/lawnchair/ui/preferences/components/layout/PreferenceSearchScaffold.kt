@@ -74,15 +74,13 @@ fun PreferenceSearchScaffold(
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
 
-    // Recomputed whenever the configuration changes (e.g. rotation) — see
-    // SettingsWallpaperBlurHelper.screenBounds() / PreferencesDashboard's
-    // SearchOverlay for the matching fix on the other call sites.
+    // Recompute bounds on configuration changes such as rotation.
     val configuration = LocalConfiguration.current
     val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
     val screenWidth = screenBounds.width()
     val screenHeight = screenBounds.height()
 
-    // Use explicit type and `this.value` to avoid clashing with the `value: String` parameter.
+    // Explicit `this.value` avoids shadowing the `value: String` parameter.
     val blurredBitmap: Bitmap? by produceState<Bitmap?>(
         initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
         blurEnabled, blurIntensity, screenWidth, screenHeight,
@@ -105,14 +103,12 @@ fun PreferenceSearchScaffold(
 
     Box(modifier = modifier.fillMaxSize()) {
         if (showBlur) {
-            // Layer 1 — blurred wallpaper
             Image(
                 bitmap = bitmap!!.asImageBitmap(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            // Layer 2 — adaptive surface scrim (dims in dark mode, brightens in light mode)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -120,7 +116,6 @@ fun PreferenceSearchScaffold(
             )
         }
 
-        // Layer 3 — Scaffold with transparent container when blur is on
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = if (showBlur) Color.Transparent else MaterialTheme.colorScheme.surface,

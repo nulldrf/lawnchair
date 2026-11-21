@@ -48,27 +48,9 @@ fun PreferenceCategory(
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
     description: String? = null,
-    // Optional trailing slot (e.g. an inline Switch). Forwarded straight to
-    // PreferenceTemplate's own endWidget, so it shares the same Row as the
-    // title/description column — which is weighted — meaning the text
-    // naturally lays out within whatever space remains, at any font scale,
-    // instead of relying on an approximate reserved-padding guess. Every
-    // existing caller is unaffected since this defaults to null.
+    // Optional trailing widget (for example, an inline toggle switch).
     endWidget: (@Composable () -> Unit)? = null,
-    // Optional shape override. PreferenceTemplate itself defaults to
-    // ListItemDefaults.segmentedShapes(index = 0, count = 1) — i.e. every
-    // single card always rendered as an independent "standalone" item.
-    // That's fine for the main dashboard's PreferenceGroup category list
-    // (fixed count, each entry genuinely is its own standalone card), but a
-    // dynamically-sized list — like settings search results, whose length
-    // changes with every keystroke — needs a *real* per-position shape:
-    // the first result rounded on top, the last rounded on bottom, middle
-    // results square, and a lone result fully rounded on all sides. That's
-    // exactly the index/count scheme PreferenceGroupItem already computes
-    // from cutTop/cutBottom (see LazyColumnPreferenceGroup.kt); this param
-    // lets a caller like the search overlay compute and pass the same thing.
-    // Defaults to PreferenceTemplate's own standalone shape, so every
-    // existing call site (the main dashboard list) is completely unaffected.
+    // Card shape override for dynamically sized lists such as search results.
     shapes: ListItemShapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
 ) {
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)

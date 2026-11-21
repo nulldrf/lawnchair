@@ -55,8 +55,6 @@ fun LazyListScope.preferenceGroupItems(
         PreferenceGroupHeading(heading?.let { it() })
     }
     items(count, key, contentType) { index ->
-        // Matches PreferenceGroup's own itemSpacing (ListItemDefaults.SegmentedGap)
-        // so lazy-list groups and eager-Column groups look identical.
         if (showDividers && index > 0) {
             Spacer(modifier = Modifier.height(ListItemDefaults.SegmentedGap))
         }
@@ -90,33 +88,12 @@ inline fun <T> LazyListScope.preferenceGroupItems(
     }
 }
 
-// Corner radius at an exposed (non-cut) end of the continuous card, and at an
-// inner seam where two rows in the same group meet.
 private val ExposedCorner = 16.dp
 private val SeamCorner = 4.dp
-
-// Corner radius while pressed — matches the "pill" press-morph language every
-// other SegmentedListItem in this app already uses (see MainSwitchPreference's
-// pressedShape = CircleShape; 28.dp reads as fully rounded on a normal-height row).
 private val PressedCorner = ExposedCorner
 
 /**
- * A single row inside a continuous, seamed preference "card": rounded at
- * group-exposed ends, square at inner seams — matching [PreferenceGroup]'s
- * card language for lazy-list contexts.
- *
- * Background/color come from here (unlike a standalone [PreferenceTemplate],
- * which is transparent and expects a parent to paint the card), since a
- * continuous card's background must be drawn once per row, not per group.
- *
- * Press feedback uses [detectTapGestures]'s `onPress` — the standard idiom
- * for observing press state on a container without stealing the gesture from
- * a nested clickable: `onPress` never consumes the pointer change, and
- * [androidx.compose.foundation.gestures.PressGestureScope.tryAwaitRelease]
- * correctly cooperates with ancestor scrollables (it returns false and we
- * reset [pressed] if the LazyColumn ends up claiming the gesture as a scroll
- * instead of a tap), unlike a raw Initial-pass-only observer which doesn't
- * participate in that arbitration and can silently never fire.
+ * A segmented card row for lazy lists that rounds exposed ends and animates corners while pressed.
  */
 @Composable
 fun PreferenceGroupItem(
@@ -144,18 +121,7 @@ fun PreferenceGroupItem(
             .padding(horizontal = 16.dp)
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    // requireUnconsumed = false + Final pass: the content()
-                    // row's own clickable (e.g. ContributorRow, AppItem) runs
-                    // on the default Main pass and consumes the down there —
-                    // Main resolves child-before-parent, so by the time this
-                    // ancestor node would see the event on Main, it's already
-                    // consumed and awaitFirstDown()'s default
-                    // requireUnconsumed = true silently ignores it forever.
-                    // Final runs after Main has resolved, and passing
-                    // requireUnconsumed = false means we observe the down
-                    // regardless of who already consumed it — purely passive,
-                    // we never call change.consume() ourselves, so the child's
-                    // real click handling is completely unaffected.
+                    // Observe press state passively on the Final pass without consuming child clicks.
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
                     pressed = true
                     do {

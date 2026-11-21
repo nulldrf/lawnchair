@@ -45,6 +45,9 @@ import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.util.addIf
 import com.android.launcher3.R
 import com.android.launcher3.util.painterResource
@@ -81,6 +84,7 @@ fun ThemedIconsPreferences(
     val drawerThemedIconsAdapter = prefs.drawerThemedIcons.getAdapter()
     val themedIconPackAdapter = prefs.themedIconPackPackage.getAdapter()
     val forceMonochromeAdapter = prefs.forceIconMonochrome.getAdapter()
+    val scrollState = rememberPreferenceScrollState()
 
     val currentState = ThemedIconsState.getForSettings(
         themedIcons = themedIconsAdapter.state.value,
@@ -145,37 +149,43 @@ fun ThemedIconsPreferences(
         ExpandAndShrink(currentState != ThemedIconsState.Off) {
             PreferenceGroup(heading = stringResource(id = R.string.settings)) {
                 val fallbackEnabled = !forceMonochromeAdapter.state.value
-                ListPreference(
-                    adapter = themedIconPackAdapter,
-                    entries = themedIconPackEntries,
-                    label = stringResource(id = R.string.fallback_icon_source_title),
-                    enabled = fallbackEnabled,
-                    endWidget = {
-                        themedIconPacks.firstOrNull { it.packageName == themedIconPackAdapter.state.value }
-                            .let {
-                                if (it?.icon !== null) {
-                                    Image(
-                                        painter = painterResource(it.icon),
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .addIf(!fallbackEnabled) {
-                                                alpha(0.38f)
-                                            },
-                                    )
+                ScrollAnchor(ScrollKeys.FALLBACK_ICON_SOURCE, scrollState) {
+                    ListPreference(
+                        adapter = themedIconPackAdapter,
+                        entries = themedIconPackEntries,
+                        label = stringResource(id = R.string.fallback_icon_source_title),
+                        enabled = fallbackEnabled,
+                        endWidget = {
+                            themedIconPacks.firstOrNull { it.packageName == themedIconPackAdapter.state.value }
+                                .let {
+                                    if (it?.icon !== null) {
+                                        Image(
+                                            painter = painterResource(it.icon),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(42.dp)
+                                                .addIf(!fallbackEnabled) {
+                                                    alpha(0.38f)
+                                                },
+                                        )
+                                    }
                                 }
-                            }
-                    },
-                )
-                SwitchPreference(
-                    adapter = forceMonochromeAdapter,
-                    label = stringResource(id = R.string.enforce_themed_icons_title),
-                    description = stringResource(id = R.string.enforce_themed_icons_description),
-                )
-                SwitchPreference(
-                    adapter = prefs.transparentIconBackground.getAdapter(),
-                    label = stringResource(id = R.string.transparent_background_icons_label),
-                )
+                        },
+                    )
+                }
+                ScrollAnchor(ScrollKeys.ENFORCE_THEMED_ICONS, scrollState) {
+                    SwitchPreference(
+                        adapter = forceMonochromeAdapter,
+                        label = stringResource(id = R.string.enforce_themed_icons_title),
+                        description = stringResource(id = R.string.enforce_themed_icons_description),
+                    )
+                }
+                ScrollAnchor(ScrollKeys.TRANSPARENT_ICON_BG, scrollState) {
+                    SwitchPreference(
+                        adapter = prefs.transparentIconBackground.getAdapter(),
+                        label = stringResource(id = R.string.transparent_background_icons_label),
+                    )
+                }
             }
         }
     }

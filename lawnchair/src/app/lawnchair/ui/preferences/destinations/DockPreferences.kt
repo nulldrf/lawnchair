@@ -75,32 +75,34 @@ fun DockPreferences(modifier: Modifier = Modifier) {
     ) {
         val hotseatBgAdapter = prefs.hotseatBG.getAdapter()
 
-        ScrollAnchor(ScrollKeys.SHOW_DOCK, scrollState) {
-            MainSwitchPreference(adapter = prefs2.isHotseatEnabled.getAdapter(), label = stringResource(id = R.string.show_hotseat_title)) {
-                DockPreferencesPreview()
-                PreferenceGroup(heading = stringResource(id = R.string.style)) {
-                    ScrollAnchor(ScrollKeys.DOCK_BG, scrollState) {
-                        SwitchPreference(
-                            adapter = hotseatBgAdapter,
-                            label = stringResource(id = R.string.hotseat_background),
-                        )
-                    }
-                    ExpandAndShrink(
-                        visible = hotseatBgAdapter.state.value,
-                    ) {
-                        HotseatBackgroundSettings(prefs, prefs2, scrollState = scrollState)
-                    }
+        MainSwitchPreference(adapter = prefs2.isHotseatEnabled.getAdapter(), label = stringResource(id = R.string.show_hotseat_title)) {
+            DockPreferencesPreview()
+            PreferenceGroup(heading = stringResource(id = R.string.style)) {
+                ScrollAnchor(ScrollKeys.DOCK_BG, scrollState) {
+                    SwitchPreference(
+                        adapter = hotseatBgAdapter,
+                        label = stringResource(id = R.string.hotseat_background),
+                    )
                 }
+                ExpandAndShrink(
+                    visible = hotseatBgAdapter.state.value,
+                ) {
+                    HotseatBackgroundSettings(prefs, prefs2, scrollState = scrollState)
+                }
+            }
+            ScrollAnchor(ScrollKeys.DOCK_SEARCH, scrollState) {
                 SearchBarPreference(SearchRoute.DOCK_SEARCH)
-                GridSettings(prefs, prefs2, scrollState)
-                PreferenceGroup(heading = stringResource(id = R.string.icons)) {
-                    val enableLabelInDockAdapter = prefs2.enableLabelInDock.getAdapter()
-                    ScrollAnchor(ScrollKeys.DOCK_SHOW_LABELS, scrollState) {
-                        SwitchPreference(
-                            adapter = enableLabelInDockAdapter,
-                            label = stringResource(id = R.string.show_labels),
-                        )
-                    }
+            }
+            GridSettings(prefs, prefs2, scrollState)
+            PreferenceGroup(heading = stringResource(id = R.string.icons)) {
+                val enableLabelInDockAdapter = prefs2.enableLabelInDock.getAdapter()
+                ScrollAnchor(ScrollKeys.DOCK_SHOW_LABELS, scrollState) {
+                    SwitchPreference(
+                        adapter = enableLabelInDockAdapter,
+                        label = stringResource(id = R.string.show_labels),
+                    )
+                }
+                ExpandAndShrink(visible = enableLabelInDockAdapter.state.value) {
                     ScrollAnchor(ScrollKeys.DOCK_TWO_LINE, scrollState) {
                         SwitchPreference(
                             adapter = prefs2.twoLineDock.getAdapter(),
@@ -123,15 +125,15 @@ fun HotseatBackgroundSettings(
         ScrollAnchor(ScrollKeys.DOCK_BG_COLOR, scrollState) {
             ColorPreference(preference = prefs2.hotseatBackgroundColor)
         }
-        // No ScrollKeys entry for this yet — added straight, matching upstream,
-        // rather than inventing a deep-link key that doesn't exist elsewhere.
-        SliderPreference(
-            label = stringResource(id = R.string.hotseat_bg_corner_radius),
-            adapter = prefs2.hotseatBackgroundCornerRadius.getAdapter(),
-            step = 1f,
-            valueRange = 0f..100f,
-            showUnit = "dp",
-        )
+        ScrollAnchor(ScrollKeys.DOCK_BG_CORNER_RADIUS, scrollState) {
+            SliderPreference(
+                label = stringResource(id = R.string.hotseat_bg_corner_radius),
+                adapter = prefs2.hotseatBackgroundCornerRadius.getAdapter(),
+                step = 1f,
+                valueRange = 0f..100f,
+                showUnit = "dp",
+            )
+        }
         ScrollAnchor(ScrollKeys.DOCK_BG_OPACITY, scrollState) {
             SliderPreference(
                 label = stringResource(id = R.string.hotseat_bg_alpha),
@@ -239,18 +241,22 @@ fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2, scrollSta
                 showAsPercentage = true,
             )
         }
-        SliderPreference(
-            label = stringResource(id = R.string.dock_rows),
-            adapter = hotseatRowsAdapter,
-            step = 1,
-            valueRange = 1..2,
-        )
-        SliderPreference(
-            label = stringResource(id = R.string.dock_pages),
-            adapter = dockPagesAdapter,
-            step = 1,
-            valueRange = 1..5,
-        )
+        ScrollAnchor(ScrollKeys.DOCK_ROWS, scrollState) {
+            SliderPreference(
+                label = stringResource(id = R.string.dock_rows),
+                adapter = hotseatRowsAdapter,
+                step = 1,
+                valueRange = 1..2,
+            )
+        }
+        ScrollAnchor(ScrollKeys.DOCK_PAGES, scrollState) {
+            SliderPreference(
+                label = stringResource(id = R.string.dock_pages),
+                adapter = dockPagesAdapter,
+                step = 1,
+                valueRange = 1..5,
+            )
+        }
     }
 }
 
@@ -291,10 +297,7 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
 
         PreferenceGroupHeading(heading = stringResource(id = R.string.preview_label))
 
-        // WithWallpaper wraps the bordered box so its permission button renders
-        // AFTER the box as the next Column child — outside the border.
-        // The bordered Box is the content lambda; the button is a sibling appended
-        // by WithWallpaper itself after content() returns.
+        // Keep the wallpaper permission button outside the preview border.
         Column(modifier = modifier.fillMaxWidth()) {
             WithWallpaper { wallpaper ->
                 Box(
@@ -307,8 +310,6 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
                     DummyLauncherBox(
                         modifier = Modifier
                             .fillMaxWidth()
-                            // Show more of the preview when 2 hotseat rows are
-                            // enabled so the second row isn't cut off
                             .clipToBottomPercentage(if (hotseatRows.getAdapter().state.value >= 2) 0.4f else 0.3f),
                     ) {
                         WallpaperPreview(
@@ -325,8 +326,6 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
                         }
                     }
                 }
-                // WithWallpaper appends the "Show wallpaper" button here as the
-                // next Column child — outside the bordered box.
             }
         }
     }

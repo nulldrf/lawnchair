@@ -41,6 +41,10 @@ import app.lawnchair.ui.preferences.components.controls.MainSwitchPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.PreferenceScrollState
+import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
+import app.lawnchair.ui.preferences.components.layout.ScrollKeys
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.navigation.DismissedPredictionApps
 import app.lawnchair.util.lifecycleState
 import com.android.launcher3.R
@@ -50,6 +54,7 @@ import com.android.launcher3.Utilities
 fun PredictionsPreferences(
     modifier: Modifier = Modifier,
 ) {
+    val scrollState = rememberPreferenceScrollState()
     PreferenceLayout(
         label = stringResource(id = R.string.suggestion_pref_screen_title),
         backArrowVisible = !LocalIsExpandedScreen.current,
@@ -63,7 +68,7 @@ fun PredictionsPreferences(
             adapter = enableGlobalPredictionAdapter,
             label = stringResource(R.string.global_predictions_label),
         ) {
-            AppPredictionsFeature(context, prefs2)
+            AppPredictionsFeature(context, prefs2, scrollState)
         }
     }
 }
@@ -72,6 +77,7 @@ fun PredictionsPreferences(
 private fun AppPredictionsFeature(
     context: Context,
     prefs2: PreferenceManager2,
+    scrollState: PreferenceScrollState,
 ) {
     val resources = LocalResources.current
     val appOps = remember { context.getSystemService(AppOpsManager::class.java) }
@@ -106,13 +112,15 @@ private fun AppPredictionsFeature(
     PreferenceGroup(
         heading = stringResource(R.string.app_predictions_label),
     ) {
-        ListPreference(
-            adapter = predictionModeAdapter,
-            entries = predictionModeEntries,
-            label = stringResource(R.string.prediction_mode_label),
-            description = if (canUseAppPrediction) null else stringResource(R.string.app_predictions_disable_reason_pre_q_description),
-            enabled = canUseAppPrediction,
-        )
+        ScrollAnchor(ScrollKeys.PREDICTION_MODE, scrollState) {
+            ListPreference(
+                adapter = predictionModeAdapter,
+                entries = predictionModeEntries,
+                label = stringResource(R.string.prediction_mode_label),
+                description = if (canUseAppPrediction) null else stringResource(R.string.app_predictions_disable_reason_pre_q_description),
+                enabled = canUseAppPrediction,
+            )
+        }
         when (predictionModeAdapter.state.value) {
             SystemPredictor -> SystemSuggestionsPreference()
 
@@ -120,6 +128,7 @@ private fun AppPredictionsFeature(
                 weightedUsageStatsAdapter = weightedUsageStatsAdapter,
                 hasUsageStatsPermission = hasUsageStatsPermission.value,
                 dismissedPredictionAppsSubtitle = dismissedPredictionAppsSubtitle,
+                scrollState = scrollState,
             )
 
             NoPredictor -> Unit
@@ -132,22 +141,25 @@ private fun LawnchairPredictionSettings(
     weightedUsageStatsAdapter: PreferenceAdapter<Boolean>,
     hasUsageStatsPermission: Boolean,
     dismissedPredictionAppsSubtitle: String,
+    scrollState: PreferenceScrollState,
 ) {
     var showPermissionDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    SwitchPreference(
-        checked = weightedUsageStatsAdapter.state.value && hasUsageStatsPermission,
-        onCheckedChange = { newValue ->
-            if (hasUsageStatsPermission) {
-                weightedUsageStatsAdapter.onChange(newValue)
-            } else {
-                showPermissionDialog = true
-            }
-        },
-        label = stringResource(R.string.prediction_weighted_usage_stats_label),
-        description = stringResource(R.string.prediction_weighted_usage_stats_description),
-    )
+    ScrollAnchor(ScrollKeys.PREDICTION_WEIGHTED_USAGE, scrollState) {
+        SwitchPreference(
+            checked = weightedUsageStatsAdapter.state.value && hasUsageStatsPermission,
+            onCheckedChange = { newValue ->
+                if (hasUsageStatsPermission) {
+                    weightedUsageStatsAdapter.onChange(newValue)
+                } else {
+                    showPermissionDialog = true
+                }
+            },
+            label = stringResource(R.string.prediction_weighted_usage_stats_label),
+            description = stringResource(R.string.prediction_weighted_usage_stats_description),
+        )
+    }
     if (showPermissionDialog) {
         PermissionDialog(
             title = stringResource(id = R.string.missing_usage_access_label),
@@ -170,11 +182,13 @@ private fun LawnchairPredictionSettings(
             },
         )
     }
-    NavigationActionPreference(
-        label = stringResource(R.string.dismissed_prediction_apps_label),
-        destination = DismissedPredictionApps,
-        subtitle = dismissedPredictionAppsSubtitle,
-    )
+    ScrollAnchor(ScrollKeys.PREDICTION_DISMISSED_APPS, scrollState) {
+        NavigationActionPreference(
+            label = stringResource(R.string.dismissed_prediction_apps_label),
+            destination = DismissedPredictionApps,
+            subtitle = dismissedPredictionAppsSubtitle,
+        )
+    }
 }
 
 @Composable

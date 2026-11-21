@@ -69,17 +69,19 @@ fun ExtrasPreferences(
                     },
                 )
             }
-            PreferenceTemplate(
-                modifier = Modifier.clickable { openAppInfo(context) },
-                title = { Text(text = stringResource(id = R.string.app_info_drop_target_label)) },
-                startWidget = {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_about),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onBackground,
-                    )
-                },
-            )
+            ScrollAnchor(ScrollKeys.APP_INFO, scrollState) {
+                PreferenceTemplate(
+                    modifier = Modifier.clickable { openAppInfo(context) },
+                    title = { Text(text = stringResource(id = R.string.app_info_drop_target_label)) },
+                    startWidget = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_about),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onBackground,
+                        )
+                    },
+                )
+            }
         }
     }
 }

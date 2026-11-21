@@ -93,11 +93,9 @@ import kotlinx.coroutines.launch
 private const val ICON_PACK_REPO_URL =
     "https://github.com/breezy-weather/breezy-weather-icon-packs/blob/main/README.md"
 
-// Maps a data source's providerName resource id to its stable ScrollKey, so
-// the dashboard search overlay can auto-scroll/highlight the exact switch —
-// even though the "what to show" list is otherwise a fully dynamic loop over
-// smartspaceProvider.dataSources with no per-item structure of its own.
+// Maps dynamic Smartspace data sources to their scroll keys.
 private fun scrollKeyForProvider(providerNameRes: Int): String? = when (providerNameRes) {
+    R.string.smartspace_weather -> ScrollKeys.SS_WEATHER_WIDGET
     R.string.smartspace_battery_status -> ScrollKeys.SS_BATTERY_STATUS
     R.string.smartspace_torch -> ScrollKeys.SS_FLASHLIGHT
     R.string.smartspace_now_playing -> ScrollKeys.SS_NOW_PLAYING
@@ -142,7 +140,7 @@ fun SmartspacePreferences(
                 Crossfade(targetState = selectedMode, label = "Smartspace setting transition") { targetState ->
                     when (targetState) {
                         LawnchairSmartspace -> LawnchairSmartspaceSettings(smartspaceProvider, scrollState = scrollState)
-                        Smartspacer -> SmartspacerSettings()
+                        Smartspacer -> SmartspacerSettings(scrollState = scrollState)
                         else -> {}
                     }
                 }
@@ -610,24 +608,31 @@ fun SmartspaceCalendarPreference(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SmartspacerSettings(modifier: Modifier = Modifier) {
+fun SmartspacerSettings(
+    modifier: Modifier = Modifier,
+    scrollState: PreferenceScrollState = rememberPreferenceScrollState(),
+) {
     val context = LocalContext.current
     val prefs2 = preferenceManager2()
     Column(modifier) {
         PreferenceGroup(
             heading = stringResource(id = R.string.smartspacer_settings),
         ) {
-            SliderPreference(
-                label = stringResource(R.string.maximum_number_of_targets),
-                adapter = prefs2.smartspacerMaxCount.getAdapter(),
-                valueRange = 5..15,
-                step = 1,
-            )
-            ClickablePreference(label = stringResource(R.string.open_smartspacer_settings)) {
-                val intent = context.packageManager.getLaunchIntentForPackage(
-                    SmartspacerConstants.SMARTSPACER_PACKAGE_NAME,
+            ScrollAnchor(ScrollKeys.SS_SMARTSPACER_MAX_TARGETS, scrollState) {
+                SliderPreference(
+                    label = stringResource(R.string.maximum_number_of_targets),
+                    adapter = prefs2.smartspacerMaxCount.getAdapter(),
+                    valueRange = 5..15,
+                    step = 1,
                 )
-                context.startActivity(intent)
+            }
+            ScrollAnchor(ScrollKeys.SS_SMARTSPACER_OPEN_SETTINGS, scrollState) {
+                ClickablePreference(label = stringResource(R.string.open_smartspacer_settings)) {
+                    val intent = context.packageManager.getLaunchIntentForPackage(
+                        SmartspacerConstants.SMARTSPACER_PACKAGE_NAME,
+                    )
+                    context.startActivity(intent)
+                }
             }
         }
     }

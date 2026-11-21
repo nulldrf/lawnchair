@@ -15,6 +15,7 @@ import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.TwoTabPreferenceLayout
+import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
 import app.lawnchair.ui.preferences.components.search.DockSearchPreference
 import app.lawnchair.ui.preferences.components.search.DrawerSearchPreference
 import app.lawnchair.ui.preferences.navigation.Search
@@ -65,18 +66,19 @@ fun SearchPreferences(
     modifier: Modifier = Modifier,
     currentTab: SearchRoute = SearchRoute.DOCK_SEARCH,
 ) {
+    val scrollState = rememberPreferenceScrollState()
     TwoTabPreferenceLayout(
         label = stringResource(id = R.string.search_bar_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
         defaultPage = currentTab.ordinal,
         firstPageLabel = stringResource(id = R.string.dock_label),
         firstPageContent = {
-            DockSearchPreference()
+            DockSearchPreference(scrollState = scrollState)
         },
         secondPageLabel = stringResource(id = R.string.app_drawer_label),
         secondPageContent = {
             Spacer(Modifier.height(8.dp))
-            DrawerSearchPreference()
+            DrawerSearchPreference(scrollState = scrollState)
         },
         modifier = modifier,
     )

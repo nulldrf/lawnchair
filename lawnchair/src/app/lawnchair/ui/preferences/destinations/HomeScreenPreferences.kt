@@ -96,7 +96,9 @@ fun HomeScreenPreferences(
         val showDeckLayout = prefs2.showDeckLayout.getAdapter().state.value
 
         if (showDeckLayout) {
-            HomeLayoutSettings()
+            ScrollAnchor(ScrollKeys.HOME_LAYOUT, scrollState) {
+                HomeLayoutSettings()
+            }
         }
 
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
@@ -129,19 +131,23 @@ fun HomeScreenPreferences(
         }
         if (hasMotionSensor) {
             PreferenceGroup {
-                SwitchPreference(
-                    adapter = panToMoveEnabledAdapter,
-                    label = stringResource(id = R.string.pan_to_move_icon_label),
-                    description = stringResource(id = R.string.pan_to_move_icon_description),
-                )
-                ExpandAndShrink(visible = panToMoveEnabledAdapter.state.value) {
-                    SliderPreference(
-                        adapter = panToMoveSensitivityAdapter,
-                        label = stringResource(id = R.string.pan_to_move_sensitivity_label),
-                        valueRange = 0f..1f,
-                        step = 0.05f,
-                        showAsPercentage = true,
+                ScrollAnchor(ScrollKeys.HOME_PAN_TO_MOVE, scrollState) {
+                    SwitchPreference(
+                        adapter = panToMoveEnabledAdapter,
+                        label = stringResource(id = R.string.pan_to_move_icon_label),
+                        description = stringResource(id = R.string.pan_to_move_icon_description),
                     )
+                }
+                ExpandAndShrink(visible = panToMoveEnabledAdapter.state.value) {
+                    ScrollAnchor(ScrollKeys.HOME_PAN_TO_MOVE_SENSITIVITY, scrollState) {
+                        SliderPreference(
+                            adapter = panToMoveSensitivityAdapter,
+                            label = stringResource(id = R.string.pan_to_move_sensitivity_label),
+                            valueRange = 0f..1f,
+                            step = 0.05f,
+                            showAsPercentage = true,
+                        )
+                    }
                 }
             }
         }
@@ -176,11 +182,9 @@ fun HomeScreenPreferences(
             }
         }
         PreferenceGroup(heading = stringResource(R.string.style)) {
-            // Theme-based light/dark/auto text colour mode (existing)
             ScrollAnchor(ScrollKeys.HOME_TEXT_COLOR, scrollState) {
                 HomeScreenTextColorPreference()
             }
-            // Full color-picker for home screen icon label colour (new)
             ScrollAnchor(ScrollKeys.HOME_ICON_TEXT_COLOR, scrollState) {
                 ColorPreference(preference = prefs2.workspaceIconTextColor)
             }
@@ -328,11 +332,13 @@ fun HomeScreenPreferences(
         val customIconsCount by remember { overrideRepo.observeCount() }.collectAsStateBlocking()
         if (customIconsCount > 0) {
             PreferenceGroup {
-                ClickablePreference(
-                    label = stringResource(id = R.string.reset_custom_icons),
-                    confirmationText = stringResource(id = R.string.reset_custom_icons_confirmation),
-                    onClick = { scope.launch { overrideRepo.deleteAll() } },
-                )
+                ScrollAnchor(ScrollKeys.HOME_RESET_CUSTOM_ICONS, scrollState) {
+                    ClickablePreference(
+                        label = stringResource(id = R.string.reset_custom_icons),
+                        confirmationText = stringResource(id = R.string.reset_custom_icons_confirmation),
+                        onClick = { scope.launch { overrideRepo.deleteAll() } },
+                    )
+                }
             }
         }
         PreferenceGroup(heading = stringResource(id = R.string.widget_button_text)) {

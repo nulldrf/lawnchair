@@ -43,11 +43,13 @@ fun BackupAndRestorePreference(
             }
         }
         PreferenceGroup {
-            ClickablePreference(
-                label = stringResource(R.string.restore_nova_backup),
-                subtitle = stringResource(R.string.restore_nova_backup_description),
-                onClick = restoreNovaBackupOpener(),
-            )
+            ScrollAnchor(ScrollKeys.RESTORE_NOVA_BACKUP, scrollState) {
+                ClickablePreference(
+                    label = stringResource(R.string.restore_nova_backup),
+                    subtitle = stringResource(R.string.restore_nova_backup_description),
+                    onClick = restoreNovaBackupOpener(),
+                )
+            }
         }
     }
 }

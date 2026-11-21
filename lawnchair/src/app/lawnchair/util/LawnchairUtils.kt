@@ -98,8 +98,18 @@ fun restartLauncher(context: Context) {
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     val componentName = intent!!.resolveActivity(pm)
     if (context.packageName != componentName.packageName) {
-        intent = pm.getLaunchIntentForPackage(context.packageName)
-            ?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        // Restart through a home-category intent pinned to our own package instead of
+        // PackageManager.getLaunchIntentForPackage(), which builds a CATEGORY_LAUNCHER
+        // (standard-typed) intent to the home activity. Some Android 8-10 OEM ROMs react
+        // to that launch by trying to re-type the home task and killing the app with
+        // RemoteServiceException("Can't change activity type once set: …
+        // mActivityType=home} activityType=standard") via SCHEDULE_CRASH, which cannot
+        // be caught. The resolved activity and flags are unchanged: NEW_TASK was already
+        // implied by the launch intent, CLEAR_TOP stays.
+        intent = Intent(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_HOME)
+            .setPackage(context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
     restartLauncher(context, intent)
 }
@@ -256,7 +266,16 @@ fun getFolderBackgroundAlpha(context: Context): Int {
  */
 fun getCustomFolderColor(context: Context): Int {
     val prefs2 = PreferenceManager2.getInstance(context)
-    return prefs2.folderColor.firstCached().colorPreferenceEntry.lightColor(context)
+    val option = prefs2.folderColor.firstCached()
+    val entry = option.colorPreferenceEntry
+    // lightColor is the sentinel for "use the theme default" (0). darkColor is always non-zero
+    // (it falls back to lightenColor()), so the default check must be made on lightColor first.
+    val lightColor = entry.lightColor(context)
+    if (lightColor == 0) return 0
+    // A colour the user picked by hand is used exactly as picked. Only the dynamic sources
+    // (system accent, wallpaper) carry a meaningful separate dark variant.
+    if (option is ColorOption.CustomColor) return lightColor
+    return if (Utilities.isDarkTheme(context)) entry.darkColor(context) else lightColor
 }
 
 /** Closed-folder preview circle color (includes preview opacity). */

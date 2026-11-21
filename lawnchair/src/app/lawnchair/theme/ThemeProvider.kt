@@ -15,11 +15,10 @@ import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
 import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
-import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.MonetColorSchemeCompat2025
 import app.lawnchair.theme.color.SystemColorScheme
-import com.android.systemui.monet.SpecVersion
+import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.ui.theme.getSystemAccent
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.Utilities
@@ -27,21 +26,27 @@ import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.DaggerSingletonObject
+import com.android.launcher3.util.DaggerSingletonTracker
 import com.android.launcher3.util.SafeCloseable
+import com.android.systemui.monet.SpecVersion
 import com.android.systemui.monet.Style
 import com.patrykmichalik.opto.core.onEach
 import dev.kdrag0n.colorkt.Color
 import dev.kdrag0n.colorkt.conversion.ConversionGraph.convert
 import dev.kdrag0n.colorkt.rgb.Srgb
 import dev.kdrag0n.monet.theme.ColorScheme
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 @LauncherAppSingleton
 class ThemeProvider @Inject constructor(
     @ApplicationContext private val context: Context,
+    tracker: DaggerSingletonTracker,
 ) : SafeCloseable {
     private val preferenceManager2 = PreferenceManager2.getInstance(context)
     private val wallpaperManager = WallpaperManagerCompat.INSTANCE.get(context)
@@ -50,13 +55,18 @@ class ThemeProvider @Inject constructor(
     // firstCached() (not firstBlocking()) — per upstream's "Cache PreferenceManager2 in
     // memory" perf commit, firstBlocking() is now @Discouraged since it does a synchronous
     // DataStore read; firstCached() reads from the in-memory cache instead.
+    @Volatile
     private var accentColor: ColorOption = preferenceManager2.accentColor.firstCached()
+
+    @Volatile
     private var colorStyle: ColorStyle = preferenceManager2.colorStyle.firstCached()
+
+    @Volatile
     private var colorSpec: SpecVersion = preferenceManager2.colorSpec.firstCached()
 
     // Cache for SPEC_2021 / LegacyKdrag — keyed by (seedColor, Style, SpecVersion).
     // Value type is the kdrag0n ColorScheme abstract class.
-    private val colorSchemeMap = java.util.concurrent.ConcurrentHashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
+    private val colorSchemeMap = ConcurrentHashMap<Triple<Int, Style, SpecVersion>, ColorScheme>()
 
     // Dedicated cache for the system accent palette. Replaced atomically on overlay change
     // so stale colors are never served after the user changes the system accent.
@@ -64,41 +74,19 @@ class ThemeProvider @Inject constructor(
     private var cachedSystemColorScheme: ColorScheme? = null
 
     // Cache for the kdrag0n ZCAM engine — keyed by seedColor alone.
-    private val kdragColorSchemeMap = java.util.concurrent.ConcurrentHashMap<Int, ColorScheme>()
+    private val kdragColorSchemeMap = ConcurrentHashMap<Int, ColorScheme>()
 
     // Cache for SPEC_2025 — keyed by (seedColor, Style, isDark).
     // isDark is part of the key because DynamicScheme bakes dark/light into palette
     // generation — surface tones and chroma multipliers differ per mode.
     // Typed as MonetColorSchemeCompat2025 directly; no kdrag0n type involved.
-    private val colorSchemeMap2025 = java.util.concurrent.ConcurrentHashMap<Triple<Int, Style, Boolean>, MonetColorSchemeCompat2025>()
+    private val colorSchemeMap2025 = ConcurrentHashMap<Triple<Int, Style, Boolean>, MonetColorSchemeCompat2025>()
 
-    private val listeners = mutableListOf<ColorSchemeChangeListener>()
-
-    @Volatile
-    private var freshWallpaperPrimary: Int? = null
-
-    init {
-        val storedAccent = accentColor
-        if (storedAccent is ColorOption.WallpaperDerived) {
-            val currentPrimary = wallpaperManager.wallpaperColors?.primaryColor
-            if (currentPrimary != null && currentPrimary != storedAccent.wallpaperPrimary) {
-                coroutineScope.launch {
-                    preferenceManager2.accentColor.set(
-                        ColorOption.WallpaperDerived(
-                            color = currentPrimary,
-                            wallpaperPrimary = currentPrimary,
-                        ),
-                    )
-                }
-            }
-        }
-
-        if (Utilities.ATLEAST_S) {
-            seedSystemColorScheme()
-            registerOverlayChangedListener()
-        }
-
-        wallpaperManager.addOnChangeListener(object : WallpaperManagerCompat.OnColorsChangedListener {
+    private val listeners = CopyOnWriteArrayList<ColorSchemeChangeListener>()
+    private var overlayChangedReceiver: BroadcastReceiver? = null
+    private var systemWallpaperColorsListener: android.app.WallpaperManager.OnColorsChangedListener? = null
+    private val wallpaperColorsChangedListener =
+        object : WallpaperManagerCompat.OnColorsChangedListener {
             override fun onColorsChanged() {
                 when (val current = accentColor) {
                     is ColorOption.WallpaperPrimary -> notifyColorSchemeChanged()
@@ -125,8 +113,35 @@ class ThemeProvider @Inject constructor(
                     else -> Unit
                 }
             }
-        })
+        }
 
+    @Volatile
+    private var isClosed = false
+
+    @Volatile
+    private var freshWallpaperPrimary: Int? = null
+
+    init {
+        val storedAccent = accentColor
+        if (storedAccent is ColorOption.WallpaperDerived) {
+            val currentPrimary = wallpaperManager.wallpaperColors?.primaryColor
+            if (currentPrimary != null && currentPrimary != storedAccent.wallpaperPrimary) {
+                coroutineScope.launch {
+                    preferenceManager2.accentColor.set(
+                        ColorOption.WallpaperDerived(
+                            color = currentPrimary,
+                            wallpaperPrimary = currentPrimary,
+                        ),
+                    )
+                }
+            }
+        }
+
+        if (Utilities.ATLEAST_S) {
+            seedSystemColorScheme()
+            registerOverlayChangedListener()
+        }
+        wallpaperManager.addOnChangeListener(wallpaperColorsChangedListener)
         preferenceManager2.accentColor.onEach(launchIn = coroutineScope) {
             accentColor = it
             freshWallpaperPrimary = null
@@ -151,34 +166,34 @@ class ThemeProvider @Inject constructor(
         }
 
         if (Utilities.ATLEAST_O_MR1) {
-            android.app.WallpaperManager.getInstance(context)
-                .addOnColorsChangedListener(
-                    { colors, which ->
-                        val current = accentColor
-                        if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0 &&
-                            current is ColorOption.WallpaperDerived
-                        ) {
-                            val newPrimary = colors?.primaryColor?.toArgb()
-                            if (newPrimary != null) {
-                                colorSchemeMap2025.clear()
-                                freshWallpaperPrimary = newPrimary
-                                notifyColorSchemeChanged()
-                                if (newPrimary != current.wallpaperPrimary) {
-                                    coroutineScope.launch {
-                                        preferenceManager2.accentColor.set(
-                                            ColorOption.WallpaperDerived(
-                                                color = newPrimary,
-                                                wallpaperPrimary = newPrimary,
-                                            ),
-                                        )
-                                    }
-                                }
+            val listener = android.app.WallpaperManager.OnColorsChangedListener { colors, which ->
+                val current = accentColor
+                if (which and android.app.WallpaperManager.FLAG_SYSTEM != 0 &&
+                    current is ColorOption.WallpaperDerived
+                ) {
+                    val newPrimary = colors?.primaryColor?.toArgb()
+                    if (newPrimary != null) {
+                        colorSchemeMap2025.clear()
+                        freshWallpaperPrimary = newPrimary
+                        notifyColorSchemeChanged()
+                        if (newPrimary != current.wallpaperPrimary) {
+                            coroutineScope.launch {
+                                preferenceManager2.accentColor.set(
+                                    ColorOption.WallpaperDerived(
+                                        color = newPrimary,
+                                        wallpaperPrimary = newPrimary,
+                                    ),
+                                )
                             }
                         }
-                    },
-                    Handler(Looper.getMainLooper()),
-                )
+                    }
+                }
+            }
+            android.app.WallpaperManager.getInstance(context)
+                .addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
+            systemWallpaperColorsListener = listener
         }
+        tracker.addCloseable(this)
     }
 
     private fun seedSystemColorScheme() {
@@ -209,19 +224,16 @@ class ThemeProvider @Inject constructor(
         val packageFilter = IntentFilter("android.intent.action.OVERLAY_CHANGED")
         packageFilter.addDataScheme("package")
         packageFilter.addDataSchemeSpecificPart("android", PatternMatcher.PATTERN_LITERAL)
-        context.registerReceiver(
-            object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
-                    seedSystemColorScheme()
-                    if (accentColor is ColorOption.SystemAccent) {
-                        notifyColorSchemeChanged()
-                    }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                seedSystemColorScheme()
+                if (accentColor is ColorOption.SystemAccent) {
+                    notifyColorSchemeChanged()
                 }
-            },
-            packageFilter,
-            null,
-            Handler(Looper.getMainLooper()),
-        )
+            }
+        }
+        context.registerReceiver(receiver, packageFilter, null, Handler(Looper.getMainLooper()))
+        overlayChangedReceiver = receiver
     }
 
     /**
@@ -354,12 +366,12 @@ class ThemeProvider @Inject constructor(
         colorStyle: ColorStyle,
         specVersion: SpecVersion = SpecVersion.SPEC_2021,
     ): ColorScheme = if (colorStyle is LegacyKdrag) {
-        kdragColorSchemeMap.getOrPut(colorInt) {
+        kdragColorSchemeMap.computeIfAbsent(colorInt) {
             KdragMonetColorScheme(colorInt)
         }
     } else {
         val key = Triple(colorInt, colorStyle.style, specVersion)
-        colorSchemeMap.getOrPut(key) {
+        colorSchemeMap.computeIfAbsent(key) {
             MonetColorSchemeCompat(colorInt, colorStyle.style, specVersion)
         }
     }
@@ -374,7 +386,7 @@ class ThemeProvider @Inject constructor(
         // function is ever called, so this branch is unreachable in normal operation.
         // Kept as a defensive fallback in case of future call-site changes.
         val effectiveStyle = if (colorStyle is LegacyKdrag) TonalSpot else colorStyle
-        return colorSchemeMap2025.getOrPut(Triple(colorInt, effectiveStyle.style, isDark)) {
+        return colorSchemeMap2025.computeIfAbsent(Triple(colorInt, effectiveStyle.style, isDark)) {
             MonetColorSchemeCompat2025(colorInt, effectiveStyle.style, isDark)
         }
     }
@@ -388,11 +400,25 @@ class ThemeProvider @Inject constructor(
     }
 
     private fun notifyColorSchemeChanged() {
-        ArrayList(listeners).forEach(ColorSchemeChangeListener::onColorSchemeChanged)
+        if (isClosed) return
+        listeners.forEach(ColorSchemeChangeListener::onColorSchemeChanged)
     }
 
     override fun close() {
-        TODO("Not yet implemented")
+        isClosed = true
+        coroutineScope.cancel()
+        wallpaperManager.removeOnChangeListener(wallpaperColorsChangedListener)
+        if (Utilities.ATLEAST_O_MR1) {
+            systemWallpaperColorsListener?.let {
+                android.app.WallpaperManager.getInstance(context).removeOnColorsChangedListener(it)
+                systemWallpaperColorsListener = null
+            }
+        }
+        overlayChangedReceiver?.let {
+            context.unregisterReceiver(it)
+            overlayChangedReceiver = null
+        }
+        listeners.clear()
     }
 
     companion object {
@@ -400,7 +426,7 @@ class ThemeProvider @Inject constructor(
         val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getThemeProvider)
     }
 
-    sealed interface ColorSchemeChangeListener {
+    interface ColorSchemeChangeListener {
         fun onColorSchemeChanged()
     }
 }

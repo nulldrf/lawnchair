@@ -56,6 +56,8 @@ import app.lawnchair.search.algorithms.LawnchairSearchAlgorithm
 import app.lawnchair.theme.color.tokens.ColorTokens
 import app.lawnchair.ui.theme.LawnchairTheme
 import app.lawnchair.util.ProvideLifecycleState
+import com.android.launcher3.DeviceProfile
+import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener
 import com.android.launcher3.Insettable
 import com.android.launcher3.InvariantDeviceProfile.OnIDPChangeListener
 import com.android.launcher3.LauncherState
@@ -77,6 +79,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     FrameLayout(context, attrs),
     Insettable,
     OnIDPChangeListener,
+    OnDeviceProfileChangeListener,
     SearchUiManager,
     SearchCallback<AdapterItem>,
     AllAppsStore.OnUpdateListener,
@@ -120,6 +123,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
     private var initialPaddingLeft: Int = 0
     private var initialPaddingRight: Int = 0
+    private var paddingAnimator: ValueAnimator? = null
     private var hideSearchBar = false
 
     override fun onFinishInflate() {
@@ -228,7 +232,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                             searchAlgorithm?.doZeroStateSearch(this@AllAppsSearchInput)
                         }
                         input.requestFocus()
-                        input.showKeyboard()
+                        postShowKeyboard()
                     },
                     onStartIconClick = if (shouldShowIcons) {
                         {
@@ -281,9 +285,6 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
             }
         })
 
-        val currentPaddingLeft = initialPaddingLeft
-        val currentPaddingRight = initialPaddingRight
-
         // Activate zero search on tap
         @SuppressLint("ClickableViewAccessibility")
         input.setOnTouchListener { _, event ->
@@ -301,14 +302,17 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     input.setHint(R.string.all_apps_search_bar_hint)
                 }
 
-                if (input.text.toString().isEmpty() && isDirectFocus) {
-                    searchAlgorithm?.doZeroStateSearch(this)
+                if (isDirectFocus) {
+                    if (input.text.toString().isEmpty()) {
+                        searchAlgorithm?.doZeroStateSearch(this)
+                    }
                     setDirectFocus(false)
+                    postShowKeyboard()
                 }
 
                 setBackgroundVisibility(true, 1f)
                 animateHintVisibility(true)
-                animatePadding(currentPaddingLeft / 2, currentPaddingRight / 2)
+                animatePadding(initialPaddingLeft / 2, initialPaddingRight / 2)
             } else {
                 setBackgroundVisibility(true, 1f)
                 animateHintVisibility(false)
@@ -318,7 +322,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                 }
 
                 if (input.text.isNullOrEmpty()) {
-                    animatePadding(currentPaddingLeft, currentPaddingRight)
+                    animatePadding(initialPaddingLeft, initialPaddingRight)
                 }
                 focusedResultTitle = ""
                 input.setHint("")
@@ -347,7 +351,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
                 val isEmpty = it.isNullOrEmpty()
                 if (isEmpty && !input.hasFocus()) {
-                    animatePadding(currentPaddingLeft, currentPaddingRight)
+                    animatePadding(initialPaddingLeft, initialPaddingRight)
                 }
                 queryEmpty = isEmpty
             },
@@ -366,7 +370,11 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
             val padding = dp.getAllAppsIconStartMargin(context)
             initialPaddingLeft = padding
             initialPaddingRight = padding
-            setPadding(padding, paddingTop, padding, paddingBottom)
+            // Keep the narrower padding of an active search (see the focus and text listeners)
+            paddingAnimator?.cancel()
+            val isSearchActive = ::input.isInitialized && (input.hasFocus() || !input.text.isNullOrEmpty())
+            val currentPadding = if (isSearchActive) padding / 2 else padding
+            setPadding(currentPadding, paddingTop, currentPadding, paddingBottom)
         }
     }
 
@@ -393,7 +401,8 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
         val currentPaddingLeft = paddingLeft
         val currentPaddingRight = paddingRight
 
-        ValueAnimator.ofFloat(0f, 1f).apply {
+        paddingAnimator?.cancel()
+        paddingAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 300
             interpolator = FastOutSlowInInterpolator()
             addUpdateListener { animation ->
@@ -442,6 +451,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         launcher.deviceProfile.inv.addOnChangeListener(this)
+        launcher.addOnDeviceProfileChangeListener(this)
         if (::appsView.isInitialized) {
             appsView.appsStore?.addUpdateListener(this)
         }
@@ -451,6 +461,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         launcher.deviceProfile.inv.removeOnChangeListener(this)
+        launcher.removeOnDeviceProfileChangeListener(this)
         if (::appsView.isInitialized) {
             appsView.appsStore?.removeUpdateListener(this)
         }
@@ -482,6 +493,17 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
 
     override fun setDirectFocus(directFocus: Boolean) {
         isDirectFocus = directFocus
+    }
+
+    /**
+     * Posts IME show until after focus/layout settle so InputMethodManager has bound [input].
+     */
+    private fun postShowKeyboard() {
+        input.post {
+            if (input.hasFocus()) {
+                input.showKeyboard()
+            }
+        }
     }
 
     override fun preDispatchKeyEvent(event: KeyEvent) {
@@ -567,6 +589,13 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private fun updateBgAlpha() {
         val fraction = bgAlphaAnimator.animatedFraction
         bgAlphaState = Utilities.mapRange(fraction, 0f, bgAlpha)
+    }
+
+    override fun onDeviceProfileChanged(dp: DeviceProfile) {
+        // LC-Note: The paddings follow the device profile, which also changes without an IDP
+        // change, e.g. on rotation or when a foldable is folded or unfolded.
+        setupPadding()
+        requestLayout()
     }
 
     override fun onIdpChanged(modelPropertiesChanged: Boolean) {

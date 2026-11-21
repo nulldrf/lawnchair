@@ -13,6 +13,7 @@ import android.content.Intent.ACTION_TIMEZONE_CHANGED
 import android.content.Intent.ACTION_TIME_CHANGED
 import android.content.Intent.ACTION_TIME_TICK
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.content.pm.ComponentInfo
 import android.content.pm.LauncherApps
@@ -73,55 +74,42 @@ class LawnchairIconProvider @Inject constructor(
     private val themedIconSource
         get() = iconPackProvider.getIconPack(themedIconSourcePref.get())?.apply { loadBlocking() }
 
+    private val themeMapLock = Any()
     private var themeMapName: String = ""
+    private var themeMapEnabled: Boolean? = null
     private var _themeMap: Map<String, ThemeData>? = null
 
     val themeMap: Map<String, ThemeData>
-        get() {
-            // Guard first — return without mutating _themeMap or themeMapName so that
-            // re-enabling themed icons later causes a clean rebuild rather than serving
-            // whatever stale state was left behind.
-            //
-            // Previously this set _themeMap = DISABLED_MAP and fell through, which meant
-            // the three subsequent if-blocks could still fire and overwrite it — so
-            // DISABLED_MAP was silently discarded whenever a themedIconSource was active,
-            // effectively ignoring the themedIconsEnabled=false setting.
-            if (!themedIconsEnabled) return DISABLED_MAP
-
-            // Evaluate themedIconSource exactly once per getter invocation.
-            //
-            // The original code accessed themedIconSource up to four times in a single
-            // call (two null-guard checks + two packPackageName reads), each of which
-            // resolves the icon pack and calls loadBlocking() on it.
-            val source = themedIconSource
-            val sourceName = source?.packPackageName ?: ""
-
-            // Rebuild the map only when it is uninitialized or the themed icon source
-            // package has changed (including when it is removed, i.e. sourceName → "").
-            //
-            // The original code used four independent if-blocks that could all fire in
-            // the same getter call:
-            //
-            //   Block 1 (_themeMap == null): calls getThemedIconMap() with themeMapName=""
-            //            → builds Lawnchair-only map.  Result immediately discarded ↓
-            //   Block 2 (themeMapName==""): calls super.getThemedIconMap()
-            //            → overwrites block 1 result.  Result immediately discarded ↓
-            //   Block 3 (themeMapName != sourceName): updates themeMapName, calls
-            //            getThemedIconMap() again with the correct name
-            //            → overwrites block 2 result.  This is the only one that matters.
-            //
-            // Block 2's result was always discarded because block 3 always fired
-            // immediately after (themeMapName was still "" when block 3 evaluated it).
-            // Blocks 1 and 2 were therefore pure waste on every first access.
-            if (_themeMap == null || themeMapName != sourceName) {
+        get() = synchronized(themeMapLock) {
+            val sourceName = themedIconSource?.packPackageName.orEmpty()
+            val enabled = themedIconsEnabled
+            if (
+                _themeMap == null ||
+                themeMapName != sourceName ||
+                themeMapEnabled != enabled
+            ) {
                 themeMapName = sourceName
-                _themeMap = getThemedIconMap()
+                themeMapEnabled = enabled
+                _themeMap = if (enabled) getThemedIconMap() else DISABLED_MAP
             }
-
-            return _themeMap!!
+            _themeMap!!
         }
 
     val systemIconState = themeManager.iconState
+
+    // Held strongly because SharedPreferences stores listeners in a WeakHashMap.
+    private val colorizeIconPackPrefListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "pref_colorizeIconPackBackground") {
+                Executors.MODEL_EXECUTOR.execute {
+                    updateSystemState()
+                    val appState = LauncherAppState.getInstance(context)
+                    appState.iconCache.clearMemoryCache()
+                    LauncherIcons.clearPool(context)
+                    appState.model.reloadIfActive()
+                }
+            }
+        }
 
     /**
      * Overrides mSystemState to include the current icon pack package name.
@@ -186,17 +174,7 @@ class LawnchairIconProvider @Inject constructor(
 
         // Flush caches when "Apply smart backgrounds to icon pack" changes.
         // Not routed through ThemeManager since it doesn't affect shape/theme state.
-        context.prefs.registerOnSharedPreferenceChangeListener { _, key ->
-            if (key == "pref_colorizeIconPackBackground") {
-                Executors.MODEL_EXECUTOR.execute {
-                    updateSystemState()
-                    val appState = LauncherAppState.getInstance(context)
-                    appState.iconCache.clearMemoryCache()
-                    LauncherIcons.clearPool(context)
-                    appState.model.reloadIfActive()
-                }
-            }
-        }
+        context.prefs.registerOnSharedPreferenceChangeListener(colorizeIconPackPrefListener)
     }
 
     private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {
@@ -205,6 +183,11 @@ class LawnchairIconProvider @Inject constructor(
         val overrideItem = overrideRepo.overridesMap[componentKey]
         if (overrideItem != null) {
             return overrideItem.toIconEntry()
+        }
+
+        // if forced monochrome is enabled, fallback to launcher3 behavior
+        if (prefs.forceIconMonochrome.get()) {
+            return null
         }
 
         val iconPack = iconPack ?: return null
@@ -218,11 +201,9 @@ class LawnchairIconProvider @Inject constructor(
     }
 
     /**
-     * Resolves the launch component for icon-pack lookup.
-     *
-     * Avoid [android.content.pm.PackageManager.getLaunchIntentForPackage], which only sees the
-     * current user — work/private profile apps would otherwise fall back to the system icon.
-     * Prefer the real component from [ComponentInfo], then [LauncherApps] for the app's user.
+     * Resolves launch component and icon entry.
+     * This function tries to resolve the real component so that it works for non-default
+     * users (like work / private profiles)
      */
     private fun resolveComponentName(
         info: PackageItemInfo,
@@ -260,65 +241,73 @@ class LawnchairIconProvider @Inject constructor(
         }
 
         var iconPackEntry = iconEntry
+        if (iconEntry?.type == IconType.Calendar) {
+            iconPackEntry = iconEntry.resolveDynamicCalendar(getDay())
+        }
 
-        val themeData = getThemeDataForPackage(packageName)
+        val iconPackIcon = iconPackEntry?.let { iconPackProvider.getDrawable(it, iconDpi, user) }
+        val baseIcon = iconPackIcon ?: super.getIcon(info, appInfo, iconDpi)
 
-        var themedIcon: Drawable? = null
+        if (!themedIconsEnabled || iconEntry == null) {
+            return baseIcon
+        }
 
+        return resolveThemedIcon(packageName, componentName, iconEntry, iconDpi) ?: baseIcon
+    }
+
+    private fun resolveThemedIcon(
+        packageName: String,
+        componentName: ComponentName?,
+        iconEntry: IconEntry,
+        iconDpi: Int,
+    ): Drawable? {
         val themedColors = ThemedIconDrawable.getColors(context)
+        val clock = iconPackProvider.getClockMetadata(iconEntry)
 
-        if (iconEntry != null) {
-            val clock = iconPackProvider.getClockMetadata(iconEntry)
-
-            if (iconEntry.type == IconType.Calendar) {
-                iconPackEntry = iconEntry.resolveDynamicCalendar(getDay())
+        return when {
+            clock != null -> {
+                // the icon supports dynamic clock, use dynamic themed clock
+                ClockDrawableWrapper.forPackage(mContext, mClock.packageName, iconDpi)?.getMonochrome()
             }
 
-            when {
-                !themedIconsEnabled -> {
-                    // theming is disabled, don't populate theme data
-                    themedIcon = null
-                }
-
-                clock != null -> {
-                    // the icon supports dynamic clock, use dynamic themed clock
-                    themedIcon =
-                        ClockDrawableWrapper.forPackage(mContext, mClock.packageName, iconDpi)
-                            ?.getMonochrome()
-                }
-
-                packageName == mClock.packageName -> {
-                    // is clock app but icon might not be adaptive, fallback to static themed clock
-                    val clockThemedData =
-                        ThemeData(context.resources, R.drawable.themed_icon_static_clock)
-                    themedIcon = CustomAdaptiveIconDrawable(
+            packageName == mClock.packageName -> {
+                // is clock app but icon might not be adaptive, fallback to static themed clock
+                val clockThemedData = ThemeData(context.resources, R.drawable.themed_icon_static_clock)
+                clockThemedData.loadPaddedDrawable()?.let { foreground ->
+                    CustomAdaptiveIconDrawable(
                         themedColors[0].toDrawable(),
-                        clockThemedData.loadPaddedDrawable().apply { setTint(themedColors[1]) },
+                        foreground.apply { setTint(themedColors[1]) },
                     )
                 }
+            }
 
-                packageName == mCalendar.packageName -> {
-                    // calendar app, apply the dynamic calendar icon
-                    themedIcon = loadCalendarDrawable(iconDpi, themeData)
-                }
+            packageName == mCalendar.packageName -> {
+                // calendar app, apply the dynamic calendar icon
+                val themeData = getThemeDataForPackage(packageName)
+                loadCalendarDrawable(iconDpi, themeData)
+            }
 
-                else -> {
-                    // regular icon
-                    themedIcon = if (themeData != null) {
+            else -> {
+                // regular icon
+                val nativeThemed = componentName?.let { ThemedIconCompat.getThemedIcon(context, it) }
+                if (nativeThemed != null) {
+                    CustomAdaptiveIconDrawable(
+                        themedColors[0].toDrawable(),
+                        nativeThemed.apply { setTint(themedColors[1]) },
+                    )
+                } else {
+                    val themeData = getThemeDataForPackage(packageName)
+                    // Clock/calendar theme entries can be arrays rather than drawables.
+                    // Return null so the caller can use the icon-pack or system fallback.
+                    themeData?.loadPaddedDrawable()?.let { foreground ->
                         CustomAdaptiveIconDrawable(
                             themedColors[0].toDrawable(),
-                            themeData.loadPaddedDrawable().apply { setTint(themedColors[1]) },
+                            foreground.apply { setTint(themedColors[1]) },
                         )
-                    } else {
-                        null
                     }
                 }
             }
         }
-
-        val iconPackIcon = iconPackEntry?.let { iconPackProvider.getDrawable(it, iconDpi, user) }
-
-        return themedIcon ?: iconPackIcon ?: super.getIcon(info, appInfo, iconDpi)
     }
 
     override fun getStateForApp(info: ApplicationInfo?): String {
@@ -335,11 +324,13 @@ class LawnchairIconProvider @Inject constructor(
             "ti=${prefs.themedIcons.get()}," +
             "dti=${prefs.drawerThemedIcons.get()}," +
             "fm=${prefs.forceIconMonochrome.get()}," +
-            "tb=${prefs.tintIconPackBackgrounds.get()}," +
             "ov=$overrideState"
     }
 
     override fun getThemeDataForPackage(packageName: String?): ThemeData? {
+        if (prefs.forceIconMonochrome.get()) {
+            return null
+        }
         return themeMap[packageName]
     }
 
@@ -423,9 +414,16 @@ class LawnchairIconProvider @Inject constructor(
         private val themedIconPackPref = PreferenceManager.getInstance(context).themedIconPackPackage
 
         private val subscription = iconPackPref.subscribeChanges {
+            recreateCalendarAndClockChangeReceiver()
+            updateIconStateIfNeeded()
+        }
+        private val themedIconSubscription = themedIconPackPref.subscribeChanges {
+            updateIconStateIfNeeded()
+        }
+
+        private fun updateIconStateIfNeeded() {
             val newState = themeManager.iconState
             if (iconState != newState) iconState = newState
-            recreateCalendarAndClockChangeReceiver()
 
             // Show overlay — dismissed when icon updates stop arriving (idle for 500ms).
             // Do NOT call recreateIfNotScheduled() — it creates a new launcher that takes
@@ -449,28 +447,6 @@ class LawnchairIconProvider @Inject constructor(
                 // this starts the 600ms countdown. If it's paused (user in Settings),
                 // the timer call is a no-op — onResume() will start it when the user
                 // returns, guaranteeing the overlay stays until icons are fully updated.
-                Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
-                        ?: run {
-                            // Launcher is paused — leave iconPackSwitchPending=true so
-                            // onResume() shows the overlay and starts the timer fresh.
-                        }
-                }
-            }
-        }
-        private val themedIconSubscription = themedIconPackPref.subscribeChanges {
-            val newState = themeManager.iconState
-            if (iconState != newState) iconState = newState
-            recreateCalendarAndClockChangeReceiver()
-            LawnchairLauncher.iconPackSwitchPending = true
-            LawnchairLauncher.instance?.showIconPackSwitchOverlay()
-            Executors.MODEL_EXECUTOR.execute {
-                updateSystemState()
-                val appState = LauncherAppState.getInstance(context)
-                appState.iconCache.clearMemoryCache()
-                ThemedIconCompat.clearResourcesCache()
-                LauncherIcons.clearPool(context)
-                appState.model.reloadIfActive()
                 Executors.MAIN_EXECUTOR.execute {
                     LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
                 }
@@ -552,11 +528,14 @@ class LawnchairIconProvider @Inject constructor(
             filter.addAction(ACTION_PACKAGE_CHANGED)
             filter.addAction(ACTION_PACKAGE_REMOVED)
             filter.addDataScheme("package")
-            filter.addDataSchemeSpecificPart(themeMapName, 0)
             context.registerReceiver(this, filter, null, handler)
         }
 
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.data?.schemeSpecificPart != themedIconSourcePref.get()) return
+            synchronized(themeMapLock) {
+                _themeMap = null
+            }
             updateSystemState()
         }
 

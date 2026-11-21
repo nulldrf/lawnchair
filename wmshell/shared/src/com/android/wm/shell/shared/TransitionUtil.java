@@ -445,6 +445,11 @@ public class TransitionUtil {
                     .getMethod("getAllowEnterPip").invoke(change);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Unable to read allowEnterPip from transition change", e);
+        } catch (LinkageError e) {
+            // The restriction bypass can be unavailable (libnrb.so failed to load), in which case
+            // touching RestrictionBypass throws ExceptionInInitializerError/NoClassDefFoundError.
+            // Assume PIP is not allowed instead of crashing the transition.
+            return false;
         }
     }
 

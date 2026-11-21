@@ -377,9 +377,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     public View getSearchView() { return mSearchContainer; }
 
+    /** Clears displayed search results. */
     public void onClearSearchResult() {
         getMainAdapterProvider().clearHighlightedItem();
-        animateToSearchState(false);
+        ExtendedEditText editText = mSearchUiManager.getEditText();
+        // An empty, focused query is still an active search session.
+        boolean keepSearchFocus = editText != null && editText.isFocused()
+                && editText.getText().length() == 0;
+        animateToSearchState(false, DEFAULT_SEARCH_TRANSITION_DURATION_MS, keepSearchFocus);
         rebindAdapters();
     }
 
@@ -408,6 +413,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     void animateToSearchState(boolean goingToSearch, long durationMs) {
+        animateToSearchState(goingToSearch, durationMs, false);
+    }
+
+    private void animateToSearchState(boolean goingToSearch, long durationMs,
+            boolean keepSearchFocus) {
         if (!mSearchTransitionController.isRunning() && goingToSearch == isSearching()) {
             return;
         }
@@ -436,7 +446,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 if (mViewPager != null) {
                     mViewPager.setCurrentPage(previousPage);
                 }
-                onActivePageChanged(previousPage);
+                onActivePageChanged(previousPage, keepSearchFocus);
                 mSearchExitInProgress = false;
             }
         });
@@ -570,13 +580,22 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     @Override
     public void onActivePageChanged(int currentActivePage) {
-        if (mSearchTransitionController.isRunning()) return;
-        if (currentActivePage != SEARCH) mActivityContext.hideKeyboard();
+        onActivePageChanged(currentActivePage, false);
+    }
+
+    private void onActivePageChanged(int currentActivePage, boolean keepSearchFocus) {
+        if (mSearchTransitionController.isRunning()) {
+            // Will be called at the end of the animation.
+            return;
+        }
+        if (currentActivePage != SEARCH && !keepSearchFocus) {
+            mActivityContext.hideKeyboard();
+        }
         if (mAH.get(currentActivePage).mRecyclerView != null) {
             mAH.get(currentActivePage).mRecyclerView.bindFastScrollbar(mFastScroller, ALL_APPS_SCROLLER);
         }
         mHeader.setActiveRV(currentActivePage);
-        reset(true, !isSearching());
+        reset(true /* animate */, !isSearching() && !keepSearchFocus /* exitSearch */);
         mWorkManager.onActivePageChanged(currentActivePage);
     }
 
@@ -717,12 +736,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         updateSearchResultsVisibility();
     }
 
+    /**
+     * Sets up header rows and hides the header shell when neither tabs nor visible row content
+     * requires it, keeping adapter top padding consistent with that visibility.
+     */
     void setupHeader() {
         mAdditionalHeaderRows.forEach(row -> mHeader.onPluginDisconnected(row));
 
         boolean hideSearchBar = isAppDrawerSearchBarHidden();
-        // Keep personal/work tabs visible when search is off; only hide the empty header shell.
-        mHeader.setVisibility((hideSearchBar && !mUsingTabs) ? View.GONE : View.VISIBLE);
         boolean tabsHidden = !mUsingTabs;
         mHeader.setup(
                 mAH.get(AdapterHolder.MAIN).mRecyclerView,
@@ -730,7 +751,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 (SearchRecyclerView) mAH.get(SEARCH).mRecyclerView,
                 getCurrentPage(), tabsHidden);
 
-        int padding = (hideSearchBar && !mUsingTabs) ? 0 : mHeader.getMaxTranslation();
+        // Keep personal/work tabs or visible rows active; hide the empty header shell.
+        boolean hasHeaderContent = mUsingTabs || (!hideSearchBar && mHeader.hasVisibleContent());
+        mHeader.setVisibility(hasHeaderContent ? View.VISIBLE : View.GONE);
+
+        int padding = hasHeaderContent ? mHeader.getMaxTranslation() : 0;
         mAH.forEach(adapterHolder -> {
             adapterHolder.mPadding.top = padding;
             adapterHolder.applyPadding();
@@ -1270,6 +1295,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
     }
 
+    /**
+     * Shows search results without the header, or restores the header only when tabs or visible
+     * header rows provide content.
+     */
     protected void updateSearchResultsVisibility() {
         if (isSearching()) {
             getSearchRecyclerView().setVisibility(VISIBLE);
@@ -1278,9 +1307,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         } else {
             getSearchRecyclerView().setVisibility(GONE);
             getAppsRecyclerViewContainer().setVisibility(VISIBLE);
-            // Keep the empty header shell hidden when search is off and there are no tabs.
-            mHeader.setVisibility(
-                    (isAppDrawerSearchBarHidden() && !mUsingTabs) ? View.GONE : View.VISIBLE);
+            // Keep personal/work tabs or visible rows active; hide the empty header shell.
+            boolean hasHeaderContent = mUsingTabs
+                    || (!isAppDrawerSearchBarHidden() && mHeader.hasVisibleContent());
+            mHeader.setVisibility(hasHeaderContent ? View.VISIBLE : View.GONE);
         }
         if (mHeader.isSetUp()) mHeader.setActiveRV(getCurrentPage());
     }

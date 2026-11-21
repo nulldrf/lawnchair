@@ -59,9 +59,12 @@ import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollSt
 import app.lawnchair.ui.preferences.components.notificationDotsEnabled
 import app.lawnchair.ui.preferences.components.notificationServiceEnabled
 import app.lawnchair.ui.preferences.data.liveinfo.liveInformationManager
+import app.lawnchair.ui.preferences.destinations.icons.ThemedIconsState
+import app.lawnchair.ui.preferences.navigation.GeneralAdvancedIcons
 import app.lawnchair.ui.preferences.navigation.GeneralColorStyle
 import app.lawnchair.ui.preferences.navigation.GeneralIconPack
 import app.lawnchair.ui.preferences.navigation.GeneralIconShape
+import app.lawnchair.ui.preferences.navigation.GeneralThemedIcons
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
@@ -84,19 +87,11 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
     val currentIconPackName = iconPacks
         .find { it.packageName == preferenceManager().iconPackPackage.get() }
         ?.name
-    val themedIconsEnabled = ThemedIconsState.getForSettings(
+    val themedIconsState = ThemedIconsState.getForSettings(
         themedIcons = themedIconsAdapter.state.value,
         drawerThemedIcons = drawerThemedIconsAdapter.state.value,
-    ) != ThemedIconsState.Off
-    val iconStyleSubtitle = if (currentIconPackName != null && themedIconsEnabled) {
-        stringResource(
-            id = R.string.x_and_y,
-            currentIconPackName,
-            stringResource(id = R.string.themed_icon_title),
-        )
-    } else {
-        currentIconPackName
-    }
+    )
+    val themedIconsSubtitle = stringResource(id = themedIconsState.labelResourceId)
     val iconShapeSubtitle = iconShapeEntries(context)
         .firstOrNull { it.value == iconShapeAdapter.state.value }
         ?.label?.invoke()
@@ -173,34 +168,23 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                 }
             }
         }
-
         // ── Icons ─────────────────────────────────────────────────────────────
-        val wrapAdaptiveIcons = prefs.wrapAdaptiveIcons.getAdapter()
-        val colorizedBackgrounds = prefs.colorizedBackgrounds.getAdapter()
-        val transparentIconBackground = prefs.transparentIconBackground.getAdapter()
-
         PreferenceGroup(
             modifier = Modifier,
             heading = stringResource(id = R.string.icons),
-            description = stringResource(id = (R.string.adaptive_icon_background_description)),
-            showDescription = wrapAdaptiveIcons.state.value,
         ) {
             ScrollAnchor(ScrollKeys.ICON_STYLE, scrollState) {
                 NavigationActionPreference(
-                    label = stringResource(id = R.string.icon_style_label),
+                    label = stringResource(id = R.string.icon_pack),
                     destination = GeneralIconPack,
-                    subtitle = iconStyleSubtitle,
+                    subtitle = currentIconPackName,
                 )
             }
-            ScrollAnchor(ScrollKeys.TRANSPARENT_ICON_BG, scrollState) {
-                ExpandAndShrink(visible = themedIconsEnabled) {
-                    SwitchPreference(
-                        adapter = transparentIconBackground,
-                        label = stringResource(id = R.string.transparent_background_icons_label),
-                        description = stringResource(id = R.string.transparent_background_icons_description),
-                    )
-                }
-            }
+            NavigationActionPreference(
+                label = stringResource(id = R.string.themed_icon_title),
+                destination = GeneralThemedIcons,
+                subtitle = themedIconsSubtitle,
+            )
             ScrollAnchor(ScrollKeys.ICON_SHAPE, scrollState) {
                 NavigationActionPreference(
                     label = stringResource(id = R.string.icon_shape_label),
@@ -211,57 +195,10 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                     },
                 )
             }
-            ScrollAnchor(ScrollKeys.AUTO_ADAPTIVE, scrollState) {
-                SwitchPreference(
-                    adapter = wrapAdaptiveIcons,
-                    label = stringResource(id = R.string.auto_adaptive_icons_label),
-                    description = stringResource(id = R.string.auto_adaptive_icons_description),
-                )
-            }
-            ScrollAnchor(ScrollKeys.SHADOW_ICONS, scrollState) {
-                SwitchPreference(
-                    adapter = prefs.shadowBGIcons.getAdapter(),
-                    label = stringResource(id = R.string.shadow_bg_icons_label),
-                )
-            }
-            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value && !transparentIconBackground.state.value) {
-                ScrollAnchor(ScrollKeys.BACKGROUND_LIGHTNESS, scrollState) {
-                    SliderPreference(
-                        label = stringResource(id = R.string.background_lightness_label),
-                        adapter = prefs.coloredBackgroundLightness.getAdapter(),
-                        valueRange = 0F..1F,
-                        step = 0.1f,
-                        showAsPercentage = true,
-                    )
-                }
-            }
-            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value) {
-                ScrollAnchor(ScrollKeys.COLORIZED_BG, scrollState) {
-                    SwitchPreference(
-                        adapter = colorizedBackgrounds,
-                        label = stringResource(id = R.string.colorized_backgrounds_label),
-                        description = stringResource(id = R.string.colorized_backgrounds_description),
-                    )
-                }
-            }
-            ExpandAndShrink(visible = wrapAdaptiveIcons.state.value && colorizedBackgrounds.state.value) {
-                ScrollAnchor(ScrollKeys.TREAT_WHITE_ADAPTIVE, scrollState) {
-                    SwitchPreference(
-                        adapter = prefs.treatWhiteAdaptiveIcons.getAdapter(),
-                        label = stringResource(id = R.string.treat_white_adaptive_icons_label),
-                        description = stringResource(id = R.string.treat_white_adaptive_icons_description),
-                    )
-                }
-            }
-            ExpandAndShrink(visible = colorizedBackgrounds.state.value) {
-                ScrollAnchor(ScrollKeys.COLORIZE_ICON_PACK_BG, scrollState) {
-                    SwitchPreference(
-                        adapter = prefs.colorizeIconPackBackground.getAdapter(),
-                        label = stringResource(id = R.string.colorize_icon_pack_background_label),
-                        description = stringResource(id = R.string.colorize_icon_pack_background_description),
-                    )
-                }
-            }
+            NavigationActionPreference(
+                label = stringResource(id = R.string.advanced_icon_settings_title),
+                destination = GeneralAdvancedIcons,
+            )
         }
 
         // ── Colors ────────────────────────────────────────────────────────────

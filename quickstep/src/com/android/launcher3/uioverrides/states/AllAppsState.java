@@ -30,7 +30,7 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.ScrimColors;
-import com.android.quickstep.util.BaseDepthController;
+import com.android.quickstep.util.BaseDepthControllerImpl;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
 import java.util.concurrent.TimeUnit;
@@ -130,7 +130,9 @@ public class AllAppsState extends LauncherState {
             return context.getDeviceProfile().getBottomSheetProfile().getBottomSheetDepth();
         } else {
             if (enableScalingRevealHomeAnimation()) {
-                return BaseDepthController.DEPTH_60_PERCENT;
+                // This means that the depth should be twice of what we want, in order to fully zoom
+                // out during the visible portion of the animation.
+                return BaseDepthControllerImpl.DEPTH_60_PERCENT;
             } else {
                 return 2f;
             }

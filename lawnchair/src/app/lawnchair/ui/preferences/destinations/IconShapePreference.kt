@@ -18,19 +18,18 @@ package app.lawnchair.ui.preferences.destinations
 
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.drawable.AdaptiveIconDrawable
 import androidx.annotation.Keep
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import android.graphics.Path as AndroidPath
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,10 +38,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -74,11 +71,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import android.graphics.drawable.AdaptiveIconDrawable
-import android.graphics.Matrix
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -360,8 +358,6 @@ private fun ShapeGridContent(
     customIconShape: IconShape?,
     currentTab: ShapeRoute = ShapeRoute.APP_SHAPE,
 ) {
-    val navController = LocalNavController.current
-
     PreferenceGroup(heading = stringResource(id = R.string.presets)) {
         ShapeGrid(
             entries = entries,
@@ -509,7 +505,6 @@ private fun ShapeCard(
                     iconShape = iconShape,
                     modifier = Modifier.fillMaxSize(0.6f),
                 )
-
             }
         }
     }
@@ -570,7 +565,7 @@ private fun ModifyCustomIconShapePreference(
 }
 
 // ---------------------------------------------------------------------------
-// IconShapePreview canvas (unchanged — reused by grid cards and GeneralPreferences)
+// IconShapePreview canvas (reused by grid cards and GeneralPreferences)
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -589,37 +584,44 @@ fun IconShapePreview(
     // AdaptiveIconDrawable directly. Android normalises this path to [0,100]×[0,100]
     // (MASK_SIZE = 100 in AOSP), so it slots into our scaling pipeline unchanged.
     // For all other shapes, getMaskPath() is correct as documented.
-    val basePath = remember(iconShape) {
+    val path = remember(iconShape) {
         if (iconShape is IconShape.SystemBased) {
-            AdaptiveIconDrawable(null, null).iconMask
+            AdaptiveIconDrawable(null, null).iconMask.asComposePath()
         } else {
-            iconShape.getMaskPath()
+            iconShape.getMaskPath().asComposePath()
         }
     }
 
-    Canvas(modifier = modifier.requiredSize(48.dp)) {
-        // Step 1: scale from the 100×100 viewport to the actual canvas size.
-        val scaleX = size.width / 100f
-        val scaleY = size.height / 100f
-        val matrix = Matrix()
-        matrix.setScale(scaleX, scaleY)
+    Canvas(
+        modifier = modifier.size(48.dp),
+    ) {
+        val pathBounds = path.getBounds()
+        if (pathBounds.width <= 0f || pathBounds.height <= 0f) return@Canvas
 
-        val scaledPath = AndroidPath()
-        basePath.transform(matrix, scaledPath)
+        val strokeWidth = 4f
+        val fitScale = minOf(
+            (size.width - strokeWidth) / (pathBounds.width + strokeWidth),
+            (size.height - strokeWidth) / (pathBounds.height + strokeWidth),
+        )
+        if (fitScale <= 0f) return@Canvas
 
-        // Step 2: center the scaled path within the canvas.
-        // Shapes like Hexagon, Teardrop etc. don't fill the full [0,100]
-        // viewport symmetrically, so after scaling their bounding box sits
-        // off-center. computeBounds() gives us the actual bounds so we can
-        // translate to the geometric center of the canvas.
-        val bounds = android.graphics.RectF()
-        scaledPath.computeBounds(bounds, true)
-        val dx = (size.width - bounds.width()) / 2f - bounds.left
-        val dy = (size.height - bounds.height()) / 2f - bounds.top
-        scaledPath.offset(dx, dy)
+        val offset = Offset(
+            x = (size.width - pathBounds.width * fitScale) / 2f - pathBounds.left * fitScale,
+            y = (size.height - pathBounds.height * fitScale) / 2f - pathBounds.top * fitScale,
+        )
 
-        val composePath = scaledPath.asComposePath()
-        drawPath(path = composePath, color = fillColor)
-        drawPath(path = composePath, color = strokeColor, style = Stroke(width = 4f))
+        translate(left = offset.x, top = offset.y) {
+            scale(scaleX = fitScale, scaleY = fitScale, pivot = Offset.Zero) {
+                drawPath(
+                    path = path,
+                    color = fillColor,
+                )
+                drawPath(
+                    path = path,
+                    color = strokeColor,
+                    style = Stroke(width = strokeWidth),
+                )
+            }
+        }
     }
 }

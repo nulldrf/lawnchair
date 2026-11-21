@@ -55,12 +55,42 @@
     <string name="changes_dialog_commit_info">przez %1$s • %2$s • %3$s</string>
     <!-- Time ago strings -->
     <string name="time_just_now">Teraz</string>
-    <string name="time_minutes_ago">%dm</string>
-    <string name="time_hours_ago">%dh</string>
-    <string name="time_days_ago">%dd</string>
-    <string name="time_weeks_ago">%dw</string>
-    <string name="time_months_ago">%dmo</string>
-    <string name="time_years_ago">%dy</string>
+    <plurals name="time_minutes_ago">
+        <item quantity="one">%dm</item>
+        <item quantity="few">%dm</item>
+        <item quantity="many">%dm</item>
+        <item quantity="other">%dm</item>
+    </plurals>
+    <plurals name="time_hours_ago">
+        <item quantity="one">%dh</item>
+        <item quantity="few">%dh</item>
+        <item quantity="many">%dh</item>
+        <item quantity="other">%dh</item>
+    </plurals>
+    <plurals name="time_days_ago">
+        <item quantity="one">%dd</item>
+        <item quantity="few">%dd</item>
+        <item quantity="many">%dd</item>
+        <item quantity="other">%dd</item>
+    </plurals>
+    <plurals name="time_weeks_ago">
+        <item quantity="one">%dw</item>
+        <item quantity="few">%dw</item>
+        <item quantity="many">%dw</item>
+        <item quantity="other">%dw</item>
+    </plurals>
+    <plurals name="time_months_ago">
+        <item quantity="one">%dmo</item>
+        <item quantity="few">%dmo</item>
+        <item quantity="many">%dmo</item>
+        <item quantity="other">%dmo</item>
+    </plurals>
+    <plurals name="time_years_ago">
+        <item quantity="one">%dy</item>
+        <item quantity="few">%dy</item>
+        <item quantity="many">%dy</item>
+        <item quantity="other">%dy</item>
+    </plurals>
     <string name="managed_by_lawnchair">Zarządzane przez Lawnchair</string>
     <!-- When mentioning settings UI -->
     <string name="smartspace_preferences">Ustawienia</string>
@@ -102,7 +132,7 @@
     <string name="caddy">Caddy</string>
     <string name="app_drawer_folder">Foldery w szufladzie aplikacji</string>
     <string name="selected_apps">Selected apps</string>
-    <string name="add_apps">Add apps</string>
+    <string name="add_apps">Dodaj aplikacje</string>
     <string name="app_drawer_folder_settings">Folder szuflady aplikacji</string>
     <string name="add_folder">Utwórz folder</string>
     <string name="edit_folder">Edytuj folder</string>
@@ -114,8 +144,9 @@
     <string name="apps_in_folder_label">Ukryj aplikacje folderu</string>
     <string name="apps_in_folder_description">Aplikacje przypisane do folderów są wykluczone z list aplikacji</string>
     <string name="folders_filter_duplicates">Pokaż tylko niedodane aplikacje</string>
+    <string name="folder_manage_apps">Zarządzaj aplikacjami</string>
     <string name="my_folder_label">Mój folder</string>
-    <string name="sort_active_items_action">Sort active items</string>
+    <string name="sort_active_items_action">Sortuj aktywne elementy</string>
     <!-- A11y description -->
     <string name="accessibility_service_description">To perform certain actions when you use a gesture, such as locking your phone, Lawnchair requires accessibility access.\n\nLawnchair doesn\'t watch your actions, though all accessibility services require this privilege. Lawnchair discards any event sent by the system.\n\nTo lock your phone or open the Recents screen, Lawnchair uses the performGlobalAction accessibility service.</string>
     <string name="x_with_y_count">%1$s (%2$d)</string>
@@ -123,10 +154,10 @@
     <string name="x_and_y">%1$s i %2$s</string>
     <string name="advanced">Zaawansowane</string>
     <!-- Draggable -->
-    <string name="reorderable_move_up">Move up</string>
-    <string name="reorderable_move_down">Move down</string>
-    <string name="reorderable_active_items">Active items</string>
-    <string name="reorderable_disabled_items">Other items</string>
+    <string name="reorderable_move_up">Przenieś w górę</string>
+    <string name="reorderable_move_down">Przenieś w dół</string>
+    <string name="reorderable_active_items">Aktywne elementy</string>
+    <string name="reorderable_disabled_items">Inne elementy</string>
     <string name="reorderable_disabled_hint">Disabled items will appear here</string>
     <string name="reorderable_add_hint_items">Active items will appear here</string>
     <!--
@@ -135,11 +166,13 @@
 
     -->
     <string name="settings">Ustawienia</string>
+    <!-- Shown on large screens until a settings page is picked from the menu beside it. -->
+    <string name="settings_pick_a_page">Pick a setting from the menu</string>
     <string name="general_label">Ogólne</string>
     <string name="general_description">Kolory, zestawy ikon, kropki powiadomień</string>
     <string name="home_screen_label">Ekran główny</string>
     <string name="home_screen_description">Wiadomości, siatka, ikony</string>
-    <string name="home_screen_actions">Home screen actions</string>
+    <string name="home_screen_actions">Akcje ekranu głównego</string>
     <string name="dock_label">Dock</string>
     <string name="dock_description">Pasek wyszukiwania, liczba ikon</string>
     <string name="app_drawer_label">Szuflada aplikacji</string>
@@ -170,7 +203,7 @@
     <string name="workspace_increase_max_grid_size_label">Zwiększ limit maksymalnego rozmiaru siatki</string>
     <string name="workspace_increase_max_grid_size_description">Increase maximum allowed home screen grid size from 10 &#xd7; 10 to 20 &#xd7; 20</string>
     <string name="always_reload_icons_label">Zawsze przeładowuj ikony</string>
-    <string name="always_reload_icons_description">Unikaj korzystania z buforowanych ikon z zestawów ikon</string>
+    <string name="always_reload_icons_description">Avoid caching to reload icons immediately when theme or accent color changes</string>
     <string name="always_reload_icons_warning">This will cause icons to refresh regularly, impacting performance. Turn off if the icon pack doesn\'t update regularly.</string>
     <string name="show_deck_layout">Układ talii</string>
     <string name="show_deck_layout_description">Pokaż opcję układu, aby ukryć szufladę aplikacji i automatycznie dodać nowe aplikacje do ekranu głównego</string>
@@ -184,10 +217,10 @@
     <string name="gesturenavcontract_warning_incompatibility">Your device isn\'t fully supported. This may cause visual issue for some animations.</string>
     <string name="vibration_feedback_level_label">Vibration feedback level</string>
     <string name="vibration_feedback_no_feedback_choice">Brak</string>
-    <string name="vibration_feedback_minimal_choice">Minimal</string>
+    <string name="vibration_feedback_minimal_choice">Minimalny</string>
     <string name="vibration_feedback_default_choice">Domyślnie</string>
     <string name="vibration_feedback_expressive_choice">Ekspresywny</string>
-    <string name="recents_lock_unlock">App locking</string>
+    <string name="recents_lock_unlock">Blokowanie aplikacji</string>
     <string name="recents_lock_unlock_description">Prevent the selected app from closing when you tap \"Clear all\"</string>
     <!--Overlay-->
     <string name="app_closing_animation">Animacja zamykania aplikacji</string>
@@ -200,15 +233,15 @@
     -->
     <string name="suggestion_pref_screen_title">Sugestie</string>
     <string name="global_predictions_label">Show suggestion features</string>
-    <string name="app_predictions_label">App suggestions</string>
+    <string name="app_predictions_label">Sugestie aplikacji</string>
     <string name="prediction_mode_label">Suggestions provider</string>
     <string name="app_predictions_disable_reason_pre_q_description">This feature requires Android 10 or higher</string>
     <string name="prediction_mode_system">System</string>
     <string name="prediction_mode_none">Wyłączono</string>
     <string name="prediction_weighted_usage_stats_label">Use device usage data</string>
     <string name="prediction_weighted_usage_stats_description">Use your device\'s usage statistics to make suggestions more accurate</string>
-    <string name="dismissed_prediction_apps_label">Blocked apps</string>
-    <string name="dismissed_prediction_apps_label_with_count">Blocked apps (%1$d)</string>
+    <string name="dismissed_prediction_apps_label">Zablokowane aplikacje</string>
+    <string name="dismissed_prediction_apps_label_with_count">Zablokowane aplikacje (%1$d)</string>
     <string name="prediction_system_settings">Manage system suggestions</string>
     <string name="missing_usage_access_label">Usage access needed</string>
     <string name="missing_usage_access_desc">To improve app suggestions, turn on usage access for <xliff:g id="name" example="Lawnchair">%1$s</xliff:g></string>
@@ -239,9 +272,7 @@
     <string name="twoline_label">Używaj wielu linijek</string>
     <!-- Icon-related settings -->
     <string name="transparent_background_icons_label">Transparent icon backgrounds</string>
-    <string name="transparent_background_icons_description">For themed icons and auto-adaptive icons</string>
     <string name="auto_adaptive_icons_label">Automatyczne ikony adaptacyjne</string>
-    <string name="auto_adaptive_icons_description">Dla wszystkich ikon nieadaptacyjnych</string>
     <string name="shadow_bg_icons_label">Pokazuj cień za ikonami</string>
     <string name="background_lightness_label">Jasność tła</string>
     <string name="adaptive_icon_background_description">Ustaw jasność tła na 100%, żeby uzyskać biały</string>
@@ -306,16 +337,23 @@
     <string name="icon_shape_clipboard_import_error">Schowek nie zawiera prawidłowego kształtu ikony</string>
     <!-- Icon pack settings -->
     <string name="icon_pack">Zestaw ikon</string>
-    <string name="themed_icon_pack">Źródło ikon z motywu</string>
-    <string name="themed_icon_pack_tint">Użyj koloru motywu</string>
+    <string name="get_more_icon_packs">Get more icons</string>
+    <string name="fallback_icon_source_title">Fallback icon source</string>
     <string name="system_icons">Ikony systemowe</string>
     <string name="force_monochrome_label">Force monochrome</string>
     <string name="force_monochrome_description">Recolor unsupported apps with the current accent color.</string>
+    <string name="enforce_themed_icons_title">Enforce themed icons</string>
+    <string name="enforce_themed_icons_description">Even to unsupported apps (not recommended)</string>
     <string name="themed_icon_title">Ikony z motywu</string>
+    <string name="themed_icons_description">Adapt supported app icons to match your device\'s theme and color scheme. These icons are applied on top of your existing icon packs.</string>
     <string name="themed_icons_off_label">Wyłączono</string>
     <string name="themed_icons_home_label">Ekran główny</string>
     <string name="themed_icons_home_and_drawer_label">Ekran domowy i szuflada aplikacji</string>
+    <string name="themed_icons_no_fallback">No fallback</string>
     <string name="lawnicons_not_installed_description">Brak obsługiwanych zestawów ikon</string>
+    <string name="advanced_icon_settings_title">Advanced icon settings</string>
+    <string name="reshape_unthemed_icons_title">Reshape unthemed icons</string>
+    <string name="reshape_unthemed_icons_description">By adding a background</string>
     <!-- Fonts -->
     <string name="pref_fonts_add_fonts">Dodaj Czcionki</string>
     <string name="pref_fonts_add_fonts_summary">Wspierane są czcionki OTF i TTF</string>
@@ -553,6 +591,10 @@
     <!-- General and home screen settings -->
     <string name="home_screen_rotation_label">Obrót ekranu głównego</string>
     <string name="home_screen_rotation_description">Allow home screen rotation when the device is rotated</string>
+    <string name="pan_to_move_icon_label">Tilt to swipe pages</string>
+    <string name="pan_to_move_icon_description">Tilt your phone left or right to move between pages during rearrangement of apps/widgets</string>
+    <string name="pan_to_move_sensitivity_label">Tilt sensitivity</string>
+    <string name="pan_to_move_sensor_unavailable">Pan to move is unavailable because no motion sensor could be registered.</string>
     <string name="auto_updater_label">Automatically check for updates</string>
     <string name="auto_updater_description">Checks for Nightly updates when opening the About screen</string>
     <string name="live_information_label">Live information</string>

@@ -13,6 +13,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.DrawableWrapper
 import android.graphics.drawable.LayerDrawable
 import androidx.annotation.DrawableRes
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.painter.Painter
@@ -55,52 +56,54 @@ fun setThemedIconResource(
         return drawable
     }
 
-    if (method == ThemingMethod.THEME_BY_LAYER_ID && drawable is LayerDrawable) {
-        val primary = ColorTokens.QsbIconTintPrimary.resolveColor(context)
-        val secondary = ColorTokens.QsbIconTintSecondary.resolveColor(context)
-        val tertiary = ColorTokens.QsbIconTintTertiary.resolveColor(context)
-        val quaternary = ColorTokens.QsbIconTintQuaternary.resolveColor(context)
+    if (method == ThemingMethod.THEME_BY_LAYER_ID) {
+        if (drawable is LayerDrawable) {
+            val primary = ColorTokens.QsbIconTintPrimary.resolveColor(context)
+            val secondary = ColorTokens.QsbIconTintSecondary.resolveColor(context)
+            val tertiary = ColorTokens.QsbIconTintTertiary.resolveColor(context)
+            val quaternary = ColorTokens.QsbIconTintQuaternary.resolveColor(context)
 
-        if (resId == R.drawable.ic_mic_color || resId == R.drawable.ic_lens_color) {
-            // Mic and lens always use a single uniform color across all layers,
-            // matching Google's latest update where these icons are monochrome.
-            val accent = ColorTokens.QsbIconTintMonochrome.resolveColor(context)
-            for (i in 0 until drawable.numberOfLayers) {
-                drawable.getDrawable(i).setTint(accent)
-            }
-            return drawable
-        } else if (resId == R.drawable.ic_super_g_color) {
-            for (i in 0 until drawable.numberOfLayers) {
-                val layerId = drawable.getId(i)
-                val color = when (layerId) {
-                    R.id.qsbIconTintPrimary -> primary
-                    R.id.qsbIconTintSecondary -> secondary
-                    R.id.qsbIconTintTertiary -> tertiary
-                    R.id.qsbIconTintQuaternary -> quaternary
-                    else -> continue
+            if (resId == R.drawable.ic_mic_color || resId == R.drawable.ic_lens_color) {
+                // Mic and lens always use a single uniform color across all layers,
+                // matching Google's latest update where these icons are monochrome.
+                val accent = ColorTokens.QsbIconTintMonochrome.resolveColor(context)
+                for (i in 0 until drawable.numberOfLayers) {
+                    drawable.getDrawable(i).setTint(accent)
                 }
-                drawable.getDrawable(i).setTint(color)
-            }
+                return drawable
+            } else if (resId == R.drawable.ic_super_g_color) {
+                for (i in 0 until drawable.numberOfLayers) {
+                    val layerId = drawable.getId(i)
+                    val color = when (layerId) {
+                        R.id.qsbIconTintPrimary -> primary
+                        R.id.qsbIconTintSecondary -> secondary
+                        R.id.qsbIconTintTertiary -> tertiary
+                        R.id.qsbIconTintQuaternary -> quaternary
+                        else -> continue
+                    }
+                    drawable.getDrawable(i).setTint(color)
+                }
 
-            return createSuperGSweepDrawable(
-                drawable = drawable,
-                primary = primary,
-                secondary = secondary,
-                tertiary = tertiary,
-                quaternary = quaternary,
-                blendHalfWidth = 0.05f,
-            )
-        } else {
-            for (i in (0 until drawable.numberOfLayers)) {
-                val color = when (drawable.getId(i)) {
-                    R.id.qsbIconTintPrimary -> primary
-                    R.id.qsbIconTintSecondary -> secondary
-                    R.id.qsbIconTintTertiary -> tertiary
-                    R.id.qsbIconTintQuaternary -> quaternary
-                    else -> 0
+                return createSuperGSweepDrawable(
+                    drawable = drawable,
+                    primary = primary,
+                    secondary = secondary,
+                    tertiary = tertiary,
+                    quaternary = quaternary,
+                    blendHalfWidth = 0.05f,
+                )
+            } else {
+                for (i in (0 until drawable.numberOfLayers)) {
+                    val color = when (drawable.getId(i)) {
+                        R.id.qsbIconTintPrimary -> primary
+                        R.id.qsbIconTintSecondary -> secondary
+                        R.id.qsbIconTintTertiary -> tertiary
+                        R.id.qsbIconTintQuaternary -> quaternary
+                        else -> 0
+                    }
+                    if (color == 0) continue
+                    drawable.getDrawable(i).setTint(color)
                 }
-                if (color == 0) continue
-                drawable.getDrawable(i).setTint(color)
             }
         }
     } else {
@@ -178,7 +181,8 @@ fun rememberThemedIconPainter(
     method: ThemingMethod = ThemingMethod.THEME_BY_LAYER_ID,
 ): Painter {
     val context = LocalContext.current
-    val drawable = remember(context, resId, themed, method) {
+    val colorScheme = MaterialTheme.colorScheme
+    val drawable = remember(context, resId, themed, method, colorScheme) {
         setThemedIconResource(context, resId, themed, method)
     }
     return rememberDrawablePainter(drawable)

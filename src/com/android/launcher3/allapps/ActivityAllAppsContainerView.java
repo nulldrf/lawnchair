@@ -194,6 +194,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
     private boolean mSearchContainerAnimating = false;
+    private boolean mSearchContainerAnimatingToTop = false;
     private int mLastSearchContainerHeight = 0;
     public SearchRecyclerView mSearchRecyclerView;
     protected SearchAdapterProvider<?> mMainAdapterProvider;
@@ -349,7 +350,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                         if (newFocus == searchEditText) {
                             animateSearchContainerForSearchState(
                                     true, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
-                        } else if (oldFocus == searchEditText && !isSearching()) {
+                        } else if (oldFocus == searchEditText
+                                && (!isSearching() || mSearchExitInProgress)) {
                             animateSearchContainerForSearchState(
                                     false, DEFAULT_SEARCH_TRANSITION_DURATION_MS);
                         }
@@ -390,7 +392,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         ExtendedEditText editText = mSearchUiManager.getEditText();
         // An empty, focused query is still an active search session.
         boolean keepSearchFocus = editText != null && editText.isFocused()
-                && editText.getText().length() == 0;
+                && Utilities.trim(editText.getText()).isEmpty();
         animateToSearchState(false, DEFAULT_SEARCH_TRANSITION_DURATION_MS, keepSearchFocus);
         rebindAdapters();
     }
@@ -436,7 +438,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mAllAppsTransitionController.animateAllAppsToNoScale();
             mFastScroller.setVisibility(showFastScroller ? VISIBLE : INVISIBLE);
         }
-        animateSearchContainerForSearchState(goingToSearch, durationMs);
+        // Keep the search bar pinned at the top (and content laid out below it) when
+        // clearing the query while the search input remains focused.
+        animateSearchContainerForSearchState(goingToSearch || keepSearchFocus, durationMs);
         mSearchTransitionController.animateToState(goingToSearch, durationMs, () -> {
             mIsSearching = goingToSearch;
             updateSearchResultsVisibility();
@@ -459,15 +463,24 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         });
     }
 
-    private void animateSearchContainerForSearchState(boolean goingToSearch, long durationMs) {
+    private void animateSearchContainerForSearchState(boolean searchBarAtTop, long durationMs) {
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
-        if (!searchBarAtBottom || isSearchBarFloating()) return;
+        if (!searchBarAtBottom || isSearchBarFloating() || isAppDrawerSearchBarHidden()) return;
         if (mSearchContainer.getHeight() == 0) return;
-        updateContentTopMarginForSearchState(goingToSearch);
-        float targetTranslationY = getSearchContainerRestingTranslationY(goingToSearch);
-        mSearchContainer.animate().cancel();
+        updateContentTopMarginForSearchState(searchBarAtTop);
+        float targetTranslationY = getSearchContainerRestingTranslationY(searchBarAtTop);
+        if (mSearchContainerAnimating && mSearchContainerAnimatingToTop == searchBarAtTop) {
+            return;
+        }
+        if (!mSearchContainerAnimating
+                && Math.abs(mSearchContainer.getTranslationY() - targetTranslationY) < 0.5f) {
+            mSearchContainer.setTranslationY(targetTranslationY);
+            return;
+        }
+        mSearchContainer.animate().setListener(null).cancel();
         mSearchContainerAnimating = true;
+        mSearchContainerAnimatingToTop = searchBarAtTop;
         mSearchContainer.animate()
                 .translationY(targetTranslationY)
                 .setDuration(durationMs)
@@ -488,17 +501,22 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     private void updateContentTopMarginForSearchState(boolean searching) {
+        if (isAppDrawerSearchBarHidden()) return;
         boolean showTabs = mUsingTabs;
         if (isSearchBarFloating()) {
             alignParentTop(getAppsRecyclerViewContainer(), showTabs);
             alignParentTop(getSearchRecyclerView(), false);
             alignParentTop(mHeader, false);
+            requestLayout();
         } else {
-            layoutBelowSearchContainer(getAppsRecyclerViewContainer(), showTabs, searching);
-            layoutBelowSearchContainer(getSearchRecyclerView(), false, searching);
-            layoutBelowSearchContainer(mHeader, false, searching);
+            boolean changed = layoutBelowSearchContainer(
+                    getAppsRecyclerViewContainer(), showTabs, searching);
+            changed |= layoutBelowSearchContainer(getSearchRecyclerView(), false, searching);
+            changed |= layoutBelowSearchContainer(mHeader, false, searching);
+            if (changed) {
+                requestLayout();
+            }
         }
-        requestLayout();
     }
 
     private float getSearchContainerRestingTranslationY(boolean searching) {
@@ -930,26 +948,38 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         return PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar());
     }
 
-    private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
-        boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
-                && mSearchUiManager.getEditText().hasFocus());
-        layoutBelowSearchContainer(v, includeTabsMargin, searching);
+    private boolean isSearchBarActiveForPositioning() {
+        ExtendedEditText editText = mSearchUiManager.getEditText();
+        boolean hasFocus = editText != null && editText.hasFocus();
+        return (isSearching() && !mSearchExitInProgress) || hasFocus;
     }
 
-    private void layoutBelowSearchContainer(View v, boolean includeTabsMargin, boolean searching) {
-        if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
-        removeCustomRules(v);
+    private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
+        layoutBelowSearchContainer(v, includeTabsMargin, isSearchBarActiveForPositioning());
+    }
+
+    private boolean layoutBelowSearchContainer(View v, boolean includeTabsMargin,
+            boolean searching) {
+        if (v == null || !(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
+            return false;
+        }
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
+        int[] rules = lp.getRules();
 
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
         if (searchBarAtBottom && !searching) {
+            if (rules[RelativeLayout.ALIGN_PARENT_TOP] == RelativeLayout.TRUE
+                    && rules[RelativeLayout.ALIGN_TOP] == 0
+                    && rules[RelativeLayout.ABOVE] == 0
+                    && lp.topMargin == 0) {
+                return false;
+            }
+            removeCustomRules(v);
             lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
             lp.topMargin = 0;
-            return;
+            return true;
         }
-
-        lp.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
 
         boolean hideSearchBar =
                 PreferenceCacheExtensionsKt.firstCached(pref2.getHideAppDrawerSearchBar());
@@ -962,7 +992,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                         R.dimen.all_apps_header_pill_height);
             }
         }
+        if (rules[RelativeLayout.ALIGN_TOP] == R.id.search_container_all_apps
+                && rules[RelativeLayout.ALIGN_PARENT_TOP] == 0
+                && rules[RelativeLayout.ABOVE] == 0
+                && lp.topMargin == topMargin) {
+            return false;
+        }
+        removeCustomRules(v);
+        lp.addRule(RelativeLayout.ALIGN_TOP, R.id.search_container_all_apps);
         lp.topMargin = topMargin;
+        return true;
     }
 
     private void alignParentTop(View v, boolean includeTabsMargin) {
@@ -983,13 +1022,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
-        if (!searchBarAtBottom || isSearchBarFloating()) {
+        if (!searchBarAtBottom || isSearchBarFloating() || isAppDrawerSearchBarHidden()) {
             mSearchContainer.setTranslationY(0f);
             return;
         }
-        boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
-                && mSearchUiManager.getEditText().hasFocus());
+        boolean searching = isSearchBarActiveForPositioning();
         mSearchContainer.setTranslationY(getSearchContainerRestingTranslationY(searching));
+        updateContentTopMarginForSearchState(searching);
     }
 
     @Override
@@ -1120,7 +1159,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // previous orientation cannot survive rotation. onLayout() will settle
         // mSearchContainer cleanly once the new orientation layout pass completes.
         if (mSearchContainer != null) {
-            mSearchContainer.animate().cancel();
+            mSearchContainer.animate().setListener(null).cancel();
             mSearchContainerAnimating = false;
             mSearchContainer.setTranslationY(0f);
             mSearchContainer.requestLayout();

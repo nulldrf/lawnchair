@@ -464,7 +464,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 pref2.getAppDrawerSearchBarAtBottom());
         if (!searchBarAtBottom || isSearchBarFloating()) return;
         if (mSearchContainer.getHeight() == 0) return;
-        updateContentTopMarginForSearchState();
+        updateContentTopMarginForSearchState(goingToSearch);
         float targetTranslationY = getSearchContainerRestingTranslationY(goingToSearch);
         mSearchContainer.animate().cancel();
         mSearchContainerAnimating = true;
@@ -487,26 +487,25 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 .start();
     }
 
-    private void updateContentTopMarginForSearchState() {
+    private void updateContentTopMarginForSearchState(boolean searching) {
         boolean showTabs = mUsingTabs;
         if (isSearchBarFloating()) {
             alignParentTop(getAppsRecyclerViewContainer(), showTabs);
             alignParentTop(getSearchRecyclerView(), false);
             alignParentTop(mHeader, false);
         } else {
-            layoutBelowSearchContainer(getAppsRecyclerViewContainer(), showTabs);
-            layoutBelowSearchContainer(getSearchRecyclerView(), false);
-            layoutBelowSearchContainer(mHeader, false);
+            layoutBelowSearchContainer(getAppsRecyclerViewContainer(), showTabs, searching);
+            layoutBelowSearchContainer(getSearchRecyclerView(), false, searching);
+            layoutBelowSearchContainer(mHeader, false, searching);
         }
         requestLayout();
     }
 
     private float getSearchContainerRestingTranslationY(boolean searching) {
         if (searching) {
-            int contentOverlap = getResources().getDimensionPixelSize(
-                    R.dimen.all_apps_search_bar_content_overlap);
-            int targetTop = getPaddingTop() + contentOverlap;
-            return targetTop - mSearchContainer.getTop();
+            // Return to the search container's exact natural top position (translationY = 0),
+            // matching the standard top-search-bar layout identically.
+            return 0f;
         } else {
             int bottomInset = Math.max(mInsets.bottom, mNavBarScrimHeight);
             int desiredBottom = getHeight() - bottomInset;
@@ -932,16 +931,21 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     private void layoutBelowSearchContainer(View v, boolean includeTabsMargin) {
+        boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
+                && mSearchUiManager.getEditText().hasFocus());
+        layoutBelowSearchContainer(v, includeTabsMargin, searching);
+    }
+
+    private void layoutBelowSearchContainer(View v, boolean includeTabsMargin, boolean searching) {
         if (!(v.getLayoutParams() instanceof RelativeLayout.LayoutParams)) return;
+        removeCustomRules(v);
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
 
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
-        if (searchBarAtBottom) {
+        if (searchBarAtBottom && !searching) {
             lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
-            boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
-                    && mSearchUiManager.getEditText().hasFocus());
-            lp.topMargin = searching ? mSearchContainer.getHeight() : 0;
+            lp.topMargin = 0;
             return;
         }
 

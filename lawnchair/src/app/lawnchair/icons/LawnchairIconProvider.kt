@@ -18,14 +18,15 @@ import android.content.pm.ComponentInfo
 import android.content.pm.LauncherApps
 import android.content.pm.PackageItemInfo
 import android.content.res.Resources
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Handler
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.ArrayMap
 import android.util.Log
 import androidx.core.content.getSystemService
-import androidx.core.graphics.drawable.toDrawable
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.data.iconoverride.IconOverrideRepository
 import app.lawnchair.icons.iconpack.IconPack
@@ -37,6 +38,7 @@ import app.lawnchair.preferences2.firstCached
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
 import app.lawnchair.util.requireSystemService
+import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
 import com.android.launcher3.dagger.ApplicationContext
@@ -45,10 +47,10 @@ import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.icons.ClockDrawableWrapper
 import com.android.launcher3.icons.LauncherIconProvider
 import com.android.launcher3.icons.LauncherIcons
-import com.android.launcher3.icons.mono.ThemedIconDrawable
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.SafeCloseable
+import com.android.quickstep.RecentsModel
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +127,13 @@ class LawnchairIconProvider @Inject constructor(
         if (iconPack.isNotEmpty()) {
             mSystemState += ",pack=$iconPack"
         }
+        val themedPack = themedIconSourcePref.firstCached()
+        if (themedPack.isNotEmpty()) {
+            mSystemState += ",themedPack=$themedPack"
+        }
+        if (themedIconsEnabled) {
+            mSystemState += ",themed=1"
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -184,27 +193,10 @@ class LawnchairIconProvider @Inject constructor(
             .launchIn(scope)
     }
 
-    private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {
-        val componentKey = ComponentKey(componentName, user)
-        // first look for user-overridden icon
-        val overrideItem = overrideRepo.overridesMap[componentKey]
-        if (overrideItem != null) {
-            return overrideItem.toIconEntry()
-        }
-
-        // if forced monochrome is enabled, fallback to launcher3 behavior
-        if (prefs.forceIconMonochrome.firstCached()) {
-            return null
-        }
-
+    private fun resolveIconPackEntry(componentName: ComponentName): IconEntry? {
         val iconPack = iconPack ?: return null
-        // then look for dynamic calendar
-        val calendarEntry = iconPack.getCalendar(componentName)
-        if (calendarEntry != null) {
-            return calendarEntry
-        }
-        // finally, look for normal icon
-        return iconPack.getIcon(componentName)
+        // Look for dynamic calendar first, then regular icon in the active custom icon pack.
+        return iconPack.getCalendar(componentName) ?: iconPack.getIcon(componentName)
     }
 
     /**
@@ -242,77 +234,105 @@ class LawnchairIconProvider @Inject constructor(
         val user = UserHandle.getUserHandleForUid(appInfo.uid)
         val componentName = resolveComponentName(info, appInfo, user)
 
-        var iconEntry: IconEntry? = null
+        // 1. Per-app manual icon overrides always win (never replaced by system/Lawnicons monochrome).
         if (componentName != null) {
-            iconEntry = resolveIconEntry(componentName, user)
+            val overrideItem = overrideRepo.overridesMap[ComponentKey(componentName, user)]
+            if (overrideItem != null) {
+                var overrideEntry = overrideItem.toIconEntry()
+                if (overrideEntry.type == IconType.Calendar) {
+                    overrideEntry = overrideEntry.resolveDynamicCalendar(getDay())
+                }
+                iconPackProvider.getDrawable(overrideEntry, iconDpi, user)?.let { return it }
+            }
         }
 
-        var iconPackEntry = iconEntry
-        if (iconEntry?.type == IconType.Calendar) {
-            iconPackEntry = iconEntry.resolveDynamicCalendar(getDay())
+        // 2. Colored base icon: active custom icon pack first, then system app icon.
+        //    This always stays intact for unthemed surfaces (e.g. App Drawer when Home-only)
+        //    and serves as the fallback on themed surfaces when no monochrome icon exists.
+        val iconPackEntry = componentName?.let { resolveIconPackEntry(it) }
+        val resolvedPackEntry = if (iconPackEntry?.type == IconType.Calendar) {
+            iconPackEntry.resolveDynamicCalendar(getDay())
+        } else {
+            iconPackEntry
         }
-
-        val iconPackIcon = iconPackEntry?.let { iconPackProvider.getDrawable(it, iconDpi, user) }
+        val iconPackIcon = resolvedPackEntry?.let { iconPackProvider.getDrawable(it, iconDpi, user) }
         val baseIcon = iconPackIcon ?: super.getIcon(info, appInfo, iconDpi)
 
-        if (!themedIconsEnabled || iconEntry == null) {
+        if (!themedIconsEnabled) {
             return baseIcon
         }
 
-        return resolveThemedIcon(packageName, componentName, iconEntry, iconDpi) ?: baseIcon
+        // 3. Themed layer (kept separate from the colored base icon so Home-only and Home+Drawer
+        //    both work cleanly and predictably):
+        //    - If baseIcon already has a monochrome layer, keep it.
+        //    - If forceIconMonochrome is ON, leave monochrome null so BaseIconFactory +
+        //      FORCED_MONO_THEME_CONTROLLER generate monochrome directly without overwriting baseIcon.
+        //    - Otherwise attach resolved monochrome (native <monochrome> or Fallback themed pack /
+        //      Lawnicons) to the monochrome layer only.
+        if (baseIcon is AdaptiveIconDrawable) {
+            val existingMono = when {
+                baseIcon is CustomAdaptiveIconDrawable -> baseIcon.monochrome
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> baseIcon.monochrome
+                else -> null
+            }
+            if (existingMono != null || prefs.forceIconMonochrome.firstCached()) {
+                return baseIcon
+            }
+            val mono = resolveMonochromeDrawable(packageName, componentName, resolvedPackEntry, iconDpi)
+            return if (mono != null) {
+                CustomAdaptiveIconDrawable(baseIcon.background, baseIcon.foreground, mono)
+            } else {
+                baseIcon
+            }
+        }
+
+        if (prefs.forceIconMonochrome.firstCached()) {
+            return baseIcon
+        }
+
+        val mono = resolveMonochromeDrawable(packageName, componentName, resolvedPackEntry, iconDpi)
+            ?: return baseIcon
+        return if (baseIcon is ExtendedBitmapDrawable) {
+            baseIcon.monochromeDrawable = mono
+            baseIcon
+        } else {
+            MonochromeDrawableWrapper(baseIcon, mono)
+        }
     }
 
-    private fun resolveThemedIcon(
+    private fun resolveMonochromeDrawable(
         packageName: String,
         componentName: ComponentName?,
-        iconEntry: IconEntry,
+        iconEntry: IconEntry?,
         iconDpi: Int,
     ): Drawable? {
-        val themedColors = ThemedIconDrawable.getColors(context)
-        val clock = iconPackProvider.getClockMetadata(iconEntry)
+        val clock = iconEntry?.let { iconPackProvider.getClockMetadata(it) }
 
         return when {
-            clock != null -> {
-                // the icon supports dynamic clock, use dynamic themed clock
-                ClockDrawableWrapper.forPackage(mContext, mClock.packageName, iconDpi)?.getMonochrome()
+            clock != null && mClock != null -> {
+                ClockDrawableWrapper.forPackage(mContext, mClock.packageName, iconDpi)?.let { wrapper ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) wrapper.monochrome else null
+                } ?: ThemeData(context.resources, R.drawable.themed_icon_static_clock).loadPaddedDrawable()
             }
 
-            packageName == mClock.packageName -> {
-                // is clock app but icon might not be adaptive, fallback to static themed clock
-                val clockThemedData = ThemeData(context.resources, R.drawable.themed_icon_static_clock)
-                clockThemedData.loadPaddedDrawable()?.let { foreground ->
-                    CustomAdaptiveIconDrawable(
-                        themedColors[0].toDrawable(),
-                        foreground.apply { setTint(themedColors[1]) },
-                    )
+            mClock != null && packageName == mClock.packageName -> {
+                ThemeData(context.resources, R.drawable.themed_icon_static_clock).loadPaddedDrawable()
+            }
+
+            mCalendar != null && packageName == mCalendar.packageName -> {
+                val themeData = getThemeDataForPackage(packageName) ?: return null
+                val calDrawable = loadCalendarDrawable(iconDpi, themeData)
+                when {
+                    calDrawable is CustomAdaptiveIconDrawable -> calDrawable.monochrome
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && calDrawable is AdaptiveIconDrawable ->
+                        calDrawable.monochrome
+                    else -> themeData.loadPaddedDrawable()
                 }
-            }
-
-            packageName == mCalendar.packageName -> {
-                // calendar app, apply the dynamic calendar icon
-                val themeData = getThemeDataForPackage(packageName)
-                loadCalendarDrawable(iconDpi, themeData)
             }
 
             else -> {
-                // regular icon
-                val nativeThemed = componentName?.let { ThemedIconCompat.getThemedIcon(context, it) }
-                if (nativeThemed != null) {
-                    CustomAdaptiveIconDrawable(
-                        themedColors[0].toDrawable(),
-                        nativeThemed.apply { setTint(themedColors[1]) },
-                    )
-                } else {
-                    val themeData = getThemeDataForPackage(packageName)
-                    // Clock/calendar theme entries can be arrays rather than drawables.
-                    // Return null so the caller can use the icon-pack or system fallback.
-                    themeData?.loadPaddedDrawable()?.let { foreground ->
-                        CustomAdaptiveIconDrawable(
-                            themedColors[0].toDrawable(),
-                            foreground.apply { setTint(themedColors[1]) },
-                        )
-                    }
-                }
+                componentName?.let { ThemedIconCompat.getThemedIcon(context, it) }
+                    ?: getThemeDataForPackage(packageName)?.loadPaddedDrawable()
             }
         }
     }
@@ -335,7 +355,7 @@ class LawnchairIconProvider @Inject constructor(
     }
 
     override fun getThemeDataForPackage(packageName: String?): ThemeData? {
-        if (prefs.forceIconMonochrome.firstCached()) {
+        if (!themedIconsEnabled || prefs.forceIconMonochrome.firstCached()) {
             return null
         }
         return themeMap[packageName]
@@ -426,31 +446,23 @@ class LawnchairIconProvider @Inject constructor(
             val newState = themeManager.iconState
             if (iconState != newState) iconState = newState
 
-            // Show overlay — dismissed when icon updates stop arriving (idle for 500ms).
-            // Do NOT call recreateIfNotScheduled() — it creates a new launcher that takes
-            // 3s to start independently of reloadIfActive(), causing the overlay to dismiss
-            // while the new instance is still loading. reloadIfActive() updates icons in-place.
+            // Mark switch pending + in-progress. If the launcher is currently visible, show the
+            // loading overlay immediately; if paused in Settings, LawnchairLauncher.onResume()
+            // will display it on return home and dismiss only once finishBindingItems() completes.
             LawnchairLauncher.iconPackSwitchPending = true
-            LawnchairLauncher.instance?.showIconPackSwitchOverlay()
+            LawnchairLauncher.iconPackReloadInProgress = true
+            LawnchairLauncher.instance?.showIconPackSwitchOverlayIfVisible()
+            RecentsModel.INSTANCE.get(context).onThemeChanged()
 
             Executors.MODEL_EXECUTOR.execute {
                 updateSystemState()
                 val appState = LauncherAppState.getInstance(context)
-                appState.iconCache.clearMemoryCache()
-                // Release all cached per-app Resources objects before the reload begins.
-                // Without this, the old pack's Resources stay alive while the new pack's
-                // Resources are loaded, doubling the .apk mmap footprint during the
-                // transition window (visible as a spike in Assets count and .apk mmap).
+                val idp = InvariantDeviceProfile.INSTANCE.get(context)
                 ThemedIconCompat.clearResourcesCache()
                 LauncherIcons.clearPool(context)
-                appState.model.reloadIfActive()
-                // Signal idle timer to start. If the launcher is active (foreground),
-                // this starts the 600ms countdown. If it's paused (user in Settings),
-                // the timer call is a no-op — onResume() will start it when the user
-                // returns, guaranteeing the overlay stays until icons are fully updated.
-                Executors.MAIN_EXECUTOR.execute {
-                    LawnchairLauncher.instance?.startIconPackSwitchIdleTimer()
-                }
+                appState.iconCache.clearMemoryCache()
+                appState.iconCache.updateIconParams(idp.fillResIconDpi, idp.iconBitmapSize)
+                appState.model.forceReload()
             }
         }
 

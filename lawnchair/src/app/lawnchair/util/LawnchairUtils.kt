@@ -545,6 +545,9 @@ fun String.toTitleCase(): String = splitToSequence(" ")
  * while both dimensions remain >= [reqWidth] / [reqHeight].
  */
 fun calculateInSampleSize(rawWidth: Int, rawHeight: Int, reqWidth: Int, reqHeight: Int): Int {
+    if (rawWidth <= 0 || rawHeight <= 0 || reqWidth <= 0 || reqHeight <= 0) {
+        return 1
+    }
     var inSampleSize = 1
     if (rawHeight > reqHeight || rawWidth > reqWidth) {
         val halfHeight = rawHeight / 2

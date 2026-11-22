@@ -114,7 +114,7 @@ sealed class IconCornerShape {
 
                 when (position) {
                     Position.BottomLeft -> newOffsetX += paddingX
-                    Position.BottomRight -> path.rMoveTo(-paddingX, 0f)
+                    Position.BottomRight -> path.setLastPoint(offsetX + size.x - paddingX, offsetY)
                     Position.TopLeft -> path.setLastPoint(paddingX + offsetX, size.y + offsetY)
                     Position.TopRight -> newOffsetX -= paddingX
                 }
@@ -165,6 +165,8 @@ sealed class IconCornerShape {
 
         override val controlDistanceX: Float = 0.4431717f
         override val controlDistanceY: Float = 0.14010102f
+
+        override fun toString(): String = "sammy"
     }
 
     open class Arc : BaseBezierPath() {

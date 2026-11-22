@@ -20,6 +20,7 @@
 package app.lawnchair.icons.shape
 
 import android.content.Context
+import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Region
@@ -117,8 +118,12 @@ sealed class IconShape {
         fun findNearestShape(): CornerBased {
             val size = 200
             val clip = Region(0, 0, size, size)
+            // iconMask is in a 100x100 viewport; scale it to match the 200x200 candidate shapes.
+            val scaledMask = Path(iconMask).apply {
+                transform(Matrix().apply { setScale(size / 100f, size / 100f) })
+            }
             val iconR = Region().apply {
-                setPath(iconMask, clip)
+                setPath(scaledMask, clip)
             }
             val shapePath = Path()
             val shapeR = Region()
@@ -368,11 +373,16 @@ sealed class IconShape {
         1f,
     )
 
-    object Teardrop : SimpleCornerBased(
-        key = "teardrop",
-        IconCornerShape.arc,
-        .3f,
-    )
+    object Teardrop :
+        CornerBased(
+            key = "teardrop",
+            IconCornerShape.arc,
+            IconCornerShape.arc,
+            IconCornerShape.arc,
+            IconCornerShape.arc,
+            1f, 1f, 1f, .3f,
+        ),
+        DefaultShapes
 
     object Cylinder : SimpleCornerBased(
         key = "cylinder",
@@ -471,7 +481,7 @@ sealed class IconShape {
 
     object Leaf : PathBased(
         key = "leaf",
-        svgPathString = "M-0.06,0.07h67.37C85.36,0.07,100,14.71,100,32.76v67.37H32.63c-18.06,0-32.69-14.64-32.69-32.69L-0.06,0.07z",
+        svgPathString = "M0,0H67.31C85.36,0,100,14.64,100,32.69V100H32.69C14.64,100,0,85.36,0,67.31V0Z",
     )
 
     object Meow : PathBased(

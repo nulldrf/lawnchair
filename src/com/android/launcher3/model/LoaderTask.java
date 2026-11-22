@@ -73,8 +73,8 @@ import com.android.launcher3.icons.CacheableShortcutInfo;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.icons.cache.CachedObject;
 import com.android.launcher3.icons.cache.CachedObjectCachingLogic;
+import app.lawnchair.LawnchairActivityCachingLogic;
 import com.android.launcher3.icons.cache.IconCacheUpdateHandler;
-import com.android.launcher3.icons.cache.LauncherActivityCachingLogic;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.LoaderCursor.LoaderCursorFactory;
 import com.android.launcher3.model.data.AppInfo;
@@ -322,7 +322,7 @@ public class LoaderTask implements Runnable {
         IconCacheUpdateHandler updateHandler = mIconCache.getUpdateHandler();
         setIgnorePackages(updateHandler);
         updateHandler.updateIcons(allActivityList,
-                LauncherActivityCachingLogic.INSTANCE,
+                LawnchairActivityCachingLogic.INSTANCE.get(mContext),
                 mModel::onPackageIconsUpdated);
         logASplit("update AllApps icon cache finished");
 

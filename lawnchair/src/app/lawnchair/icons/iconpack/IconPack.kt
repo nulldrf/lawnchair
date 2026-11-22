@@ -21,6 +21,7 @@ sealed class IconPack(
     protected val context: Context,
     val packPackageName: String,
 ) {
+    @Volatile
     private var waiter: Semaphore? = Semaphore(0)
     private lateinit var deferredLoad: Deferred<Unit>
 
@@ -30,9 +31,13 @@ sealed class IconPack(
 
     protected fun startLoad() {
         deferredLoad = scope.async(Dispatchers.IO) {
-            loadInternal()
-            waiter?.release()
-            waiter = null
+            try {
+                loadInternal()
+            } finally {
+                val sem = waiter
+                waiter = null
+                sem?.release()
+            }
         }
     }
 

@@ -66,11 +66,16 @@ class ReloadHelper(private val context: Context) {
 
     /**
      * Clears the recents thumbnail + icon cache and pool, updates icon params, and forces a full
-     * model reload (used by icon pack and themed icon switches).
+     * model reload (used by themed icon switches).
      */
     fun reloadIconsFull() {
+        LawnchairLauncher.iconPackSwitchPending = true
+        LawnchairLauncher.iconPackReloadInProgress = true
+        LawnchairLauncher.instance?.showIconPackSwitchOverlayIfVisible()
         recentsModel.onThemeChanged()
         Executors.MODEL_EXECUTOR.execute {
+            las.iconProvider.updateSystemState()
+            app.lawnchair.icons.ThemedIconCompat.clearResourcesCache()
             LauncherIcons.clearPool(context)
             las.iconCache.clearMemoryCache()
             las.iconCache.updateIconParams(idp.fillResIconDpi, idp.iconBitmapSize)

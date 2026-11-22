@@ -57,4 +57,8 @@ class WallpaperViewModel(application: Application) : AndroidViewModel(applicatio
         wallpaperManagerCompat.service.updateWallpaperRank(wallpaper)
         loadTopWallpapers()
     }
+
+    fun cleanup() {
+        wallpaperManagerCompat.removeOnChangeListener(listener)
+    }
 }

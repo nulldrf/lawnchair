@@ -1160,16 +1160,15 @@ class PreferenceManager2 @Inject constructor(
     // Migrated legacy PreferenceManager keys (86 keys)
     // -----------------------------------------------------------------------
 
+    // Reload handled by LawnchairIconProvider.IconPackChangeReceiver (single serialized reload + loading overlay).
     val iconPackPackage = preference(
         key = stringPreferencesKey(name = "icon_pack_package"),
         defaultValue = "",
-        onSet = { reloadHelper.reloadIconsFull() },
     )
 
     val themedIconPackPackage = preference(
         key = stringPreferencesKey(name = "themed_icon_pack_package"),
         defaultValue = "",
-        onSet = { reloadHelper.reloadIconsFull() },
     )
 
     val allowRotation = preference(

@@ -48,6 +48,8 @@ class IconPackProvider @Inject constructor(
      * it is cached to prevent repeated failed construction attempts and is subject to the same
      * LRU eviction as a successful entry.
      */
+    private val iconPacksLock = Any()
+
     private val iconPacks: MutableMap<String, IconPack?> = object : LinkedHashMap<String, IconPack?>(
         MAX_CACHED_ICON_PACKS + 1,
         0.75f,
@@ -67,12 +69,20 @@ class IconPackProvider @Inject constructor(
         if (packageName.isEmpty()) {
             return null
         }
-        return iconPacks.getOrPut(packageName) {
-            try {
-                CustomIconPack(context, packageName)
-            } catch (_: PackageManager.NameNotFoundException) {
-                null
+        // LinkedHashMap(accessOrder = true) mutates its internal linked list even on get(),
+        // so concurrent access from MODEL_EXECUTOR and Dispatchers.IO must be synchronized.
+        synchronized(iconPacksLock) {
+            if (iconPacks.containsKey(packageName)) {
+                return iconPacks[packageName]
             }
+        }
+        val created = try {
+            CustomIconPack(context, packageName)
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
+        }
+        synchronized(iconPacksLock) {
+            return iconPacks.getOrPut(packageName) { created }
         }
     }
 
@@ -118,7 +128,9 @@ class IconPackProvider @Inject constructor(
      * meaning APK pages were never explicitly released at shutdown.
      */
     override fun close() {
-        iconPacks.clear()
+        synchronized(iconPacksLock) {
+            iconPacks.clear()
+        }
     }
 
     companion object {
@@ -128,12 +140,10 @@ class IconPackProvider @Inject constructor(
         /**
          * Maximum number of [IconPack] instances kept in the LRU cache.
          *
-         * Two slots cover the two packs that [LawnchairIconProvider] accesses simultaneously:
-         * the active icon pack ([iconPackPref]) and the themed icon source
-         * ([themedIconSourcePref]). Packs beyond this count are evicted and their APK
-         * mappings freed, preventing the 150–400 MB .apk mmap accumulation seen when a
-         * user browses multiple icon packs in a single session.
+         * Four slots cover the active icon pack, themed icon source, and up to two per-app
+         * override packs without thrashing during full icon reloads while still capping mmap
+         * footprint when browsing many packs in the picker.
          */
-        private const val MAX_CACHED_ICON_PACKS = 2
+        private const val MAX_CACHED_ICON_PACKS = 4
     }
 }

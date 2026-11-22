@@ -23,6 +23,7 @@ import android.content.Intent
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Pair
 import android.view.Display
 import android.view.View
@@ -78,6 +79,7 @@ import com.android.launcher3.uioverrides.states.BackgroundAppState
 import com.android.launcher3.uioverrides.states.OverviewState
 import com.android.launcher3.util.ActivityOptionsWrapper
 import com.android.launcher3.util.Executors
+import com.android.launcher3.util.IntSet
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SystemUiController.UI_STATE_BASE_WINDOW
 import com.android.launcher3.util.Themes
@@ -496,13 +498,16 @@ class LawnchairLauncher : QuickstepLauncher() {
         // differs, so this is a no-op on normal resumes.
         themeProvider.reseedSystemAccentIfChanged()
 
-        // If an icon pack switch happened while in background, show overlay now.
-        // We also start the idle timer here — the timer from LawnchairIconProvider
-        // may have already fired against a null/paused instance and been lost.
-        // Starting it fresh in onResume ensures it runs against the live dragLayer.
+        // If an icon pack / themed icons switch happened while in Settings (or is still
+        // binding on return home), show the loading overlay immediately without a fade-in
+        // delay so old/half-bound icons never flash through. Dismiss only after workspace
+        // binding completes (plus a brief settle + minimum visible duration) or safety timeout.
         if (iconPackSwitchPending) {
-            showIconPackSwitchOverlay()
-            startIconPackSwitchIdleTimer()
+            showIconPackSwitchOverlay(immediate = true)
+            scheduleIconPackOverlaySafetyTimeout()
+            if (!iconPackReloadInProgress) {
+                scheduleIconPackOverlayDismiss()
+            }
         }
 
         dragLayer.viewTreeObserver.addOnDrawListener(
@@ -519,6 +524,19 @@ class LawnchairLauncher : QuickstepLauncher() {
                 }
             },
         )
+    }
+
+    override fun finishBindingItems(pagesBoundFirst: IntSet?) {
+        super.finishBindingItems(pagesBoundFirst)
+        if (!iconPackReloadInProgress && !iconPackSwitchPending) return
+        iconPackReloadInProgress = false
+        // Only start the dismiss countdown if the launcher is currently visible with the
+        // overlay up. If binding finished while the user is still in Settings, keep
+        // iconPackSwitchPending = true so onResume() displays the brief loading animation
+        // when returning home (Lawnchair 9 style).
+        if (hasBeenResumed() && iconPackOverlay != null) {
+            scheduleIconPackOverlayDismiss()
+        }
     }
 
     override fun onStop() {
@@ -543,6 +561,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         // active launcher; clearing it from a stale stopping activity would prevent the
         // new launcher from showing its overlay.
         dragLayer.removeCallbacks(iconPackIdleRunnable)
+        dragLayer.removeCallbacks(iconPackSafetyRunnable)
         iconPackOverlay?.let { overlay ->
             overlay.animate().cancel()
             dragLayer.removeView(overlay)
@@ -562,6 +581,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         // between onStop() and onDestroy(). Primary cleanup happens in onStop() above.
         dragLayer.removeCallbacks(recreateDebounceRunnable)
         dragLayer.removeCallbacks(iconPackIdleRunnable)
+        dragLayer.removeCallbacks(iconPackSafetyRunnable)
         iconPackOverlay?.let { overlay ->
             overlay.animate().cancel()
             dragLayer.removeView(overlay)
@@ -578,13 +598,34 @@ class LawnchairLauncher : QuickstepLauncher() {
     // ── Icon pack switch loading overlay ──────────────────────────────────
 
     private var iconPackOverlay: View? = null
+    private var iconPackOverlayShownAt = 0L
     private val iconPackIdleRunnable = Runnable { dismissIconPackSwitchOverlay() }
-    private val iconPackIdleDelayMs = 600L
+    private val iconPackSafetyRunnable = Runnable {
+        iconPackReloadInProgress = false
+        dismissIconPackSwitchOverlay()
+    }
 
-    fun showIconPackSwitchOverlay() {
-        // Guard: dragLayer must be attached and visible before we can add views.
+    /**
+     * Shows the icon pack loading overlay only when the launcher is actively resumed and
+     * visible. Safe to invoke from any thread (dispatches to the main thread). When the
+     * launcher is paused (e.g. user is in Settings), this is a no-op and [onResume] will
+     * display the overlay on return home.
+     */
+    fun showIconPackSwitchOverlayIfVisible() {
+        Executors.MAIN_EXECUTOR.execute {
+            if (isDestroyed || !hasBeenResumed() || !dragLayer.isAttachedToWindow) return@execute
+            showIconPackSwitchOverlay(immediate = false)
+            scheduleIconPackOverlaySafetyTimeout()
+        }
+    }
+
+    fun showIconPackSwitchOverlay(immediate: Boolean = false) {
+        // Guard: dragLayer must be attached before we can add views.
         // If the launcher is paused/stopped, skip — onResume() will show it later.
         if (!dragLayer.isAttachedToWindow) return
+
+        dragLayer.removeCallbacks(iconPackIdleRunnable)
+        iconPackOverlayShownAt = SystemClock.uptimeMillis()
 
         val existing = iconPackOverlay
         if (existing != null) {
@@ -608,42 +649,51 @@ class LawnchairLauncher : QuickstepLauncher() {
 
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.argb(160, 0, 0, 0))
+            isClickable = true
+            isFocusable = true
         }
         scrim.addView(indicator, FrameLayout.LayoutParams(indicatorSize, indicatorSize).apply {
             gravity = android.view.Gravity.CENTER
         })
-        scrim.alpha = 0f
         dragLayer.addView(scrim, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT,
         ))
-        scrim.animate().alpha(1f).setDuration(200).start()
+        if (immediate) {
+            scrim.alpha = 1f
+        } else {
+            scrim.alpha = 0f
+            scrim.animate().alpha(1f).setDuration(150).start()
+        }
         iconPackOverlay = scrim
     }
 
-    /**
-     * Starts or resets the 600ms idle timer. When no further call arrives for 600ms,
-     * the overlay is dismissed — meaning all visible icon updates have completed.
-     * Also clears [iconPackSwitchPending] so that if the launcher is recreated or
-     * resumed after dismiss, it does not show a stale overlay.
-     */
-    fun startIconPackSwitchIdleTimer() {
-        // Only run if the overlay is actually showing. If the launcher was in the
-        // background when this was called, the overlay may not exist yet — onResume()
-        // will show it and call startIconPackSwitchIdleTimer() again.
+    private fun scheduleIconPackOverlaySafetyTimeout() {
+        dragLayer.removeCallbacks(iconPackSafetyRunnable)
+        dragLayer.postDelayed(iconPackSafetyRunnable, MAX_OVERLAY_TIMEOUT_MS)
+    }
+
+    private fun scheduleIconPackOverlayDismiss() {
         if (iconPackOverlay == null && !iconPackSwitchPending) return
+        val elapsed = SystemClock.uptimeMillis() - iconPackOverlayShownAt
+        val minRemaining = (MIN_OVERLAY_VISIBLE_MS - elapsed).coerceAtLeast(0L)
+        val delay = maxOf(SETTLE_AFTER_BIND_MS, minRemaining)
         dragLayer.removeCallbacks(iconPackIdleRunnable)
-        dragLayer.postDelayed(iconPackIdleRunnable, iconPackIdleDelayMs)
+        dragLayer.postDelayed(iconPackIdleRunnable, delay)
     }
 
     fun dismissIconPackSwitchOverlay() {
         dragLayer.removeCallbacks(iconPackIdleRunnable)
+        dragLayer.removeCallbacks(iconPackSafetyRunnable)
         // Only clear the static companion flag if this activity is still alive.
-        // If this is called from a stale iconPackIdleRunnable that fired after
-        // onDestroy() (e.g. the activity was recreated by a theme change while the
-        // 600ms timer was running), clearing the flag would prevent the new activity
-        // from seeing iconPackSwitchPending=true in onResume() and skipping its overlay.
-        if (!isDestroyed) iconPackSwitchPending = false
+        // If this is called from a stale runnable that fired after onDestroy()
+        // (e.g. the activity was recreated by a theme change), clearing the flag
+        // would prevent the new activity from seeing iconPackSwitchPending=true
+        // in onResume() and skipping its overlay.
+        if (!isDestroyed) {
+            iconPackSwitchPending = false
+            iconPackReloadInProgress = false
+        }
         val overlay = iconPackOverlay ?: return
         // Do NOT null iconPackOverlay here. Nulling before the animation ends creates
         // a 300ms window where showIconPackSwitchOverlay() sees null and adds a second
@@ -710,10 +760,15 @@ class LawnchairLauncher : QuickstepLauncher() {
          * icon pack switch; this collapses them into one recreate.
          */
         private const val RECREATE_DEBOUNCE_MS = 150L
+        private const val MIN_OVERLAY_VISIBLE_MS = 450L
+        private const val SETTLE_AFTER_BIND_MS = 200L
+        private const val MAX_OVERLAY_TIMEOUT_MS = 4_000L
 
         var sRestartFlags = 0
 
         @Volatile var iconPackSwitchPending = false
+
+        @Volatile var iconPackReloadInProgress = false
 
         val instance get() = LawnchairApp.launcher
     }

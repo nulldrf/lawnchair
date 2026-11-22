@@ -27,7 +27,6 @@ import java.util.List;
 
 import com.hoko.blur.HokoBlur;
 import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.util.FileAccessManager;
 import app.lawnchair.util.FileAccessState;
@@ -51,21 +50,20 @@ public class LauncherRootView extends InsettableFrameLayout {
     private final SysUiScrim mSysUiScrim;
     private final boolean mEnableTaskbarOnPhone;
 
-    private final PreferenceManager pref;
+    private final PreferenceManager2 prefs2;
 
     public LauncherRootView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mStatefulContainer = ActivityContext.lookupContext(context);
         mSysUiScrim = new SysUiScrim(this);
 
-        pref = PreferenceManager.getInstance(context);
-        PreferenceManager2 prefs2 = PreferenceManager2.getInstance(context);
+        prefs2 = PreferenceManager2.getInstance(context);
         
         mEnableTaskbarOnPhone = PreferenceCacheExtensionsKt.firstCached(prefs2.getEnableTaskbarOnPhone());
 
         FileAccessManager fileAccessManager = FileAccessManager.getInstance(context);
         FileAccessState wallpaperAccessState = fileAccessManager.getWallpaperAccessState().getValue();
-        if (pref.getEnableWallpaperBlur().get() && wallpaperAccessState != FileAccessState.Denied.INSTANCE) {
+        if (PreferenceCacheExtensionsKt.firstCached(prefs2.getEnableWallpaperBlur()) && wallpaperAccessState != FileAccessState.Denied.INSTANCE) {
             setUpBlur(context);
         }
     }
@@ -94,8 +92,8 @@ public class LauncherRootView extends InsettableFrameLayout {
         Bitmap blurredBitmap = HokoBlur.with(context)
                 .forceCopy(true)
                 .scheme(HokoBlur.SCHEME_OPENGL)
-                .sampleFactor(pref.getWallpaperBlurFactorThreshold().get())
-                .radius(pref.getWallpaperBlur().get())
+                .sampleFactor(PreferenceCacheExtensionsKt.firstCached(prefs2.getWallpaperBlurFactorThreshold()))
+                .radius(PreferenceCacheExtensionsKt.firstCached(prefs2.getWallpaperBlur()))
                 .blur(originalBitmap);
 
         setBackground(new BitmapDrawable(getContext().getResources(), blurredBitmap));

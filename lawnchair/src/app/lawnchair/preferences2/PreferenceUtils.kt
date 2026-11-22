@@ -13,10 +13,14 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 @Composable
-fun <C, S> Preference<C, S, *>.asState() = get().collectAsStateWithLifecycle(initialValue = firstBlocking())
+fun <C, S> Preference<C, S, *>.asState() = if (this is PreferenceImpl<C, S>) {
+    get().collectAsStateWithLifecycle(initialValue = firstCached())
+} else {
+    get().collectAsStateWithLifecycle(initialValue = firstBlocking())
+}
 
 @Composable
-fun <C, S> PreferenceImpl<C, S>.asState() = get().collectAsStateWithLifecycle(initialValue = firstCached(preferenceManager2()))
+fun <C, S> PreferenceImpl<C, S>.asState() = get().collectAsStateWithLifecycle(initialValue = firstCached())
 
 fun <C, S> PreferenceImpl<C, S>.subscribeBlocking(
     prefs2: PreferenceManager2,
@@ -36,5 +40,15 @@ fun <C, S> Preference<C, S, *>.subscribeBlocking(
     scope: CoroutineScope,
     block: (C) -> Unit,
 ) {
-    get().subscribeBlocking(scope, block)
+    if (this is PreferenceImpl<C, S>) {
+        val initial = firstCached()
+        block(initial)
+        get()
+            .distinctUntilChanged()
+            .dropWhile { it == initial }
+            .onEach { block(it) }
+            .launchIn(scope = scope)
+    } else {
+        get().subscribeBlocking(scope, block)
+    }
 }

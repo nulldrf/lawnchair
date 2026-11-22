@@ -36,7 +36,8 @@ import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.util.ApiWrapper;
 
-import app.lawnchair.preferences.PreferenceManager;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
+import app.lawnchair.preferences2.PreferenceManager2;
 
 /**
  * Represents an ItemInfo which also holds an icon.
@@ -322,7 +323,8 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
      * Returns a FastBitmapDrawable with the icon.
      */
     public FastBitmapDrawable newIcon(Context context) {
-        var shouldTheme = PreferenceManager.getInstance(context).getThemedIcons().get();
+        var shouldTheme = PreferenceCacheExtensionsKt.firstCached(
+                PreferenceManager2.getInstance(context).getThemedIcons());
         // Use 0 (not FLAG_NO_BADGE) when theming is off so work/clone profile badges still draw.
         return newIcon(context, shouldTheme ? FLAG_THEMED : 0);
     }
@@ -331,7 +333,8 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
      * Returns a FastBitmapDrawable with the icon and context theme applied
      */
     public FastBitmapDrawable newIcon(Context context, @DrawableCreationFlags int creationFlags) {
-        var shouldTheme = PreferenceManager.getInstance(context).getThemedIcons().get();
+        var shouldTheme = PreferenceCacheExtensionsKt.firstCached(
+                PreferenceManager2.getInstance(context).getThemedIcons());
         return newIcon(context, creationFlags, shouldTheme);
     }
 

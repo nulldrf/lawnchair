@@ -31,7 +31,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.PermissionDialog
 import app.lawnchair.ui.preferences.components.controls.MainSwitchPreference
@@ -72,11 +71,10 @@ fun FileSearchProvider(
     modifier: Modifier = Modifier,
     viewModel: FileSearchProviderViewModel = viewModel(),
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
     val appName = stringResource(id = R.string.derived_app_name)
 
-    val mainAdapter = prefs.searchResultFilesToggle.getAdapter()
+    val mainAdapter = prefs2.searchResultFilesToggle.getAdapter()
     val hasAnyPermissions by viewModel.hasAnyPermissions.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
@@ -99,7 +97,7 @@ fun FileSearchProvider(
         heading = stringResource(R.string.search_pref_files_search_on),
     ) {
         val allFilesAccessState by viewModel.allFilesAccessState.collectAsStateWithLifecycle()
-        val allFilesAccessAdapter = prefs.searchResultAllFiles.getAdapter()
+        val allFilesAccessAdapter = prefs2.searchResultAllFiles.getAdapter()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             ManageExternalStorageSetting(
@@ -125,12 +123,12 @@ fun FileSearchProvider(
 
             VisualMediaSetting(
                 accessState = visualMediaAccessState,
-                adapter = prefs.searchResultVisualMedia.getAdapter(),
+                adapter = prefs2.searchResultVisualMedia.getAdapter(),
                 onPermissionRequest = viewModel::refreshAccessStates,
                 alwaysEnabled = allFilesAccessAdapter.state.value && allFilesAccessState == FileAccessState.Full,
             )
             GenericAccessSetting(
-                adapter = prefs.searchResultAudio.getAdapter(),
+                adapter = prefs2.searchResultAudio.getAdapter(),
                 requiredPermission = android.Manifest.permission.READ_MEDIA_AUDIO,
                 switchEnabled = { audioAccessState != FileAccessState.Denied },
                 label = stringResource(R.string.search_pref_result_audio_media_title),

@@ -21,7 +21,9 @@ import app.lawnchair.LawnchairLauncher
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.graphics.ThemeManager
+import com.android.launcher3.icons.LauncherIcons
 import com.android.launcher3.util.Executors
+import com.android.quickstep.RecentsModel
 import com.android.quickstep.TouchInteractionService
 import com.android.quickstep.util.TISBindHelper
 
@@ -29,13 +31,17 @@ class ReloadHelper(private val context: Context) {
 
     private val idp: InvariantDeviceProfile
         get() = InvariantDeviceProfile.INSTANCE.get(context)
+    private val recentsModel: RecentsModel
+        get() = RecentsModel.INSTANCE.get(context)
+    private val las: LauncherAppState
+        get() = LauncherAppState.INSTANCE.get(context)
     private var tis: TouchInteractionService.TISBinder? = null
     private val tisBinder = TISBindHelper(context) { tis = it }
 
     fun reloadGrid() {
-        // The grid reads the preferences from the cache of PreferenceManager2, which may not have
-        // the value just set yet.
-        PreferenceManager2.getInstance(context).withFreshCache { idp.onPreferencesChanged(context) }
+        // CachedPreferencesDataStore updates in-memory state synchronously before onSet runs,
+        // so the grid immediately sees every preference value written so far.
+        idp.onPreferencesChanged(context)
     }
 
     fun recreate() {
@@ -53,8 +59,22 @@ class ReloadHelper(private val context: Context) {
      */
     fun reloadIcons() {
         Executors.MODEL_EXECUTOR.execute {
-            LauncherAppState.INSTANCE.get(context).iconCache.clearMemoryCache()
-            LauncherAppState.INSTANCE.get(context).model.reloadIfActive()
+            las.iconCache.clearMemoryCache()
+            las.model.reloadIfActive()
+        }
+    }
+
+    /**
+     * Clears the recents thumbnail + icon cache and pool, updates icon params, and forces a full
+     * model reload (used by icon pack and themed icon switches).
+     */
+    fun reloadIconsFull() {
+        recentsModel.onThemeChanged()
+        Executors.MODEL_EXECUTOR.execute {
+            LauncherIcons.clearPool(context)
+            las.iconCache.clearMemoryCache()
+            las.iconCache.updateIconParams(idp.fillResIconDpi, idp.iconBitmapSize)
+            las.model.forceReload()
         }
     }
 

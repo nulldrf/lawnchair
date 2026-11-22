@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import android.util.Log
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.algorithms.data.ContactInfo
@@ -28,11 +27,10 @@ object ContactsSearchProvider : SearchProvider, SearchPermission {
         context: Context,
         query: String,
     ): Flow<List<SearchResult>> = flow {
-        val prefs = PreferenceManager.getInstance(context)
         val prefs2 = PreferenceManager2.getInstance(context)
 
         val permissionsGranted = checkPermission(context)
-        if (query.isBlank() || !prefs.searchResultPeople.get() || !permissionsGranted) {
+        if (query.isBlank() || !prefs2.searchResultPeople.firstCached() || !permissionsGranted) {
             emit(emptyList())
             return@flow
         }

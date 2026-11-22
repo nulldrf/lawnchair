@@ -37,7 +37,6 @@ import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.views.ActivityContext;
 
 import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.theme.color.ColorMode;
 import app.lawnchair.theme.color.tokens.ColorTokens;
@@ -97,7 +96,8 @@ public class Themes {
      * Returns true if workspace icon theming is enabled
      */
     public static boolean isThemedIconEnabled(Context context) {
-        return PreferenceManager.getInstance(context).getThemedIcons().get();
+        return PreferenceCacheExtensionsKt.firstCached(
+                PreferenceManager2.getInstance(context).getThemedIcons());
     }
 
     public static String getDefaultBodyFont(Context context) {

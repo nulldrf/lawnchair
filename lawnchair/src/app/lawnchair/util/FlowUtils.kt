@@ -9,10 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import app.lawnchair.LawnchairApp
 import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached as firstCachedPref
 import com.patrykmichalik.opto.core.PreferenceImpl
-import com.patrykmichalik.opto.core.getFromPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -34,8 +33,8 @@ fun <T> Flow<T>.firstBlocking() = runBlocking { first() }
 fun <T> Flow<T>.collectAsStateBlocking() = collectAsStateWithLifecycle(initialValue = firstBlocking())
 
 fun <C, S> PreferenceImpl<C, S>.firstCached(
-    prefs2: PreferenceManager2 = PreferenceManager2.getInstance(LawnchairApp.instance),
-): C = getFromPreferences(prefs2.getCachedPreferences())
+    prefs2: PreferenceManager2? = null,
+): C = firstCachedPref(prefs2)
 
 fun broadcastReceiverFlow(context: Context, filter: IntentFilter) = callbackFlow {
     val receiver = object : BroadcastReceiver() {

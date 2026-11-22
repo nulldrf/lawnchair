@@ -51,7 +51,6 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 import app.lawnchair.LawnchairApp;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 
 /**

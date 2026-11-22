@@ -17,7 +17,6 @@
 package app.lawnchair.preferences
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -29,8 +28,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences2.IdpPreference
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.firstCached
-import app.lawnchair.preferences2.preferenceManager2
 import com.android.launcher3.InvariantDeviceProfile
+import com.patrykmichalik.opto.core.PreferenceImpl
 import com.patrykmichalik.opto.domain.Preference
 import kotlin.reflect.KProperty
 import kotlinx.coroutines.launch
@@ -55,24 +54,6 @@ private class MutableStatePreferenceAdapter<T>(
     }
 }
 
-class PreferenceAdapterImpl<T>(
-    private val get: () -> T,
-    private val set: (T) -> Unit,
-) : PreferenceAdapter<T>,
-    PreferenceChangeListener {
-    private val stateInternal = mutableStateOf(get())
-    override val state: State<T> get() = stateInternal
-
-    override fun onChange(newValue: T) {
-        set(newValue)
-        stateInternal.value = newValue
-    }
-
-    override fun onPreferenceChange() {
-        stateInternal.value = get()
-    }
-}
-
 private class StatePreferenceAdapter<T>(
     override val state: State<T>,
     private val set: (T) -> Unit,
@@ -84,38 +65,8 @@ private class StatePreferenceAdapter<T>(
 }
 
 @Composable
-fun BasePreferenceManager.IdpIntPref.getAdapter(): PreferenceAdapter<Int> {
-    val context = LocalContext.current
-    val idp = remember { InvariantDeviceProfile.INSTANCE.get(context) }
-    val defaultGrid = idp.closestProfile
-    return getAdapter(
-        this,
-        { get(defaultGrid) },
-        { newValue -> set(newValue, defaultGrid) },
-    )
-}
-
-@Composable
-fun <T> PrefEntry<T>.getAdapter() = getAdapter(this, ::get, ::set)
-
-@Composable
-fun <T> PrefEntry<T>.getState() = getAdapter().state
-
-@Composable
-fun <T> PrefEntry<T>.observeAsState() = getAdapter().state
-
-@Composable
-private fun <P, T> getAdapter(
-    pref: PrefEntry<P>,
-    get: () -> T,
-    set: (T) -> Unit,
-): PreferenceAdapter<T> {
-    val adapter = remember { PreferenceAdapterImpl(get, set) }
-    DisposableEffect(pref) {
-        pref.addListener(adapter)
-        onDispose { pref.removeListener(adapter) }
-    }
-    return adapter
+fun <C, S> PreferenceImpl<C, S>.getAdapter(): PreferenceAdapter<C> {
+    return createStateAdapter(state = asState(), set = this::set)
 }
 
 @Composable
@@ -128,8 +79,7 @@ fun IdpPreference.getAdapter(): PreferenceAdapter<Int> {
     val context = LocalContext.current
     val idp = remember { InvariantDeviceProfile.INSTANCE.get(context) }
     val defaultGrid = idp.closestProfile
-    val prefs2 = preferenceManager2()
-    val state = get(defaultGrid).collectAsStateWithLifecycle(initialValue = firstCached(defaultGrid, prefs2))
+    val state = get(defaultGrid).collectAsStateWithLifecycle(initialValue = firstCached(defaultGrid))
     return createStateAdapter(state = state, set = { set(it, defaultGrid) })
 }
 

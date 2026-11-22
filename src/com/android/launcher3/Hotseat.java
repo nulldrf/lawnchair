@@ -62,7 +62,6 @@ import app.lawnchair.hotseat.DisabledHotseat;
 import app.lawnchair.hotseat.HotseatMode;
 import app.lawnchair.hotseat.HotseatPagedView;
 import app.lawnchair.hotseat.LawnchairHotseat;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
 import app.lawnchair.preferences2.PreferenceManager2;
 
@@ -118,7 +117,6 @@ public class Hotseat extends FrameLayout implements Insettable {
     private final ActivityContext mActivity;
 
     PreferenceManager2 preferenceManager2;
-    PreferenceManager preferenceManager;
 
     public Hotseat(Context context) {
         this(context, null);
@@ -133,7 +131,6 @@ public class Hotseat extends FrameLayout implements Insettable {
         mActivity = ActivityContext.lookupContext(context);
 
         preferenceManager2 = PreferenceManager2.getInstance(context);
-        preferenceManager = PreferenceManager.getInstance(context);
         HotseatMode hotseatMode = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatMode());
         var hotseatEnabled = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.isHotseatEnabled());
 
@@ -202,17 +199,17 @@ public class Hotseat extends FrameLayout implements Insettable {
     }
 
     private void setUpBackground() {
-        if(!preferenceManager.getHotseatBG().get()) return;
+        if (!PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBG())) return;
 
         var bgColor = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBackgroundColor());
-        var transparency = preferenceManager.getHotseatBGAlpha().get();
+        var transparency = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBGAlpha());
         var alphaValue = (transparency * 255) / 100;
         var baseColor = bgColor.getColorPreferenceEntry().getLightColor().invoke(getContext());
         var finalColor = Color.argb(alphaValue, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor));
-        int insetHorizontalLeft = preferenceManager.getHotseatBGHorizontalInsetLeft().get();
-        int insetHorizontalRight = preferenceManager.getHotseatBGHorizontalInsetRight().get();
-        int insetVerticalTop = preferenceManager.getHotseatBGVerticalInsetTop().get();
-        int insetVerticalBottom = preferenceManager.getHotseatBGVerticalInsetBottom().get();
+        int insetHorizontalLeft = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBGHorizontalInsetLeft());
+        int insetHorizontalRight = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBGHorizontalInsetRight());
+        int insetVerticalTop = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBGVerticalInsetTop());
+        int insetVerticalBottom = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBGVerticalInsetBottom());
         float cornerRadiusDp = PreferenceCacheExtensionsKt.firstCached(
                 preferenceManager2.getHotseatBackgroundCornerRadius());
         float cornerRadius = TypedValue.applyDimension(

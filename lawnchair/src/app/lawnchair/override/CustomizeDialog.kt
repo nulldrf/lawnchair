@@ -37,7 +37,6 @@ import app.lawnchair.BlankActivity
 import app.lawnchair.gestures.type.GestureType
 import app.lawnchair.launcher
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.PreferenceActivity
@@ -140,14 +139,13 @@ fun CustomizeAppDialog(
     modifier: Modifier = Modifier,
     onClose: () -> Unit,
 ) {
-    val prefs = preferenceManager()
     val preferenceManager2 = preferenceManager2()
     val showComponentNames by preferenceManager2.showComponentNames.asState()
     val hiddenApps by preferenceManager2.hiddenApps.asState()
     val adapter = preferenceManager2.hiddenApps.getAdapter()
     val context = LocalContext.current
     var title by remember {
-        mutableStateOf(prefs.customAppName[componentKey] ?: defaultTitle)
+        mutableStateOf(preferenceManager2.getCustomAppName(componentKey) ?: defaultTitle)
     }
     val launcherAppState = LauncherAppState.getInstance(context)
 
@@ -169,10 +167,10 @@ fun CustomizeAppDialog(
 
     DisposableEffect(Unit) {
         onDispose {
-            val previousTitle = prefs.customAppName[componentKey]
+            val previousTitle = preferenceManager2.getCustomAppName(componentKey)
             val newTitle = if (title != defaultTitle) title else null
             if (newTitle != previousTitle) {
-                prefs.customAppName[componentKey] = newTitle
+                preferenceManager2.setCustomAppName(componentKey, newTitle)
                 val model = launcherAppState.model
                 model.onAppIconChanged(componentKey.componentName.packageName, componentKey.user)
             }

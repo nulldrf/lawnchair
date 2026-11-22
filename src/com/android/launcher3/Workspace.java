@@ -152,7 +152,6 @@ import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
 import static app.lawnchair.util.LawnchairUtilsKt.toBitmap;
 import app.lawnchair.LawnchairApp;
 import app.lawnchair.LawnchairAppKt;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.smartspace.DoubleShadowTextView;
 import app.lawnchair.smartspace.SmartspaceAppWidgetProvider;
@@ -340,7 +339,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     PreferenceManager2 mPreferenceManager2;
     private PanToMoveController mPanToMoveController;
-    PreferenceManager mPreferenceManger;
     private int mDefaultPage = -1;
 
     /**
@@ -368,7 +366,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         mAllAppsIconSize = mLauncher.getDeviceProfile().getAllAppsProfile().getIconSizePx();
         mPreferenceManager2 = PreferenceManager2.getInstance(context);
         mPanToMoveController = new PanToMoveController(context, this);
-        mPreferenceManger = PreferenceManager.getInstance(context);
         mWallpaperOffset = new WallpaperOffsetInterpolator(this);
 
         setHapticFeedbackEnabled(false);
@@ -1537,7 +1534,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     @Override
     protected boolean canWrapPastEnd(boolean maxEnd) {
-        if (!mPreferenceManger.getInfiniteScrolling().get()) {
+        if (!PreferenceCacheExtensionsKt.firstCached(mPreferenceManager2.getInfiniteScrolling())) {
             return false;
         }
         // LC-Note: The side before the first page belongs to the feed while it is on.

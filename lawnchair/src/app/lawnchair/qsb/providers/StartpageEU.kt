@@ -1,7 +1,8 @@
 package app.lawnchair.qsb.providers
 
 import app.lawnchair.animateToAllApps
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.qsb.ThemingMethod
 import com.android.launcher3.Launcher
 import com.android.launcher3.R
@@ -17,8 +18,8 @@ data object StartpageEU : QsbSearchProvider(
     sponsored = false,
 ) {
     override suspend fun launch(launcher: Launcher, forceWebsite: Boolean) {
-        val prefs = PreferenceManager.getInstance(launcher)
-        val useWebSuggestions = prefs.searchResultStartPageSuggestion.get()
+        val prefs = PreferenceManager2.getInstance(launcher)
+        val useWebSuggestions = prefs.searchResultStartPageSuggestion.firstCached()
 
         if (useWebSuggestions) {
             launcher.animateToAllApps()

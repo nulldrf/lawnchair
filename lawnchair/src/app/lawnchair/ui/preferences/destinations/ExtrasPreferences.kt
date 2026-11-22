@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import app.lawnchair.preferences.observeAsState
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.asState
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
@@ -31,8 +31,8 @@ import com.android.launcher3.R
 fun ExtrasPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
-    val enableDebug by prefs.enableDebugMenu.observeAsState()
+    val prefs = preferenceManager2()
+    val enableDebug by prefs.enableDebugMenu.asState()
     val scrollState = rememberPreferenceScrollState()
     val context = LocalContext.current
 

@@ -28,7 +28,6 @@ import app.lawnchair.hotseat.HotseatMode
 import app.lawnchair.hotseat.LawnchairHotseat
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.qsb.LawnQsbLayout
 import app.lawnchair.qsb.LawnQsbUi
@@ -64,15 +63,14 @@ fun DockSearchPreference(
     modifier: Modifier = Modifier,
     scrollState: PreferenceScrollState = rememberPreferenceScrollState(),
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
     val isHotseatEnabled = prefs2.isHotseatEnabled.getAdapter()
     val hotseatModeAdapter = prefs2.hotseatMode.getAdapter()
     val themeQsbAdapter = prefs2.themedHotseatQsb.getAdapter()
-    val qsbCornerAdapter = prefs.hotseatQsbCornerRadius.getAdapter()
-    val qsbAlphaAdapter = prefs.hotseatQsbAlpha.getAdapter()
-    val qsbHotseatStrokeWidth = prefs.hotseatQsbStrokeWidth.getAdapter()
+    val qsbCornerAdapter = prefs2.hotseatQsbCornerRadius.getAdapter()
+    val qsbAlphaAdapter = prefs2.hotseatQsbAlpha.getAdapter()
+    val qsbHotseatStrokeWidth = prefs2.hotseatQsbStrokeWidth.getAdapter()
     val strokeColorStyleAdapter = prefs2.strokeColorStyle.getAdapter()
     val hotseatQsbProviderAdapter by prefs2.hotseatQsbProvider.getAdapter()
 

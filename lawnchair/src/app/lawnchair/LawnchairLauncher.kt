@@ -42,9 +42,9 @@ import app.lawnchair.gestures.VerticalSwipeTouchController
 import app.lawnchair.gestures.config.GestureHandlerConfig
 import app.lawnchair.gestures.ui.LawnchairShortcutActivity
 import app.lawnchair.nexuslauncher.OverlayCallbackImpl
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
+import app.lawnchair.preferences2.setCached
 import app.lawnchair.root.RootHelperManager
 import app.lawnchair.root.RootNotAvailableException
 import app.lawnchair.theme.ThemeProvider
@@ -94,6 +94,7 @@ import com.patrykmichalik.opto.core.onEach
 import dev.kdrag0n.monet.theme.ColorScheme
 import java.util.stream.Stream
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -101,7 +102,6 @@ import kotlinx.coroutines.launch
 class LawnchairLauncher : QuickstepLauncher() {
 
     private val defaultOverlay by unsafeLazy { OverlayCallbackImpl(this) }
-    private val prefs by unsafeLazy { PreferenceManager.getInstance(this) }
     private val preferenceManager2 by unsafeLazy { PreferenceManager2.getInstance(this) }
     private val insetsController: WindowInsetsControllerCompat by lazy {
         val window = launcher.window
@@ -160,14 +160,18 @@ class LawnchairLauncher : QuickstepLauncher() {
         layoutInflater.factory2 = LawnchairLayoutFactory(this)
         super.onCreate(savedInstanceState)
 
-        prefs.launcherTheme.subscribeChanges(this, ::updateTheme)
-        prefs.feedProvider.subscribeChanges(this, defaultOverlay::reconnect)
+        preferenceManager2.launcherTheme.get().drop(1).distinctUntilChanged().onEach {
+            updateTheme()
+        }.launchIn(scope = lifecycleScope)
+        preferenceManager2.feedProvider.get().drop(1).distinctUntilChanged().onEach {
+            defaultOverlay.reconnect()
+        }.launchIn(scope = lifecycleScope)
         preferenceManager2.enableFeed.get().distinctUntilChanged().onEach { enable ->
             defaultOverlay.setEnableFeed(enable)
         }.launchIn(scope = lifecycleScope)
         launcher.stateManager.addStateListener(clearSearchStateListener)
 
-        if (prefs.autoLaunchRoot.get()) {
+        if (preferenceManager2.autoLaunchRoot.firstCached()) {
             lifecycleScope.launch {
                 try {
                     RootHelperManager.INSTANCE.get(this@LawnchairLauncher)
@@ -203,10 +207,10 @@ class LawnchairLauncher : QuickstepLauncher() {
             }
         }.launchIn(scope = lifecycleScope)
 
-        prefs.overrideWindowCornerRadius.subscribeValues(this) {
+        preferenceManager2.overrideWindowCornerRadius.onEach(launchIn = lifecycleScope) {
             QuickStepContract.sHasCustomCornerRadius = it
         }
-        prefs.windowCornerRadius.subscribeValues(this) {
+        preferenceManager2.windowCornerRadius.onEach(launchIn = lifecycleScope) {
             QuickStepContract.sCustomCornerRadius = it.toFloat()
         }
         preferenceManager2.roundedWidgets.onEach(launchIn = lifecycleScope) {
@@ -225,9 +229,10 @@ class LawnchairLauncher : QuickstepLauncher() {
             LauncherOptionsPopup.migrateLegacyPreferences(launcher)
         }
 
-        if (prefs.themedIcons.get() &&
-            packageManager.getThemedIconPacksInstalled(this).isEmpty()) {
-            prefs.themedIcons.set(newValue = false)
+        if (preferenceManager2.themedIcons.firstCached() &&
+            packageManager.getThemedIconPacksInstalled(this).isEmpty()
+        ) {
+            preferenceManager2.themedIcons.setCached(false)
         }
 
         colorScheme = themeProvider.colorScheme
@@ -331,7 +336,7 @@ class LawnchairLauncher : QuickstepLauncher() {
     }
 
     override fun handleGestureContract(intent: Intent) {
-        if (!LawnchairApp.isRecentsEnabled && prefs.enableGnc.get()) {
+        if (!LawnchairApp.isRecentsEnabled && preferenceManager2.enableGnc.firstCached()) {
             val gnc = GestureNavContract.fromIntent(intent)
             if (gnc != null) {
                 AbstractFloatingView.closeOpenViews(

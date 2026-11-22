@@ -17,9 +17,13 @@
 package app.lawnchair.preferences2
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -39,7 +43,6 @@ import app.lawnchair.icons.CustomAdaptiveIconDrawable
 import app.lawnchair.icons.shape.IconShape
 import app.lawnchair.icons.shape.IconShapeManager
 import app.lawnchair.predictions.PredictionMode
-import app.lawnchair.preferences.PreferenceManager as LawnchairPreferenceManager
 import app.lawnchair.qsb.providers.QsbSearchProvider
 import app.lawnchair.search.algorithms.LawnchairSearchAlgorithm
 import app.lawnchair.search.algorithms.engine.provider.web.WebSearchProvider
@@ -51,11 +54,13 @@ import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
-import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.popup.LauncherOptionsPopup
 import app.lawnchair.ui.popup.toOptionOrderString
 import app.lawnchair.ui.preferences.components.HiddenAppsInSearch
 import app.lawnchair.ui.preferences.data.liveinfo.LiveInformationManager
+import app.lawnchair.util.getApkVersionComparison
+import app.lawnchair.util.isGestureNavContractCompatible
+import app.lawnchair.util.isOnePlusStock
 import app.lawnchair.util.kotlinxJson
 import app.lawnchair.views.overlay.AppOpenAnimationType
 import app.lawnchair.views.overlay.FullScreenOverlayMode
@@ -63,18 +68,25 @@ import com.android.launcher3.BuildConfig
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.InvariantDeviceProfile.INDEX_DEFAULT
 import com.android.launcher3.LauncherAppState
+import com.android.launcher3.LauncherPrefChangeListener
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherPrefs.Companion.ENABLE_TWOLINE_ALLAPPS_TOGGLE
 import com.android.launcher3.R
+import com.android.launcher3.SessionCommitReceiver
 import com.android.launcher3.Workspace
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.graphics.ThemeManager as L3ThemeManager
+import com.android.launcher3.states.RotationHelper
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.DaggerSingletonObject
+import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.DynamicResource
 import com.android.launcher3.util.SafeCloseable
+import com.android.systemui.monet.SpecVersion
+import com.google.android.msdl.data.model.FeedbackLevel
+import com.google.android.msdl.domain.MSDLPlayer
 import com.patrykmichalik.opto.core.PreferenceManager
 import com.patrykmichalik.opto.core.firstBlocking
 import com.patrykmichalik.opto.core.setBlocking
@@ -86,12 +98,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 
 @LauncherAppSingleton
 class PreferenceManager2 @Inject constructor(
@@ -100,9 +112,13 @@ class PreferenceManager2 @Inject constructor(
     SafeCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resourceProvider = DynamicResource.provider(context)
     private var liveInformationManager: LiveInformationManager =
         LiveInformationManager.getInstance(context)
+    private val legacyPrefs: SharedPreferences = LauncherPrefs.getPrefs(context)
+    private val fontCache = FontCache.INSTANCE.get(context)
+    private val deviceType = DisplayController.INSTANCE.get(context).info.deviceType
 
     private fun idpPreference(
         key: Preferences.Key<Int>,
@@ -115,27 +131,27 @@ class PreferenceManager2 @Inject constructor(
         onSet = onSet,
     )
 
-    override val preferencesDataStore = context.preferencesDataStore
+    private val cachedDataStore = CachedPreferencesDataStore(
+        delegate = context.preferencesDataStore,
+        ioScope = ioScope,
+    )
 
-    @Volatile
-    private var cachedPreferences: Preferences = runBlocking {
-        preferencesDataStore.data.first()
-    }
+    override val preferencesDataStore: DataStore<Preferences> = cachedDataStore
 
-    fun getCachedPreferences(): Preferences = cachedPreferences
+    fun getCachedPreferences(): Preferences = cachedDataStore.currentPreferences
 
-    /**
-     * Runs [block] on the main thread once the cache has every value written so far. A preference's
-     * onSet runs right after its DataStore write, but the cache is updated by its own collector,
-     * which may not have run yet: refresh it from the DataStore, which already has the new value.
-     * If the collector stores a newer value while the read is suspended, that value is kept.
-     */
-    internal fun withFreshCache(block: () -> Unit) {
-        scope.launch {
-            val cacheBeforeRead = cachedPreferences
-            val freshPreferences = preferencesDataStore.data.first()
-            if (cachedPreferences === cacheBeforeRead) cachedPreferences = freshPreferences
-            block()
+    val hasPendingWrites: Boolean
+        get() = cachedDataStore.hasPendingWrites
+
+    suspend fun flush() = cachedDataStore.flush()
+
+    fun flushAsync() = cachedDataStore.flushAsync()
+
+    fun flushBlocking(timeoutMs: Long = 2_000L) = cachedDataStore.flushBlocking(timeoutMs)
+
+    fun batchEdit(block: MutablePreferences.() -> Unit) {
+        runBlocking {
+            cachedDataStore.editBatch(block)
         }
     }
 
@@ -563,8 +579,7 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = context.resources.getBoolean(R.bool.config_default_enable_font_selection),
         onSet = { newValue ->
             if (!newValue) {
-                val fontCache = FontCache.INSTANCE.get(context)
-                LawnchairPreferenceManager.getInstance(context).fontWorkspace.set(newValue = fontCache.uiText)
+                fontWorkspace.setCached(fontCache.uiText)
             }
         },
     )
@@ -1141,6 +1156,565 @@ class PreferenceManager2 @Inject constructor(
         },
     )
 
+    // -----------------------------------------------------------------------
+    // Migrated legacy PreferenceManager keys (86 keys)
+    // -----------------------------------------------------------------------
+
+    val iconPackPackage = preference(
+        key = stringPreferencesKey(name = "icon_pack_package"),
+        defaultValue = "",
+        onSet = { reloadHelper.reloadIconsFull() },
+    )
+
+    val themedIconPackPackage = preference(
+        key = stringPreferencesKey(name = "themed_icon_pack_package"),
+        defaultValue = "",
+        onSet = { reloadHelper.reloadIconsFull() },
+    )
+
+    val allowRotation = preference(
+        key = booleanPreferencesKey(name = "allow_rotation"),
+        defaultValue = false,
+        onSet = { value ->
+            LauncherPrefs.get(context).put(LauncherPrefs.ALLOW_ROTATION, value)
+        },
+    )
+
+    /** Enables motion-driven interactions that use the device's motion sensors. */
+    val motionEnabled = preference(
+        key = booleanPreferencesKey(name = "motion_enabled"),
+        defaultValue = false,
+    )
+
+    /** Enables tilt-to-page gestures while rearranging home-screen items. */
+    val panToMoveEnabled = preference(
+        key = booleanPreferencesKey(name = "pan_to_move_enabled"),
+        defaultValue = false,
+    )
+
+    /** Controls how far a motion reading must move toward the gesture threshold. */
+    val panToMoveSensitivity = preference(
+        key = floatPreferencesKey(name = "pan_to_move_sensitivity"),
+        defaultValue = 0.5f,
+    )
+
+    // Mirrored to SharedPreferences for iconloaderlib (IconPreferences.kt).
+    // LawnchairThemeManager observes these via Flow and calls verifyIconState() -> onThemeChanged().
+    val wrapAdaptiveIcons = preference(
+        key = booleanPreferencesKey(name = "wrap_adaptive_icons"),
+        defaultValue = true,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_WRAP_ADAPTIVE, value) } },
+    )
+
+    val transparentIconBackground = preference(
+        key = booleanPreferencesKey(name = "transparent_icon_background"),
+        defaultValue = false,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_TRANSPARENT_ICON_BG, value) } },
+    )
+
+    val shadowBGIcons = preference(
+        key = booleanPreferencesKey(name = "shadow_bg_icons"),
+        defaultValue = true,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_SHADOW_BG_ICONS, value) } },
+    )
+
+    val addIconToHome = preference(
+        key = booleanPreferencesKey(name = "add_icon_to_home"),
+        defaultValue = true,
+        onSet = { value ->
+            legacyPrefs.edit { putBoolean(SessionCommitReceiver.ADD_ICON_PREFERENCE_KEY, value) }
+        },
+    )
+
+    private val isPhone: Boolean get() = deviceType == InvariantDeviceProfile.TYPE_PHONE
+    private val isTablet: Boolean get() = deviceType == InvariantDeviceProfile.TYPE_TABLET
+    private val isFoldable: Boolean get() = deviceType == InvariantDeviceProfile.TYPE_MULTI_DISPLAY
+    private val isDesktop: Boolean get() = deviceType == InvariantDeviceProfile.TYPE_DESKTOP
+
+    val calculatedGridSpec = when {
+        // This grid configuration is perfect for Phone, tested against Pixel 7,
+        // alternative dense configuration can be 5x5x7
+        isPhone -> LayoutConfig(4, 4, 6)
+
+        // This grid configuration is perfect for Tablet, tested against Pixel Tablet
+        isTablet -> LayoutConfig(6, 6, 5)
+
+        // This grid configuration is perfect for Foldable, tested against Pixel 10 Pro Fold
+        // Note: Hotseat column is 4 when folded, unfolded uses hotseatColumns + 2 or higher number
+        // defined in numExtendedHotseatIcons from device profile
+        isFoldable -> LayoutConfig(4, 4, 6, 6)
+
+        // This grid configuration is not tested against actual desktop devices,
+        // but tablet configuration works perfectly when displayed via emulator
+        isDesktop -> LayoutConfig(6, 6, 5)
+
+        // This grid configuration is the fallback for all devices type, this shouldn't be possible
+        else -> LayoutConfig(4, 4, 7)
+    }
+
+    val hotseatColumns = preference(
+        key = intPreferencesKey(name = "hotseat_columns"),
+        defaultValue = calculatedGridSpec.hotseatColumns,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val hotseatColumnsUnfolded = preference(
+        key = intPreferencesKey(name = "hotseat_columns_unfolded"),
+        defaultValue = calculatedGridSpec.hotseatColumnsUnfolded,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val hotseatRows = preference(
+        key = intPreferencesKey(name = "hotseat_rows"),
+        defaultValue = 1,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val dockPages = preference(
+        key = intPreferencesKey(name = "dock_pages"),
+        defaultValue = 1,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val workspaceColumns = preference(
+        key = intPreferencesKey(name = "workspace_columns"),
+        defaultValue = calculatedGridSpec.workspaceColumns,
+    )
+
+    val workspaceRows = preference(
+        key = intPreferencesKey(name = "workspace_rows"),
+        defaultValue = calculatedGridSpec.workspaceRows,
+    )
+
+    val workspaceIncreaseMaxGridSize = preference(
+        key = booleanPreferencesKey(name = "workspace_increase_max_grid_size"),
+        defaultValue = false,
+    )
+
+    val folderRows = idpPreference(
+        key = intPreferencesKey(name = "folder_rows"),
+        defaultSelector = { numFolderRows[INDEX_DEFAULT] },
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val drawerOpacity = preference(
+        key = floatPreferencesKey(name = "drawer_opacity"),
+        defaultValue = .5f,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    // Mirrored to SharedPreferences for iconloaderlib; tracked by LawnchairThemeManager via Flow.
+    val coloredBackgroundLightness = preference(
+        key = floatPreferencesKey(name = "colored_background_lightness"),
+        defaultValue = 1F,
+        onSet = { value -> legacyPrefs.edit { putFloat(SP_COLORED_BG_LIGHTNESS, value) } },
+    )
+
+    val feedProvider = preference(
+        key = stringPreferencesKey(name = "feed_provider"),
+        defaultValue = "",
+    )
+
+    val ignoreFeedWhitelist = preference(
+        key = booleanPreferencesKey(name = "ignore_feed_whitelist"),
+        defaultValue = false,
+    )
+
+    val launcherTheme = preference(
+        key = stringPreferencesKey(name = "launcher_theme"),
+        defaultValue = "system",
+    )
+
+    val overrideWindowCornerRadius = preference(
+        key = booleanPreferencesKey(name = "override_window_corner_radius"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val windowCornerRadius = preference(
+        key = intPreferencesKey(name = "window_corner_radius"),
+        defaultValue = 80,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val autoLaunchRoot = preference(
+        key = booleanPreferencesKey(name = "auto_launch_root"),
+        defaultValue = false,
+    )
+
+    val wallpaperScrolling = preference(
+        key = booleanPreferencesKey(name = "wallpaper_scrolling"),
+        defaultValue = true,
+    )
+
+    val infiniteScrolling = preference(
+        key = booleanPreferencesKey(name = "infinite_scrolling"),
+        defaultValue = false,
+    )
+
+    val enableDebugMenu = preference(
+        key = booleanPreferencesKey(name = "enable_debug_menu"),
+        defaultValue = false,
+    )
+
+    val vibrationFeedbackLevel = preference(
+        key = intPreferencesKey(name = "vibration_feedback_level"),
+        defaultValue = FeedbackLevel.DEFAULT.ordinal,
+        onSet = { normalizeVibrationFeedbackLevel() },
+    )
+
+    val customAppName = preference(
+        key = stringPreferencesKey(name = "custom_app_name"),
+        defaultValue = emptyMap<ComponentKey, String>(),
+        parse = ::parseCustomAppNameMap,
+        save = ::serializeCustomAppNameMap,
+        onSet = { map ->
+            legacyPrefs.edit { putString(SP_APP_NAME_MAP, serializeCustomAppNameMap(map)) }
+            reloadHelper.reloadGrid()
+        },
+    )
+
+    val recentActionOrder = preference(
+        key = stringPreferencesKey(name = "recent_action_order"),
+        defaultValue = "0,1,2,3,4",
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val fontWorkspace = fontPreference(
+        key = stringPreferencesKey(name = "font_workspace"),
+        defaultValue = fontCache.uiText,
+    )
+
+    val fontHeading = fontPreference(
+        key = stringPreferencesKey(name = "font_heading"),
+        defaultValue = fontCache.uiRegular,
+    )
+
+    val fontHeadingMedium = fontPreference(
+        key = stringPreferencesKey(name = "font_heading_medium"),
+        defaultValue = fontCache.uiMedium,
+    )
+
+    val fontBody = fontPreference(
+        key = stringPreferencesKey(name = "font_body"),
+        defaultValue = fontCache.uiText,
+    )
+
+    val fontBodyMedium = fontPreference(
+        key = stringPreferencesKey(name = "font_body_medium"),
+        defaultValue = fontCache.uiTextMedium,
+    )
+
+    val fontPrefsMap by lazy {
+        listOf(
+            fontWorkspace,
+            fontHeading,
+            fontHeadingMedium,
+            fontBody,
+            fontBodyMedium,
+        ).associateBy { it.key.name }
+    }
+
+    // TODO REMOVE
+    val deviceSearch = preference(
+        key = booleanPreferencesKey(name = "device_search"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultShortcuts = preference(
+        key = booleanPreferencesKey(name = "search_result_shortcuts"),
+        defaultValue = false,
+    )
+
+    val searchResultPeople = preference(
+        key = booleanPreferencesKey(name = "search_result_people"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultPixelTips = preference(
+        key = booleanPreferencesKey(name = "search_result_pixel_tips"),
+        defaultValue = false,
+    )
+
+    val searchResultSettings = preference(
+        key = booleanPreferencesKey(name = "search_result_settings"),
+        defaultValue = false,
+    )
+
+    val searchResultCalculator = preference(
+        key = booleanPreferencesKey(name = "search_result_calculator"),
+        defaultValue = false,
+    )
+
+    val searchResultApps = preference(
+        key = booleanPreferencesKey(name = "search_result_apps"),
+        defaultValue = true,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultFilesToggle = preference(
+        key = booleanPreferencesKey(name = "search_result_files"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultAllFiles = preference(
+        key = booleanPreferencesKey(name = "search_result_all_files"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultAudio = preference(
+        key = booleanPreferencesKey(name = "search_result_audio"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultVisualMedia = preference(
+        key = booleanPreferencesKey(name = "search_result_visual_media"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultStartPageSuggestion = preference(
+        key = booleanPreferencesKey(name = "search_result_start_page_suggestion"),
+        defaultValue = true,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResultSettingsEntry = preference(
+        key = booleanPreferencesKey(name = "search_result_settings_entry"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val searchResulRecentSuggestion = preference(
+        key = booleanPreferencesKey(name = "search_result_recent_suggestion"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val themedIcons = preference(
+        key = booleanPreferencesKey(name = "themed_icons"),
+        defaultValue = false,
+        onSet = { value ->
+            LauncherPrefs.get(context).put(L3ThemeManager.THEMED_ICONS, value)
+            reloadHelper.reloadIconsFull()
+        },
+    )
+
+    val drawerThemedIcons = preference(
+        key = booleanPreferencesKey(name = "drawer_themed_icons"),
+        defaultValue = false,
+        onSet = { reloadHelper.reloadIconsFull() },
+    )
+
+    val hotseatQsbCornerRadius = preference(
+        key = floatPreferencesKey(name = "hotseat_qsb_corner_radius"),
+        defaultValue = 1F,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatQsbAlpha = preference(
+        key = intPreferencesKey(name = "hotseat_qsb_alpha"),
+        defaultValue = 100,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatQsbStrokeWidth = preference(
+        key = floatPreferencesKey(name = "hotseat_qsb_stroke_width"),
+        defaultValue = 0F,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatBG = preference(
+        key = booleanPreferencesKey(name = "hotseat_bg"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatBGHorizontalInsetLeft = preference(
+        key = intPreferencesKey(name = "hotseat_bg_horizontal_inset_left"),
+        defaultValue = 0,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatBGVerticalInsetTop = preference(
+        key = intPreferencesKey(name = "hotseat_bg_vertical_inset_top"),
+        defaultValue = 0,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatBGHorizontalInsetRight = preference(
+        key = intPreferencesKey(name = "hotseat_bg_horizontal_inset_right"),
+        defaultValue = 0,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatBGVerticalInsetBottom = preference(
+        key = intPreferencesKey(name = "hotseat_bg_vertical_inset_bottom"),
+        defaultValue = 0,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hotseatBGAlpha = preference(
+        key = intPreferencesKey(name = "hotseat_bg_alpha"),
+        defaultValue = 100,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val enableWallpaperBlur = preference(
+        key = booleanPreferencesKey(name = "enable_wallpaper_blur"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val wallpaperBlur = preference(
+        key = intPreferencesKey(name = "wallpaper_blur"),
+        defaultValue = 25,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val wallpaperBlurFactorThreshold = preference(
+        key = floatPreferencesKey(name = "wallpaper_blur_factor_threshold"),
+        defaultValue = 3.0F,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    // Settings background blur — Compose recomposes directly, no recreate needed.
+    val settingsBlurBackground = preference(
+        key = booleanPreferencesKey(name = "settings_blur_background"),
+        defaultValue = false,
+    )
+
+    val settingsBlurIntensity = preference(
+        key = floatPreferencesKey(name = "settings_blur_intensity"),
+        defaultValue = 75f,
+    )
+
+    val drawerListOrder = preference(
+        key = stringPreferencesKey(name = "drawer_list_order"),
+        defaultValue = "",
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val drawerList = preference(
+        key = booleanPreferencesKey(name = "drawer_list"),
+        defaultValue = true,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val folderApps = preference(
+        key = booleanPreferencesKey(name = "folder_apps"),
+        defaultValue = true,
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val recentsActionScreenshot = preference(
+        key = booleanPreferencesKey(name = "recents_action_screenshot"),
+        defaultValue = !isOnePlusStock,
+    )
+
+    val recentsActionShare = preference(
+        key = booleanPreferencesKey(name = "recents_action_share"),
+        defaultValue = isOnePlusStock,
+    )
+
+    val recentsActionLens = preference(
+        key = booleanPreferencesKey(name = "recents_action_lens"),
+        defaultValue = true,
+    )
+
+    val recentsActionClearAll = preference(
+        key = booleanPreferencesKey(name = "recents_action_clear_all"),
+        defaultValue = false,
+    )
+
+    val recentsActionLocked = preference(
+        key = booleanPreferencesKey(name = "recents_action_locked"),
+        defaultValue = false,
+    )
+
+    val recentsTranslucentBackground = preference(
+        key = booleanPreferencesKey(name = "recents_translucent_background"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val recentsTranslucentBackgroundAlpha = preference(
+        key = floatPreferencesKey(name = "recents_translucent_background_alpha"),
+        defaultValue = .8f,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hideVersionInfo = preference(
+        key = booleanPreferencesKey(name = "hide_version_info"),
+        defaultValue = false,
+    )
+
+    val pseudonymVersion = preference(
+        key = stringPreferencesKey(name = "pseudonym_version"),
+        defaultValue = "Bubble Tea",
+    )
+
+    val enableGnc = preference(
+        key = booleanPreferencesKey(name = "enable_gnc"),
+        defaultValue = isGestureNavContractCompatible,
+        onSet = { reloadHelper.recreate() },
+    )
+
+    val hasOpenedSettings = preference(
+        key = booleanPreferencesKey(name = "has_opened_settings"),
+        defaultValue = false,
+    )
+
+    val lawnchairMajorVersion = preference(
+        key = intPreferencesKey(name = "lawnchair_major_version"),
+        defaultValue = context.getApkVersionComparison().first[0],
+    )
+
+    // Mirrored to SharedPreferences for iconloaderlib; tracked by LawnchairThemeManager via Flow.
+    val forceIconMonochrome = preference(
+        key = booleanPreferencesKey(name = "force_icon_monochrome"),
+        defaultValue = false,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_FORCE_ICON_MONOCHROME, value) } },
+    )
+
+    val colorizedBackgrounds = preference(
+        key = booleanPreferencesKey(name = "colorized_backgrounds"),
+        defaultValue = false,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_COLORIZED_LEGACY_TREATMENT, value) } },
+    )
+
+    val treatWhiteAdaptiveIcons = preference(
+        key = booleanPreferencesKey(name = "treat_white_adaptive_icons"),
+        defaultValue = false,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_ENABLE_WHITE_ONLY_TREATMENT, value) } },
+    )
+
+    // Mirrored to SharedPreferences for iconloaderlib; LawnchairIconProvider observes via Flow.
+    val colorizeIconPackBackground = preference(
+        key = booleanPreferencesKey(name = "colorize_icon_pack_background"),
+        defaultValue = false,
+        onSet = { value -> legacyPrefs.edit { putBoolean(SP_COLORIZE_ICON_PACK_BG, value) } },
+    )
+
+    private fun fontPreference(
+        key: Preferences.Key<String>,
+        defaultValue: FontCache.Font,
+    ) = preference(
+        key = key,
+        defaultValue = defaultValue,
+        parse = { stringValue ->
+            runCatching { FontCache.Font.fromJsonString(context, stringValue) }
+                .getOrDefault(defaultValue)
+        },
+        save = { it.toJsonString() },
+        onSet = { reloadHelper.recreate() },
+    )
+
     private inline fun <reified T> serializablePreference(
         key: Preferences.Key<String>,
         defaultValue: T,
@@ -1153,10 +1727,122 @@ class PreferenceManager2 @Inject constructor(
         save = kotlinxJson::encodeToString,
     )
 
+    fun getCustomAppName(key: ComponentKey): String? = customAppName.firstCached(this)[key]
+
+    fun setCustomAppName(key: ComponentKey, value: String?) {
+        val updated = customAppName.firstCached(this).toMutableMap()
+        if (value != null) {
+            updated[key] = value
+        } else {
+            updated.remove(key)
+        }
+        customAppName.setCached(updated)
+    }
+
+    private fun normalizeVibrationFeedbackLevel() {
+        val storedLevel = vibrationFeedbackLevel.firstCached(this)
+        val normalizedLevel = storedLevel.toFeedbackLevel().ordinal
+        if (storedLevel != normalizedLevel) {
+            vibrationFeedbackLevel.setCached(normalizedLevel)
+        }
+        MSDLPlayer.SYSTEM_FEEDBACK_LEVEL = FeedbackLevel.entries[normalizedLevel]
+    }
+
+    /**
+     * Ensures the 12 keys read directly by AOSP Launcher3 or iconloaderlib match DataStore
+     * (e.g. after restoring a DataStore backup). Only writes keys that exist in DataStore and
+     * differ from SharedPreferences, so normal startups perform zero SharedPreferences writes.
+     */
+    private fun syncMirroredPreferences() {
+        val cached = getCachedPreferences()
+        val launcherPrefs = LauncherPrefs.get(context)
+
+        cached[allowRotation.key]?.let { value ->
+            if (!legacyPrefs.contains(SP_ALLOW_ROTATION) ||
+                legacyPrefs.getBoolean(SP_ALLOW_ROTATION, !value) != value
+            ) {
+                launcherPrefs.put(LauncherPrefs.ALLOW_ROTATION, value)
+            }
+        }
+        cached[themedIcons.key]?.let { value ->
+            if (!legacyPrefs.contains(SP_THEMED_ICONS) ||
+                legacyPrefs.getBoolean(SP_THEMED_ICONS, !value) != value
+            ) {
+                launcherPrefs.put(L3ThemeManager.THEMED_ICONS, value)
+            }
+        }
+
+        val boolMirrors = listOf(
+            addIconToHome.key to SessionCommitReceiver.ADD_ICON_PREFERENCE_KEY,
+            wrapAdaptiveIcons.key to SP_WRAP_ADAPTIVE,
+            transparentIconBackground.key to SP_TRANSPARENT_ICON_BG,
+            shadowBGIcons.key to SP_SHADOW_BG_ICONS,
+            forceIconMonochrome.key to SP_FORCE_ICON_MONOCHROME,
+            colorizedBackgrounds.key to SP_COLORIZED_LEGACY_TREATMENT,
+            treatWhiteAdaptiveIcons.key to SP_ENABLE_WHITE_ONLY_TREATMENT,
+            colorizeIconPackBackground.key to SP_COLORIZE_ICON_PACK_BG,
+        )
+
+        var editor: SharedPreferences.Editor? = null
+        fun ensureEditor(): SharedPreferences.Editor = editor ?: legacyPrefs.edit().also { editor = it }
+
+        for ((dsKey, spKey) in boolMirrors) {
+            val value = cached[dsKey] ?: continue
+            if (!legacyPrefs.contains(spKey) || legacyPrefs.getBoolean(spKey, !value) != value) {
+                ensureEditor().putBoolean(spKey, value)
+            }
+        }
+
+        cached[coloredBackgroundLightness.key]?.let { value ->
+            if (!legacyPrefs.contains(SP_COLORED_BG_LIGHTNESS) ||
+                legacyPrefs.getFloat(SP_COLORED_BG_LIGHTNESS, Float.NaN) != value
+            ) {
+                ensureEditor().putFloat(SP_COLORED_BG_LIGHTNESS, value)
+            }
+        }
+
+        cached[customAppName.key]?.let { value ->
+            if (!legacyPrefs.contains(SP_APP_NAME_MAP) ||
+                legacyPrefs.getString(SP_APP_NAME_MAP, null) != value
+            ) {
+                ensureEditor().putString(SP_APP_NAME_MAP, value)
+            }
+        }
+
+        editor?.apply()
+    }
+
+    private val launcherPrefChangeListener = LauncherPrefChangeListener { key ->
+        val launcherPrefs = LauncherPrefs.get(context)
+        when (key) {
+            L3ThemeManager.KEY_THEMED_ICONS -> {
+                val value = launcherPrefs.get(L3ThemeManager.THEMED_ICONS)
+                if (themedIcons.firstCached(this) != value) {
+                    scope.launch {
+                        cachedDataStore.editBatch { this[themedIcons.key] = value }
+                    }
+                }
+            }
+
+            RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY -> {
+                val value = launcherPrefs.get(LauncherPrefs.ALLOW_ROTATION)
+                if (allowRotation.firstCached(this) != value) {
+                    scope.launch {
+                        cachedDataStore.editBatch { this[allowRotation.key] = value }
+                    }
+                }
+            }
+        }
+    }
+
     init {
-        preferencesDataStore.data
-            .onEach { cachedPreferences = it }
-            .launchIn(scope)
+        syncMirroredPreferences()
+        LauncherPrefs.get(context).addListener(
+            launcherPrefChangeListener,
+            L3ThemeManager.THEMED_ICONS,
+            LauncherPrefs.ALLOW_ROTATION,
+        )
+        normalizeVibrationFeedbackLevel()
 
         initializeIconShape(iconShape.firstCached(this))
         iconShape.get()
@@ -1237,7 +1923,14 @@ class PreferenceManager2 @Inject constructor(
     }
 
     override fun close() {
+        LauncherPrefs.get(context).removeListener(
+            launcherPrefChangeListener,
+            L3ThemeManager.THEMED_ICONS,
+            LauncherPrefs.ALLOW_ROTATION,
+        )
+        cachedDataStore.flushBlocking()
         scope.cancel()
+        ioScope.cancel()
     }
 
     private fun getRemoteDefault(key: String): String? = liveInformationManager.liveInformation
@@ -1254,7 +1947,7 @@ class PreferenceManager2 @Inject constructor(
     companion object {
         private val Context.preferencesDataStore by preferencesDataStore(
             name = "preferences",
-            produceMigrations = { listOf(SharedPreferencesMigration(context = it).produceMigration()) },
+            produceMigrations = { SharedPreferencesMigration(context = it).produceMigrations() },
         )
 
         @JvmField
@@ -1264,8 +1957,73 @@ class PreferenceManager2 @Inject constructor(
         fun getInstance(context: Context) = INSTANCE.get(context)!!
 
         private const val TAG = "PreferenceManager2"
+
+        private const val SP_ALLOW_ROTATION = "pref_allowRotation"
+        private const val SP_THEMED_ICONS = "themed_icons"
+        private const val SP_WRAP_ADAPTIVE = "prefs_wrapAdaptive"
+        private const val SP_TRANSPARENT_ICON_BG = "prefs_transparentIconBackground"
+        private const val SP_SHADOW_BG_ICONS = "pref_shadowBGIcons"
+        private const val SP_COLORED_BG_LIGHTNESS = "pref_coloredBackgroundLightness"
+        private const val SP_FORCE_ICON_MONOCHROME = "pref_forceIconMonochrome"
+        private const val SP_COLORIZED_LEGACY_TREATMENT = "pref_colorizedLegacyTreatment"
+        private const val SP_ENABLE_WHITE_ONLY_TREATMENT = "pref_enableWhiteOnlyTreatment"
+        private const val SP_COLORIZE_ICON_PACK_BG = "pref_colorizeIconPackBackground"
+        private const val SP_APP_NAME_MAP = "pref_appNameMap"
+
+        private fun parseCustomAppNameMap(json: String): Map<ComponentKey, String> {
+            if (json.isBlank()) return emptyMap()
+            return runCatching {
+                val obj = JSONObject(json)
+                val map = LinkedHashMap<ComponentKey, String>(obj.length())
+                obj.keys().forEach { keyStr ->
+                    val componentKey = ComponentKey.fromString(keyStr) ?: return@forEach
+                    map[componentKey] = obj.getString(keyStr)
+                }
+                map
+            }.getOrDefault(emptyMap())
+        }
+
+        private fun serializeCustomAppNameMap(map: Map<ComponentKey, String>): String {
+            val obj = JSONObject()
+            map.entries.forEach { obj.put(it.key.toString(), it.value) }
+            return obj.toString()
+        }
     }
 }
 
+private fun Int.toFeedbackLevel() = FeedbackLevel.entries.getOrNull(this) ?: FeedbackLevel.DEFAULT
+
 @Composable
 fun preferenceManager2() = PreferenceManager2.getInstance(LocalContext.current)
+
+/**
+ * Grid layout configuration for a device's workspace.
+ *
+ * @param hotseatColumns The amount of column the dock can contain
+ * @param workspaceColumns The amount of column the home screen can contain
+ * @param workspaceRows The amount of row the home screen can contain
+ * @param hotseatColumnsUnfolded The amount of column the dock can contain when unfolded (foldables only)
+ */
+data class LayoutConfig(
+    /**
+     * Hotseat columns refer to the amount of column the dock can contain.
+     * For foldables, this is the folded (closed) state.
+     */
+    val hotseatColumns: Int,
+
+    /**
+     * Workspace columns refer to the amount of column the home screen can contain.
+     */
+    val workspaceColumns: Int,
+
+    /**
+     * Workspace rows refer to the amount of row the home screen can contain.
+     */
+    val workspaceRows: Int,
+
+    /**
+     * Hotseat columns when the foldable is in unfolded (opened) state.
+     * For non-foldable devices, this must be equals to [hotseatColumns].
+     */
+    val hotseatColumnsUnfolded: Int = hotseatColumns,
+)

@@ -109,7 +109,8 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 import app.lawnchair.icons.ExtendedBitmapDrawable;
-import app.lawnchair.preferences.PreferenceManager;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
+import app.lawnchair.preferences2.PreferenceManager2;
 
 /**
  * Various utilities shared amongst the Launcher's classes.
@@ -191,8 +192,8 @@ public final class Utilities {
      * Returns true if theme is dark.
      */
     public static boolean isDarkTheme(Context context) {
-        PreferenceManager preferenceManager = PreferenceManager.getInstance(context);
-        String themeChoice = preferenceManager.getLauncherTheme().get();
+        PreferenceManager2 preferenceManager2 = PreferenceManager2.getInstance(context);
+        String themeChoice = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getLauncherTheme());
         if (themeChoice.equals("light")) {
             return false;
         }
@@ -828,7 +829,7 @@ public final class Utilities {
         }
         AdaptiveIconDrawable result;
 
-        if (ExtendedBitmapDrawable.isFromIconPack(mainIcon) || (!PreferenceManager.INSTANCE.get(context).getWrapAdaptiveIcons().get() && info.itemType != LauncherSettings.Favorites.ITEM_TYPE_FOLDER))
+        if (ExtendedBitmapDrawable.isFromIconPack(mainIcon) || (!PreferenceCacheExtensionsKt.firstCached(PreferenceManager2.INSTANCE.get(context).getWrapAdaptiveIcons()) && info.itemType != LauncherSettings.Favorites.ITEM_TYPE_FOLDER))
             return null;
         if (mainIcon instanceof AdaptiveIconDrawable aid) {
             result = aid;

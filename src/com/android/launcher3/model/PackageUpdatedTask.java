@@ -70,7 +70,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import app.lawnchair.deck.LawndeckManager;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
 
@@ -168,12 +167,12 @@ public class PackageUpdatedTask implements ModelUpdateTask {
             case OP_REMOVE: {
                 for (int i = 0; i < packageCount; i++) {
                     iconCache.removeIconsForPkg(packages[i], mUser);
-                    PreferenceManager pm = PreferenceManager.getInstance(context);
-                    if (packages[i].equals(pm.getIconPackPackage().get())) {
-                        pm.getIconPackPackage().set("");
+                    PreferenceManager2 pm = PreferenceManager2.getInstance(context);
+                    if (packages[i].equals(PreferenceCacheExtensionsKt.firstCached(pm.getIconPackPackage()))) {
+                        PreferenceCacheExtensionsKt.setCached(pm.getIconPackPackage(), "");
                     }
-                    if (packages[i].equals(pm.getThemedIconPackPackage().get())) {
-                        pm.getThemedIconPackPackage().set("");
+                    if (packages[i].equals(PreferenceCacheExtensionsKt.firstCached(pm.getThemedIconPackPackage()))) {
+                        PreferenceCacheExtensionsKt.setCached(pm.getThemedIconPackPackage(), "");
                     }
                     final boolean isThemedIconsAvailable = context.getPackageManager()
                             .queryIntentActivityOptions(
@@ -186,7 +185,7 @@ public class PackageUpdatedTask implements ModelUpdateTask {
                             .noneMatch(it -> new ApplicationInfoWrapper(context, it, mUser)
                                 .isInstalled());
                     if (isThemedIconsAvailable) {
-                        pm.getThemedIcons().set(false);
+                        PreferenceCacheExtensionsKt.setCached(pm.getThemedIcons(), false);
                     }
                 }
                 // Fall through

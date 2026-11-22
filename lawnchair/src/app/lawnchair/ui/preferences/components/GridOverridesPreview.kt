@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.lawnchair.DeviceProfileOverrides
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import com.android.launcher3.InvariantDeviceProfile
 
 @Composable
@@ -100,7 +100,7 @@ fun createPreviewIdp(
     previewOverrides: DeviceProfileOverrides.PreviewOverrides = DeviceProfileOverrides.PreviewOverrides(),
 ): InvariantDeviceProfile {
     val context = LocalContext.current
-    val prefs = preferenceManager()
+    val prefs = preferenceManager2()
 
     val newIdp by remember(previewOverrides) {
         derivedStateOf {

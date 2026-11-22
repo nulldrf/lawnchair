@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.drawable.Icon
-import androidx.core.content.edit
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.setCached
 import app.lawnchair.smartspace.model.SmartspaceAction
 import app.lawnchair.smartspace.model.SmartspaceScores
 import app.lawnchair.smartspace.model.SmartspaceTarget
@@ -16,6 +16,7 @@ import com.android.launcher3.R
 import com.android.launcher3.util.OnboardingPrefs
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
 
 class OnboardingProvider(context: Context) :
     SmartspaceDataSource(
@@ -25,19 +26,12 @@ class OnboardingProvider(context: Context) :
     ) {
 
     companion object {
-        const val PREF_LAWNCHAIR_MAJOR_VERSION = "pref_lawnchairMajorVersion"
-        const val PREF_HAS_OPENED_SETTINGS = "pref_hasOpenedSettings"
-
         private val HOME_BOUNCE_KEY = OnboardingPrefs.HOME_BOUNCE_SEEN.sharedPrefKey
-        private val PREF_KEYS = setOf(
-            PREF_LAWNCHAIR_MAJOR_VERSION,
-            PREF_HAS_OPENED_SETTINGS,
-            HOME_BOUNCE_KEY,
-        )
-
         private const val REQUEST_CODE_SETTINGS = 1
     }
+
     private val prefs = getPrefs(context)
+    private val prefs2 = PreferenceManager2.getInstance(context)
 
     private val lawnSettingsIntent: Intent = Intent(Intent.ACTION_APPLICATION_PREFERENCES)
         .setPackage(context.packageName)
@@ -52,46 +46,35 @@ class OnboardingProvider(context: Context) :
     /** No-op. */
     private val lawnOnboardingPendingIntent: PendingIntent = lawnSettingsPendingIntent
 
-    override val internalTargets = callbackFlow {
-        val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener {
-                sharedPreferences,
-                key,
-            ->
-            if (key == null) return@OnSharedPreferenceChangeListener
-
-            val isRelevant = when (sharedPreferences) {
-                prefs -> key in PREF_KEYS
-                else -> false
+    private val homeBounceSeenFlow = callbackFlow {
+        val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+            if (sharedPreferences == prefs && key == HOME_BOUNCE_KEY) {
+                trySend(prefs.getBoolean(HOME_BOUNCE_KEY, false))
             }
-            if (!isRelevant) return@OnSharedPreferenceChangeListener
-
-            trySend(listOfNotNull(getSmartspaceTarget()))
         }
-
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
-
-        trySend(listOfNotNull(getSmartspaceTarget()))
-
+        trySend(prefs.getBoolean(HOME_BOUNCE_KEY, false))
         awaitClose {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         }
     }
 
-    private fun hasSeenHomeBounce(): Boolean {
-        return prefs.getBoolean(HOME_BOUNCE_KEY, false)
+    override val internalTargets = combine(
+        homeBounceSeenFlow,
+        prefs2.hasOpenedSettings.get(),
+        prefs2.lawnchairMajorVersion.get(),
+    ) { homeBounceSeen, hasOpenedSettings, majorVersion ->
+        listOfNotNull(getSmartspaceTarget(homeBounceSeen, hasOpenedSettings, majorVersion))
     }
 
-    private fun hasSeenSettings(): Boolean {
-        return prefs.getBoolean(PREF_HAS_OPENED_SETTINGS, false)
-    }
-
-    private fun hasRecentlyUpgradedMajor(): Boolean {
-        return context.getApkVersionComparison().first[0] > prefs.getInt(PREF_LAWNCHAIR_MAJOR_VERSION, 123456)
-    }
-
-    private fun getSmartspaceTarget(): SmartspaceTarget? {
+    private fun getSmartspaceTarget(
+        hasSeenHomeBounce: Boolean,
+        hasSeenSettings: Boolean,
+        storedMajorVersion: Int,
+    ): SmartspaceTarget? {
+        val currentMajor = context.getApkVersionComparison().first[0]
         return when {
-            !hasSeenHomeBounce() -> {
+            !hasSeenHomeBounce -> {
                 SmartspaceTarget(
                     id = "onboarding-swipe",
                     headerAction = SmartspaceAction(
@@ -106,7 +89,7 @@ class OnboardingProvider(context: Context) :
                 )
             }
 
-            !hasSeenSettings() -> {
+            !hasSeenSettings -> {
                 SmartspaceTarget(
                     id = "onboarding-settings",
                     headerAction = SmartspaceAction(
@@ -121,9 +104,9 @@ class OnboardingProvider(context: Context) :
                 )
             }
 
-            hasRecentlyUpgradedMajor() -> {
+            currentMajor > storedMajorVersion -> {
                 if (true) return null // pE-TODO(FeatureFlags): upgraded onboarding
-                prefs.edit { putInt(PREF_LAWNCHAIR_MAJOR_VERSION, context.getApkVersionComparison().first[0]) }
+                prefs2.lawnchairMajorVersion.setCached(currentMajor)
                 SmartspaceTarget(
                     id = "onboarding-upgrade",
                     headerAction = SmartspaceAction(

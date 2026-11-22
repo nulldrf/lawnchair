@@ -8,10 +8,16 @@ import android.widget.LinearLayout
 import android.widget.Space
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.util.isOnePlusStock
+import app.lawnchair.util.repeatOnAttached
 import com.android.launcher3.R
 import com.android.quickstep.views.OverviewActionsView
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onEach
 
 class LawnchairOverviewActionsView @JvmOverloads constructor(
     context: Context,
@@ -19,7 +25,7 @@ class LawnchairOverviewActionsView @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : OverviewActionsView<TaskOverlayFactoryImpl.OverlayUICallbacks>(context, attrs, defStyleAttr) {
 
-    private val prefs = PreferenceManager.getInstance(context)
+    private val prefs = PreferenceManager2.getInstance(context)
     private lateinit var container: LinearLayout
     private lateinit var screenshotAction: Button
     private lateinit var shareAction: Button
@@ -40,33 +46,39 @@ class LawnchairOverviewActionsView @JvmOverloads constructor(
         shareAction.setOnClickListener { mCallbacks?.onShare() }
         lensAction.setOnClickListener { mCallbacks?.onLens() }
 
-        prefs.recentsActionClearAll.subscribeChanges(this, ::updateVisibilities)
-        prefs.recentsActionLens.subscribeChanges(this, ::updateVisibilities)
-        prefs.recentsActionScreenshot.subscribeChanges(this, ::updateVisibilities)
-        prefs.recentsActionShare.subscribeChanges(this, ::updateVisibilities)
-        prefs.recentsActionLocked.subscribeChanges(this, ::updateVisibilities)
-        prefs.recentActionOrder.subscribeChanges(this, ::updateVisibilities)
+        repeatOnAttached {
+            merge(
+                prefs.recentsActionClearAll.get().drop(1),
+                prefs.recentsActionLens.get().drop(1),
+                prefs.recentsActionScreenshot.get().drop(1),
+                prefs.recentsActionShare.get().drop(1),
+                prefs.recentsActionLocked.get().drop(1),
+                prefs.recentActionOrder.get().drop(1),
+            ).onEach {
+                updateVisibilities()
+            }.launchIn(this)
+        }
 
         updateVisibilities()
     }
 
     private fun updateVisibilities() {
-        val order = prefs.recentActionOrder.get().split(",").map { it.toInt() }
+        val order = prefs.recentActionOrder.firstCached().split(",").map { it.toInt() }
 
         val buttonMap = mutableMapOf<Int, View>()
-        if (prefs.recentsActionScreenshot.get() && !isOnePlusStock) {
+        if (prefs.recentsActionScreenshot.firstCached() && !isOnePlusStock) {
             buttonMap[0] = screenshotAction
         }
-        if (prefs.recentsActionShare.get()) {
+        if (prefs.recentsActionShare.firstCached()) {
             buttonMap[1] = shareAction
         }
-        if (prefs.recentsActionLens.get() && isLensAvailable()) {
+        if (prefs.recentsActionLens.firstCached() && isLensAvailable()) {
             buttonMap[2] = lensAction
         }
-        if (prefs.recentsActionLocked.get()) {
+        if (prefs.recentsActionLocked.firstCached()) {
             buttonMap[3] = lockedAction
         }
-        if (prefs.recentsActionClearAll.get()) {
+        if (prefs.recentsActionClearAll.firstCached()) {
             buttonMap[4] = clearAllAction
         }
 

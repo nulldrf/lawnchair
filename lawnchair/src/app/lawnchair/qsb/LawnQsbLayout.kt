@@ -18,8 +18,6 @@ import androidx.lifecycle.lifecycleScope
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.animateToAllApps
 import app.lawnchair.launcher
-import app.lawnchair.preferences.observeAsState
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.firstCached
@@ -66,7 +64,6 @@ class LawnQsbLayout(context: Context, attrs: AttributeSet?) : FrameLayout(contex
                     ProvideLifecycleState {
                         val context = LocalContext.current
 
-                        val prefs = preferenceManager()
                         val prefs2 = preferenceManager2
 
                         val searchProviderPref by prefs2.hotseatQsbProvider.asState()
@@ -95,11 +92,11 @@ class LawnQsbLayout(context: Context, attrs: AttributeSet?) : FrameLayout(contex
                             themed = themed,
                             // LC-Note: always use QsbFillColor regardless of themed state.
                             backgroundColor = app.lawnchair.theme.color.tokens.ColorTokens.QsbFillColor.resolveColor(context),
-                            backgroundAlpha = prefs.hotseatQsbAlpha.observeAsState().value,
-                            cornerRadius = prefs.hotseatQsbCornerRadius.observeAsState().value,
+                            backgroundAlpha = prefs2.hotseatQsbAlpha.asState().value,
+                            cornerRadius = prefs2.hotseatQsbCornerRadius.asState().value,
                             // Use light color as strokeColor is a static color that doesn't use darkColor
                             strokeColor = prefs2.strokeColorStyle.asState().value.colorPreferenceEntry.lightColor.invoke(context),
-                            strokeWidth = prefs.hotseatQsbStrokeWidth.observeAsState().value,
+                            strokeWidth = prefs2.hotseatQsbStrokeWidth.asState().value,
                         )
 
                         val actions = QsbActions(

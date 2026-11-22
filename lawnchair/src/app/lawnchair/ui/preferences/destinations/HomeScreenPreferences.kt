@@ -31,7 +31,6 @@ import app.lawnchair.LawnchairApp
 import app.lawnchair.data.iconoverride.IconOverrideRepository
 import app.lawnchair.nexuslauncher.OverlayCallbackImpl
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorMode
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
@@ -73,7 +72,6 @@ object HomeScreenRoutes {
 fun HomeScreenPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -85,8 +83,8 @@ fun HomeScreenPreferences(
                     manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null
             } == true
     }
-    val panToMoveEnabledAdapter = prefs.panToMoveEnabled.getAdapter()
-    val panToMoveSensitivityAdapter = prefs.panToMoveSensitivity.getAdapter()
+    val panToMoveEnabledAdapter = prefs2.panToMoveEnabled.getAdapter()
+    val panToMoveSensitivityAdapter = prefs2.panToMoveSensitivity.getAdapter()
     PreferenceLayout(
         label = stringResource(id = R.string.home_screen_label),
         backArrowVisible = !LocalIsExpandedScreen.current,
@@ -102,7 +100,7 @@ fun HomeScreenPreferences(
         }
 
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
-            val addIconToHomeAdapter = prefs.addIconToHome.getAdapter()
+            val addIconToHomeAdapter = prefs2.addIconToHome.getAdapter()
             val isDeckLayoutAdapter = prefs2.deckLayout.getAdapter()
             ExpandAndShrink(visible = !isDeckLayoutAdapter.state.value) {
                 ScrollAnchor(ScrollKeys.AUTO_ADD_SHORTCUTS, scrollState) {
@@ -123,7 +121,7 @@ fun HomeScreenPreferences(
             }
             ScrollAnchor(ScrollKeys.INFINITE_SCROLLING, scrollState) {
                 SwitchPreference(
-                    prefs.infiniteScrolling.getAdapter(),
+                    prefs2.infiniteScrolling.getAdapter(),
                     label = stringResource(id = R.string.infinite_scrolling_label),
                     description = stringResource(id = R.string.infinite_scrolling_description),
                 )
@@ -204,7 +202,7 @@ fun HomeScreenPreferences(
         PreferenceGroup(heading = stringResource(id = R.string.wallpaper)) {
             ScrollAnchor(ScrollKeys.WALLPAPER_SCROLL, scrollState) {
                 SwitchPreference(
-                    prefs.wallpaperScrolling.getAdapter(),
+                    prefs2.wallpaperScrolling.getAdapter(),
                     label = stringResource(id = R.string.wallpaper_scrolling_label),
                 )
             }
@@ -224,8 +222,8 @@ fun HomeScreenPreferences(
                 )
             }
         }
-        val columns by prefs.workspaceColumns.getAdapter()
-        val rows by prefs.workspaceRows.getAdapter()
+        val columns by prefs2.workspaceColumns.getAdapter()
+        val rows by prefs2.workspaceRows.getAdapter()
         PreferenceGroup(heading = stringResource(id = R.string.layout)) {
             ScrollAnchor(ScrollKeys.HOME_GRID, scrollState) {
                 NavigationActionPreference(

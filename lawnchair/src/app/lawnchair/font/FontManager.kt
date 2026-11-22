@@ -7,8 +7,8 @@ import android.widget.TextView
 import androidx.annotation.IdRes
 import androidx.core.content.res.use
 import androidx.lifecycle.lifecycleScope
-import app.lawnchair.preferences.BasePreferenceManager
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.util.lookupLifecycleOwner
 import app.lawnchair.util.runOnMainThread
 import com.android.launcher3.R
@@ -17,6 +17,7 @@ import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.DaggerSingletonObject
 import com.android.launcher3.util.SafeCloseable
+import com.patrykmichalik.opto.core.PreferenceImpl
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
@@ -35,7 +36,7 @@ class FontManager @Inject constructor(
         val sansSerif = Typeface.SANS_SERIF
         val sansSerifMedium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
 
-        val prefs = PreferenceManager.getInstance(context)
+        val prefs = PreferenceManager2.getInstance(context)
         return mapOf(
             R.id.font_base_icon to FontSpec(prefs.fontWorkspace, sansSerif),
             R.id.font_button to FontSpec(prefs.fontHeadingMedium, sansSerifMedium),
@@ -118,7 +119,10 @@ class FontManager @Inject constructor(
     }
 
     class FontSpec(val loader: () -> FontCache.Font, val fallback: Typeface) {
-        constructor(pref: BasePreferenceManager.FontPref, fallback: Typeface) : this(pref::get, fallback)
+        constructor(pref: PreferenceImpl<FontCache.Font, String>, fallback: Typeface) : this(
+            { pref.firstCached() },
+            fallback,
+        )
 
         val font get() = loader()
     }

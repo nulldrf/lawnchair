@@ -46,7 +46,7 @@ import androidx.core.content.FileProvider
 import androidx.profileinstaller.ProfileInstaller
 import app.lawnchair.backup.LawnchairBackup
 import app.lawnchair.flowerpot.Flowerpot
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.destinations.openAppInfo
 import app.lawnchair.util.DecorReattachGuard
@@ -187,9 +187,8 @@ class LawnchairApp : LauncherApplication() {
     fun migrateDbName(dbName: String) {
         val dbFile = getDatabasePath(dbName)
         if (dbFile.exists()) return
-        val prefs = PreferenceManager.INSTANCE.get(this)
         val dbJournalFile = getJournalFile(dbFile)
-        val oldDbSlot = prefs.sp.getString("pref_currentDbSlot", "a")
+        val oldDbSlot = com.android.launcher3.LauncherPrefs.getPrefs(this).getString("pref_currentDbSlot", "a")
         val oldDbName = if (oldDbSlot == "a") "launcher.db" else "launcher.db_b"
         val oldDbFile = getDatabasePath(oldDbName)
         val oldDbJournalFile = getJournalFile(oldDbFile)
@@ -270,7 +269,11 @@ class LawnchairApp : LauncherApplication() {
 
         override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
-        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {
+            if (androidx.core.os.UserManagerCompat.isUserUnlocked(activity)) {
+                runCatching { PreferenceManager2.getInstance(activity).flushAsync() }
+            }
+        }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
             activities.add(activity)

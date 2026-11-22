@@ -33,7 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.asPreferenceAdapter
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.DummyLauncherBox
@@ -62,7 +62,7 @@ fun HomeScreenGridPreferences(
         modifier = modifier,
         isExpandedScreen = true,
     ) {
-        val prefs = preferenceManager()
+        val prefs = preferenceManager2()
         val columnsAdapter = prefs.workspaceColumns.getAdapter()
         val rowsAdapter = prefs.workspaceRows.getAdapter()
         val hotseatColumnsAdapter = prefs.hotseatColumns.getAdapter()
@@ -170,10 +170,10 @@ fun HomeScreenGridPreferences(
             val context = LocalContext.current
             val applyOverrides = {
                 prefs.batchEdit {
-                    columnsAdapter.onChange(columns.intValue)
-                    rowsAdapter.onChange(rows.intValue)
-                    hotseatColumnsAdapter.onChange(hotseatColumns.intValue)
-                    hotseatColumnsUnfoldedAdapter.onChange(hotseatColumnsUnfolded.intValue)
+                    this[prefs.workspaceColumns.key] = columns.intValue
+                    this[prefs.workspaceRows.key] = rows.intValue
+                    this[prefs.hotseatColumns.key] = hotseatColumns.intValue
+                    this[prefs.hotseatColumnsUnfolded.key] = hotseatColumnsUnfolded.intValue
                 }
                 LauncherAppState.getIDP(context).onPreferencesChanged(context)
                 navController.popBackStack()

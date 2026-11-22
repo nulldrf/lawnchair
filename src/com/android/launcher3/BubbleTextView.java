@@ -114,7 +114,6 @@ import java.util.Objects;
 import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
 import app.lawnchair.font.FontManager;
 import app.lawnchair.gestures.IconGestureListener;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.util.LawnchairUtilsKt;
 import app.lawnchair.animation.PhysicsAnimator;
@@ -583,7 +582,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public boolean shouldUseTheme() {
         if (mDisplay == DISPLAY_ALL_APPS || mDisplay == DISPLAY_DRAWER_FOLDER
                 || mDisplay == DISPLAY_PREDICTION_ROW) {
-            return PreferenceManager.getInstance(getContext()).getDrawerThemedIcons().get();
+            return PreferenceCacheExtensionsKt.firstCached(
+                    PreferenceManager2.getInstance(getContext()).getDrawerThemedIcons());
         }
         return mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER
                 || mDisplay == DISPLAY_TASKBAR;

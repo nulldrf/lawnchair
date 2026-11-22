@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.util.MainThreadInitializedObject
 import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ipc.RootService
@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
 
 class RootHelperManager(private val context: Context) {
     private val scope = MainScope() + CoroutineName("RootHelperManager")
-    private val prefs = PreferenceManager.getInstance(context)
+    private val prefs = PreferenceManager2.getInstance(context)
     private val isAvailableDeferred by lazy {
         scope.async(Dispatchers.IO) {
             Shell.rootAccess()

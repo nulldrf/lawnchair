@@ -37,10 +37,10 @@ import androidx.core.widget.addTextChangedListener
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import androidx.lifecycle.lifecycleScope
 import app.lawnchair.launcher
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.firstCached
+import app.lawnchair.preferences2.setCached
 import app.lawnchair.qsb.LawnQsbLayout.Companion.getLensIntent
 import app.lawnchair.qsb.LawnQsbLayout.Companion.getSearchProvider
 import app.lawnchair.qsb.LawnQsbLayout.Companion.getVoiceIntent
@@ -70,7 +70,6 @@ import com.android.launcher3.allapps.SearchUiManager
 import com.android.launcher3.allapps.search.AllAppsSearchBarController
 import com.android.launcher3.search.SearchCallback
 import com.android.launcher3.util.Themes
-import com.patrykmichalik.opto.core.firstBlocking
 import java.util.Locale
 import kotlin.math.max
 import kotlinx.coroutines.launch
@@ -119,7 +118,6 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private var bgVisible = true
     private var bgAlpha = 1f
     private val suggestionsRecent = SearchRecentSuggestions(launcher, LawnchairRecentSuggestionProvider.AUTHORITY, LawnchairRecentSuggestionProvider.MODE)
-    private val prefs = PreferenceManager.getInstance(launcher)
     private val prefs2 = PreferenceManager2.getInstance(launcher)
 
     private var initialPaddingLeft: Int = 0
@@ -317,7 +315,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
             } else {
                 setBackgroundVisibility(true, 1f)
                 animateHintVisibility(false)
-                if (prefs.searchResulRecentSuggestion.get()) {
+                if (prefs2.searchResulRecentSuggestion.firstCached()) {
                     val query = editText.text.toString()
                     suggestionsRecent.saveRecentQuery(query, null)
                 }
@@ -345,8 +343,8 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                     searchAlgorithm?.doZeroStateSearch(this)
                 }
                 if (input.text.toString() == "/lawnchairdebug") {
-                    val enableDebugMenu = prefs.enableDebugMenu
-                    enableDebugMenu.set(!enableDebugMenu.get())
+                    val enableDebugMenu = prefs2.enableDebugMenu
+                    enableDebugMenu.setCached(!enableDebugMenu.firstCached())
                     launcher.stateManager.goToState(LauncherState.NORMAL)
                 }
 

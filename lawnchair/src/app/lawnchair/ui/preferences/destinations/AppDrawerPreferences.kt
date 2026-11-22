@@ -45,7 +45,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.AppDrawerHapticFeedbackPreference
@@ -78,7 +77,6 @@ object AppDrawerRoutes {
 fun AppDrawerPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
     val context = LocalContext.current
     val resources = context.resources
@@ -89,7 +87,7 @@ fun AppDrawerPreferences(
         backArrowVisible = !LocalIsExpandedScreen.current,
         modifier = modifier,
     ) {
-        val drawerListAdapter = prefs.drawerList.getAdapter()
+        val drawerListAdapter = prefs2.drawerList.getAdapter()
         val scrollState = rememberPreferenceScrollState()
         Column {
             ScrollAnchor(ScrollKeys.DRAWER_LAYOUT, scrollState) {
@@ -169,7 +167,7 @@ fun AppDrawerPreferences(
             ScrollAnchor(ScrollKeys.DRAWER_BG_OPACITY, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.background_opacity),
-                    adapter = prefs.drawerOpacity.getAdapter(),
+                    adapter = prefs2.drawerOpacity.getAdapter(),
                     step = 0.1f,
                     valueRange = 0F..1F,
                     showAsPercentage = true,

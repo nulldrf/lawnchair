@@ -22,7 +22,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.search.LawnchairRecentSuggestionProvider
 import app.lawnchair.ui.preferences.components.PermissionDialog
@@ -87,7 +86,6 @@ fun SearchProviderPreferenceScreen(
 fun ContactsSearchProvider(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
     val context = LocalContext.current
@@ -101,7 +99,7 @@ fun ContactsSearchProvider(
         }
     }
 
-    val adapter = prefs.searchResultPeople.getAdapter()
+    val adapter = prefs2.searchResultPeople.getAdapter()
     MainSwitchPreference(
         checked = adapter.state.value && contactsPermissionState.status.isGranted,
         onCheckedChange = adapter::onChange,
@@ -141,10 +139,9 @@ fun GenericSearchProviderPreference(
     provider: SearchProviderId,
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
-    val adapter = prefs.let {
+    val adapter = prefs2.let {
         when (provider) {
             SearchProviderId.APPS -> it.searchResultApps
             SearchProviderId.HISTORY -> it.searchResulRecentSuggestion

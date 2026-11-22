@@ -161,6 +161,9 @@ class LawnchairBackup(
                 .setPreviewDarkText(wallpaperSupportsDarkText)
                 .build()
 
+            // Ensure any in-memory preference updates are persisted before zipping DataStore.
+            app.lawnchair.preferences2.PreferenceManager2.getInstance(context).flush()
+
             val pfd = context.contentResolver.openFileDescriptor(fileUri, "w")!!
             withContext(Dispatchers.IO) {
                 pfd.use {

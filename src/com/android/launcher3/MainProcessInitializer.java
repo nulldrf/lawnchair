@@ -41,7 +41,7 @@ import com.android.launcher3.util.ResourceBasedOverride;
 
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
-import app.lawnchair.preferences.PreferenceManager;
+import app.lawnchair.preferences2.PreferenceManager2;
 
 /**
  * Utility class to handle one time initializations of the main process
@@ -68,7 +68,7 @@ public class MainProcessInitializer implements ResourceBasedOverride {
         // 
         // *Unless* your SharedPreferences instance is explicitly told to run in device-protected storage or (DE) Device Encrypted storage, 
         // but in this case it's not, but it's something to keep in mind.
-        LockedUserState.get(context).runOnUserUnlocked(() -> PreferenceManager.getInstance(context));
+        LockedUserState.get(context).runOnUserUnlocked(() -> PreferenceManager2.getInstance(context));
         
         Overrides.getObject(
                 MainProcessInitializer.class, context, R.string.main_process_initializer_class)

@@ -13,7 +13,6 @@ import android.content.Intent.ACTION_TIMEZONE_CHANGED
 import android.content.Intent.ACTION_TIME_CHANGED
 import android.content.Intent.ACTION_TIME_TICK
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.content.pm.ComponentInfo
 import android.content.pm.LauncherApps
@@ -33,7 +32,8 @@ import app.lawnchair.icons.iconpack.IconPack
 import app.lawnchair.icons.iconpack.IconPackProvider
 import app.lawnchair.icons.picker.IconEntry
 import app.lawnchair.icons.picker.IconType
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.util.MultiSafeCloseable
 import app.lawnchair.util.isPackageInstalled
 import app.lawnchair.util.requireSystemService
@@ -50,6 +50,14 @@ import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.SafeCloseable
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import org.xmlpull.v1.XmlPullParser
 
 @LauncherAppSingleton
@@ -60,8 +68,9 @@ class LawnchairIconProvider @Inject constructor(
     context,
     themeManager,
 ) {
-    private val prefs = PreferenceManager.getInstance(context)
-    private val themedIconsEnabled get() = prefs.themedIcons.get()
+    private val prefs = PreferenceManager2.getInstance(context)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val themedIconsEnabled get() = prefs.themedIcons.firstCached()
 
     private val iconPackPref = prefs.iconPackPackage
     private val themedIconSourcePref = prefs.themedIconPackPackage
@@ -70,9 +79,9 @@ class LawnchairIconProvider @Inject constructor(
     private val overrideRepo = IconOverrideRepository.INSTANCE.get(context)
 
     private val iconPack
-        get() = iconPackProvider.getIconPack(iconPackPref.get())?.apply { loadBlocking() }
+        get() = iconPackProvider.getIconPack(iconPackPref.firstCached())?.apply { loadBlocking() }
     private val themedIconSource
-        get() = iconPackProvider.getIconPack(themedIconSourcePref.get())?.apply { loadBlocking() }
+        get() = iconPackProvider.getIconPack(themedIconSourcePref.firstCached())?.apply { loadBlocking() }
 
     private val themeMapLock = Any()
     private var themeMapName: String = ""
@@ -97,20 +106,6 @@ class LawnchairIconProvider @Inject constructor(
 
     val systemIconState = themeManager.iconState
 
-    // Held strongly because SharedPreferences stores listeners in a WeakHashMap.
-    private val colorizeIconPackPrefListener =
-        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "pref_colorizeIconPackBackground") {
-                Executors.MODEL_EXECUTOR.execute {
-                    updateSystemState()
-                    val appState = LauncherAppState.getInstance(context)
-                    appState.iconCache.clearMemoryCache()
-                    LauncherIcons.clearPool(context)
-                    appState.model.reloadIfActive()
-                }
-            }
-        }
-
     /**
      * Overrides mSystemState to include the current icon pack package name.
      *
@@ -126,7 +121,7 @@ class LawnchairIconProvider @Inject constructor(
      */
     override fun updateSystemState() {
         super.updateSystemState()
-        val iconPack = iconPackPref.get()
+        val iconPack = iconPackPref.firstCached()
         if (iconPack.isNotEmpty()) {
             mSystemState += ",pack=$iconPack"
         }
@@ -174,7 +169,19 @@ class LawnchairIconProvider @Inject constructor(
 
         // Flush caches when "Apply smart backgrounds to icon pack" changes.
         // Not routed through ThemeManager since it doesn't affect shape/theme state.
-        context.prefs.registerOnSharedPreferenceChangeListener(colorizeIconPackPrefListener)
+        prefs.colorizeIconPackBackground.get()
+            .drop(1)
+            .distinctUntilChanged()
+            .onEach {
+                Executors.MODEL_EXECUTOR.execute {
+                    updateSystemState()
+                    val appState = LauncherAppState.getInstance(context)
+                    appState.iconCache.clearMemoryCache()
+                    LauncherIcons.clearPool(context)
+                    appState.model.reloadIfActive()
+                }
+            }
+            .launchIn(scope)
     }
 
     private fun resolveIconEntry(componentName: ComponentName, user: UserHandle): IconEntry? {
@@ -186,7 +193,7 @@ class LawnchairIconProvider @Inject constructor(
         }
 
         // if forced monochrome is enabled, fallback to launcher3 behavior
-        if (prefs.forceIconMonochrome.get()) {
+        if (prefs.forceIconMonochrome.firstCached()) {
             return null
         }
 
@@ -319,16 +326,16 @@ class LawnchairIconProvider @Inject constructor(
             ""
         }
         return "$base|lc:" +
-            "ip=${iconPackPref.get()}," +
-            "tip=${themedIconSourcePref.get()}," +
-            "ti=${prefs.themedIcons.get()}," +
-            "dti=${prefs.drawerThemedIcons.get()}," +
-            "fm=${prefs.forceIconMonochrome.get()}," +
+            "ip=${iconPackPref.firstCached()}," +
+            "tip=${themedIconSourcePref.firstCached()}," +
+            "ti=${prefs.themedIcons.firstCached()}," +
+            "dti=${prefs.drawerThemedIcons.firstCached()}," +
+            "fm=${prefs.forceIconMonochrome.firstCached()}," +
             "ov=$overrideState"
     }
 
     override fun getThemeDataForPackage(packageName: String?): ThemeData? {
-        if (prefs.forceIconMonochrome.get()) {
+        if (prefs.forceIconMonochrome.firstCached()) {
             return null
         }
         return themeMap[packageName]
@@ -410,16 +417,10 @@ class LawnchairIconProvider @Inject constructor(
                 field = value
             }
         private var iconState = themeManager.iconState
-        private val iconPackPref = PreferenceManager.getInstance(context).iconPackPackage
-        private val themedIconPackPref = PreferenceManager.getInstance(context).themedIconPackPackage
-
-        private val subscription = iconPackPref.subscribeChanges {
-            recreateCalendarAndClockChangeReceiver()
-            updateIconStateIfNeeded()
-        }
-        private val themedIconSubscription = themedIconPackPref.subscribeChanges {
-            updateIconStateIfNeeded()
-        }
+        private val receiverScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        private val prefs2 = PreferenceManager2.getInstance(context)
+        private val iconPackPref = prefs2.iconPackPackage
+        private val themedIconPackPref = prefs2.themedIconPackPackage
 
         private fun updateIconStateIfNeeded() {
             val newState = themeManager.iconState
@@ -455,10 +456,25 @@ class LawnchairIconProvider @Inject constructor(
 
         init {
             recreateCalendarAndClockChangeReceiver()
+            iconPackPref.get()
+                .drop(1)
+                .distinctUntilChanged()
+                .onEach {
+                    recreateCalendarAndClockChangeReceiver()
+                    updateIconStateIfNeeded()
+                }
+                .launchIn(receiverScope)
+            themedIconPackPref.get()
+                .drop(1)
+                .distinctUntilChanged()
+                .onEach {
+                    updateIconStateIfNeeded()
+                }
+                .launchIn(receiverScope)
         }
 
         private fun recreateCalendarAndClockChangeReceiver() {
-            val iconPack = IconPackProvider.INSTANCE.get(context).getIconPack(iconPackPref.get())
+            val iconPack = IconPackProvider.INSTANCE.get(context).getIconPack(iconPackPref.firstCached())
             calendarAndClockChangeReceiver = if (iconPack != null) {
                 CalendarAndClockChangeReceiver(context, handler, iconPack, callback)
             } else {
@@ -468,8 +484,7 @@ class LawnchairIconProvider @Inject constructor(
 
         override fun close() {
             calendarAndClockChangeReceiver = null
-            subscription.close()
-            themedIconSubscription.close()
+            receiverScope.cancel()
         }
     }
 
@@ -532,7 +547,7 @@ class LawnchairIconProvider @Inject constructor(
         }
 
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.data?.schemeSpecificPart != themedIconSourcePref.get()) return
+            if (intent.data?.schemeSpecificPart != themedIconSourcePref.firstCached()) return
             synchronized(themeMapLock) {
                 _themeMap = null
             }

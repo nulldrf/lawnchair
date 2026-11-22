@@ -8,10 +8,10 @@ import android.graphics.RectF
 import android.view.View
 import app.lawnchair.launcher
 import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.theme.color.tokens.ColorTokens
 import com.android.launcher3.R
 import com.android.systemui.util.dpToPx
-import com.patrykmichalik.opto.core.firstBlocking
 
 class SearchItemBackground(
     context: Context,
@@ -29,7 +29,7 @@ class SearchItemBackground(
     // LC-Note: System cross-window blur replaced by HokoBlur. The focus/group
     // highlight colors are now driven by the drawerBlurBackground HokoBlur
     // preference instead of BlurUtils.supportsBlursOnWindows().
-    private val drawerBlurEnabled = PreferenceManager2.getInstance(context.launcher).drawerBlurBackground.firstBlocking()
+    private val drawerBlurEnabled = PreferenceManager2.getInstance(context.launcher).drawerBlurBackground.firstCached()
 
     // Retained for any external callers that previously checked supportBlur.
     val supportBlur = drawerBlurEnabled

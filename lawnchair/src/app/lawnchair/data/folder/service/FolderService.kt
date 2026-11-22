@@ -1,12 +1,12 @@
-﻿package app.lawnchair.data.folder.service
+package app.lawnchair.data.folder.service
 
 import android.content.Context
-import androidx.core.content.edit
 import app.lawnchair.data.AppDatabase
 import app.lawnchair.data.folder.FolderEntry
 import app.lawnchair.data.folder.FolderInfoEntity
 import app.lawnchair.data.folder.FolderItemEntity
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
@@ -25,7 +25,7 @@ class FolderService @Inject constructor(
 ) : SafeCloseable {
 
     private val folderDao = AppDatabase.INSTANCE.get(context).folderDao()
-    private val prefs = PreferenceManager.getInstance(context)
+    private val prefs2 = PreferenceManager2.getInstance(context)
 
     fun getFoldersFlow(): Flow<List<FolderEntry>> {
         return folderDao.getAllFoldersWithItems()
@@ -64,7 +64,7 @@ class FolderService @Inject constructor(
     }
 
     private suspend fun migrateLegacyFolderRanks() = withContext(Dispatchers.IO) {
-        val legacyOrder = prefs.sp.getString(LEGACY_FOLDER_ORDER_STRING, "") ?: ""
+        val legacyOrder = prefs2.drawerListOrder.firstCached()
         if (legacyOrder.isNotEmpty()) {
             val legacyIds = stringToIntList(legacyOrder).distinct()
             val currentIds = folderDao.getAllFolderIds()
@@ -75,9 +75,7 @@ class FolderService @Inject constructor(
             if (orderedIds.isNotEmpty()) {
                 folderDao.updateFolderRanks(orderedIds)
             }
-            prefs.sp.edit {
-                putString(LEGACY_FOLDER_ORDER_STRING, "")
-            }
+            prefs2.drawerListOrder.set("")
         }
     }
 
@@ -106,5 +104,3 @@ class FolderService @Inject constructor(
         val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getFolderService)
     }
 }
-
-private const val LEGACY_FOLDER_ORDER_STRING = "pref_drawerListOrder"

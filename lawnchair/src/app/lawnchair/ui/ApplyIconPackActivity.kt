@@ -44,7 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.icons.CustomAdaptiveIconDrawable
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.setCached
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceTemplate
 import app.lawnchair.ui.preferences.iconPackIntents
@@ -93,8 +94,8 @@ class ApplyIconPackActivity : ComponentActivity() {
                         packName = info.first,
                         packIcon = info.second,
                         onConfirm = {
-                            PreferenceManager.getInstance(this@ApplyIconPackActivity)
-                                .iconPackPackage.set(packPackageName)
+                            PreferenceManager2.getInstance(this@ApplyIconPackActivity)
+                                .iconPackPackage.setCached(packPackageName)
                             finish()
                         },
                         onDismiss = { finish() },

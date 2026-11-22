@@ -16,8 +16,7 @@ import androidx.navigation.toRoute
 import app.lawnchair.backup.ui.CreateBackupScreen
 import app.lawnchair.backup.ui.restoreBackupGraph
 import app.lawnchair.backup.ui.restoreNovaBackupGraph
-import app.lawnchair.preferences.BasePreferenceManager
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.about.About
 import app.lawnchair.ui.preferences.about.acknowledgements.Acknowledgements
@@ -118,8 +117,7 @@ fun PreferenceNavigation(
         ) { GeneralPreferences() }
         composable<GeneralFontSelection> { backStackEntry ->
             val route: GeneralFontSelection = backStackEntry.toRoute()
-            val pref = preferenceManager().prefsMap[route.prefKey]
-                as? BasePreferenceManager.FontPref ?: return@composable
+            val pref = preferenceManager2().fontPrefsMap[route.prefKey] ?: return@composable
             FontSelection(pref)
         }
         composable<GeneralIconPack>(

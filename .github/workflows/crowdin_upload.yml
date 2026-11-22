@@ -1,8 +1,6 @@
 name: Crowdin Upload
 
 on:
-  push:
-
 jobs:
 
   synchronize-with-crowdin:

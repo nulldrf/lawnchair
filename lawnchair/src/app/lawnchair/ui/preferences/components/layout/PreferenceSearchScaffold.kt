@@ -1,6 +1,5 @@
 package app.lawnchair.ui.preferences.components.layout
 
-import android.graphics.Bitmap
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.Crossfade
@@ -33,8 +32,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,8 +40,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -52,11 +47,8 @@ import androidx.compose.ui.zIndex
 import androidx.core.graphics.ColorUtils
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
-import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
 import app.lawnchair.ui.theme.LawnchairTheme
 import app.lawnchair.ui.util.preview.PreviewLawnchair
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun PreferenceSearchScaffold(
@@ -67,41 +59,20 @@ fun PreferenceSearchScaffold(
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val context = LocalContext.current
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
     val prefs = preferenceManager()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
-
-    // Recompute bounds on configuration changes such as rotation.
-    val configuration = LocalConfiguration.current
-    val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
-    val screenWidth = screenBounds.width()
-    val screenHeight = screenBounds.height()
-
-    // Explicit `this.value` avoids shadowing the `value: String` parameter.
-    val blurredBitmap: Bitmap? by produceState<Bitmap?>(
-        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
-        blurEnabled, blurIntensity, screenWidth, screenHeight,
-    ) {
-        this.value = if (blurEnabled) {
-            withContext(Dispatchers.IO) {
-                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
-            }
-        } else {
-            SettingsWallpaperBlurHelper.clearCache()
-            null
-        }
-    }
+    val blurState = rememberSettingsBlurState(blurEnabled, blurIntensity)
 
     val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
     val scrimColor = Color(ColorUtils.setAlphaComponent(surfaceArgb, (0.72f * 255).toInt()))
 
-    val bitmap = blurredBitmap
-    val showBlur = blurEnabled && bitmap != null && !bitmap.isRecycled
+    val bitmap = blurState.bitmap
+    val showBlur = bitmap != null
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().then(blurState.sizeModifier)) {
         if (showBlur) {
             Image(
                 bitmap = bitmap!!.asImageBitmap(),

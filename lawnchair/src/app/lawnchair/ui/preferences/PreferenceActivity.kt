@@ -18,6 +18,7 @@ package app.lawnchair.ui.preferences
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -64,6 +65,13 @@ class PreferenceActivity : ComponentActivity() {
                 true,
             )
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Drop cached settings blur bitmap on every orientation/size change so the
+        // new orientation always takes a fresh crop from the system wallpaper.
+        SettingsWallpaperBlurHelper.clearCache()
     }
 
     companion object {

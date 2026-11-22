@@ -22,7 +22,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
-import android.graphics.Bitmap
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.os.Build
@@ -86,7 +85,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -100,7 +98,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -136,7 +133,6 @@ import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.ui.preferences.LocalNavController
-import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
 import app.lawnchair.ui.preferences.components.AnnouncementPreference
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
 import app.lawnchair.ui.preferences.components.controls.PreferenceCategory
@@ -145,6 +141,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.ScrollTargetManager
+import app.lawnchair.ui.preferences.components.layout.rememberSettingsBlurState
 import app.lawnchair.ui.preferences.components.notificationDotsEnabled
 import app.lawnchair.ui.preferences.components.notificationServiceEnabled
 import app.lawnchair.ui.preferences.data.liveinfo.SyncLiveInformation
@@ -181,8 +178,6 @@ import com.android.systemui.monet.SpecVersion
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.android.msdl.data.model.MSDLToken
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 // Checked state and change handler for inline switches in search results.
 private data class ToggleAction(
@@ -190,8 +185,7 @@ private data class ToggleAction(
     val onCheckedChange: (Boolean) -> Unit,
 )
 
-private fun PreferenceAdapter<Boolean>.toToggle(): ToggleAction =
-    ToggleAction(checked = state.value) { onChange(it) }
+private fun PreferenceAdapter<Boolean>.toToggle(): ToggleAction = ToggleAction(checked = state.value) { onChange(it) }
 
 private data class SearchableEntry(
     val label: String,
@@ -254,7 +248,9 @@ fun PreferencesDashboard(
                 .let { context.startActivity(it) }
             (context as? Activity)?.finish()
         }
-    } else null
+    } else {
+        null
+    }
 
     val aboutDescription = if (prefs.hideVersionInfo.get()) {
         prefs.pseudonymVersion.get()
@@ -267,33 +263,33 @@ fun PreferencesDashboard(
 
     var searchBarOffsetY by remember { mutableIntStateOf(0) }
 
-    val labelGeneral        = stringResource(R.string.general_label)
-    val descGeneral         = stringResource(R.string.general_description)
-    val labelThemedIcons    = stringResource(R.string.themed_icon_title)
-    val labelAdvancedIcons  = stringResource(R.string.advanced_icon_settings_title)
-    val labelHomeScreen     = stringResource(R.string.home_screen_label)
-    val descHomeScreen      = stringResource(R.string.home_screen_description)
-    val labelSmartspace     = stringResource(id = R.string.smartspace_widget)
-    val descSmartspace      = stringResource(R.string.smartspace_widget_description)
-    val labelDock           = stringResource(R.string.dock_label)
-    val descDock            = stringResource(R.string.dock_description)
-    val labelAppDrawer      = stringResource(R.string.app_drawer_label)
-    val descAppDrawer       = stringResource(R.string.app_drawer_description)
-    val labelSuggestions    = stringResource(R.string.suggestion_pref_screen_title)
-    val labelSearchBar      = stringResource(R.string.search_bar_label)
-    val descSearchBar       = stringResource(R.string.drawer_search_description)
-    val labelFolders        = stringResource(R.string.folders_label)
-    val descFolders         = stringResource(R.string.folders_description)
-    val labelGestures       = stringResource(id = R.string.gestures_label)
-    val descGestures        = stringResource(R.string.gestures_description)
-    val labelQuickstep      = stringResource(id = R.string.quickstep_label)
-    val descQuickstep       = stringResource(id = R.string.quickstep_description)
-    val labelBackup         = stringResource(R.string.backup_and_restore_label)
-    val descBackup          = stringResource(R.string.backup_and_restore_description)
-    val labelExtras         = stringResource(R.string.extras_label)
-    val descExtras          = stringResource(R.string.extras_description)
-    val labelExperimental   = stringResource(R.string.experimental_features_label)
-    val labelAbout          = stringResource(R.string.about_label)
+    val labelGeneral = stringResource(R.string.general_label)
+    val descGeneral = stringResource(R.string.general_description)
+    val labelThemedIcons = stringResource(R.string.themed_icon_title)
+    val labelAdvancedIcons = stringResource(R.string.advanced_icon_settings_title)
+    val labelHomeScreen = stringResource(R.string.home_screen_label)
+    val descHomeScreen = stringResource(R.string.home_screen_description)
+    val labelSmartspace = stringResource(id = R.string.smartspace_widget)
+    val descSmartspace = stringResource(R.string.smartspace_widget_description)
+    val labelDock = stringResource(R.string.dock_label)
+    val descDock = stringResource(R.string.dock_description)
+    val labelAppDrawer = stringResource(R.string.app_drawer_label)
+    val descAppDrawer = stringResource(R.string.app_drawer_description)
+    val labelSuggestions = stringResource(R.string.suggestion_pref_screen_title)
+    val labelSearchBar = stringResource(R.string.search_bar_label)
+    val descSearchBar = stringResource(R.string.drawer_search_description)
+    val labelFolders = stringResource(R.string.folders_label)
+    val descFolders = stringResource(R.string.folders_description)
+    val labelGestures = stringResource(id = R.string.gestures_label)
+    val descGestures = stringResource(R.string.gestures_description)
+    val labelQuickstep = stringResource(id = R.string.quickstep_label)
+    val descQuickstep = stringResource(id = R.string.quickstep_description)
+    val labelBackup = stringResource(R.string.backup_and_restore_label)
+    val descBackup = stringResource(R.string.backup_and_restore_description)
+    val labelExtras = stringResource(R.string.extras_label)
+    val descExtras = stringResource(R.string.extras_description)
+    val labelExperimental = stringResource(R.string.experimental_features_label)
+    val labelAbout = stringResource(R.string.about_label)
 
     val deckLayout = prefs2.deckLayout.getAdapter()
     val isSmartspaceEnabled = prefs2.enableSmartspace.firstCached()
@@ -330,18 +326,24 @@ fun PreferencesDashboard(
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Environment.isExternalStorageManager()
-            } else false,
+            } else {
+                false
+            },
         )
     }
     val settingsBlurMediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         rememberMultiplePermissionsState(
             listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO),
         )
-    } else null
+    } else {
+        null
+    }
     val settingsBlurPermissionsGranted = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
             settingsBlurManagedFilesChecked && (settingsBlurMediaPermission?.allPermissionsGranted == true)
+
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> settingsBlurManagedFilesChecked
+
         else -> true
     }
     LaunchedEffect(settingsBlurManagedFilesChecked, settingsBlurMediaPermission?.allPermissionsGranted) {
@@ -475,18 +477,24 @@ fun PreferencesDashboard(
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 Environment.isExternalStorageManager()
-            } else false,
+            } else {
+                false
+            },
         )
     }
     val drawerBlurMediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         rememberMultiplePermissionsState(
             listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO),
         )
-    } else null
+    } else {
+        null
+    }
     val drawerBlurPermissionsGranted = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
             drawerBlurManagedFilesChecked && (drawerBlurMediaPermission?.allPermissionsGranted == true)
+
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> drawerBlurManagedFilesChecked
+
         else -> true
     }
     LaunchedEffect(drawerBlurManagedFilesChecked, drawerBlurMediaPermission?.allPermissionsGranted) {
@@ -816,8 +824,7 @@ fun PreferencesDashboard(
         f(stringResource(R.string.show_labels), "show labels folder", ScrollKeys.FOLDER_SHOW_LABELS, toggle = showIconLabelsOnHomeScreenFolderAdapterObj.toToggle())
         f(stringResource(R.string.label_size), "label size folder", ScrollKeys.FOLDER_LABEL_SIZE, visible = folderShowLabels)
 
-        fun ge(label: String, kw: String = "", sk: String? = null) =
-            add(SearchableEntry(label, kw, labelGestures, R.drawable.ic_gestures, Gestures, sk))
+        fun ge(label: String, kw: String = "", sk: String? = null) = add(SearchableEntry(label, kw, labelGestures, R.drawable.ic_gestures, Gestures, sk))
         ge(stringResource(R.string.gesture_double_tap), "double tap action sleep lock screen", ScrollKeys.GESTURE_DOUBLE_TAP)
         ge(stringResource(R.string.gesture_swipe_up), "swipe up drawer recents app", ScrollKeys.GESTURE_SWIPE_UP)
         ge(stringResource(R.string.gesture_swipe_down), "swipe down notifications quick settings panel", ScrollKeys.GESTURE_SWIPE_DOWN)
@@ -843,8 +850,7 @@ fun PreferencesDashboard(
             q(stringResource(R.string.enable_taskbar_experimental), "taskbar phone quickstep experimental", ScrollKeys.QS_TASKBAR, visible = Utilities.ATLEAST_S_V2, toggle = enableTaskbarOnPhoneAdapter.toToggle())
         }
 
-        fun b(label: String, kw: String = "", sk: String? = null) =
-            add(SearchableEntry(label, kw, labelBackup, R.drawable.backup_restore, BackupAndRestore, sk))
+        fun b(label: String, kw: String = "", sk: String? = null) = add(SearchableEntry(label, kw, labelBackup, R.drawable.backup_restore, BackupAndRestore, sk))
         b(stringResource(R.string.create_backup), "export backup save layout settings create", ScrollKeys.CREATE_BACKUP)
         b(stringResource(R.string.restore_backup), "import restore backup load file", ScrollKeys.RESTORE_BACKUP)
         b(stringResource(R.string.restore_nova_backup), "import restore nova launcher backup", ScrollKeys.RESTORE_NOVA_BACKUP)
@@ -875,8 +881,7 @@ fun PreferencesDashboard(
         e(stringResource(R.string.gesturenavcontract_label), "gesturenavcontract api gesture navigation enhanced animation", ScrollKeys.GNC, route = ExperimentalFeatures, breadcrumb = breadcrumbExperimental, toggle = if (Utilities.ATLEAST_Q) enableGncAdapter.toToggle() else null)
         e(stringResource(R.string.vibration_feedback_level_label), "haptic vibration feedback level msdl", ScrollKeys.VIBRATION_FEEDBACK_LEVEL, route = ExperimentalFeatures, breadcrumb = breadcrumbExperimental)
 
-        fun ab(label: String, kw: String = "", sk: String? = null) =
-            add(SearchableEntry(label, kw, labelAbout, R.drawable.ic_about, About, sk))
+        fun ab(label: String, kw: String = "", sk: String? = null) = add(SearchableEntry(label, kw, labelAbout, R.drawable.ic_about, About, sk))
         ab(stringResource(R.string.news), "news announcements updates channel")
         ab(stringResource(R.string.support), "support help faq")
         ab(stringResource(R.string.github), "github source code repository")
@@ -1154,8 +1159,9 @@ private fun SearchOverlay(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     val filtered = remember(query, entries) {
-        if (query.isBlank()) emptyList()
-        else {
+        if (query.isBlank()) {
+            emptyList()
+        } else {
             val q = query.trim().lowercase()
             entries.filter {
                 it.label.lowercase().contains(q) || it.keywords.lowercase().contains(q)
@@ -1166,29 +1172,14 @@ private fun SearchOverlay(
     val prefs = preferenceManager()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
-
-    val configuration = LocalConfiguration.current
-    val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
-    val screenWidth = screenBounds.width()
-    val screenHeight = screenBounds.height()
-
-    val blurredBitmap: Bitmap? by produceState<Bitmap?>(
-        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
-        blurEnabled, blurIntensity, screenWidth, screenHeight,
-    ) {
-        this.value = if (blurEnabled) {
-            withContext(Dispatchers.IO) {
-                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
-            }
-        } else null
-    }
+    val blurState = rememberSettingsBlurState(blurEnabled, blurIntensity)
 
     val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
     val scrimColor = Color(ColorUtils.setAlphaComponent(surfaceArgb, (0.72f * 255).toInt()))
-    val bitmap = blurredBitmap
-    val showBlur = blurEnabled && bitmap != null && !bitmap.isRecycled
+    val bitmap = blurState.bitmap
+    val showBlur = bitmap != null
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().then(blurState.sizeModifier)) {
         if (showBlur) {
             Image(
                 bitmap = bitmap!!.asImageBitmap(),
@@ -1254,6 +1245,7 @@ private fun SearchOverlay(
 
             when {
                 query.isBlank() -> {}
+
                 filtered.isEmpty() -> {
                     Spacer(modifier = Modifier.height(32.dp))
                     Text(
@@ -1263,6 +1255,7 @@ private fun SearchOverlay(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     )
                 }
+
                 else -> {
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),

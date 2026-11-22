@@ -32,7 +32,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -43,14 +42,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.ColorUtils
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.preferenceManager
-import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal class PreferenceTopBarState(
@@ -74,7 +68,6 @@ fun PreferenceScaffold(
     bottomBar: @Composable () -> Unit = { BottomSpacer() },
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val context = LocalContext.current
     val scrollBehavior = if (isExpandedScreen) {
         TopAppBarDefaults.pinnedScrollBehavior()
     } else {
@@ -86,32 +79,14 @@ fun PreferenceScaffold(
     val prefs = preferenceManager()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
-
-    val configuration = LocalConfiguration.current
-    val screenBounds = remember(configuration) { SettingsWallpaperBlurHelper.screenBounds(context) }
-    val screenWidth = screenBounds.width()
-    val screenHeight = screenBounds.height()
-
-    val blurredBitmap by produceState(
-        initialValue = SettingsWallpaperBlurHelper.getCachedBitmap(blurEnabled, blurIntensity, screenWidth, screenHeight),
-        blurEnabled, blurIntensity, screenWidth, screenHeight,
-    ) {
-        value = if (blurEnabled) {
-            withContext(Dispatchers.IO) {
-                SettingsWallpaperBlurHelper.getBlurredBitmap(context, blurIntensity)
-            }
-        } else {
-            SettingsWallpaperBlurHelper.clearCache()
-            null
-        }
-    }
+    val blurState = rememberSettingsBlurState(blurEnabled, blurIntensity)
 
     val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
     val scrimColor = Color(ColorUtils.setAlphaComponent(surfaceArgb, (0.72f * 255).toInt()))
-    val bitmap = blurredBitmap
-    val showBlur = blurEnabled && bitmap != null && !bitmap.isRecycled
+    val bitmap = blurState.bitmap
+    val showBlur = bitmap != null
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().then(blurState.sizeModifier)) {
         if (showBlur) {
             Image(
                 bitmap = bitmap!!.asImageBitmap(),

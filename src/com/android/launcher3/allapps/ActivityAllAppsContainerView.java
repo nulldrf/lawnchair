@@ -35,6 +35,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -225,6 +226,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     // -----------------------------------------------------------------------
     @Nullable private Bitmap mBlurBitmap;
     private int mBlurRequestId = 0;
+    private int mBlurTargetWidth = -1;
+    private int mBlurTargetHeight = -1;
+    private int mBlurDisplayRotation = -1;
 
     public ActivityAllAppsContainerView(Context context) {
         this(context, null);
@@ -1148,12 +1152,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (updateBottomSheetBackgroundColor()) needsInvalidate = true;
         if (needsInvalidate) invalidate();
 
-        // LC-Note (rotation fix): null the stale bitmap immediately so it is
-        // not drawn at the wrong orientation even for one frame, then clear the
-        // helper cache and recompute for the new DeviceProfile viewport.
-        mBlurBitmap = null;
-        DrawerWallpaperBlurHelper.clearCache();
-        applyDrawerHokoBlur(dp);
+        // LC-Note (rotation fix): null the stale bitmap immediately and force a fresh
+        // wallpaper crop for the new orientation so portrait crops never leak into landscape.
+        Rect dpBounds = resolveBlurTargetBounds(dp, getResources().getConfiguration().orientation);
+        onBlurViewportChanged(dpBounds.width(), dpBounds.height(), getCurrentDisplayRotation(dp));
 
         // Cancel any in-flight search-bar animation so stale translationY from the
         // previous orientation cannot survive rotation. onLayout() will settle
@@ -1165,6 +1167,41 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mSearchContainer.requestLayout();
         }
         requestLayout();
+    }
+
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        Rect bounds = DrawerWallpaperBlurHelper.screenBoundsForOrientation(
+                getContext(), newConfig.orientation);
+        onBlurViewportChanged(
+                bounds.width(),
+                bounds.height(),
+                DrawerWallpaperBlurHelper.displayRotation(getContext()));
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if (w <= 0 || h <= 0 || (w == oldw && h == oldh)) {
+            return;
+        }
+        boolean viewLandscape = w > h;
+        boolean targetMismatch = mBlurTargetWidth > 0 && mBlurTargetHeight > 0
+                && (mBlurTargetWidth > mBlurTargetHeight) != viewLandscape;
+        boolean bitmapMismatch = mBlurBitmap != null
+                && (mBlurBitmap.getWidth() > mBlurBitmap.getHeight()) != viewLandscape;
+        if (targetMismatch || bitmapMismatch) {
+            int orientation = viewLandscape
+                    ? Configuration.ORIENTATION_LANDSCAPE
+                    : Configuration.ORIENTATION_PORTRAIT;
+            Rect bounds = DrawerWallpaperBlurHelper.screenBoundsForOrientation(
+                    getContext(), orientation);
+            onBlurViewportChanged(
+                    bounds.width(),
+                    bounds.height(),
+                    DrawerWallpaperBlurHelper.displayRotation(getContext()));
+        }
     }
 
     protected void updateBackgroundVisibility(DeviceProfile deviceProfile) {
@@ -1572,6 +1609,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     /**
      * Draws the blurred screen-wallpaper bitmap aligned to the scrim canvas without stretching
      * even if canvas bounds transiently differ from the bitmap dimensions (e.g. split-screen).
+     * Never draws a bitmap from a different orientation; instead triggers a fresh crop.
      */
     private void drawBlurBitmap(@NonNull Canvas canvas, @NonNull Bitmap blur) {
         final int canvasW = canvas.getWidth();
@@ -1579,6 +1617,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         final int bmpW = blur.getWidth();
         final int bmpH = blur.getHeight();
         if (canvasW <= 0 || canvasH <= 0 || bmpW <= 0 || bmpH <= 0) {
+            return;
+        }
+        if ((bmpW > bmpH) != (canvasW > canvasH)) {
+            if (mBlurTargetWidth != canvasW || mBlurTargetHeight != canvasH) {
+                final int rotation = DrawerWallpaperBlurHelper.displayRotation(getContext());
+                post(() -> onBlurViewportChanged(canvasW, canvasH, rotation));
+            }
             return;
         }
         if (bmpW == canvasW && bmpH == canvasH) {
@@ -1651,16 +1696,53 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         applyDrawerHokoBlur(mActivityContext.getDeviceProfile());
     }
 
+    private void onBlurViewportChanged(int targetW, int targetH, int rotation) {
+        if (targetW <= 0 || targetH <= 0) return;
+        boolean sameTarget = targetW == mBlurTargetWidth
+                && targetH == mBlurTargetHeight
+                && rotation == mBlurDisplayRotation;
+        if (sameTarget) {
+            return;
+        }
+        invalidateAndRecomputeDrawerBlur(targetW, targetH, rotation);
+    }
+
+    private void invalidateAndRecomputeDrawerBlur(int targetW, int targetH, int rotation) {
+        if (mBlurBitmap != null) {
+            mBlurBitmap = null;
+            invalidateHeader();
+        }
+        DrawerWallpaperBlurHelper.clearCache();
+        applyDrawerHokoBlur(targetW, targetH, rotation, /* forceReload= */ true);
+    }
+
     /**
      * Dispatches a wallpaper-blur recompute to a background thread for the
      * visible viewport defined by {@code dp} and the current workspace
      * wallpaper horizontal offset.
      */
     private void applyDrawerHokoBlur(@NonNull DeviceProfile dp) {
+        Rect bounds = resolveBlurTargetBounds(dp, getResources().getConfiguration().orientation);
+        int rotation = getCurrentDisplayRotation(dp);
+        boolean orientationChanged = mBlurTargetWidth > 0 && mBlurTargetHeight > 0
+                && (bounds.width() != mBlurTargetWidth
+                        || bounds.height() != mBlurTargetHeight
+                        || rotation != mBlurDisplayRotation);
+        if (orientationChanged) {
+            invalidateAndRecomputeDrawerBlur(bounds.width(), bounds.height(), rotation);
+        } else {
+            applyDrawerHokoBlur(bounds.width(), bounds.height(), rotation, /* forceReload= */ false);
+        }
+    }
+
+    private void applyDrawerHokoBlur(int targetW, int targetH, int rotation, boolean forceReload) {
         boolean blurEnabled = PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerBlurBackground());
 
         if (!blurEnabled) {
             mBlurRequestId++;
+            mBlurTargetWidth = -1;
+            mBlurTargetHeight = -1;
+            mBlurDisplayRotation = -1;
             if (mBlurBitmap != null) {
                 mBlurBitmap = null;
                 invalidateHeader();
@@ -1670,15 +1752,16 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
         final int intensity = Math.round(
                 PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerBlurIntensity()));
-        final int targetW = dp.getDeviceProperties().getWidthPx();
-        final int targetH = dp.getDeviceProperties().getHeightPx();
         final float xOffset = getCurrentWallpaperOffsetX();
         final Context ctx = getContext();
+        mBlurTargetWidth = targetW;
+        mBlurTargetHeight = targetH;
+        mBlurDisplayRotation = rotation;
         final int requestId = ++mBlurRequestId;
 
         UI_HELPER_EXECUTOR.execute(() -> {
             Bitmap blurred = DrawerWallpaperBlurHelper.getBlurredBitmap(
-                    ctx, intensity, targetW, targetH, xOffset);
+                    ctx, intensity, targetW, targetH, xOffset, rotation, forceReload);
             MAIN_EXECUTOR.getHandler().post(() -> {
                 if (requestId != mBlurRequestId) {
                     return;
@@ -1689,6 +1772,26 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 }
             });
         });
+    }
+
+    private Rect resolveBlurTargetBounds(@NonNull DeviceProfile dp, int orientation) {
+        int dpW = dp.getDeviceProperties().getWidthPx();
+        int dpH = dp.getDeviceProperties().getHeightPx();
+        boolean dpMatchesOrientation = dpW > 0 && dpH > 0
+                && !((orientation == Configuration.ORIENTATION_LANDSCAPE && dpW < dpH)
+                        || (orientation == Configuration.ORIENTATION_PORTRAIT && dpW > dpH));
+        if (dpMatchesOrientation) {
+            return new Rect(0, 0, dpW, dpH);
+        }
+        return DrawerWallpaperBlurHelper.screenBoundsForOrientation(getContext(), orientation);
+    }
+
+    private int getCurrentDisplayRotation(@NonNull DeviceProfile dp) {
+        int displayRotation = DrawerWallpaperBlurHelper.displayRotation(getContext());
+        if (displayRotation >= 0) {
+            return displayRotation;
+        }
+        return dp.getDeviceProperties().getRotationHint();
     }
 
     private float getCurrentWallpaperOffsetX() {

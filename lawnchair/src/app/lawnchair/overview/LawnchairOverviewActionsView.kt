@@ -14,6 +14,7 @@ import app.lawnchair.util.isOnePlusStock
 import app.lawnchair.util.repeatOnAttached
 import com.android.launcher3.R
 import com.android.quickstep.views.OverviewActionsView
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
@@ -48,12 +49,12 @@ class LawnchairOverviewActionsView @JvmOverloads constructor(
 
         repeatOnAttached {
             merge(
-                prefs.recentsActionClearAll.get().drop(1),
-                prefs.recentsActionLens.get().drop(1),
-                prefs.recentsActionScreenshot.get().drop(1),
-                prefs.recentsActionShare.get().drop(1),
-                prefs.recentsActionLocked.get().drop(1),
-                prefs.recentActionOrder.get().drop(1),
+                prefs.recentsActionClearAll.get().distinctUntilChanged().drop(1),
+                prefs.recentsActionLens.get().distinctUntilChanged().drop(1),
+                prefs.recentsActionScreenshot.get().distinctUntilChanged().drop(1),
+                prefs.recentsActionShare.get().distinctUntilChanged().drop(1),
+                prefs.recentsActionLocked.get().distinctUntilChanged().drop(1),
+                prefs.recentActionOrder.get().distinctUntilChanged().drop(1),
             ).onEach {
                 updateVisibilities()
             }.launchIn(this)

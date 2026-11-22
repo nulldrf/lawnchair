@@ -170,8 +170,8 @@ class LawnchairIconProvider @Inject constructor(
         // Flush caches when "Apply smart backgrounds to icon pack" changes.
         // Not routed through ThemeManager since it doesn't affect shape/theme state.
         prefs.colorizeIconPackBackground.get()
-            .drop(1)
             .distinctUntilChanged()
+            .drop(1)
             .onEach {
                 Executors.MODEL_EXECUTOR.execute {
                     updateSystemState()
@@ -457,16 +457,16 @@ class LawnchairIconProvider @Inject constructor(
         init {
             recreateCalendarAndClockChangeReceiver()
             iconPackPref.get()
-                .drop(1)
                 .distinctUntilChanged()
+                .drop(1)
                 .onEach {
                     recreateCalendarAndClockChangeReceiver()
                     updateIconStateIfNeeded()
                 }
                 .launchIn(receiverScope)
             themedIconPackPref.get()
-                .drop(1)
                 .distinctUntilChanged()
+                .drop(1)
                 .onEach {
                     updateIconStateIfNeeded()
                 }

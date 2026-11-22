@@ -14,13 +14,13 @@ import kotlinx.coroutines.flow.onEach
 
 @Composable
 fun <C, S> Preference<C, S, *>.asState() = if (this is PreferenceImpl<C, S>) {
-    get().collectAsStateWithLifecycle(initialValue = firstCached())
+    get().distinctUntilChanged().collectAsStateWithLifecycle(initialValue = firstCached())
 } else {
-    get().collectAsStateWithLifecycle(initialValue = firstBlocking())
+    get().distinctUntilChanged().collectAsStateWithLifecycle(initialValue = firstBlocking())
 }
 
 @Composable
-fun <C, S> PreferenceImpl<C, S>.asState() = get().collectAsStateWithLifecycle(initialValue = firstCached())
+fun <C, S> PreferenceImpl<C, S>.asState() = get().distinctUntilChanged().collectAsStateWithLifecycle(initialValue = firstCached())
 
 fun <C, S> PreferenceImpl<C, S>.subscribeBlocking(
     prefs2: PreferenceManager2,

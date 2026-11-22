@@ -5,15 +5,15 @@ import com.android.launcher3.R
 
 /**
  * Controls the animation used when opening (launching) an app from the launcher.
- * Backported from old Lawnchair 2 animation system (ch.deletescape.lawnchair.animations).
+ * 1:1 port of Lawnchair 9's animation types (`ch.deletescape.lawnchair.animations.AnimationType`).
  *
- * - DEFAULT   : System default clip-reveal from icon
- * - PIE       : Android Pie (9) style — launcher scales up & fades while app scales in from 0.3
- * - REVEAL    : Circular clip-reveal expanding from the tapped icon
- * - SLIDE_UP  : App slides in from the bottom edge of the screen
- * - SCALE_UP  : App scales up from the tapped icon position
- * - BLINK     : Quick triple-flash blink before the app appears
- * - FADE      : Simple cross-fade between launcher and app
+ * - DEFAULT   : System / Quickstep default launch animation
+ * - PIE       : Emulated Android Pie (9) icon-to-splash launch and slide-down return
+ * - REVEAL    : System clip-reveal expanding from the tapped icon
+ * - SLIDE_UP  : App slides up from the bottom edge (`task_open_enter` / `no_anim`)
+ * - SCALE_UP  : System scale-up from the tapped icon bounds
+ * - BLINK     : Horizontal/vertical stretch-blink (`blink_open_*` / `blink_close_*`)
+ * - FADE      : Short cross-fade (`fade_in_short` / `fade_out_short`)
  */
 enum class AppOpenAnimationType(val value: String, @StringRes val labelRes: Int) {
     DEFAULT("default", R.string.animation_type_default),

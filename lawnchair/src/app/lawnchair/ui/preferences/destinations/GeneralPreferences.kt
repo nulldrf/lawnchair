@@ -321,18 +321,24 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             mutableStateOf(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Environment.isExternalStorageManager()
-                } else false,
+                } else {
+                    false
+                },
             )
         }
         val settingsBlurMediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             rememberMultiplePermissionsState(
                 listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO),
             )
-        } else null
+        } else {
+            null
+        }
         val settingsBlurPermissionsGranted = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
                 settingsBlurManagedFilesChecked && (settingsBlurMediaPermission?.allPermissionsGranted == true)
+
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> settingsBlurManagedFilesChecked
+
             else -> true
         }
         LaunchedEffect(settingsBlurManagedFilesChecked, settingsBlurMediaPermission?.allPermissionsGranted) {
@@ -362,8 +368,9 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                     SliderPreference(
                         label = stringResource(id = R.string.settings_blur_intensity_label),
                         adapter = prefs.settingsBlurIntensity.getAdapter(),
-                        valueRange = 10F..150F,
-                        step = 10f,
+                        valueRange = 10f..150f,
+                        step = 5f,
+                        showUnit = "%",
                     )
                 }
             }

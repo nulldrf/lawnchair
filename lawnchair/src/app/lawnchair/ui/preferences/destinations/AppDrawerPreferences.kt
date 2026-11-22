@@ -135,18 +135,24 @@ fun AppDrawerPreferences(
             mutableStateOf(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Environment.isExternalStorageManager()
-                } else false,
+                } else {
+                    false
+                },
             )
         }
         val drawerBlurMediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             rememberMultiplePermissionsState(
                 listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO),
             )
-        } else null
+        } else {
+            null
+        }
         val drawerBlurPermissionsGranted = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
                 drawerBlurManagedFilesChecked && (drawerBlurMediaPermission?.allPermissionsGranted == true)
+
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> drawerBlurManagedFilesChecked
+
             else -> true
         }
         LaunchedEffect(drawerBlurManagedFilesChecked, drawerBlurMediaPermission?.allPermissionsGranted) {
@@ -208,6 +214,7 @@ fun AppDrawerPreferences(
                         adapter = prefs2.drawerBlurIntensity.getAdapter(),
                         step = 5f,
                         valueRange = 10f..150f,
+                        showUnit = "%",
                     )
                 }
             }

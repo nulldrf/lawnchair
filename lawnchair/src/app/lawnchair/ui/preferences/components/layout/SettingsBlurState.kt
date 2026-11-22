@@ -21,6 +21,13 @@ internal data class SettingsBlurState(
     val sizeModifier: Modifier,
 )
 
+private data class SettingsBlurViewportKey(
+    val width: Int,
+    val height: Int,
+    val orientation: Int,
+    val rotation: Int,
+)
+
 /**
  * Loads and keeps a blurred wallpaper bitmap in sync with the settings container's
  * live pixel bounds and screen orientation.
@@ -47,53 +54,61 @@ internal fun rememberSettingsBlurState(
     val displayRotation = remember(orientation, targetWidth, targetHeight) {
         SettingsWallpaperBlurHelper.displayRotation(context)
     }
+    val viewportKey = SettingsBlurViewportKey(
+        width = targetWidth,
+        height = targetHeight,
+        orientation = orientation,
+        rotation = displayRotation,
+    )
 
-    var bitmap by remember {
-        mutableStateOf(
-            SettingsWallpaperBlurHelper.getCachedBitmap(
-                blurEnabled = blurEnabled,
-                blurIntensity = blurIntensity,
-                width = targetWidth,
-                height = targetHeight,
-                displayRotation = displayRotation,
-            ),
+    // Pair the bitmap with the requested viewport key rather than checking exact
+    // bitmap pixel dimensions: HokoBlur's sampleFactor downscale/upscale can round
+    // the output bitmap by 1–3 px at certain blur intensities (e.g. 75%–100%).
+    var loaded by remember {
+        val cached = SettingsWallpaperBlurHelper.getCachedBitmap(
+            blurEnabled = blurEnabled,
+            blurIntensity = blurIntensity,
+            width = targetWidth,
+            height = targetHeight,
+            displayRotation = displayRotation,
         )
+        mutableStateOf(cached?.let { viewportKey to it })
     }
-    var lastOrientationKey by remember { mutableStateOf(orientation to displayRotation) }
 
-    LaunchedEffect(blurEnabled, blurIntensity, targetWidth, targetHeight, orientation, displayRotation) {
+    LaunchedEffect(blurEnabled, blurIntensity, viewportKey) {
         if (!blurEnabled) {
-            bitmap = null
+            loaded = null
             SettingsWallpaperBlurHelper.clearCache()
             return@LaunchedEffect
         }
 
-        val orientationChanged = lastOrientationKey != (orientation to displayRotation)
-        lastOrientationKey = orientation to displayRotation
-
-        val current = bitmap
-        val sizeMismatch = current != null && (current.width != targetWidth || current.height != targetHeight)
-        if (orientationChanged || sizeMismatch) {
-            bitmap = null
+        val currentKey = loaded?.first
+        val viewportChanged = currentKey != null && currentKey != viewportKey
+        if (viewportChanged) {
+            loaded = null
         }
 
-        bitmap = withContext(Dispatchers.IO) {
+        val fresh = withContext(Dispatchers.IO) {
             SettingsWallpaperBlurHelper.getBlurredBitmap(
                 context = context,
                 blurIntensity = blurIntensity,
-                targetWidth = targetWidth,
-                targetHeight = targetHeight,
-                displayRotation = displayRotation,
-                forceReload = orientationChanged || sizeMismatch,
+                targetWidth = viewportKey.width,
+                targetHeight = viewportKey.height,
+                displayRotation = viewportKey.rotation,
+                forceReload = viewportChanged,
             )
         }
+        loaded = fresh?.let { viewportKey to it }
     }
 
-    val validBitmap = bitmap?.takeIf {
-        blurEnabled &&
-            !it.isRecycled &&
-            it.width == targetWidth &&
-            it.height == targetHeight
+    val validBitmap = loaded?.let { (loadedKey, bmp) ->
+        val sameOrientation = targetWidth == targetHeight ||
+            (bmp.width > bmp.height) == (targetWidth > targetHeight)
+        if (blurEnabled && loadedKey == viewportKey && !bmp.isRecycled && sameOrientation) {
+            bmp
+        } else {
+            null
+        }
     }
 
     return SettingsBlurState(

@@ -16,8 +16,8 @@ interface PirateWeatherApi {
         @Path("apikey") apiKey: String,
         @Path("lat") lat: Double,
         @Path("lon") lon: Double,
-        /** We only need currently — exclude everything else for a leaner response. */
-        @Query("exclude") exclude: String = "minutely,hourly,daily,alerts",
+        /** Keep `daily` alongside `currently` so we have today's sunrise/sunset for day/night icons. */
+        @Query("exclude") exclude: String = "minutely,hourly,alerts",
         @Query("units") units: String = "si",
     ): PirateWeatherForecastResult
 }

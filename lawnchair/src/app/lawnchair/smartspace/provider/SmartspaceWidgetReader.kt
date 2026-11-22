@@ -26,6 +26,8 @@ import app.lawnchair.util.pendingIntent
 import com.android.launcher3.R
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
@@ -35,9 +37,26 @@ class SmartspaceWidgetReader(context: Context) :
         R.string.smartspace_weather,
         { smartspaceAagWidget },
     ) {
+    private val prefs = PreferenceManager2.getInstance(context)
     override val isAvailable: Boolean
 
     override val disabledTargets = listOf(dummyTarget)
+
+    // When a custom weather provider is active, emit emptyList() even if Google is
+    // disabled/unavailable (isAvailable == false) or smartspaceAagWidget is turned off,
+    // so SmartspaceWidgetReader never injects a duplicate date-only card alongside
+    // WeatherDataProvider.
+    override val disabledTargetsFlow: Flow<List<SmartspaceTarget>> =
+        prefs.smartspaceWeatherProvider.get()
+            .distinctUntilChanged()
+            .map { weatherProvider ->
+                if (weatherProvider != WeatherProvider.NONE) {
+                    emptyList()
+                } else {
+                    listOf(dummyTarget)
+                }
+            }
+
     private val widget: HeadlessWidgetsManager.Widget?
     override val internalTargets: Flow<List<SmartspaceTarget>>
 
@@ -51,7 +70,6 @@ class SmartspaceWidgetReader(context: Context) :
             widgetsManager.getWidget(provider, "smartspaceWidgetId")
         }
 
-        val prefs = PreferenceManager2.getInstance(context)
         val widgetFlow = widget?.updates?.map(this::extractWidgetLayout) ?: flowOf(disabledTargets)
 
         // When a custom weather provider is active, strip FEATURE_WEATHER targets so the
@@ -59,17 +77,26 @@ class SmartspaceWidgetReader(context: Context) :
         // contribute zero pager cards rather than a blank dummy card.
         internalTargets = combine(
             widgetFlow,
-            prefs.smartspaceWeatherProvider.get(),
+            prefs.smartspaceWeatherProvider.get().distinctUntilChanged(),
         ) { targets, weatherProvider ->
             if (weatherProvider != WeatherProvider.NONE) {
-                targets.filter { it.featureType != SmartspaceTarget.FeatureType.FEATURE_WEATHER }
+                if (widget?.isBound != true) {
+                    emptyList()
+                } else {
+                    targets.filter { it.featureType != SmartspaceTarget.FeatureType.FEATURE_WEATHER }
+                }
             } else {
                 targets
             }
         }
     }
 
-    override suspend fun requiresSetup() = widget?.isBound == false
+    override suspend fun requiresSetup(): Boolean {
+        if (prefs.smartspaceWeatherProvider.get().first() != WeatherProvider.NONE) {
+            return false
+        }
+        return widget?.isBound == false
+    }
 
     override suspend fun startSetup(activity: Activity) {
         val intent = widget?.getBindIntent() ?: return
@@ -154,8 +181,7 @@ class SmartspaceWidgetReader(context: Context) :
         )
     }
 
-    private fun extractBitmap(imageView: ImageView?): Bitmap? =
-        (imageView?.drawable as? BitmapDrawable)?.bitmap
+    private fun extractBitmap(imageView: ImageView?): Bitmap? = (imageView?.drawable as? BitmapDrawable)?.bitmap
 
     data class WeatherData(
         val icon: Bitmap,
@@ -164,8 +190,7 @@ class SmartspaceWidgetReader(context: Context) :
         val forecastIntent: Intent? = null,
         val pendingIntent: PendingIntent? = null,
     ) {
-        fun getTitle(unit: Temperature.Unit = temperature.unit): String =
-            "${temperature.inUnit(unit)}${unit.suffix}"
+        fun getTitle(unit: Temperature.Unit = temperature.unit): String = "${temperature.inUnit(unit)}${unit.suffix}"
     }
 
     companion object {
@@ -199,8 +224,11 @@ class SmartspaceWidgetReader(context: Context) :
                         ),
                         pendingIntent = intent,
                     )
-                } catch (_: NumberFormatException) { null }
-                catch (_: IllegalArgumentException) { null }
+                } catch (_: NumberFormatException) {
+                    null
+                } catch (_: IllegalArgumentException) {
+                    null
+                }
             } else {
                 null
             }

@@ -17,26 +17,27 @@ enum class WeatherCondition {
     HAIL,
     THUNDERSTORM,
     WINDY,
-    NA;
+    NA,
+    ;
 
     fun toDisplayString(): String = when (this) {
-        CLEAR         -> "Clear"
-        MOSTLY_CLEAR  -> "Mostly clear"
+        CLEAR -> "Clear"
+        MOSTLY_CLEAR -> "Mostly clear"
         PARTLY_CLOUDY -> "Partly cloudy"
         MOSTLY_CLOUDY -> "Mostly cloudy"
-        CLOUDY        -> "Cloudy"
-        OVERCAST      -> "Overcast"
-        FOG           -> "Fog"
-        DRIZZLE       -> "Drizzle"
-        RAIN          -> "Rain"
+        CLOUDY -> "Cloudy"
+        OVERCAST -> "Overcast"
+        FOG -> "Fog"
+        DRIZZLE -> "Drizzle"
+        RAIN -> "Rain"
         FREEZING_RAIN -> "Freezing rain"
-        SLEET         -> "Sleet"
-        SNOW          -> "Snow"
-        FLURRIES      -> "Flurries"
-        HAIL          -> "Hail"
-        THUNDERSTORM  -> "Thunderstorm"
-        WINDY         -> "Windy"
-        NA            -> ""
+        SLEET -> "Sleet"
+        SNOW -> "Snow"
+        FLURRIES -> "Flurries"
+        HAIL -> "Hail"
+        THUNDERSTORM -> "Thunderstorm"
+        WINDY -> "Windy"
+        NA -> ""
     }
 
     companion object {
@@ -58,16 +59,18 @@ enum class WeatherCondition {
         }
 
         fun fromPirateIcon(icon: String?): WeatherCondition = when (icon) {
-            "clear-day", "clear-night"                 -> CLEAR
-            "partly-cloudy-day", "partly-cloudy-night" -> PARTLY_CLOUDY
-            "cloudy"                                   -> CLOUDY
-            "rain"                                     -> RAIN
-            "sleet"                                    -> SLEET
-            "snow"                                     -> SNOW
-            "fog"                                      -> FOG
-            "wind"                                     -> WINDY
-            "thunderstorm"                             -> THUNDERSTORM
-            else                                       -> NA
+            "clear-day", "clear-night", "clear" -> CLEAR
+            "partly-cloudy-day", "partly-cloudy-night", "partly-cloudy" -> PARTLY_CLOUDY
+            "mostly-cloudy-day", "mostly-cloudy-night" -> MOSTLY_CLOUDY
+            "cloudy" -> CLOUDY
+            "rain" -> RAIN
+            "sleet" -> SLEET
+            "snow" -> SNOW
+            "hail" -> HAIL
+            "fog" -> FOG
+            "wind" -> WINDY
+            "thunderstorm" -> THUNDERSTORM
+            else -> NA
         }
     }
 }

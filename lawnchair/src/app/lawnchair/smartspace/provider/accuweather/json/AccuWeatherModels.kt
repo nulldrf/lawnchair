@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AccuLocationResult(
-    val Key: String,
+    val Key: String? = null,
     val LocalizedName: String? = null,
     val Country: AccuLocationArea? = null,
 )
@@ -19,6 +19,7 @@ data class AccuLocationArea(
 data class AccuCurrentResult(
     val WeatherText: String? = null,
     val WeatherIcon: Int? = null,
+    val IsDayTime: Boolean? = null,
     val Temperature: AccuValueContainer? = null,
 )
 

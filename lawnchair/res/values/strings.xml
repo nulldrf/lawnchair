@@ -637,8 +637,9 @@
     <string name="smartspace_weather_unit_fahrenheit">Fahrenheit (°F)</string>
     <string name="smartspace_weather_unit_kelvin">Kelvin (K)</string>
 
-   <!-- Icon pack -->
+    <!-- Icon pack -->
     <string name="smartspace_weather_icon_pack">Weather Icon Pack</string>
+    <string name="smartspace_weather_icon_pack_builtin">Built-in</string>
     <string name="smartspace_weather_icon_pack_none">None (no icon)</string>
     <string name="smartspace_weather_icon_pack_get_more">Get more</string>
 

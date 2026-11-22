@@ -2,7 +2,6 @@
 package app.lawnchair.smartspace.provider
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -11,7 +10,6 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
-import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -21,25 +19,31 @@ import app.lawnchair.smartspace.model.SmartspaceAction
 import app.lawnchair.smartspace.model.SmartspaceScores
 import app.lawnchair.smartspace.model.SmartspaceTarget
 import app.lawnchair.smartspace.provider.accuweather.AccuWeatherApi
-import app.lawnchair.smartspace.provider.accuweather.json.AccuCurrentResult
 import app.lawnchair.smartspace.provider.openmeteo.OpenMeteoApi
 import app.lawnchair.smartspace.provider.openmeteo.OpenMeteoGeocodingApi
-import app.lawnchair.smartspace.provider.openmeteo.json.OpenMeteoWeatherCurrent
 import app.lawnchair.smartspace.provider.openweathermap.OpenWeatherMapApi
-import app.lawnchair.smartspace.provider.openweathermap.json.OpenWeatherCurrentResult
 import app.lawnchair.smartspace.provider.pirateweather.PirateWeatherApi
-import app.lawnchair.smartspace.provider.pirateweather.json.PirateWeatherCurrently
+import app.lawnchair.smartspace.provider.pirateweather.json.PirateWeatherForecastResult
 import app.lawnchair.smartspace.provider.weather.TemperatureUnit
 import app.lawnchair.smartspace.provider.weather.WeatherCondition
 import app.lawnchair.smartspace.provider.weather.WeatherIconProvider
 import app.lawnchair.smartspace.provider.weather.WeatherProvider
 import com.android.launcher3.R
+import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -51,9 +55,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import java.util.concurrent.Executors
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 private data class WeatherConfigPartial(
     val provider: WeatherProvider,
@@ -77,15 +78,17 @@ private data class WeatherConfig(
 private data class Coords(val lat: Double, val lon: Double)
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class WeatherDataProvider(context: Context) : SmartspaceDataSource(
-    context,
-    R.string.smartspace_weather_source,
-    { smartspaceWeatherEnabled },
-) {
-    // Never block with a setup card — show date-only card instead.
-    // configFlow.flatMapLatest handles config changes reactively without needing restart().
-    override val disabledTargets get() = listOf(emptyWeatherTarget())
+class WeatherDataProvider(context: Context) :
+    SmartspaceDataSource(
+        context,
+        R.string.smartspace_weather_source,
+        { smartspaceWeatherEnabled },
+    ) {
+    // Emit emptyList() when disabled so we never duplicate the date card owned by
+    // SmartspaceWidgetReader / SmartspaceProvider's single fallback.
+    override val disabledTargets get() = emptyList<SmartspaceTarget>()
     override suspend fun requiresSetup() = false
+
     private val prefs = PreferenceManager2.getInstance(context)
     private val iconProvider = WeatherIconProvider(context)
     private val sp: SharedPreferences =
@@ -116,80 +119,119 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
             provider = partial.provider,
             iconPack = partial.iconPack.ifBlank { null },
             unit = partial.unit,
-            city = partial.city,
-            pirateApiKey = partial.pirateApiKey,
-            owmApiKey = owmKey,
-            accuApiKey = accuKey,
-            refreshInterval = interval,
+            city = partial.city.trim(),
+            pirateApiKey = partial.pirateApiKey.trim(),
+            owmApiKey = owmKey.trim(),
+            accuApiKey = accuKey.trim(),
+            refreshInterval = interval.coerceAtLeast(15L),
         )
-    }
+    }.distinctUntilChanged()
 
     override val internalTargets = configFlow.flatMapLatest { config ->
         when (config.provider) {
             WeatherProvider.NONE -> flowOf(emptyList())
+
             WeatherProvider.OPEN_METEO ->
-                weatherFlow(config.refreshInterval) { fetchOpenMeteo(config) }
+                weatherFlow(config) { fetchOpenMeteo(config) }
+
             WeatherProvider.PIRATE_WEATHER ->
-                weatherFlow(config.refreshInterval) { fetchPirateWeather(config) }
+                weatherFlow(config) { fetchPirateWeather(config) }
+
             WeatherProvider.OPEN_WEATHER_MAP ->
-                weatherFlow(config.refreshInterval) { fetchOpenWeatherMap(config) }
+                weatherFlow(config) { fetchOpenWeatherMap(config) }
+
             WeatherProvider.ACCU_WEATHER ->
-                weatherFlow(config.refreshInterval) { fetchAccuWeather(config) }
+                weatherFlow(config) { fetchAccuWeather(config) }
         }
     }.flowOn(Dispatchers.IO)
 
-    // ── Setup ─────────────────────────────────────────────────────────────────
+    fun refreshNow() {
+        restart()
+    }
 
-
-
-    // ── Polling flow with cache ───────────────────────────────────────────────
+    // ── Polling flow with cache & retry backoff ──────────────────────────────
 
     private fun weatherFlow(
-        intervalMinutes: Long,
+        config: WeatherConfig,
         fetch: suspend () -> List<SmartspaceTarget>,
     ) = flow {
         // Always emit immediately so the date card is never blank, even on first run
-        // with no cache and no internet. emptyWeatherTarget() shows date-only card.
-        emit(buildCachedTargets().ifEmpty { listOf(emptyWeatherTarget()) })
+        // with no cache and no internet. Re-renders cached temperature with the latest
+        // unit & icon pack immediately when those settings change.
+        emit(buildCachedTargets(config).ifEmpty { listOf(emptyWeatherTarget()) })
 
+        var consecutiveFailures = 0
         while (true) {
             val fresh = fetch()
             if (fresh.isNotEmpty()) {
+                consecutiveFailures = 0
                 emit(fresh)
+                delay(config.refreshInterval.minutes)
             } else {
-                // No fresh data — re-emit cache or date-only fallback
-                emit(buildCachedTargets().ifEmpty { listOf(emptyWeatherTarget()) })
+                consecutiveFailures++
+                emit(buildCachedTargets(config).ifEmpty { listOf(emptyWeatherTarget()) })
+                // Short progressive retry backoff (1m -> 2m -> 5m, capped at refreshInterval)
+                // so temporary boot/network/GPS failures recover quickly.
+                val retryMinutes = when (consecutiveFailures) {
+                    1 -> 1L
+                    2 -> 2L
+                    else -> 5L
+                }.coerceAtMost(config.refreshInterval)
+                delay(retryMinutes.minutes)
             }
-            delay(intervalMinutes.minutes)
         }
     }
 
     // ── Cache ─────────────────────────────────────────────────────────────────
 
-    private fun saveCache(tempCelsius: Double, condition: WeatherCondition, isDay: Boolean, summary: String?) {
+    private fun saveCache(
+        config: WeatherConfig,
+        tempCelsius: Double,
+        condition: WeatherCondition,
+        isDay: Boolean,
+        summary: String?,
+    ) {
         sp.edit()
             .putFloat(KEY_TEMP, tempCelsius.toFloat())
             .putString(KEY_CONDITION, condition.name)
             .putBoolean(KEY_IS_DAY, isDay)
             .putString(KEY_SUMMARY, summary)
+            .putLong(KEY_TIMESTAMP, System.currentTimeMillis())
+            .putString(KEY_PROVIDER, config.provider.name)
+            .putString(KEY_CITY, config.city.lowercase(Locale.ROOT))
             .apply()
     }
 
-    private fun buildCachedTargets(): List<SmartspaceTarget> {
-        val temp = sp.getFloat(KEY_TEMP, Float.MIN_VALUE)
-        if (temp == Float.MIN_VALUE) return emptyList()
+    private fun buildCachedTargets(config: WeatherConfig): List<SmartspaceTarget> {
+        if (!sp.contains(KEY_TEMP)) return emptyList()
+        val cachedProvider = sp.getString(KEY_PROVIDER, null)
+        val cachedCity = sp.getString(KEY_CITY, null)
+        if (cachedProvider != null && cachedProvider != config.provider.name) return emptyList()
+        if (cachedCity != null && cachedCity != config.city.lowercase(Locale.ROOT)) return emptyList()
+
+        val timestamp = sp.getLong(KEY_TIMESTAMP, 0L)
+        if (timestamp > 0L && System.currentTimeMillis() - timestamp > MAX_CACHE_AGE_MS) {
+            return emptyList()
+        }
+
+        val temp = sp.getFloat(KEY_TEMP, Float.NaN)
+        if (temp.isNaN()) return emptyList()
         val conditionName = sp.getString(KEY_CONDITION, null) ?: return emptyList()
         val condition = runCatching { WeatherCondition.valueOf(conditionName) }
             .getOrDefault(WeatherCondition.NA)
         val isDay = sp.getBoolean(KEY_IS_DAY, true)
         val summary = sp.getString(KEY_SUMMARY, null)
-        val iconPack = prefs.smartspaceWeatherIconPack.get().let {
-            try { kotlinx.coroutines.runBlocking { it.first() }.ifBlank { null } } catch (e: Exception) { null }
-        }
-        val unit = try {
-            kotlinx.coroutines.runBlocking { prefs.smartspaceWeatherUnit.get().first() }
-        } catch (e: Exception) { TemperatureUnit.CELSIUS }
-        return listOf(buildTarget("weatherCached", condition, isDay, temp.toDouble(), summary, iconPack, unit))
+        return listOf(
+            buildTarget(
+                id = "weatherCached",
+                condition = condition,
+                isDay = isDay,
+                tempCelsius = temp.toDouble(),
+                summary = summary,
+                iconPack = config.iconPack,
+                unit = config.unit,
+            ),
+        )
     }
 
     // ── Open-Meteo ────────────────────────────────────────────────────────────
@@ -198,14 +240,20 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         return try {
             val coords = resolveCoords(config) ?: return emptyList()
             val result = openMeteoApi.getWeather(coords.lat, coords.lon, OPEN_METEO_CURRENT_FIELDS)
-            if (result.error == true) { Log.w(TAG, "Open-Meteo error: ${result.reason}"); return emptyList() }
+            if (result.error == true) {
+                Log.w(TAG, "Open-Meteo error: ${result.reason}")
+                return emptyList()
+            }
             val current = result.current ?: return emptyList()
             val temp = current.temperature ?: return emptyList()
             val isDay = current.isDay != 0
             val condition = WeatherCondition.fromWmoCode(current.weatherCode, isDay)
-            saveCache(temp, condition, isDay, null)
+            saveCache(config, temp, condition, isDay, null)
             listOf(buildTarget("openMeteoWeather", condition, isDay, temp, null, config.iconPack, config.unit))
-        } catch (e: Exception) { Log.e(TAG, "Open-Meteo fetch failed", e); emptyList() }
+        } catch (e: Exception) {
+            Log.e(TAG, "Open-Meteo fetch failed", e)
+            emptyList()
+        }
     }
 
     // ── PirateWeather ─────────────────────────────────────────────────────────
@@ -217,11 +265,31 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
             val result = pirateApi.getForecast(config.pirateApiKey, coords.lat, coords.lon)
             val currently = result.currently ?: return emptyList()
             val temp = currently.temperature ?: return emptyList()
-            val isDay = currently.icon?.endsWith("-night") == false
+            val isDay = resolvePirateIsDay(result)
             val condition = WeatherCondition.fromPirateIcon(currently.icon)
-            saveCache(temp, condition, isDay, currently.summary)
+            saveCache(config, temp, condition, isDay, currently.summary)
             listOf(buildTarget("pirateWeather", condition, isDay, temp, currently.summary, config.iconPack, config.unit))
-        } catch (e: Exception) { Log.e(TAG, "PirateWeather fetch failed", e); emptyList() }
+        } catch (e: Exception) {
+            Log.e(TAG, "PirateWeather fetch failed", e)
+            emptyList()
+        }
+    }
+
+    private fun resolvePirateIsDay(result: PirateWeatherForecastResult): Boolean {
+        val icon = result.currently?.icon
+        if (icon != null) {
+            if (icon.endsWith("-night")) return false
+            if (icon.endsWith("-day")) return true
+        }
+        val nowSec = result.currently?.time ?: (System.currentTimeMillis() / 1000L)
+        val today = result.daily?.data?.firstOrNull()
+        val sunrise = today?.sunriseTime
+        val sunset = today?.sunsetTime
+        if (sunrise != null && sunset != null && sunrise < sunset) {
+            return nowSec in sunrise..sunset
+        }
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return hour in 6..18
     }
 
     // ── OpenWeatherMap ────────────────────────────────────────────────────────
@@ -238,25 +306,28 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
             val isDay = !icon.endsWith("n")
             val condition = owmCodeToCondition(weatherId)
             val description = result.weather?.firstOrNull()?.description
-            saveCache(temp, condition, isDay, description)
+            saveCache(config, temp, condition, isDay, description)
             listOf(buildTarget("owmWeather", condition, isDay, temp, description, config.iconPack, config.unit))
-        } catch (e: Exception) { Log.e(TAG, "OWM fetch failed", e); emptyList() }
+        } catch (e: Exception) {
+            Log.e(TAG, "OWM fetch failed", e)
+            emptyList()
+        }
     }
 
     /** Maps OWM weather IDs to WeatherCondition — ported from Breezy's OpenWeatherService */
     private fun owmCodeToCondition(id: Int?): WeatherCondition = when (id) {
-        in 200..202, 221, in 230..232 -> WeatherCondition.THUNDERSTORM
-        in 210..212 -> WeatherCondition.THUNDERSTORM
+        in 200..232 -> WeatherCondition.THUNDERSTORM
         in 300..321 -> WeatherCondition.DRIZZLE
-        in 500..504 -> WeatherCondition.RAIN
-        511 -> WeatherCondition.SLEET
+        in 500..504, in 520..531 -> WeatherCondition.RAIN
+        511 -> WeatherCondition.FREEZING_RAIN
         in 600..602, in 620..622 -> WeatherCondition.SNOW
         in 611..616 -> WeatherCondition.SLEET
-        741 -> WeatherCondition.FOG
-        in 700..781 -> WeatherCondition.CLOUDY
+        701, 711, 721, 731, 741, 751, 761, 762 -> WeatherCondition.FOG
+        771, 781 -> WeatherCondition.WINDY
         800 -> WeatherCondition.CLEAR
         801, 802 -> WeatherCondition.PARTLY_CLOUDY
-        803, 804 -> WeatherCondition.CLOUDY
+        803 -> WeatherCondition.MOSTLY_CLOUDY
+        804 -> WeatherCondition.OVERCAST
         else -> WeatherCondition.NA
     }
 
@@ -266,7 +337,7 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         return try {
             if (config.accuApiKey.isBlank()) return emptyList()
 
-            // AccuWeather requires a location key first — resolve from city name or coords
+            // AccuWeather requires a location key first — resolve from city name or GPS coords
             val locationKey = resolveAccuLocationKey(config) ?: return emptyList()
 
             val results = accuApi.getCurrent(locationKey, config.accuApiKey)
@@ -274,33 +345,47 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
             // AccuWeather always returns metric in .Metric field
             val temp = current.Temperature?.Metric?.Value ?: return emptyList()
             val condition = accuIconToCondition(current.WeatherIcon)
-            // AccuWeather icons 1-5 are daytime clear/partly-cloudy, 33-44 are night
-            val isDay = (current.WeatherIcon ?: 0) <= 32
+            val isDay = current.IsDayTime ?: ((current.WeatherIcon ?: 0) <= 32)
             val description = current.WeatherText
-            saveCache(temp, condition, isDay, description)
+            saveCache(config, temp, condition, isDay, description)
             listOf(buildTarget("accuWeather", condition, isDay, temp, description, config.iconPack, config.unit))
-        } catch (e: Exception) { Log.e(TAG, "AccuWeather fetch failed", e); emptyList() }
+        } catch (e: Exception) {
+            Log.e(TAG, "AccuWeather fetch failed", e)
+            emptyList()
+        }
     }
 
     /**
-     * Resolves an AccuWeather location key.
-     * - If city is set: uses AccuWeather's own text search
-     * - If no city: uses GPS coordinates via geoposition search
-     *   (note: geoposition endpoint needs separate implementation — for now falls back to city search)
+     * Resolves and caches an AccuWeather location key.
+     * - If city is set: uses AccuWeather's city text search (`locations/v1/cities/search`)
+     * - If no city: resolves GPS coordinates via geoposition search (`locations/v1/cities/geoposition/search`)
+     * Results are cached by normalized query so repeated refreshes do not burn API quota.
      */
     private suspend fun resolveAccuLocationKey(config: WeatherConfig): String? {
         return try {
             if (config.city.isNotBlank()) {
-                accuApi.searchLocation(config.accuApiKey, config.city)
+                val queryKey = "city:${config.city.lowercase(Locale.ROOT)}"
+                getCachedAccuLocationKey(queryKey)?.let { return it }
+
+                val key = accuApi.searchLocation(config.accuApiKey, config.city)
                     .firstOrNull()?.Key
+                if (!key.isNullOrBlank()) {
+                    saveAccuLocationKey(queryKey, key)
+                }
+                key
             } else {
-                // Cache the location key to avoid repeated API calls (it counts against quota)
-                val cached = sp.getString(KEY_ACCU_LOCATION_KEY, null)
-                if (cached != null) return cached
-                // No city set, no cached key — can't proceed without geoposition endpoint
-                // (geoposition requires a separate paid/enterprise API call in AccuWeather)
-                Log.w(TAG, "AccuWeather: set a city name to avoid repeated location lookups")
-                null
+                val loc = getDeviceLocation() ?: return sp.getString(KEY_ACCU_LOCATION_KEY, null)
+                // Round to ~1 km so tiny GPS jitter reuses the cached location key.
+                val latKey = (loc.latitude * 100.0).roundToInt() / 100.0
+                val lonKey = (loc.longitude * 100.0).roundToInt() / 100.0
+                val queryKey = "geo:$latKey,$lonKey"
+                getCachedAccuLocationKey(queryKey)?.let { return it }
+
+                val key = accuApi.searchByGeoposition(config.accuApiKey, "${loc.latitude},${loc.longitude}").Key
+                if (!key.isNullOrBlank()) {
+                    saveAccuLocationKey(queryKey, key)
+                }
+                key
             }
         } catch (e: Exception) {
             Log.e(TAG, "AccuWeather location lookup failed", e)
@@ -308,40 +393,90 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         }
     }
 
+    private fun getCachedAccuLocationKey(queryKey: String): String? {
+        val cachedQuery = sp.getString(KEY_ACCU_LOCATION_QUERY, null)
+        if (cachedQuery != queryKey) return null
+        return sp.getString(KEY_ACCU_LOCATION_KEY, null)
+    }
+
+    private fun saveAccuLocationKey(queryKey: String, locationKey: String) {
+        sp.edit()
+            .putString(KEY_ACCU_LOCATION_QUERY, queryKey)
+            .putString(KEY_ACCU_LOCATION_KEY, locationKey)
+            .apply()
+    }
+
     /**
      * Maps all 44 AccuWeather icon codes to WeatherCondition.
-     * Day icons: 1-32. Night equivalents: 33-44 (roughly icon - 32 for 33-44).
-     * Reference: http://apidev.accuweather.com/developers/weatherIcons
+     * Reference: https://developer.accuweather.com/weather-icons
      */
     private fun accuIconToCondition(icon: Int?): WeatherCondition = when (icon) {
-        1, 2 -> WeatherCondition.CLEAR                 // Sunny / Mostly Sunny
-        3, 4 -> WeatherCondition.PARTLY_CLOUDY         // Partly Sunny / Intermittent Clouds
-        5 -> WeatherCondition.MOSTLY_CLOUDY            // Hazy Sunshine
-        6 -> WeatherCondition.PARTLY_CLOUDY            // Mostly Cloudy
-        7, 8 -> WeatherCondition.CLOUDY                // Cloudy / Dreary
-        11 -> WeatherCondition.FOG                     // Fog
-        12 -> WeatherCondition.RAIN                    // Showers
-        13, 14 -> WeatherCondition.RAIN                // Mostly Cloudy w/ Showers / Partly Sunny w/ Showers
-        15 -> WeatherCondition.THUNDERSTORM            // T-Storms
-        16, 17 -> WeatherCondition.THUNDERSTORM        // Mostly Cloudy w/ T-Storms / Partly Sunny w/ T-Storms
-        18 -> WeatherCondition.RAIN                    // Rain
-        19, 20, 21 -> WeatherCondition.FLURRIES        // Flurries / Mostly Cloudy w/ Flurries / Partly Sunny w/ Flurries
-        22 -> WeatherCondition.SNOW                    // Snow
-        23 -> WeatherCondition.MOSTLY_CLOUDY           // Mostly Cloudy w/ Snow
-        24 -> WeatherCondition.SLEET                   // Ice
-        25 -> WeatherCondition.SLEET                   // Sleet
-        26 -> WeatherCondition.FREEZING_RAIN           // Freezing Rain
-        29 -> WeatherCondition.SLEET                   // Rain and Snow
-        30 -> WeatherCondition.WINDY                   // Hot (use clear)
-        31 -> WeatherCondition.WINDY                   // Cold
-        32 -> WeatherCondition.WINDY                   // Windy
-        33, 34 -> WeatherCondition.CLEAR               // Clear / Mostly Clear (night)
-        35, 36 -> WeatherCondition.PARTLY_CLOUDY       // Partly Cloudy / Intermittent Clouds (night)
-        37 -> WeatherCondition.MOSTLY_CLOUDY           // Hazy Moonlight
-        38 -> WeatherCondition.MOSTLY_CLOUDY           // Mostly Cloudy (night)
-        39, 40 -> WeatherCondition.RAIN                // Partly Cloudy w/ Showers / Mostly Cloudy w/ Showers (night)
-        41, 42 -> WeatherCondition.THUNDERSTORM        // Partly Cloudy w/ T-Storms / Mostly Cloudy w/ T-Storms (night)
-        43, 44 -> WeatherCondition.SNOW                // Mostly Cloudy w/ Flurries / Mostly Cloudy w/ Snow (night)
+        1 -> WeatherCondition.CLEAR
+
+        // Sunny
+        2 -> WeatherCondition.MOSTLY_CLEAR
+
+        // Mostly Sunny
+        3, 4 -> WeatherCondition.PARTLY_CLOUDY
+
+        // Partly Sunny / Intermittent Clouds
+        5 -> WeatherCondition.MOSTLY_CLOUDY
+
+        // Hazy Sunshine
+        6 -> WeatherCondition.MOSTLY_CLOUDY
+
+        // Mostly Cloudy
+        7, 8 -> WeatherCondition.CLOUDY
+
+        // Cloudy / Dreary
+        11 -> WeatherCondition.FOG
+
+        // Fog
+        12, 13, 14, 18 -> WeatherCondition.RAIN
+
+        // Showers / Rain
+        15, 16, 17 -> WeatherCondition.THUNDERSTORM
+
+        // T-Storms
+        19, 20, 21 -> WeatherCondition.FLURRIES
+
+        // Flurries
+        22, 23 -> WeatherCondition.SNOW
+
+        // Snow / Mostly Cloudy w/ Snow
+        24, 25, 29 -> WeatherCondition.SLEET
+
+        // Ice / Sleet / Rain and Snow
+        26 -> WeatherCondition.FREEZING_RAIN
+
+        // Freezing Rain
+        30, 31 -> WeatherCondition.CLEAR
+
+        // Hot / Cold
+        32 -> WeatherCondition.WINDY
+
+        // Windy
+        33 -> WeatherCondition.CLEAR
+
+        // Clear (night)
+        34 -> WeatherCondition.MOSTLY_CLEAR
+
+        // Mostly Clear (night)
+        35, 36 -> WeatherCondition.PARTLY_CLOUDY
+
+        // Partly Cloudy / Intermittent Clouds (night)
+        37, 38 -> WeatherCondition.MOSTLY_CLOUDY
+
+        // Hazy Moonlight / Mostly Cloudy (night)
+        39, 40 -> WeatherCondition.RAIN
+
+        // Showers (night)
+        41, 42 -> WeatherCondition.THUNDERSTORM
+
+        // T-Storms (night)
+        43, 44 -> WeatherCondition.SNOW
+
+        // Flurries / Snow (night)
         else -> WeatherCondition.NA
     }
 
@@ -349,13 +484,38 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     /**
      * Resolves coordinates either from the user's manually entered city name
-     * (via the provider's own geocoder) or from the device's LocationManager.
+     * (via the provider's own geocoder, cached locally) or from the device's LocationManager.
      */
     private suspend fun resolveCoords(config: WeatherConfig): Coords? {
         if (config.city.isNotBlank()) {
-            return geocodeCity(config.city, config.provider, config.owmApiKey)
+            return geocodeCityCached(config.city, config.provider, config.owmApiKey)
         }
         return getDeviceLocation()?.let { Coords(it.latitude, it.longitude) }
+    }
+
+    private suspend fun geocodeCityCached(
+        city: String,
+        provider: WeatherProvider,
+        owmApiKey: String,
+    ): Coords? {
+        val normalizedCity = city.lowercase(Locale.ROOT)
+        if (sp.getString(KEY_GEO_CITY, null) == normalizedCity &&
+            sp.contains(KEY_GEO_LAT) &&
+            sp.contains(KEY_GEO_LON)
+        ) {
+            val lat = Double.fromBits(sp.getLong(KEY_GEO_LAT, 0L))
+            val lon = Double.fromBits(sp.getLong(KEY_GEO_LON, 0L))
+            if (!lat.isNaN() && !lon.isNaN()) {
+                return Coords(lat, lon)
+            }
+        }
+        val coords = geocodeCity(city, provider, owmApiKey) ?: return null
+        sp.edit()
+            .putString(KEY_GEO_CITY, normalizedCity)
+            .putLong(KEY_GEO_LAT, coords.lat.toRawBits())
+            .putLong(KEY_GEO_LON, coords.lon.toRawBits())
+            .apply()
+        return coords
     }
 
     private suspend fun geocodeCity(
@@ -370,6 +530,7 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
                     val result = openMeteoGeoApi.search(city)
                     result.results?.firstOrNull()?.let { Coords(it.latitude, it.longitude) }
                 }
+
                 WeatherProvider.OPEN_WEATHER_MAP -> {
                     if (owmApiKey.isBlank()) return null
                     val results = owmApi.geocode(owmApiKey, city)
@@ -379,7 +540,10 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
                         Coords(lat, lon)
                     }
                 }
-                WeatherProvider.ACCU_WEATHER -> null // AccuWeather uses its own location key, not coords
+
+                WeatherProvider.ACCU_WEATHER -> null
+
+                // AccuWeather uses its own location key
                 WeatherProvider.NONE -> null
             }
         } catch (e: Exception) {
@@ -390,43 +554,87 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
 
     @Suppress("MissingPermission")
     private suspend fun getDeviceLocation(): Location? {
-        if (!hasLocationPermission()) return null
+        if (!hasLocationPermission()) {
+            Log.w(TAG, "Location permission not granted and no city configured")
+            return null
+        }
         val lm = context.getSystemService<LocationManager>() ?: return null
-        val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-        for (p in providers) {
-            val cached = lm.getLastKnownLocation(p)
-            if (cached != null) return cached
+
+        val cachedProviders = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(LocationManager.FUSED_PROVIDER)
+            }
+            add(LocationManager.NETWORK_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+            add(LocationManager.PASSIVE_PROVIDER)
         }
-        for (provider in providers.filter { lm.isProviderEnabled(it) }) {
-            val loc = requestFreshLocation(lm, provider)
-            if (loc != null) return loc
+
+        // Pick the freshest last-known location across all providers.
+        val bestCached = cachedProviders
+            .mapNotNull { provider -> runCatching { lm.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time }
+
+        if (bestCached != null && System.currentTimeMillis() - bestCached.time <= FRESH_LOCATION_MAX_AGE_MS) {
+            return bestCached
         }
-        return null
+
+        val activeProviders = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(LocationManager.FUSED_PROVIDER)
+            }
+            add(LocationManager.NETWORK_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+        }.filter { provider -> runCatching { lm.isProviderEnabled(provider) }.getOrDefault(false) }
+
+        for (provider in activeProviders) {
+            val fresh = requestFreshLocation(lm, provider)
+            if (fresh != null) return fresh
+        }
+
+        // Fall back to older last-known fix if requesting a fresh fix timed out.
+        return bestCached
     }
 
     @Suppress("MissingPermission", "DEPRECATION")
-    private suspend fun requestFreshLocation(lm: LocationManager, provider: String): Location? =
-        withTimeoutOrNull(LOCATION_TIMEOUT) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                callbackFlow {
-                    val signal = CancellationSignal()
-                    lm.getCurrentLocation(provider, signal, Executors.newSingleThreadExecutor()) { loc ->
-                        trySend(loc); close()
+    private suspend fun requestFreshLocation(lm: LocationManager, provider: String): Location? = withTimeoutOrNull(LOCATION_TIMEOUT) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            callbackFlow {
+                val signal = CancellationSignal()
+                try {
+                    lm.getCurrentLocation(provider, signal, locationExecutor) { loc ->
+                        trySend(loc)
+                        close()
                     }
-                    awaitClose { signal.cancel() }
-                }.first()
-            } else {
-                callbackFlow<Location?> {
-                    val thread = HandlerThread("WeatherLoc-$provider").also { it.start() }
-                    val listener = LocationListener { loc -> trySend(loc); close() }
+                } catch (e: Exception) {
+                    Log.w(TAG, "getCurrentLocation($provider) failed", e)
+                    trySend(null)
+                    close()
+                }
+                awaitClose { signal.cancel() }
+            }.first()
+        } else {
+            callbackFlow<Location?> {
+                val thread = HandlerThread("WeatherLoc-$provider").also { it.start() }
+                val listener = LocationListener { loc ->
+                    trySend(loc)
+                    close()
+                }
+                try {
                     lm.requestSingleUpdate(provider, listener, thread.looper)
-                    awaitClose { lm.removeUpdates(listener); thread.quit() }
-                }.first()
-            }
+                } catch (e: Exception) {
+                    Log.w(TAG, "requestSingleUpdate($provider) failed", e)
+                    trySend(null)
+                    close()
+                }
+                awaitClose {
+                    runCatching { lm.removeUpdates(listener) }
+                    thread.quitSafely()
+                }
+            }.first()
         }
+    }
 
     // ── Target builder ────────────────────────────────────────────────────────
-
 
     /**
      * A minimal FEATURE_WEATHER target with no headerAction.
@@ -462,9 +670,10 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         featureType = SmartspaceTarget.FeatureType.FEATURE_WEATHER,
     )
 
-    private fun hasLocationPermission() =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
+    fun hasLocationPermission(): Boolean = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
 
     companion object {
         private const val TAG = "WeatherDataProvider"
@@ -475,22 +684,51 @@ class WeatherDataProvider(context: Context) : SmartspaceDataSource(
         private const val ACCU_BASE_URL = "https://dataservice.accuweather.com/"
         private const val OPEN_METEO_CURRENT_FIELDS = "temperature_2m,weather_code,is_day"
         private val LOCATION_TIMEOUT = 15.seconds
+        private val MAX_CACHE_AGE_MS = 6.hours.inWholeMilliseconds
+        private val FRESH_LOCATION_MAX_AGE_MS = 30.minutes.inWholeMilliseconds
 
         private const val PREFS_NAME = "weather_data_provider_cache"
         private const val KEY_TEMP = "temp"
         private const val KEY_CONDITION = "condition"
         private const val KEY_IS_DAY = "is_day"
         private const val KEY_SUMMARY = "summary"
+        private const val KEY_TIMESTAMP = "timestamp"
+        private const val KEY_PROVIDER = "provider"
+        private const val KEY_CITY = "city"
+        private const val KEY_GEO_CITY = "geo_city"
+        private const val KEY_GEO_LAT = "geo_lat"
+        private const val KEY_GEO_LON = "geo_lon"
+        private const val KEY_ACCU_LOCATION_QUERY = "accu_location_query"
         private const val KEY_ACCU_LOCATION_KEY = "accu_location_key"
 
         val REFRESH_INTERVAL_OPTIONS = listOf(15L, 30L, 60L, 180L)
 
+        private val sharedJson = Json { ignoreUnknownKeys = true }
+
+        private val sharedHttpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    val req = chain.request().newBuilder()
+                        .header("User-Agent", "Lawnchair/16 (Android)")
+                        .build()
+                    chain.proceed(req)
+                }
+                .build()
+        }
+
+        private val locationExecutor by lazy {
+            Executors.newSingleThreadExecutor { r ->
+                Thread(r, "WeatherLocation").apply { isDaemon = true }
+            }
+        }
+
         private fun buildRetrofit(baseUrl: String): Retrofit {
-            val json = Json { ignoreUnknownKeys = true }
             return Retrofit.Builder()
                 .baseUrl(baseUrl)
-                .client(OkHttpClient.Builder().build())
-                .addConverterFactory(json.asConverterFactory("application/json; charset=UTF8".toMediaType()))
+                .client(sharedHttpClient)
+                .addConverterFactory(sharedJson.asConverterFactory("application/json; charset=UTF8".toMediaType()))
                 .build()
         }
     }

@@ -12,10 +12,10 @@ data class OpenMeteoWeatherResult(
 
 @Serializable
 data class OpenMeteoWeatherCurrent(
-    @SerialName("temperature_2m") val temperature: Double?,
-    @SerialName("weather_code") val weatherCode: Int?,
-    @SerialName("is_day") val isDay: Int?,
-    val time: Long,
+    @SerialName("temperature_2m") val temperature: Double? = null,
+    @SerialName("weather_code") val weatherCode: Int? = null,
+    @SerialName("is_day") val isDay: Int? = null,
+    val time: Long? = null,
 )
 
 @Serializable

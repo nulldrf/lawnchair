@@ -16,12 +16,15 @@
 
 package app.lawnchair.ui.preferences.destinations
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.view.ContextThemeWrapper
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.preferenceManager2
@@ -88,7 +91,6 @@ import app.lawnchair.ui.theme.isSelectedThemeDark
 import app.lawnchair.ui.theme.preferenceGroupColor
 import com.android.launcher3.R
 import com.kieronquinn.app.smartspacer.sdk.SmartspacerConstants
-import kotlinx.coroutines.launch
 
 private const val ICON_PACK_REPO_URL =
     "https://github.com/breezy-weather/breezy-weather-icon-packs/blob/main/README.md"
@@ -196,13 +198,43 @@ private fun SmartspaceWeatherSettings(
 ) {
     val context = LocalContext.current
     val prefs = preferenceManager2()
-    val scope = rememberCoroutineScope()
 
+    val weatherDataProvider = remember(smartspaceProvider) {
+        smartspaceProvider.dataSources
+            .filterIsInstance<WeatherDataProvider>()
+            .firstOrNull()
+    }
     val weatherProviderAdapter = prefs.smartspaceWeatherProvider.getAdapter()
+    val cityAdapter = prefs.smartspaceWeatherCity.getAdapter()
     val selectedProvider = weatherProviderAdapter.state.value
     val hasSource = selectedProvider != WeatherProvider.NONE
 
-    val installedPacks = remember { WeatherIconProvider.getInstalledPacks(context) }
+    var installedPacks by remember { mutableStateOf(WeatherIconProvider.getInstalledPacks(context)) }
+    var hasLocationPermission by remember {
+        mutableStateOf(weatherDataProvider?.hasLocationPermission() ?: false)
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { results ->
+        val granted = results[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
+            results[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            (weatherDataProvider?.hasLocationPermission() == true)
+        hasLocationPermission = granted
+        if (granted) {
+            weatherDataProvider?.refreshNow()
+        }
+    }
+
+    LifecycleResumeEffect(Unit) {
+        installedPacks = WeatherIconProvider.getInstalledPacks(context)
+        val grantedNow = weatherDataProvider?.hasLocationPermission() ?: false
+        if (grantedNow && !hasLocationPermission) {
+            weatherDataProvider?.refreshNow()
+        }
+        hasLocationPermission = grantedNow
+        onPauseOrDispose {}
+    }
 
     val weatherProviderEntries = remember {
         WeatherProvider.entries.map { provider ->
@@ -273,8 +305,24 @@ private fun SmartspaceWeatherSettings(
         // City — shown for all providers when source is active
         ExpandAndShrink(visible = hasSource) {
             ScrollAnchor(ScrollKeys.SS_WEATHER_CITY, scrollState) {
-                CityPreference(adapter = prefs.smartspaceWeatherCity.getAdapter())
+                CityPreference(adapter = cityAdapter)
             }
+        }
+
+        // Location permission prompt — shown when Auto (GPS) is used without permission
+        ExpandAndShrink(visible = hasSource && cityAdapter.state.value.isBlank() && !hasLocationPermission) {
+            ClickablePreference(
+                label = stringResource(R.string.smartspace_weather_location_permission_title),
+                subtitle = stringResource(R.string.smartspace_weather_location_permission_description),
+                onClick = {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                        ),
+                    )
+                },
+            )
         }
 
         // Temperature unit
@@ -314,14 +362,7 @@ private fun SmartspaceWeatherSettings(
             ScrollAnchor(ScrollKeys.SS_WEATHER_REFRESH_NOW, scrollState) {
                 ClickablePreference(
                     label = stringResource(R.string.smartspace_weather_refresh_now),
-                    onClick = {
-                        scope.launch {
-                            smartspaceProvider.dataSources
-                                .filterIsInstance<WeatherDataProvider>()
-                                .firstOrNull()
-                                ?.onSetupDone()
-                        }
-                    },
+                    onClick = { weatherDataProvider?.refreshNow() },
                 )
             }
         }
@@ -341,13 +382,18 @@ private fun ApiKeyPreference(
     val currentKey = adapter.state.value
     val masked = if (currentKey.isBlank()) {
         stringResource(R.string.smartspace_api_key_not_set)
-    } else "*".repeat(minOf(currentKey.length, 32))
+    } else {
+        "*".repeat(minOf(currentKey.length, 32))
+    }
 
     Column(modifier = modifier) {
         ClickablePreference(
             label = label,
             subtitle = masked,
-            onClick = { inputValue = adapter.state.value; showDialog = true },
+            onClick = {
+                inputValue = adapter.state.value
+                showDialog = true
+            },
         )
     }
     if (showDialog) {
@@ -365,7 +411,10 @@ private fun ApiKeyPreference(
             },
             confirmButton = {
                 Button(
-                    onClick = { adapter.onChange(inputValue.trim()); showDialog = false },
+                    onClick = {
+                        adapter.onChange(inputValue.trim())
+                        showDialog = false
+                    },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(stringResource(android.R.string.ok))
@@ -394,13 +443,18 @@ private fun CityPreference(
     val currentCity = adapter.state.value
     val subtitle = if (currentCity.isBlank()) {
         stringResource(R.string.smartspace_weather_city_auto)
-    } else currentCity
+    } else {
+        currentCity
+    }
 
     Column(modifier = modifier) {
         ClickablePreference(
             label = stringResource(R.string.smartspace_weather_city),
             subtitle = subtitle,
-            onClick = { inputValue = adapter.state.value; showDialog = true },
+            onClick = {
+                inputValue = adapter.state.value
+                showDialog = true
+            },
         )
     }
     if (showDialog) {
@@ -418,7 +472,10 @@ private fun CityPreference(
             },
             confirmButton = {
                 Button(
-                    onClick = { adapter.onChange(inputValue.trim()); showDialog = false },
+                    onClick = {
+                        adapter.onChange(inputValue.trim())
+                        showDialog = false
+                    },
                     shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(stringResource(android.R.string.ok))
@@ -447,10 +504,13 @@ private fun IconPackPreference(
     var showDialog by remember { mutableStateOf(false) }
     val currentPack = adapter.state.value
     val entries = remember(installedPacks) {
-        listOf("" to context.getString(R.string.smartspace_weather_icon_pack_none)) + installedPacks
+        listOf(
+            WeatherIconProvider.ICON_PACK_BUILTIN to context.getString(R.string.smartspace_weather_icon_pack_builtin),
+            WeatherIconProvider.ICON_PACK_NONE to context.getString(R.string.smartspace_weather_icon_pack_none),
+        ) + installedPacks
     }
     val currentLabel = entries.firstOrNull { it.first == currentPack }?.second
-        ?: context.getString(R.string.smartspace_weather_icon_pack_none)
+        ?: context.getString(R.string.smartspace_weather_icon_pack_builtin)
 
     ClickablePreference(
         label = stringResource(R.string.smartspace_weather_icon_pack),
@@ -472,7 +532,10 @@ private fun IconPackPreference(
                                 .selectable(
                                     selected = pkg == currentPack,
                                     role = Role.RadioButton,
-                                    onClick = { adapter.onChange(pkg); showDialog = false },
+                                    onClick = {
+                                        adapter.onChange(pkg)
+                                        showDialog = false
+                                    },
                                 )
                                 .padding(vertical = 4.dp),
                         ) {

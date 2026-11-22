@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -133,20 +134,31 @@ fun CreateBackupScreen(
         val primary = MaterialTheme.colorScheme.primary
         val phoneShape = RoundedCornerShape(28.dp)
         val borderColor = primary.copy(alpha = 0.25f)
-        val widthFraction = if (isPortrait) 0.65f else 0.45f
+        val screenshotRatio = screenshot
+            .takeIf { it.width > 1 && it.height > 1 }
+            ?.let { it.width.toFloat() / it.height.toFloat() }
 
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
             // WithWallpaper is a ColumnScope extension — Column is required.
-            Column(modifier = Modifier.fillMaxWidth(widthFraction)) {
+            Column(
+                modifier = if (isPortrait) Modifier.fillMaxWidth(0.65f) else Modifier,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 WithWallpaper(displayWallpaperButton = false) { wallpaper ->
+                    val boxModifier = if (isPortrait) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier.height(260.dp)
+                    }
                     DummyLauncherBox(
-                        modifier = Modifier
-                            .fillMaxWidth()
+                        modifier = boxModifier
                             .border(width = 1.dp, color = borderColor, shape = phoneShape)
                             .clip(phoneShape),
+                        aspectRatio = screenshotRatio,
+                        forcePortrait = true,
                     ) {
                         if (contents.hasFlag(LawnchairBackup.INCLUDE_WALLPAPER)) {
                             WallpaperPreview(

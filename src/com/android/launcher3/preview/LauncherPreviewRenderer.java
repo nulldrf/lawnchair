@@ -38,6 +38,7 @@ import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -129,15 +130,25 @@ public class LauncherPreviewRenderer extends BaseContext
             LauncherModel model,
             int themeRes,
             @Nullable InvariantDeviceProfile previewIdp) {
+        this(context, workspaceScreenId, wallpaperColorResources, model, themeRes, previewIdp, false);
+    }
+
+    public LauncherPreviewRenderer(Context context,
+            int workspaceScreenId,
+            @Nullable SparseIntArray wallpaperColorResources,
+            LauncherModel model,
+            int themeRes,
+            @Nullable InvariantDeviceProfile previewIdp,
+            boolean forcePortrait) {
 
         super(context, themeRes);
         mPreferenceManager2 = PreferenceManager2.getInstance(context);
         
         mUiHandler = new Handler(Looper.getMainLooper());
         mIdp = previewIdp != null ? previewIdp : InvariantDeviceProfile.INSTANCE.get(context);
-        mDp = getDeviceProfileForPreview(context).toBuilder(context)
+        mDp = getDeviceProfileForPreview(context, forcePortrait).toBuilder(context)
                 .setViewScaleProvider(new PreviewScaleProvider(this)).build();
-        Rect insets = getInsets(context);
+        Rect insets = getInsets(context, forcePortrait);
         mDp.updateInsets(insets);
 
         mHomeElementInflater = LayoutInflater.from(
@@ -153,7 +164,7 @@ public class LauncherPreviewRenderer extends BaseContext
         measureAndLayoutRootView();
 
         mHotseat = mRootView.findViewById(R.id.hotseat);
-        mHotseat.resetLayout(false);
+        mHotseat.resetLayout(mDp.isVerticalBarLayout());
 
         CellLayout firstScreen = mRootView.findViewById(R.id.workspace);
         firstScreen.setPadding(
@@ -235,13 +246,23 @@ public class LauncherPreviewRenderer extends BaseContext
      * Returns the device profile based on resource configuration for previewing various display
      * sizes
      */
-    private DeviceProfile getDeviceProfileForPreview(Context context) {
+    private DeviceProfile getDeviceProfileForPreview(Context context, boolean forcePortrait) {
         float density = context.getResources().getDisplayMetrics().density;
         Configuration config = context.getResources().getConfiguration();
+        float screenWidth = config.screenWidthDp * density;
+        float screenHeight = config.screenHeightDp * density;
+
+        if (forcePortrait) {
+            return mIdp.getBestMatch(
+                    Math.min(screenWidth, screenHeight),
+                    Math.max(screenWidth, screenHeight),
+                    Surface.ROTATION_0
+            );
+        }
 
         return mIdp.getBestMatch(
-                config.screenWidthDp * density,
-                config.screenHeightDp * density,
+                screenWidth,
+                screenHeight,
                 WindowManagerProxy.INSTANCE.get(context).getRotation(context)
         );
     }
@@ -377,14 +398,21 @@ public class LauncherPreviewRenderer extends BaseContext
     private void populateHotseatPredictions(WorkspaceData itemIdMap) {
         List<ItemInfo> predictions = itemIdMap.getPredictedContents(CONTAINER_HOTSEAT_PREDICTION);
         int predictionIndex = 0;
-        int totalHotseatSlots = mDp.numShownHotseatIcons * mDp.numHotseatRows;
+        int totalHotseatSlots = mDp.isVerticalBarLayout()
+                ? mDp.numShownHotseatIcons
+                : mDp.numShownHotseatIcons * mDp.numHotseatRows;
         for (int rank = 0; rank < totalHotseatSlots; rank++) {
             if (predictions.size() <= predictionIndex) continue;
 
             int cellX = mHotseat.getCellXFromOrder(rank);
             int cellY = mHotseat.getCellYFromOrder(rank);
             CellLayout page = mHotseat.getPageAt(mHotseat.getPageFromOrder(rank));
-            if (page == null || page.isOccupied(cellX, cellY)) continue;
+            if (page == null
+                    || cellX < 0 || cellY < 0
+                    || cellX >= page.getCountX() || cellY >= page.getCountY()
+                    || page.isOccupied(cellX, cellY)) {
+                continue;
+            }
 
             WorkspaceItemInfo itemInfo =
                     new WorkspaceItemInfo((WorkspaceItemInfo) predictions.get(predictionIndex));
@@ -419,14 +447,21 @@ public class LauncherPreviewRenderer extends BaseContext
     /**
      * Returns the insets of the screen closest to the display given by the context
      */
-    private static Rect getInsets(Context context) {
+    private static Rect getInsets(Context context, boolean forcePortrait) {
         WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         Display display = windowManager.getDefaultDisplay();
+        int targetRotation = forcePortrait ? Surface.ROTATION_0 : display.getRotation();
+        int targetWidth = forcePortrait
+                ? Math.min(display.getWidth(), display.getHeight())
+                : display.getWidth();
+        int targetHeight = forcePortrait
+                ? Math.max(display.getWidth(), display.getHeight())
+                : display.getHeight();
         return DisplayController.INSTANCE.get(context).getInfo().supportedBounds.stream()
-                .filter(w -> w.rotationHint == display.getRotation())
+                .filter(w -> w.rotationHint == targetRotation)
                 .min(comparingDouble(w ->
-                        Math.pow(display.getWidth() - w.availableSize.x, 2)
-                                + Math.pow(display.getHeight() - w.availableSize.y, 2)))
+                        Math.pow(targetWidth - w.availableSize.x, 2)
+                                + Math.pow(targetHeight - w.availableSize.y, 2)))
                 .map(w -> new Rect(w.insets))
                 .orElse(new Rect());
     }

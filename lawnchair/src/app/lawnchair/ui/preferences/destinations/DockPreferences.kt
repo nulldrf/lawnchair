@@ -28,9 +28,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.PreferenceManager
@@ -50,6 +53,7 @@ import app.lawnchair.ui.preferences.components.controls.SliderPreference
 import app.lawnchair.ui.preferences.components.controls.SwitchPreference
 import app.lawnchair.ui.preferences.components.controls.WarningPreference
 import app.lawnchair.ui.preferences.components.createPreviewIdp
+import app.lawnchair.ui.preferences.components.invariantDeviceProfile
 import app.lawnchair.ui.preferences.components.layout.DividerColumn
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroup
@@ -262,68 +266,84 @@ fun GridSettings(prefs: PreferenceManager, prefs2: PreferenceManager2, scrollSta
 
 @Composable
 fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
-    if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT) {
-        val prefs = preferenceManager()
-        val prefs2 = preferenceManager2()
-        val primary = MaterialTheme.colorScheme.primary
-        val shape = RoundedCornerShape(28.dp)
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val idp = invariantDeviceProfile()
+    // On phones, landscape switches to a vertical side hotseat with no QSB.
+    // Force the portrait profile in landscape so the horizontal bottom dock,
+    // multi-row layout, and QSB remain visible and editable.
+    val forcePortrait = remember(idp, configuration) {
+        isLandscape && idp.getDeviceProfile(context).isVerticalBarLayout()
+    }
 
-        val hotseatRows = prefs.hotseatRows
-        val dockPages = prefs.dockPages
+    val prefs = preferenceManager()
+    val prefs2 = preferenceManager2()
+    val primary = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(28.dp)
 
-        val adapters = listOf(
-            prefs2.hotseatMode.getAdapter(),
-            prefs.hotseatColumns.getAdapter(),
-            prefs.hotseatColumnsUnfolded.getAdapter(),
-            hotseatRows.getAdapter(),
-            dockPages.getAdapter(),
-            prefs2.themedHotseatQsb.getAdapter(),
-            prefs.hotseatQsbCornerRadius.getAdapter(),
-            prefs.hotseatQsbAlpha.getAdapter(),
-            prefs.hotseatQsbStrokeWidth.getAdapter(),
-            prefs2.hotseatBottomFactor.getAdapter(),
-            prefs2.strokeColorStyle.getAdapter(),
-            prefs2.enableLabelInDock.getAdapter(),
-            prefs.hotseatBG.getAdapter(),
-            prefs.hotseatBGHorizontalInsetLeft.getAdapter(),
-            prefs.hotseatBGVerticalInsetTop.getAdapter(),
-            prefs.hotseatBGHorizontalInsetRight.getAdapter(),
-            prefs.hotseatBGVerticalInsetBottom.getAdapter(),
-            prefs2.pageIndicatorHeightFactor.getAdapter(),
-            prefs2.hotseatBackgroundColor.getAdapter(),
-            prefs2.hotseatBackgroundCornerRadius.getAdapter(),
-            prefs.hotseatBGAlpha.getAdapter(),
-        )
+    val hotseatRows = prefs.hotseatRows
+    val dockPages = prefs.dockPages
 
-        PreferenceGroupHeading(heading = stringResource(id = R.string.preview_label))
+    val adapters = listOf(
+        prefs2.hotseatMode.getAdapter(),
+        prefs2.hotseatQsbProvider.getAdapter(),
+        prefs.hotseatColumns.getAdapter(),
+        prefs.hotseatColumnsUnfolded.getAdapter(),
+        hotseatRows.getAdapter(),
+        dockPages.getAdapter(),
+        prefs2.themedHotseatQsb.getAdapter(),
+        prefs.hotseatQsbCornerRadius.getAdapter(),
+        prefs.hotseatQsbAlpha.getAdapter(),
+        prefs.hotseatQsbStrokeWidth.getAdapter(),
+        prefs2.hotseatBottomFactor.getAdapter(),
+        prefs2.strokeColorStyle.getAdapter(),
+        prefs2.enableLabelInDock.getAdapter(),
+        prefs.hotseatBG.getAdapter(),
+        prefs.hotseatBGHorizontalInsetLeft.getAdapter(),
+        prefs.hotseatBGVerticalInsetTop.getAdapter(),
+        prefs.hotseatBGHorizontalInsetRight.getAdapter(),
+        prefs.hotseatBGVerticalInsetBottom.getAdapter(),
+        prefs2.pageIndicatorHeightFactor.getAdapter(),
+        prefs2.hotseatBackgroundColor.getAdapter(),
+        prefs2.hotseatBackgroundCornerRadius.getAdapter(),
+        prefs.hotseatBGAlpha.getAdapter(),
+    )
 
-        // Keep the wallpaper permission button outside the preview border.
-        Column(modifier = modifier.fillMaxWidth()) {
-            WithWallpaper { wallpaper ->
-                Box(
+    PreferenceGroupHeading(heading = stringResource(id = R.string.preview_label))
+
+    // Keep the wallpaper permission button outside the preview border.
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        WithWallpaper { wallpaper ->
+            val previewWidthFraction = if (isLandscape) 0.45f else 1f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(previewWidthFraction)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .border(width = 1.dp, color = primary.copy(alpha = 0.25f), shape = shape)
+                    .clip(shape),
+            ) {
+                DummyLauncherBox(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .border(width = 1.dp, color = primary.copy(alpha = 0.25f), shape = shape)
-                        .clip(shape),
+                        .clipToBottomPercentage(if (hotseatRows.getAdapter().state.value >= 2) 0.4f else 0.3f),
+                    forcePortrait = forcePortrait,
                 ) {
-                    DummyLauncherBox(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clipToBottomPercentage(if (hotseatRows.getAdapter().state.value >= 2) 0.4f else 0.3f),
-                    ) {
-                        WallpaperPreview(
-                            wallpaper = wallpaper,
+                    WallpaperPreview(
+                        wallpaper = wallpaper,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    key(adapters.map { it.state.value }.toTypedArray()) {
+                        DummyLauncherLayout(
+                            idp = createPreviewIdp {
+                                copy(numHotseatColumns = prefs.hotseatColumns.get())
+                            },
                             modifier = Modifier.fillMaxSize(),
+                            forcePortrait = forcePortrait,
                         )
-                        key(adapters.map { it.state.value }.toTypedArray()) {
-                            DummyLauncherLayout(
-                                idp = createPreviewIdp {
-                                    copy(numHotseatColumns = prefs.hotseatColumns.get())
-                                },
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
                     }
                 }
             }

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.view.ContextThemeWrapper
+import android.view.Surface
 import android.view.View.MeasureSpec
 import android.view.View.MeasureSpec.EXACTLY
 import androidx.lifecycle.AndroidViewModel
@@ -70,10 +71,16 @@ class CreateBackupViewModel(
                 dummyInsets = true,
                 dummySmartspace = true,
                 appContext = themedContext,
+                forcePortrait = true,
             )
             continuation.invokeOnCancellation { previewView.destroy() }
             previewView.addOnReadyCallback {
-                val dp = idp.getDeviceProfile(context)
+                val density = context.resources.displayMetrics.density
+                val dp = idp.getBestMatch(
+                    config.screenWidthDp * density,
+                    config.screenHeightDp * density,
+                    Surface.ROTATION_0,
+                )
                 val width = dp.deviceProperties.widthPx
                 val height = dp.deviceProperties.heightPx
                 previewView.measure(

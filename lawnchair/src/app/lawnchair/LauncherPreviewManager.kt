@@ -9,9 +9,12 @@ class LauncherPreviewManager(private val context: Context) : RememberObserver {
 
     private var activePreview: LauncherPreviewView? = null
 
-    fun createPreviewView(idp: InvariantDeviceProfile): LauncherPreviewView {
+    fun createPreviewView(
+        idp: InvariantDeviceProfile,
+        forcePortrait: Boolean = false,
+    ): LauncherPreviewView {
         destroyActivePreview()
-        activePreview = LauncherPreviewView(context, idp)
+        activePreview = LauncherPreviewView(context, idp, forcePortrait = forcePortrait)
         return activePreview!!
     }
 

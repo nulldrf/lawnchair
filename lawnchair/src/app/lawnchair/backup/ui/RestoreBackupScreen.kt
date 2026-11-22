@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -156,18 +157,26 @@ fun ColumnScope.RestoreBackupOptions(
     val primary = MaterialTheme.colorScheme.primary
     val phoneShape = RoundedCornerShape(28.dp)
     val borderColor = primary.copy(alpha = 0.25f)
-    val widthFraction = if (isPortrait) 0.65f else 0.45f
+    val screenshotRatio = backup.screenshot
+        ?.takeIf { it.width > 1 && it.height > 1 }
+        ?.let { it.width.toFloat() / it.height.toFloat() }
+    val boxModifier = if (isPortrait) {
+        Modifier.fillMaxWidth(0.65f)
+    } else {
+        Modifier.height(260.dp)
+    }
 
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center,
     ) {
         DummyLauncherBox(
-            modifier = Modifier
-                .fillMaxWidth(widthFraction)
+            modifier = boxModifier
                 .border(width = 1.dp, color = borderColor, shape = phoneShape)
                 .clip(phoneShape),
             darkText = backup.info.previewDarkText,
+            aspectRatio = screenshotRatio,
+            forcePortrait = true,
         ) {
             val wallpaper = backup.wallpaper
             if (contents.hasFlag(LawnchairBackup.INCLUDE_WALLPAPER) && wallpaper != null) {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -249,7 +250,7 @@ private fun GridMockup(
                 ) {
                     WallpaperPreview(
                         wallpaper = wallpaper,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                     )
                     // createPreviewIdp reflects current slider values live,
                     // including the dock column count added in this merge.
@@ -261,7 +262,7 @@ private fun GridMockup(
                                 numHotseatColumns = hotseatColumns,
                             )
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }

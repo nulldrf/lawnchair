@@ -143,8 +143,9 @@ class LawnQsbLayout(context: Context, attrs: AttributeSet?) : FrameLayout(contex
         // https://stackoverflow.com/questions/72781705/jetpack-compose-view-not-drawing-when-coming-back-to-fragment/77496737#77496737
         composeView.addOnAttachStateChangeListener(object : OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) {
-                requestLayout()
                 composeView.disposeComposition()
+                composeView.requestLayout()
+                requestLayout()
             }
             override fun onViewDetachedFromWindow(v: View) {
                 composeView.disposeComposition()

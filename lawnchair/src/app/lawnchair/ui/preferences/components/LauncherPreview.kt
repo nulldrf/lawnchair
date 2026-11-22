@@ -1,5 +1,6 @@
 package app.lawnchair.ui.preferences.components
 
+import android.view.Surface
 import android.view.View
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
@@ -14,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -24,17 +26,34 @@ import app.lawnchair.wallpaper.WallpaperColorsCompat
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
+import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun DummyLauncherBox(
     modifier: Modifier = Modifier,
     darkText: Boolean = wallpaperSupportsDarkText(),
     aspectRatio: Float? = null,
+    forcePortrait: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val context = LocalContext.current
-    val idp = remember { InvariantDeviceProfile.INSTANCE.get(context) }
-    val dp = idp.getDeviceProfile(context)
+    val configuration = LocalConfiguration.current
+    val idp = remember(context) { InvariantDeviceProfile.INSTANCE.get(context) }
+    val dp = remember(idp, configuration, forcePortrait) {
+        if (forcePortrait) {
+            val density = context.resources.displayMetrics.density
+            val screenWidth = configuration.screenWidthDp * density
+            val screenHeight = configuration.screenHeightDp * density
+            idp.getBestMatch(
+                min(screenWidth, screenHeight),
+                max(screenWidth, screenHeight),
+                Surface.ROTATION_0,
+            )
+        } else {
+            idp.getDeviceProfile(context)
+        }
+    }
     val ratio = aspectRatio ?: (dp.deviceProperties.widthPx.toFloat() / dp.deviceProperties.heightPx.toFloat())
 
     Box(modifier = modifier.aspectRatio(ratio, matchHeightConstraintsFirst = true)) {
@@ -53,8 +72,9 @@ fun DummyLauncherBox(
 fun DummyLauncherLayout(
     idp: InvariantDeviceProfile,
     modifier: Modifier = Modifier,
+    forcePortrait: Boolean = false,
 ) {
-    val previewView = createPreviewView(idp)
+    val previewView = createPreviewView(idp, forcePortrait = forcePortrait)
     Crossfade(targetState = previewView, label = "") {
         val view = it
         AndroidView(
@@ -82,14 +102,20 @@ fun invariantDeviceProfile(): InvariantDeviceProfile {
 }
 
 @Composable
-fun createPreviewView(idp: InvariantDeviceProfile = invariantDeviceProfile()): View? {
+fun createPreviewView(
+    idp: InvariantDeviceProfile = invariantDeviceProfile(),
+    forcePortrait: Boolean = false,
+): View? {
     val context = LocalContext.current
+    val orientation = LocalConfiguration.current.orientation
     val lifecycleState = lifecycleState()
     if (!lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) {
         return null
     }
-    val previewManager = remember { LauncherPreviewManager(context) }
-    return remember(idp) { previewManager.createPreviewView(idp) }
+    val previewManager = remember(context) { LauncherPreviewManager(context) }
+    return remember(idp, forcePortrait, orientation) {
+        previewManager.createPreviewView(idp, forcePortrait = forcePortrait)
+    }
 }
 
 /**

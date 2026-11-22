@@ -1,25 +1,20 @@
 package app.lawnchair.views
 
 import android.annotation.SuppressLint
-import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.annotation.UiThread
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
-import com.android.launcher3.model.BgDataModel
 import com.android.launcher3.preview.LauncherPreviewRenderer
-import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.Themes
-import com.android.launcher3.widget.LauncherWidgetHolder
 import kotlin.math.min
 
 @SuppressLint("ViewConstructor")
@@ -29,6 +24,7 @@ class LauncherPreviewView(
     private val dummySmartspace: Boolean = false,
     private val dummyInsets: Boolean = false, // Note: New Renderer calculates insets internally based on Context
     private val appContext: Context = context.applicationContext,
+    private val forcePortrait: Boolean = false,
 ) : FrameLayout(context) {
 
     private val onReadyCallbacks = RunnableList()
@@ -112,6 +108,7 @@ class LauncherPreviewView(
             model,
             themeRes,
             idp,
+            forcePortrait,
         )
         // Store so destroy() can unregister it from LauncherModel callbacks.
         renderer = newRenderer
@@ -151,7 +148,7 @@ class LauncherPreviewView(
     }
 
     private fun updateScale(view: View) {
-        if (view.measuredWidth == 0 || view.measuredHeight == 0) return
+        if (measuredWidth == 0 || measuredHeight == 0 || view.measuredWidth == 0 || view.measuredHeight == 0) return
 
         val scale: Float = min(
             measuredWidth / view.measuredWidth.toFloat(),

@@ -83,6 +83,8 @@ fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): C
                 onSecondaryContainer     = secondary(90),
                 tertiary                 = tertiary(80),
                 onTertiary               = tertiary(20),
+                tertiaryContainer        = tertiary(30),
+                onTertiaryContainer      = tertiary(90),
                 background               = neutral6,
                 onBackground             = neutral(90),
                 surface                  = neutral6,
@@ -102,6 +104,18 @@ fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): C
                 surfaceContainerLow      = neutralVariant(10),
                 surfaceContainerLowest   = neutral4,
                 surfaceTint              = primary(80),
+                primaryFixed             = primary(90),
+                primaryFixedDim          = primary(80),
+                onPrimaryFixed           = primary(10),
+                onPrimaryFixedVariant    = primary(30),
+                secondaryFixed           = secondary(90),
+                secondaryFixedDim        = secondary(80),
+                onSecondaryFixed         = secondary(10),
+                onSecondaryFixedVariant  = secondary(30),
+                tertiaryFixed            = tertiary(90),
+                tertiaryFixedDim         = tertiary(80),
+                onTertiaryFixed          = tertiary(10),
+                onTertiaryFixedVariant   = tertiary(30),
             )
         } else {
             lightColorScheme(
@@ -137,25 +151,38 @@ fun dev.kdrag0n.monet.theme.ColorScheme.toComposeColorScheme(isDark: Boolean): C
                 surfaceContainerLow      = neutral96,
                 surfaceContainerLowest   = neutral(100),
                 surfaceTint              = primary(40),
+                primaryFixed             = primary(90),
+                primaryFixedDim          = primary(80),
+                onPrimaryFixed           = primary(10),
+                onPrimaryFixedVariant    = primary(30),
+                secondaryFixed           = secondary(90),
+                secondaryFixedDim        = secondary(80),
+                onSecondaryFixed         = secondary(10),
+                onSecondaryFixedVariant  = secondary(30),
+                tertiaryFixed            = tertiary(90),
+                tertiaryFixedDim         = tertiary(80),
+                onTertiaryFixed          = tertiary(10),
+                onTertiaryFixedVariant   = tertiary(30),
             )
         }
     }
 
-// ── SPEC 2025 ─────────────────────────────────────────────────────────────────
+// ── SPEC 2025 / SPEC 2026 ─────────────────────────────────────────────────────
 
 /**
  * Converts a [MonetColorSchemeCompat2025] to a Compose [ColorScheme].
  *
  * Reads role values directly from [MonetColorSchemeCompat2025.scheme] — a
  * materialkolor [DynamicScheme] whose ARGB properties are pre-computed by
- * [MaterialDynamicColors] + [ColorSpec2025].
+ * [MaterialDynamicColors] + [ColorSpec2025] / [ColorSpec2026].
  *
  * No tone arithmetic, no sparse grid lookups, no [setLuminance] workarounds.
  * Every value is the canonical HCT result matching what MaterialKolor produces.
  *
  * Surface roles (background, surface, surfaceContainer* etc.) use [ColorSpec2025]
- * tone logic which accounts for yellow hue special cases, variant-specific tones,
- * and chroma multipliers — all handled inside the library, not in Lawnchair.
+ * / [ColorSpec2026] tone logic which accounts for yellow hue special cases,
+ * variant-specific tones, and chroma multipliers — all handled inside the library,
+ * not in Lawnchair.
  *
  * [isDark] is already baked into [MonetColorSchemeCompat2025.scheme] at construction,
  * so the correct dark/light variant is always returned regardless of this parameter.
@@ -205,6 +232,18 @@ fun MonetColorSchemeCompat2025.toComposeColorScheme2025(isDark: Boolean): ColorS
                 onError                  = Color(s.onError),
                 errorContainer           = Color(s.errorContainer),
                 onErrorContainer         = Color(s.onErrorContainer),
+                primaryFixed             = Color(s.primaryFixed),
+                primaryFixedDim          = Color(s.primaryFixedDim),
+                onPrimaryFixed           = Color(s.onPrimaryFixed),
+                onPrimaryFixedVariant    = Color(s.onPrimaryFixedVariant),
+                secondaryFixed           = Color(s.secondaryFixed),
+                secondaryFixedDim        = Color(s.secondaryFixedDim),
+                onSecondaryFixed         = Color(s.onSecondaryFixed),
+                onSecondaryFixedVariant  = Color(s.onSecondaryFixedVariant),
+                tertiaryFixed            = Color(s.tertiaryFixed),
+                tertiaryFixedDim         = Color(s.tertiaryFixedDim),
+                onTertiaryFixed          = Color(s.onTertiaryFixed),
+                onTertiaryFixedVariant   = Color(s.onTertiaryFixedVariant),
             )
         } else {
             lightColorScheme(
@@ -244,6 +283,18 @@ fun MonetColorSchemeCompat2025.toComposeColorScheme2025(isDark: Boolean): ColorS
                 onError                  = Color(s.onError),
                 errorContainer           = Color(s.errorContainer),
                 onErrorContainer         = Color(s.onErrorContainer),
+                primaryFixed             = Color(s.primaryFixed),
+                primaryFixedDim          = Color(s.primaryFixedDim),
+                onPrimaryFixed           = Color(s.onPrimaryFixed),
+                onPrimaryFixedVariant    = Color(s.onPrimaryFixedVariant),
+                secondaryFixed           = Color(s.secondaryFixed),
+                secondaryFixedDim        = Color(s.secondaryFixedDim),
+                onSecondaryFixed         = Color(s.onSecondaryFixed),
+                onSecondaryFixedVariant  = Color(s.onSecondaryFixedVariant),
+                tertiaryFixed            = Color(s.tertiaryFixed),
+                tertiaryFixedDim         = Color(s.tertiaryFixedDim),
+                onTertiaryFixed          = Color(s.onTertiaryFixed),
+                onTertiaryFixedVariant   = Color(s.onTertiaryFixedVariant),
             )
         }
     }

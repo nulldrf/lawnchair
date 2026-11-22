@@ -590,7 +590,6 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     1.6
                                 }
                             }
-                            s.variant === Variant.VIBRANT -> 1.29
                             else -> 1.0
                         }
                     } else {

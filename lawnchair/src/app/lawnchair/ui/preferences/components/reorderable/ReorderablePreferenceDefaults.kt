@@ -102,6 +102,9 @@ fun ReorderableSwitchPreference(
                 checked = checked,
                 onCheckedChange = wrappedOnCheckedChange,
                 enabled = enabled,
+                colors = SwitchDefaults.colors(
+                    checkedIconColor = MaterialTheme.colorScheme.primary,
+                ),
                 thumbContent = {
                     if (checked) {
                         Icon(

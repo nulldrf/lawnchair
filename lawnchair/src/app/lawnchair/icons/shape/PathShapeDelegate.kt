@@ -34,7 +34,7 @@ import com.android.launcher3.views.ClipPathView
  */
 data class PathShapeDelegate(val iconShape: IconShape) : ShapeDelegate {
 
-    private val basePath: Path = iconShape.getMaskPath()
+    private val basePath: Path = normalizeToViewport(iconShape.getMaskPath())
     private val tmpPath = Path()
     private val tmpMatrix = Matrix()
 
@@ -73,7 +73,13 @@ data class PathShapeDelegate(val iconShape: IconShape) : ShapeDelegate {
         matrix.setScale(scale, scale)
         matrix.postTranslate(offsetX, offsetY)
         // Apply the transformation to our base path and add it to the destination path.
-        basePath.transform(matrix, path)
+        if (path.isEmpty) {
+            basePath.transform(matrix, path)
+        } else {
+            val transformed = Path()
+            basePath.transform(matrix, transformed)
+            path.addPath(transformed)
+        }
     }
 
     /** LC-Note: See [ShapeDelegate.createRevealAnimator] */
@@ -264,5 +270,36 @@ data class PathShapeDelegate(val iconShape: IconShape) : ShapeDelegate {
     companion object {
         private const val SPRING_STIFFNESS_SHAPE_POSITION = 380f
         private const val SPRING_DAMPING_SHAPE_POSITION = 0.8f
+        private const val VIEWPORT_TOLERANCE = 0.01f
+
+        /**
+         * Ensures [path] stays within the [0, 0, DEFAULT_PATH_SIZE, DEFAULT_PATH_SIZE] viewport
+         * assumed by [addToPath] and `BaseIconFactory`'s shader bitmap. Paths already within
+         * bounds are returned untouched; out-of-bounds paths (e.g. VerySunny, SevenSidedCookie,
+         * or non-standard OEM system masks) are uniformly scaled and centered to fit.
+         */
+        private fun normalizeToViewport(path: Path): Path {
+            val bounds = RectF()
+            path.computeBounds(bounds, true)
+            if (bounds.isEmpty) return path
+
+            val isWithinBounds =
+                bounds.left >= -VIEWPORT_TOLERANCE &&
+                    bounds.top >= -VIEWPORT_TOLERANCE &&
+                    bounds.right <= DEFAULT_PATH_SIZE + VIEWPORT_TOLERANCE &&
+                    bounds.bottom <= DEFAULT_PATH_SIZE + VIEWPORT_TOLERANCE
+            if (isWithinBounds) return path
+
+            val maxDim = maxOf(bounds.width(), bounds.height())
+            if (maxDim <= 0f) return path
+
+            val scale = minOf(1f, DEFAULT_PATH_SIZE / maxDim)
+            val matrix = Matrix().apply {
+                postTranslate(-bounds.centerX(), -bounds.centerY())
+                postScale(scale, scale)
+                postTranslate(DEFAULT_PATH_SIZE / 2f, DEFAULT_PATH_SIZE / 2f)
+            }
+            return Path(path).apply { transform(matrix) }
+        }
     }
 }

@@ -5,7 +5,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.algorithms.data.FileInfo
@@ -39,13 +38,13 @@ object FileSearchProvider : SearchProvider {
         context: Context,
         query: String,
     ): Flow<List<SearchResult>> = flow {
-        val prefs = PreferenceManager.getInstance(context)
+        val prefs2 = PreferenceManager2.getInstance(context)
 
-        val searchAllFiles = prefs.searchResultAllFiles.get()
-        val searchAudio = prefs.searchResultAudio.get()
-        val searchVisualMedia = prefs.searchResultVisualMedia.get()
+        val searchAllFiles = prefs2.searchResultAllFiles.firstCached()
+        val searchAudio = prefs2.searchResultAudio.firstCached()
+        val searchVisualMedia = prefs2.searchResultVisualMedia.firstCached()
 
-        val fileSearchEnabled = prefs.searchResultFilesToggle.get()
+        val fileSearchEnabled = prefs2.searchResultFilesToggle.firstCached()
         val anyProviderEnabled = searchAllFiles || searchAudio || searchVisualMedia
         if (query.isBlank() || !fileSearchEnabled || !anyProviderEnabled) {
             // do nothing if query is empty, file search is disabled, or none of the providers are enabled
@@ -53,7 +52,6 @@ object FileSearchProvider : SearchProvider {
             return@flow
         }
 
-        val prefs2 = PreferenceManager2.getInstance(context)
         val maxResults = prefs2.maxFileResultCount.firstCached()
 
         // check for permissions:

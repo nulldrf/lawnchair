@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.font.FontCache
 import app.lawnchair.font.googlefonts.GoogleFontsListing
-import app.lawnchair.preferences.BasePreferenceManager
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.ui.AndroidText
@@ -65,6 +64,7 @@ import app.lawnchair.ui.preferences.components.layout.preferenceGroupItems
 import com.android.launcher3.R
 import com.android.launcher3.util.MSDLPlayerWrapper
 import com.google.android.msdl.data.model.MSDLToken
+import com.patrykmichalik.opto.core.PreferenceImpl
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -75,7 +75,7 @@ private enum class ContentType {
 
 @Composable
 fun FontSelection(
-    fontPref: BasePreferenceManager.FontPref,
+    fontPref: PreferenceImpl<FontCache.Font, String>,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -183,7 +183,7 @@ fun FontSelection(
                     DropdownMenuItem(
                         onClick = {
                             mMSDLPlayerWrapper.playToken(MSDLToken.SUCCESS)
-                            fontPref.set(fontPref.defaultValue)
+                            adapter.onChange(fontPref.defaultValue)
                             hideMenu()
                         },
                         text = {
@@ -215,7 +215,7 @@ fun FontSelection(
                                 onDelete = {
                                     val selected = family.variants.any { it.value == adapter.state.value }
                                     if (selected) {
-                                        fontPref.set(fontPref.defaultValue)
+                                        adapter.onChange(fontPref.defaultValue)
                                     }
                                     (family.default as? FontCache.TTFFont)?.delete()
                                 },

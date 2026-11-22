@@ -3,6 +3,7 @@ package app.lawnchair.theme.color.tokens
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import app.lawnchair.preferences2.firstCached
 
 @Suppress("MemberVisibilityCanBePrivate", "unused")
 object ColorTokens {
@@ -118,15 +119,15 @@ object ColorTokens {
 
     @JvmField val OverviewScrim = OverviewScrimColor
         .withPreferences { prefs ->
-            val translucent = prefs.recentsTranslucentBackground.get()
-            val translucentIntensity = prefs.recentsTranslucentBackgroundAlpha.get()
+            val translucent = prefs.recentsTranslucentBackground.firstCached()
+            val translucentIntensity = prefs.recentsTranslucentBackgroundAlpha.firstCached()
             if (translucent) setAlpha(translucentIntensity) else this
         }
 
     @JvmField val OverviewScrimOverBlur = OverviewScrimOverBlurColor
         .withPreferences { prefs ->
-            val translucent = prefs.recentsTranslucentBackground.get()
-            val translucentIntensity = prefs.recentsTranslucentBackgroundAlpha.get()
+            val translucent = prefs.recentsTranslucentBackground.firstCached()
+            val translucentIntensity = prefs.recentsTranslucentBackgroundAlpha.firstCached()
             if (translucent) setAlpha(translucentIntensity) else this
         }
 

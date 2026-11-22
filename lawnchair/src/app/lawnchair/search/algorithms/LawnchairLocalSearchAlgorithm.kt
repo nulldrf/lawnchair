@@ -1,7 +1,6 @@
 package app.lawnchair.search.algorithms
 
 import android.content.Context
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.adapter.SearchLinksTarget
@@ -105,14 +104,13 @@ class LawnchairLocalSearchAlgorithm(context: Context) : LawnchairSearchAlgorithm
         modelRetryJob?.cancel()
         currentJob?.cancel()
 
-        val prefs = PreferenceManager.getInstance(context)
-        val historyEnabled = prefs.searchResulRecentSuggestion.get()
+        val prefs2 = PreferenceManager2.getInstance(context)
+        val historyEnabled = prefs2.searchResulRecentSuggestion.firstCached()
 
         if (!historyEnabled) {
             callback.clearSearchResult()
         } else {
             currentJob = coroutineScope.launch {
-                val prefs2 = PreferenceManager2.getInstance(context)
                 val maxHistory = prefs2.maxRecentResultCount.firstCached()
 
                 val historyResults = historySearchProvider.getRecentKeywords(context, maxHistory)
@@ -145,10 +143,9 @@ class LawnchairLocalSearchAlgorithm(context: Context) : LawnchairSearchAlgorithm
 
     private fun generateActionResults(query: String): List<SearchResult.Action> {
         val actions = mutableListOf<SearchResult.Action>()
-        val prefs = PreferenceManager.getInstance(context)
         val prefs2 = PreferenceManager2.getInstance(context)
 
-        if (prefs.searchResultStartPageSuggestion.get()) {
+        if (prefs2.searchResultStartPageSuggestion.firstCached()) {
             val provider = prefs2.webSuggestionProvider.firstCached()
             val webProvider = provider.configure(context)
 

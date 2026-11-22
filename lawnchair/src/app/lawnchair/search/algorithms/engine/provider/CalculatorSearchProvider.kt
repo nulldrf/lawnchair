@@ -1,7 +1,8 @@
 package app.lawnchair.search.algorithms.engine.provider
 
 import android.content.Context
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.algorithms.data.Calculation
 import app.lawnchair.search.algorithms.data.calculator.Expressions
 import app.lawnchair.search.algorithms.engine.SearchProvider
@@ -19,9 +20,9 @@ object CalculatorSearchProvider : SearchProvider {
         context: Context,
         query: String,
     ): Flow<List<SearchResult>> = flow {
-        val legacyPrefs = PreferenceManager.getInstance(context)
+        val prefs = PreferenceManager2.getInstance(context)
 
-        if (query.isBlank() || !legacyPrefs.searchResultCalculator.get()) {
+        if (query.isBlank() || !prefs.searchResultCalculator.firstCached()) {
             emit(emptyList())
             return@flow
         }

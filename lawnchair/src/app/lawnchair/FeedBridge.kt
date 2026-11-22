@@ -24,7 +24,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Process
 import android.util.Log
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.util.SingletonHolder
 import app.lawnchair.util.ensureOnMainThread
 import app.lawnchair.util.getSignatureHash
@@ -37,7 +38,7 @@ import com.kieronquinn.app.smartspacer.sdk.SmartspacerConstants
 class FeedBridge(private val context: Context) {
 
     private val shouldUseFeed = context.applicationInfo.flags and (FLAG_DEBUGGABLE or FLAG_SYSTEM) == 0
-    private val prefs by lazy { PreferenceManager.getInstance(context) }
+    private val prefs by lazy { PreferenceManager2.getInstance(context) }
     private val bridgePackages by lazy {
         listOf(
             PixelBridgeInfo("com.google.android.apps.nexuslauncher", R.integer.bridge_signature_hash),
@@ -46,7 +47,7 @@ class FeedBridge(private val context: Context) {
     }
 
     @JvmOverloads
-    fun resolveBridge(customPackage: String = prefs.feedProvider.get()): BridgeInfo? {
+    fun resolveBridge(customPackage: String = prefs.feedProvider.firstCached()): BridgeInfo? {
         val customBridge = customBridgeOrNull(customPackage)
         val feedProvider = customPackage.toBoolean()
         return when {
@@ -56,7 +57,7 @@ class FeedBridge(private val context: Context) {
         }
     }
 
-    private fun customBridgeOrNull(customPackage: String = prefs.feedProvider.get()): CustomBridgeInfo? {
+    private fun customBridgeOrNull(customPackage: String = prefs.feedProvider.firstCached()): CustomBridgeInfo? {
         return if (customPackage.isNotBlank()) {
             val bridge = CustomBridgeInfo(customPackage)
             if (bridge.isAvailable()) bridge else null
@@ -127,7 +128,7 @@ class FeedBridge(private val context: Context) {
 
     private inner class CustomBridgeInfo(packageName: String) : BridgeInfo(packageName, 0) {
         override val signatureHash = whitelist[packageName]?.toInt() ?: -1
-        val ignoreWhitelist = prefs.ignoreFeedWhitelist.get()
+        val ignoreWhitelist = prefs.ignoreFeedWhitelist.firstCached()
         override fun isSigned(): Boolean {
             if (signatureHash == -1 && Utilities.ATLEAST_P) {
                 val info = context.packageManager

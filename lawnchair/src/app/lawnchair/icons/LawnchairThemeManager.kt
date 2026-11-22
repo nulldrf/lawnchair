@@ -4,8 +4,6 @@ import android.content.Context
 import android.util.Log
 import app.lawnchair.icons.shape.IconShape
 import app.lawnchair.icons.shape.PathShapeDelegate
-import app.lawnchair.preferences.PreferenceChangeListener
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.theme.ThemeProvider
@@ -38,7 +36,6 @@ constructor(
     private val iconControllerFactory: IconControllerFactory,
     private val lifecycle: DaggerSingletonTracker,
     private val prefs2: PreferenceManager2,
-    private val prefs1: PreferenceManager,
     private val themeProvider: ThemeProvider,
 ) : ThemeManager(
     context,
@@ -47,18 +44,16 @@ constructor(
     iconControllerFactory,
     lifecycle,
 ) {
-    private val statePrefs1 = listOf(
-        prefs1.wrapAdaptiveIcons,
-        prefs1.transparentIconBackground,
-        prefs1.shadowBGIcons,
-        prefs1.coloredBackgroundLightness,
-        prefs1.forceIconMonochrome,
-        prefs1.launcherTheme,
+    private val statePrefs = listOf(
+        prefs2.wrapAdaptiveIcons,
+        prefs2.transparentIconBackground,
+        prefs2.shadowBGIcons,
+        prefs2.coloredBackgroundLightness,
+        prefs2.forceIconMonochrome,
+        prefs2.launcherTheme,
+        prefs2.colorizedBackgrounds,
+        prefs2.treatWhiteAdaptiveIcons,
     )
-
-    private val prefListener = PreferenceChangeListener {
-        uiExecutor.execute { verifyIconState() }
-    }
 
     override var iconState = parseIconStateV2(null)
 
@@ -69,6 +64,14 @@ constructor(
             prefs2.customIconShape.get(),
             prefs2.folderShape.get(),
             prefs2.customFolderShape.get(),
+            prefs2.wrapAdaptiveIcons.get(),
+            prefs2.transparentIconBackground.get(),
+            prefs2.shadowBGIcons.get(),
+            prefs2.coloredBackgroundLightness.get(),
+            prefs2.forceIconMonochrome.get(),
+            prefs2.launcherTheme.get(),
+            prefs2.colorizedBackgrounds.get(),
+            prefs2.treatWhiteAdaptiveIcons.get(),
         ).onEach { verifyIconState() }
             .launchIn(scope)
 
@@ -105,13 +108,10 @@ constructor(
         }
         displayController.addChangeListener(displayInfoChangeListener)
 
-        statePrefs1.forEach { it.addListener(prefListener) }
-
         lifecycle.addCloseable {
             colorSchemeChangeListener.destroy()
             scope.cancel()
             displayController.removeChangeListener(displayInfoChangeListener)
-            statePrefs1.forEach { it.removeListener(prefListener) }
         }
     }
 
@@ -123,7 +123,7 @@ constructor(
         listeners.forEach { it.onThemeChanged() }
     }
 
-    private fun prefs1State(): String = statePrefs1.joinToString(",") { it.get().toString() }
+    private fun statePrefsKey(): String = statePrefs.joinToString(",") { it.firstCached().toString() }
 
     private fun parseIconStateV2(oldState: IconState?): IconState {
         val currentAppShape: IconShape = try {
@@ -140,11 +140,11 @@ constructor(
             IconShape.Circle
         }
 
-        val currentPrefs1State = prefs1State()
-        val appShapeKey = currentAppShape.getHashString() + currentPrefs1State
-        val folderShapeKey = currentFolderShape.getHashString() + currentPrefs1State
+        val currentPrefsState = statePrefsKey()
+        val appShapeKey = currentAppShape.getHashString() + currentPrefsState
+        val folderShapeKey = currentFolderShape.getHashString() + currentPrefsState
         val themeController = iconControllerFactory.createThemeController()?.let {
-            if (prefs1.forceIconMonochrome.get()) {
+            if (prefs2.forceIconMonochrome.firstCached()) {
                 FORCED_MONO_THEME_CONTROLLER
             } else {
                 MONO_THEME_CONTROLLER

@@ -2,7 +2,6 @@ package app.lawnchair.search.algorithms.engine.provider.web
 
 import android.content.Context
 import android.util.Log
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.algorithms.engine.SearchProvider
@@ -22,10 +21,9 @@ object WebSuggestionProvider : SearchProvider {
         context: Context,
         query: String,
     ): Flow<List<SearchResult>> {
-        val prefs = PreferenceManager.getInstance(context)
         val prefs2 = PreferenceManager2.getInstance(context)
 
-        if (query.isBlank() || !prefs.searchResultStartPageSuggestion.get()) {
+        if (query.isBlank() || !prefs2.searchResultStartPageSuggestion.firstCached()) {
             return flow { emit(emptyList()) }
         }
 

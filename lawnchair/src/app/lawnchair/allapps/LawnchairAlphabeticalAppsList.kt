@@ -9,8 +9,8 @@ import androidx.lifecycle.lifecycleScope
 import app.lawnchair.data.folder.FolderEntry
 import app.lawnchair.data.folder.model.FolderViewModel
 import app.lawnchair.launcher
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.util.categorizeAppsWithSystemAndGoogle
 import app.lawnchair.util.observeOnce
 import com.android.launcher3.InvariantDeviceProfile.OnIDPChangeListener
@@ -40,7 +40,6 @@ class LawnchairAlphabeticalAppsList<T>(
 
     private var hiddenApps: Set<String> = setOf()
     private val prefs2 = PreferenceManager2.getInstance(context)
-    private val prefs = PreferenceManager.getInstance(context)
 
     private val viewModel = FolderViewModel(
         (context as? ComponentActivity)?.application ?: context.launcher.application,
@@ -87,7 +86,7 @@ class LawnchairAlphabeticalAppsList<T>(
 
     override fun addAppsWithSections(appList: List<AppInfo?>?, startPosition: Int): Int {
         if (appList.isNullOrEmpty()) return startPosition
-        val drawerListDefault = prefs.drawerList.get()
+        val drawerListDefault = prefs2.drawerList.firstCached()
         filteredList.clear()
         var position = startPosition
 
@@ -126,12 +125,12 @@ class LawnchairAlphabeticalAppsList<T>(
                     mAdapterItems.add(AdapterItem.asFolder(folderInfo))
                     position++
 
-                    if (prefs.folderApps.get()) {
+                    if (prefs2.folderApps.firstCached()) {
                         filteredList.addAll(resolvedApps)
                     }
                 }
             }
-            val remainingApps = appList.filterNot { app -> filteredList.contains(app) && prefs.folderApps.get() }
+            val remainingApps = appList.filterNot { app -> filteredList.contains(app) && prefs2.folderApps.firstCached() }
             position = super.addAppsWithSections(remainingApps, position)
         }
 

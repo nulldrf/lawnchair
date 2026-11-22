@@ -31,8 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.LegacyKdrag
@@ -76,16 +76,15 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 @Composable
 fun GeneralPreferences(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
     val liveInfoManager = liveInformationManager()
     val iconPacks by LocalPreferenceInteractor.current.iconPacks.collectAsStateWithLifecycle()
-    val themedIconsAdapter = prefs.themedIcons.getAdapter()
-    val drawerThemedIconsAdapter = prefs.drawerThemedIcons.getAdapter()
+    val themedIconsAdapter = prefs2.themedIcons.getAdapter()
+    val drawerThemedIconsAdapter = prefs2.drawerThemedIcons.getAdapter()
     val iconShapeAdapter = prefs2.iconShape.getAdapter()
 
     val currentIconPackName = iconPacks
-        .find { it.packageName == preferenceManager().iconPackPackage.get() }
+        .find { it.packageName == prefs2.iconPackPackage.firstCached() }
         ?.name
     val themedIconsState = ThemedIconsState.getForSettings(
         themedIcons = themedIconsAdapter.state.value,
@@ -110,7 +109,7 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
         PreferenceGroup {
             ScrollAnchor(ScrollKeys.HOME_ROTATION, scrollState) {
                 SwitchPreference(
-                    adapter = prefs.allowRotation.getAdapter(),
+                    adapter = prefs2.allowRotation.getAdapter(),
                     label = stringResource(id = R.string.home_screen_rotation_label),
                     description = stringResource(id = R.string.home_screen_rotation_description),
                 )
@@ -140,31 +139,31 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
             PreferenceGroup(heading = stringResource(id = R.string.font_label)) {
                 ScrollAnchor(ScrollKeys.FONT_WORKSPACE, scrollState) {
                     FontPreference(
-                        fontPref = prefs.fontWorkspace,
+                        fontPref = prefs2.fontWorkspace,
                         label = stringResource(R.string.fontWorkspace),
                     )
                 }
                 ScrollAnchor(ScrollKeys.FONT_HEADING, scrollState) {
                     FontPreference(
-                        fontPref = prefs.fontHeading,
+                        fontPref = prefs2.fontHeading,
                         label = stringResource(R.string.fontHeading),
                     )
                 }
                 ScrollAnchor(ScrollKeys.FONT_HEADING_MEDIUM, scrollState) {
                     FontPreference(
-                        fontPref = prefs.fontHeadingMedium,
+                        fontPref = prefs2.fontHeadingMedium,
                         label = stringResource(R.string.fontHeadingMedium),
                     )
                 }
                 ScrollAnchor(ScrollKeys.FONT_BODY, scrollState) {
                     FontPreference(
-                        fontPref = prefs.fontBody,
+                        fontPref = prefs2.fontBody,
                         label = stringResource(R.string.fontBody),
                     )
                 }
                 ScrollAnchor(ScrollKeys.FONT_BODY_MEDIUM, scrollState) {
                     FontPreference(
-                        fontPref = prefs.fontBodyMedium,
+                        fontPref = prefs2.fontBodyMedium,
                         label = stringResource(R.string.fontBodyMedium),
                     )
                 }
@@ -315,7 +314,7 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
         }
 
         // Settings wallpaper blur requires storage permissions on Android 10+.
-        val settingsBlurAdapter = prefs.settingsBlurBackground.getAdapter()
+        val settingsBlurAdapter = prefs2.settingsBlurBackground.getAdapter()
         var showSettingsBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
         var settingsBlurManagedFilesChecked by rememberSaveable {
             mutableStateOf(
@@ -367,7 +366,7 @@ fun GeneralPreferences(modifier: Modifier = Modifier) {
                 ScrollAnchor(ScrollKeys.SETTINGS_BLUR_INTENSITY, scrollState) {
                     SliderPreference(
                         label = stringResource(id = R.string.settings_blur_intensity_label),
-                        adapter = prefs.settingsBlurIntensity.getAdapter(),
+                        adapter = prefs2.settingsBlurIntensity.getAdapter(),
                         valueRange = 10f..150f,
                         step = 5f,
                         showUnit = "%",

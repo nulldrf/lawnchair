@@ -140,7 +140,7 @@ fun ColumnScope.RestoreBackupOptions(
             try {
                 backup.restore(contents)
                 Toast.makeText(context, R.string.backup_restore_success, Toast.LENGTH_SHORT).show()
-                restartLauncher(context)
+                restartLauncher(context, flushPreferences = false)
             } catch (t: Throwable) {
                 Log.e("RestoreBackupScreen", "failed to restore backup", t)
                 Toast.makeText(context, R.string.backup_restore_error, Toast.LENGTH_SHORT).show()

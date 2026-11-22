@@ -9,7 +9,7 @@ import android.net.Uri
 import android.os.Process
 import android.util.Log
 import app.lawnchair.DeviceProfileOverrides
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
 import com.android.launcher3.GridType
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherSettings.Favorites
@@ -194,13 +194,14 @@ class NovaBackupConverter(
     }
 
     private fun writeGridToLawnchairPrefs(info: NovaBackupInfo) {
-        val prefs = PreferenceManager.getInstance(context)
-        prefs.sp.edit().apply {
-            info.columns?.let { putInt(prefs.workspaceColumns.key, it) }
-            info.rows?.let { putInt(prefs.workspaceRows.key, it) }
-            info.hotseatCount?.let { putInt(prefs.hotseatColumns.key, it) }
-            info.iconPackPackage?.let { putString(prefs.iconPackPackage.key, it) }
-        }.commit()
+        val prefs = PreferenceManager2.getInstance(context)
+        prefs.batchEdit {
+            info.columns?.let { this[prefs.workspaceColumns.key] = it }
+            info.rows?.let { this[prefs.workspaceRows.key] = it }
+            info.hotseatCount?.let { this[prefs.hotseatColumns.key] = it }
+            info.iconPackPackage?.let { this[prefs.iconPackPackage.key] = it }
+        }
+        prefs.flushBlocking()
     }
 
     private fun parseNovaConfig(xmlFile: File): NovaConfig {

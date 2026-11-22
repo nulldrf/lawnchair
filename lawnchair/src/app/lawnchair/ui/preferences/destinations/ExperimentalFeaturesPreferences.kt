@@ -11,7 +11,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.WallpaperAccessPermissionDialog
@@ -37,7 +36,6 @@ import com.google.android.msdl.data.model.FeedbackLevel
 fun ExperimentalFeaturesPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
     val scrollState = rememberPreferenceScrollState()
     val prefs2 = preferenceManager2()
 
@@ -46,7 +44,7 @@ fun ExperimentalFeaturesPreferences(
         backArrowVisible = !LocalIsExpandedScreen.current,
         modifier = modifier,
     ) {
-        val enableWallpaperBlur = prefs.enableWallpaperBlur.getAdapter()
+        val enableWallpaperBlur = prefs2.enableWallpaperBlur.getAdapter()
         val context = LocalContext.current
         val fileAccessManager = remember { FileAccessManager.getInstance(context) }
         val allFilesAccessState by fileAccessManager.allFilesAccessState.collectAsStateWithLifecycle()
@@ -67,7 +65,7 @@ fun ExperimentalFeaturesPreferences(
             }
             ScrollAnchor(ScrollKeys.MAX_GRID_SIZE, scrollState) {
                 SwitchPreference(
-                    adapter = prefs.workspaceIncreaseMaxGridSize.getAdapter(),
+                    adapter = prefs2.workspaceIncreaseMaxGridSize.getAdapter(),
                     label = stringResource(id = R.string.workspace_increase_max_grid_size_label),
                     description = stringResource(id = R.string.workspace_increase_max_grid_size_description),
                 )
@@ -98,7 +96,7 @@ fun ExperimentalFeaturesPreferences(
                 ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR_AMOUNT, scrollState) {
                     SliderPreference(
                         label = stringResource(id = R.string.wallpaper_background_blur),
-                        adapter = prefs.wallpaperBlur.getAdapter(),
+                        adapter = prefs2.wallpaperBlur.getAdapter(),
                         step = 5,
                         valueRange = 0..100,
                         showUnit = "%",
@@ -109,7 +107,7 @@ fun ExperimentalFeaturesPreferences(
                 ScrollAnchor(ScrollKeys.EXP_WALLPAPER_BLUR_FACTOR, scrollState) {
                     SliderPreference(
                         label = stringResource(id = R.string.wallpaper_background_blur_factor),
-                        adapter = prefs.wallpaperBlurFactorThreshold.getAdapter(),
+                        adapter = prefs2.wallpaperBlurFactorThreshold.getAdapter(),
                         step = 1F,
                         valueRange = 0F..10F,
                     )
@@ -131,8 +129,8 @@ fun ExperimentalFeaturesPreferences(
             onPauseOrDispose { }
         }
 
-        val enableGncAdapter = prefs.enableGnc.getAdapter()
-        val vibrationFeedbackLevelAdapter = prefs.vibrationFeedbackLevel.getAdapter()
+        val enableGncAdapter = prefs2.enableGnc.getAdapter()
+        val vibrationFeedbackLevelAdapter = prefs2.vibrationFeedbackLevel.getAdapter()
 
         PreferenceGroup(
             modifier = Modifier,

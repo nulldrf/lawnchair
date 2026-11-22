@@ -25,12 +25,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
-import androidx.core.content.edit
-import app.lawnchair.smartspace.provider.OnboardingProvider
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.setCached
 import app.lawnchair.ui.preferences.navigation.PreferenceRoute
 import app.lawnchair.ui.theme.EdgeToEdge
 import app.lawnchair.ui.theme.LawnchairTheme
-import com.android.launcher3.LauncherPrefs
 import com.google.accompanist.adaptive.calculateDisplayFeatures
 import kotlinx.serialization.json.Json
 
@@ -59,12 +58,7 @@ class PreferenceActivity : ComponentActivity() {
                 )
             }
         }
-        LauncherPrefs.getPrefs(this).edit {
-            putBoolean(
-                OnboardingProvider.PREF_HAS_OPENED_SETTINGS,
-                true,
-            )
-        }
+        PreferenceManager2.getInstance(this).hasOpenedSettings.setCached(true)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

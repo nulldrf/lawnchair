@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.layout.ConnectedButtonGroup
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
@@ -57,7 +57,7 @@ object ThemeChoice {
  */
 @Composable
 fun ThemePreference() {
-    val adapter = preferenceManager().launcherTheme.getAdapter()
+    val adapter = preferenceManager2().launcherTheme.getAdapter()
 
     // Optimistic local state: updated immediately on tap so the mockup animation
     // and segment highlight fire at the moment of the gesture, not after the

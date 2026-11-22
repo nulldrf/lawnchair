@@ -3,7 +3,6 @@ package app.lawnchair.search.algorithms.engine.provider
 import android.content.Context
 import android.provider.Settings
 import android.util.Log
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.algorithms.data.SettingInfo
@@ -25,10 +24,9 @@ object SettingsSearchProvider : SearchProvider {
         query: String,
     ): Flow<List<SearchResult>> = flow {
         // We get the preference manager instance when needed, using the passed context.
-        val prefs = PreferenceManager.getInstance(context)
         val prefs2 = PreferenceManager2.getInstance(context)
 
-        if (query.isBlank() || !prefs.searchResultSettingsEntry.get()) {
+        if (query.isBlank() || !prefs2.searchResultSettingsEntry.firstCached()) {
             emit(emptyList())
             return@flow
         }

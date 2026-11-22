@@ -38,7 +38,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.lawnchair.data.folder.FolderEntry
 import app.lawnchair.data.folder.model.FolderViewModel
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.LocalNavController
 import app.lawnchair.ui.preferences.components.controls.ClickablePreference
@@ -119,7 +119,7 @@ fun AppDrawerFoldersPreference(
 ) {
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
     val bottomSheetHandler = bottomSheetHandler
-    val prefs = preferenceManager()
+    val prefs = preferenceManager2()
 
     val sortedDisplayList = folders ?: emptyList()
 

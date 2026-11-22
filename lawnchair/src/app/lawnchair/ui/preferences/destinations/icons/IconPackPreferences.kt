@@ -62,7 +62,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.DummyLauncherBox
 import app.lawnchair.ui.preferences.components.DummyLauncherLayout
@@ -88,7 +88,7 @@ data class IconPackInfo(
 fun IconPackPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
+    val prefs = preferenceManager2()
     val iconPackAdapter = prefs.iconPackPackage.getAdapter()
 
     PreferenceLayout(

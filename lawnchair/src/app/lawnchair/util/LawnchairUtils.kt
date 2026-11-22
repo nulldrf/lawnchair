@@ -49,7 +49,6 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.luminance
 import androidx.core.os.UserManagerCompat
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.theme.color.ColorOption
@@ -91,7 +90,8 @@ fun <T> useApplicationContext(creator: (Context) -> T): (Context) -> T = { it ->
     creator(it.applicationContext)
 }
 
-fun restartLauncher(context: Context) {
+@JvmOverloads
+fun restartLauncher(context: Context, flushPreferences: Boolean = true) {
     val pm = context.packageManager
     var intent: Intent? = Intent(Intent.ACTION_MAIN)
         .addCategory(Intent.CATEGORY_HOME)
@@ -111,10 +111,14 @@ fun restartLauncher(context: Context) {
             .setPackage(context.packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
-    restartLauncher(context, intent)
+    restartLauncher(context, intent, flushPreferences)
 }
 
-fun restartLauncher(context: Context, intent: Intent?) {
+@JvmOverloads
+fun restartLauncher(context: Context, intent: Intent?, flushPreferences: Boolean = true) {
+    if (flushPreferences && UserManagerCompat.isUserUnlocked(context)) {
+        runCatching { PreferenceManager2.getInstance(context).flushBlocking() }
+    }
     context.startActivity(intent)
 
     // Create a pending intent so the application is restarted after System.exit(0) was called.
@@ -132,9 +136,9 @@ fun killLauncher() {
     exitProcess(0)
 }
 
-fun getPrefsIfUnlocked(context: Context): PreferenceManager? {
+fun getPrefsIfUnlocked(context: Context): PreferenceManager2? {
     return if (UserManagerCompat.isUserUnlocked(context)) {
-        PreferenceManager.getInstance(context)
+        PreferenceManager2.getInstance(context)
     } else {
         null
     }
@@ -143,7 +147,7 @@ fun getPrefsIfUnlocked(context: Context): PreferenceManager? {
 fun getWindowCornerRadius(context: Context): Float {
     val prefs = getPrefsIfUnlocked(context)
     return when {
-        prefs?.overrideWindowCornerRadius?.get() == true -> prefs.windowCornerRadius.get().toFloat()
+        prefs?.overrideWindowCornerRadius?.firstCached() == true -> prefs.windowCornerRadius.firstCached().toFloat()
         Utilities.ATLEAST_Q -> QuickStepContract.getWindowCornerRadius(context)
         else -> 0.0f
     }
@@ -153,7 +157,7 @@ fun supportsRoundedCornersOnWindows(context: Context): Boolean {
     val prefs = getPrefsIfUnlocked(context)
 
     return when {
-        prefs?.overrideWindowCornerRadius?.get() == true -> true
+        prefs?.overrideWindowCornerRadius?.firstCached() == true -> true
         Utilities.ATLEAST_Q -> QuickStepContract.supportsRoundedCornersOnWindows(context.resources)
         else -> false
     }
@@ -199,7 +203,7 @@ fun overrideAllAppsTextColor(textView: TextView) {
         context,
         ColorTokens.AllAppsScrimColor.resolveColor(context),
     ).luminance
-    val opacity = PreferenceManager.getInstance(context).drawerOpacity.get()
+    val opacity = prefs2.drawerOpacity.firstCached()
     if (luminance > 0.5f || opacity <= 0.3f) {
         textView.setTextColor(Themes.getAttrColor(context, R.attr.allAppsAlternateTextColor))
     }
@@ -313,8 +317,8 @@ private fun getAllAppsBaseColor(context: Context, defaultColor: Int): Int {
 
 /** Apply Lawnchair custom allapps opacity and colour to the provided colour */
 fun getAllAppsBackgroundColor(context: Context, defaultColor: Int): Int {
-    val prefs = PreferenceManager.getInstance(context)
-    val userOpacity = prefs.drawerOpacity.get()
+    val prefs = PreferenceManager2.getInstance(context)
+    val userOpacity = prefs.drawerOpacity.firstCached()
     return ColorUtils.setAlphaComponent(getAllAppsBaseColor(context, defaultColor), (userOpacity * 255).roundToInt())
 }
 

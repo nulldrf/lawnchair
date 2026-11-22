@@ -13,7 +13,8 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.animation.Interpolator;
 
-import app.lawnchair.preferences.PreferenceManager;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
+import app.lawnchair.preferences2.PreferenceManager2;
 import androidx.annotation.AnyThread;
 
 import com.android.app.animation.Interpolators;
@@ -44,7 +45,7 @@ public class WallpaperOffsetInterpolator {
     private boolean mLockedToDefaultPage;
     private int mNumScreens;
 
-    private PreferenceManager prefs;
+    private PreferenceManager2 prefs;
 
     public WallpaperOffsetInterpolator(Workspace<?> workspace) {
         mWorkspace = workspace;
@@ -52,7 +53,7 @@ public class WallpaperOffsetInterpolator {
                 workspace.getContext(), UI_HELPER_EXECUTOR, i -> onWallpaperChanged());
         mIsRtl = Utilities.isRtl(workspace.getResources());
         mHandler = new OffsetHandler(workspace.getContext());
-        prefs = PreferenceManager.getInstance(workspace.getContext());
+        prefs = PreferenceManager2.getInstance(workspace.getContext());
     }
 
     /**
@@ -76,7 +77,7 @@ public class WallpaperOffsetInterpolator {
 
         // To match the default wallpaper behavior in the system, we default to either the left
         // or right edge on initialization
-        if (!prefs.getWallpaperScrolling().get() || mLockedToDefaultPage || numScrollableScreens <= 1) {
+        if (!PreferenceCacheExtensionsKt.firstCached(prefs.getWallpaperScrolling()) || mLockedToDefaultPage || numScrollableScreens <= 1) {
             out[0] = mIsRtl ? 1 : 0;
             return;
         }

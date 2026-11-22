@@ -10,8 +10,9 @@ import android.os.Bundle
 import android.os.Handler
 import androidx.core.os.bundleOf
 import app.lawnchair.compat.LawnchairQuickstepCompat
-import app.lawnchair.preferences.PreferenceChangeListener
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
+import app.lawnchair.preferences2.setCached
 import app.lawnchair.search.adapter.SearchTargetCompat
 import app.lawnchair.util.requireSystemService
 import com.android.launcher3.LauncherAppState
@@ -20,26 +21,31 @@ import com.android.launcher3.search.SearchCallback
 import com.android.launcher3.util.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onEach
 
-class LawnchairASISearchAlgorithm(context: Context) :
-    LawnchairSearchAlgorithm(context),
-    PreferenceChangeListener {
-    private val prefs: PreferenceManager
+class LawnchairASISearchAlgorithm(context: Context) : LawnchairSearchAlgorithm(context) {
+    private val prefs = PreferenceManager2.getInstance(context)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var searchSession: SearchSession? = null
     private var activeQuery: PendingQuery? = null
 
     init {
-        prefs = PreferenceManager.getInstance(context).also {
-            createSearchSession()
-            it.searchResultShortcuts.addListener(this)
-            it.searchResultPeople.addListener(this)
-            it.searchResultPixelTips.addListener(this)
-            it.searchResultSettings.addListener(this)
-        }
-    }
-
-    override fun onPreferenceChange() {
         createSearchSession()
+        merge(
+            prefs.searchResultShortcuts.get().drop(1),
+            prefs.searchResultPeople.get().drop(1),
+            prefs.searchResultPixelTips.get().drop(1),
+            prefs.searchResultSettings.get().drop(1),
+        ).onEach {
+            createSearchSession()
+        }.launchIn(scope)
     }
 
     override fun doSearch(query: String, callback: SearchCallback<BaseAllAppsAdapter.AdapterItem>) {
@@ -56,14 +62,9 @@ class LawnchairASISearchAlgorithm(context: Context) :
 
     override fun destroy() {
         super.destroy()
+        scope.cancel()
         Executors.UI_HELPER_EXECUTOR.execute {
             searchSession?.destroy()
-        }
-        prefs.let {
-            it.searchResultShortcuts.removeListener(this)
-            it.searchResultPeople.removeListener(this)
-            it.searchResultPixelTips.removeListener(this)
-            it.searchResultSettings.removeListener(this)
         }
     }
 
@@ -79,17 +80,17 @@ class LawnchairASISearchAlgorithm(context: Context) :
             )
             // apps or shortcuts
             var resultTypes = 1 or 2
-            if (prefs.searchResultShortcuts.get()) {
+            if (prefs.searchResultShortcuts.firstCached()) {
                 resultTypes = resultTypes or 1546
             }
-            if (prefs.searchResultPeople.get()) {
+            if (prefs.searchResultPeople.firstCached()) {
                 resultTypes = resultTypes or 4
             }
-            if (prefs.searchResultPixelTips.get()) {
+            if (prefs.searchResultPixelTips.firstCached()) {
                 resultTypes = resultTypes or 8192
                 extras.putString("tips_source", "superpacks_tips_source")
             }
-            if (prefs.searchResultSettings.get()) {
+            if (prefs.searchResultSettings.firstCached()) {
                 resultTypes = resultTypes or 80
                 extras.putString("settings_source", "superpacks_settings_source")
             }
@@ -131,7 +132,7 @@ class LawnchairASISearchAlgorithm(context: Context) :
                 val searchManager = context.requireSystemService<SearchUiManager>()
                 val searchSession: SearchSession = searchManager.createSearchSession(searchContext)
                 val searchQuery = Query("dummy", System.currentTimeMillis())
-                val prefs = PreferenceManager.getInstance(context)
+                val prefs = PreferenceManager2.getInstance(context)
                 val checkDone = AtomicBoolean(false)
                 searchSession.query(searchQuery, Executors.MAIN_EXECUTOR) { targets ->
                     checkDone.set(true)
@@ -149,11 +150,11 @@ class LawnchairASISearchAlgorithm(context: Context) :
         }
 
         private fun finishCompatibilityCheck(
-            prefs: PreferenceManager,
+            prefs: PreferenceManager2,
             session: SearchSession,
             isCompatible: Boolean,
         ) {
-            Executors.MAIN_EXECUTOR.execute { prefs.deviceSearch.set(isCompatible) }
+            Executors.MAIN_EXECUTOR.execute { prefs.deviceSearch.setCached(isCompatible) }
             try {
                 session.destroy()
             } catch (_: Exception) {

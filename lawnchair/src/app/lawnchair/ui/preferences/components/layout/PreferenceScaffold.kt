@@ -44,7 +44,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.core.graphics.ColorUtils
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal class PreferenceTopBarState(
@@ -76,7 +76,7 @@ fun PreferenceScaffold(
     val topBarState = remember(scrollBehavior) { PreferenceTopBarState(scrollBehavior) }
 
     // Blurred wallpaper background for settings screens.
-    val prefs = preferenceManager()
+    val prefs = preferenceManager2()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
     val blurState = rememberSettingsBlurState(blurEnabled, blurIntensity)

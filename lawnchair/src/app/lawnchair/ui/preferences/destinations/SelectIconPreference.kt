@@ -1,5 +1,7 @@
 package app.lawnchair.ui.preferences.destinations
 
+import app.lawnchair.preferences2.firstCached
+
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.LauncherApps
@@ -190,7 +192,7 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                         // 2. Active icon pack (prefs.iconPackPackage — the single selected pack)
                         // 3. System icon fallback
                         val prefs = remember {
-                            app.lawnchair.preferences.PreferenceManager.getInstance(context)
+                            app.lawnchair.preferences2.PreferenceManager2.getInstance(context)
                         }
                         val currentDrawable by produceState<Drawable?>(
                             initialValue = null,
@@ -219,7 +221,7 @@ fun SelectIconPreference(componentKey: ComponentKey) {
                                     } else {
                                         // 2. Active icon pack — exactly what LawnchairIconProvider
                                         //    does: read iconPackPackage pref, get that single pack
-                                        val activePackName = prefs.iconPackPackage.get()
+                                        val activePackName = prefs.iconPackPackage.firstCached()
                                         val activePack = iconPackProvider
                                             .getIconPack(activePackName)
                                             ?.also { it.loadBlocking() }

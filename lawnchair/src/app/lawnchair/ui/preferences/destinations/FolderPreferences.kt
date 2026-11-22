@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.NavigationActionPreference
@@ -48,7 +47,6 @@ fun FolderPreferences(
     ) {
         val context = LocalContext.current
         val scrollState = rememberPreferenceScrollState()
-        val prefs = preferenceManager()
         val prefs2 = preferenceManager2()
         val folderIconShapeAdapter = prefs2.folderShape.getAdapter()
         val folderIconShapeSubtitle = iconShapeEntries(context)
@@ -100,7 +98,7 @@ fun FolderPreferences(
             ScrollAnchor(ScrollKeys.FOLDER_MAX_ROWS, scrollState) {
                 SliderPreference(
                     label = stringResource(id = R.string.max_folder_rows),
-                    adapter = prefs.folderRows.getAdapter(),
+                    adapter = prefs2.folderRows.getAdapter(),
                     step = 1,
                     valueRange = 2..5,
                 )

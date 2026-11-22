@@ -121,7 +121,6 @@ import static com.topjohnwu.superuser.internal.Utils.context;
 import app.lawnchair.allapps.DrawerWallpaperBlurHelper;
 import app.lawnchair.allapps.LawnchairAlphabeticalAppsList;
 import app.lawnchair.font.FontManager;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.theme.color.tokens.ColorTokens;
 import app.lawnchair.util.LawnchairUtilsKt;
@@ -211,7 +210,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     @Nullable private AllAppsTransitionController mAllAppsTransitionController;
 
     private final PreferenceManager2 pref2;
-    private final PreferenceManager pref;
 
     private int mCachedBottomSheetBgColor;
 
@@ -244,7 +242,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mAllAppsStore = new AllAppsStore<>(mActivityContext);
 
         pref2 = PreferenceManager2.getInstance(mActivityContext);
-        pref = PreferenceManager.getInstance(mActivityContext);
 
         mScrimColor = ColorTokens.AllAppsScrimColor.resolveColor(context);
         mHeaderThreshold = getResources().getDimensionPixelSize(
@@ -899,7 +896,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
             // Phone / non-sheet mode: use drawer opacity as the scrim alpha so
             // the protection blends proportionally with the background.
-            float opacity = pref.getDrawerOpacity().get();
+            float opacity = PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerOpacity());
             opacity = MathUtils.clamp(opacity, 0f, 1f);
             return ColorUtils.setAlphaComponent(
                     ColorUtils.blendARGB(getBackgroundColor(), mHeaderProtectionColor, blendRatio),

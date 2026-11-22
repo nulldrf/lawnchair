@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import app.lawnchair.FeedBridge
 import app.lawnchair.icons.CustomAdaptiveIconDrawable
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.controls.ListPreference
 import app.lawnchair.ui.preferences.components.controls.ListPreferenceEntry
 import com.android.launcher3.R
@@ -55,7 +55,7 @@ fun FeedPreference(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val adapter = preferenceManager().feedProvider.getAdapter()
+    val adapter = preferenceManager2().feedProvider.getAdapter()
     val preferredPackage = adapter.state.value
     val entries = remember { getEntries(context) }
     val resolvedPackage = remember(preferredPackage) {

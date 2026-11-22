@@ -36,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalPreferenceInteractor
 import app.lawnchair.ui.preferences.components.controls.ListPreference
 import app.lawnchair.ui.preferences.components.controls.ListPreferenceEntry
@@ -79,7 +79,7 @@ enum class ThemedIconsState(
 fun ThemedIconsPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
+    val prefs = preferenceManager2()
     val themedIconsAdapter = prefs.themedIcons.getAdapter()
     val drawerThemedIconsAdapter = prefs.drawerThemedIcons.getAdapter()
     val themedIconPackAdapter = prefs.themedIconPackPackage.getAdapter()

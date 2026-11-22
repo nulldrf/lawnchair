@@ -24,7 +24,7 @@ import android.platform.test.flag.junit.SetFlagsRule
 import android.util.DisplayMetrics
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
 import com.android.launcher3.FakeLauncherPrefs
 import com.android.launcher3.Flags
 import com.android.launcher3.dagger.LauncherAppComponent
@@ -40,6 +40,7 @@ import com.android.launcher3.util.SandboxApplication
 import com.android.launcher3.util.TestUtil
 import com.google.common.truth.Truth.assertThat
 import dagger.Component
+import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -53,15 +54,15 @@ class LawnchairThemeManagerTest {
     @get:Rule val setFlagsRule = SetFlagsRule()
 
     private lateinit var themeManager: ThemeManager
-    private lateinit var prefs: PreferenceManager
+    private lateinit var prefs: PreferenceManager2
 
     @Before
     fun setUp() {
         context.initDaggerComponent(DaggerLawnchairThemeManagerTestComponent.builder())
         themeManager = ThemeManager.INSTANCE[context]
-        prefs = PreferenceManager.INSTANCE[context]
+        prefs = PreferenceManager2.INSTANCE[context]
         themeManager.isMonoThemeEnabled = false
-        prefs.forceIconMonochrome.set(false)
+        runBlocking { prefs.forceIconMonochrome.set(false) }
         waitForPreferenceChanges()
     }
 
@@ -69,7 +70,7 @@ class LawnchairThemeManagerTest {
     @EnableFlags(Flags.FLAG_FORCE_MONOCHROME_APP_ICONS)
     fun `force monochrome themes unsupported adaptive icons`() {
         ensureBitmapSerializationSupported()
-        prefs.forceIconMonochrome.set(true)
+        runBlocking { prefs.forceIconMonochrome.set(true) }
         themeManager.isMonoThemeEnabled = true
         waitForPreferenceChanges()
 
@@ -106,11 +107,11 @@ class LawnchairThemeManagerTest {
 
     @Test
     fun `force monochrome does not enable themed icons`() {
-        prefs.forceIconMonochrome.set(true)
+        runBlocking { prefs.forceIconMonochrome.set(true) }
         waitForPreferenceChanges()
         assertThat(themeManager.themeController).isNull()
 
-        prefs.forceIconMonochrome.set(false)
+        runBlocking { prefs.forceIconMonochrome.set(false) }
         waitForPreferenceChanges()
         assertThat(themeManager.themeController).isNull()
     }
@@ -123,7 +124,7 @@ class LawnchairThemeManagerTest {
         var callbackCalled = false
         themeManager.addChangeListener { callbackCalled = true }
 
-        prefs.forceIconMonochrome.set(true)
+        runBlocking { prefs.forceIconMonochrome.set(true) }
         waitForPreferenceChanges()
 
         assertThat(themeManager.iconState).isNotEqualTo(previousState)

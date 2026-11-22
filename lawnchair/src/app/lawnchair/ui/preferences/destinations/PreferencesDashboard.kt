@@ -117,8 +117,6 @@ import app.lawnchair.predictions.LawnchairPredictor
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences.not
-import app.lawnchair.preferences.observeAsState
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.preferences2.preferenceManager2
@@ -220,7 +218,6 @@ fun PreferencesDashboard(
     val context = LocalContext.current
     val navController = LocalNavController.current
     SyncLiveInformation()
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
 
     val liveInformationManager = liveInformationManager()
@@ -252,8 +249,8 @@ fun PreferencesDashboard(
         null
     }
 
-    val aboutDescription = if (prefs.hideVersionInfo.get()) {
-        prefs.pseudonymVersion.get()
+    val aboutDescription = if (prefs2.hideVersionInfo.firstCached()) {
+        prefs2.pseudonymVersion.firstCached()
     } else {
         "${context.getString(R.string.derived_app_name)} ${BuildConfig.MAJOR_VERSION}"
     }
@@ -295,7 +292,7 @@ fun PreferencesDashboard(
     val isSmartspaceEnabled = prefs2.enableSmartspace.firstCached()
 
     // General state
-    val allowRotationAdapter = prefs.allowRotation.getAdapter()
+    val allowRotationAdapter = prefs2.allowRotation.getAdapter()
     val isNightlyBuild = BuildConfig.APPLICATION_ID.contains("nightly")
     val autoUpdaterNightlyAdapter = prefs2.autoUpdaterNightly.getAdapter()
     val liveInfoEnabledAdapter = liveInformationManager.enabled.getAdapter()
@@ -320,7 +317,7 @@ fun PreferencesDashboard(
     val showNotificationCountAdapter = prefs2.showNotificationCount.getAdapter()
     val showNotificationCount = showNotificationCountAdapter.state.value
 
-    val settingsBlurAdapter = prefs.settingsBlurBackground.getAdapter()
+    val settingsBlurAdapter = prefs2.settingsBlurBackground.getAdapter()
     var showSettingsBlurPermissionDialog by rememberSaveable { mutableStateOf(false) }
     var settingsBlurManagedFilesChecked by rememberSaveable {
         mutableStateOf(
@@ -361,18 +358,18 @@ fun PreferencesDashboard(
     }
 
     // Themed & advanced icon state
-    val themedIconsActive = prefs.themedIcons.getAdapter().state.value
-    val forceIconMonochromeAdapter = prefs.forceIconMonochrome.getAdapter()
-    val transparentIconBackgroundAdapter = prefs.transparentIconBackground.getAdapter()
+    val themedIconsActive = prefs2.themedIcons.getAdapter().state.value
+    val forceIconMonochromeAdapter = prefs2.forceIconMonochrome.getAdapter()
+    val transparentIconBackgroundAdapter = prefs2.transparentIconBackground.getAdapter()
     val transparentIconBackground = transparentIconBackgroundAdapter.state.value
     val alwaysReloadIconsAdapter = prefs2.alwaysReloadIcons.getAdapter()
-    val shadowBGIconsAdapter = prefs.shadowBGIcons.getAdapter()
-    val wrapAdaptiveIconsAdapter = prefs.wrapAdaptiveIcons.getAdapter()
+    val shadowBGIconsAdapter = prefs2.shadowBGIcons.getAdapter()
+    val wrapAdaptiveIconsAdapter = prefs2.wrapAdaptiveIcons.getAdapter()
     val wrapAdaptiveIcons = wrapAdaptiveIconsAdapter.state.value
-    val colorizedBackgroundsAdapter = prefs.colorizedBackgrounds.getAdapter()
+    val colorizedBackgroundsAdapter = prefs2.colorizedBackgrounds.getAdapter()
     val colorizedBackgrounds = colorizedBackgroundsAdapter.state.value
-    val treatWhiteAdaptiveIconsAdapter = prefs.treatWhiteAdaptiveIcons.getAdapter()
-    val colorizeIconPackBackgroundAdapter = prefs.colorizeIconPackBackground.getAdapter()
+    val treatWhiteAdaptiveIconsAdapter = prefs2.treatWhiteAdaptiveIcons.getAdapter()
+    val colorizeIconPackBackgroundAdapter = prefs2.colorizeIconPackBackground.getAdapter()
 
     // Home screen state
     val hasMotionSensor = remember {
@@ -382,13 +379,13 @@ fun PreferencesDashboard(
         } == true
     }
     val showDeckLayoutAdapter = prefs2.showDeckLayout.getAdapter()
-    val addIconToHomeAdapter = prefs.addIconToHome.getAdapter()
-    val infiniteScrollingAdapter = prefs.infiniteScrolling.getAdapter()
-    val panToMoveEnabledAdapter = prefs.panToMoveEnabled.getAdapter()
+    val addIconToHomeAdapter = prefs2.addIconToHome.getAdapter()
+    val infiniteScrollingAdapter = prefs2.infiniteScrolling.getAdapter()
+    val panToMoveEnabledAdapter = prefs2.panToMoveEnabled.getAdapter()
     val enableFeedAdapter = prefs2.enableFeed.getAdapter()
     val enableFeedState = enableFeedAdapter.state.value
     val feedAvailableState = OverlayCallbackImpl.minusOneAvailable(context)
-    val wallpaperScrollingAdapter = prefs.wallpaperScrolling.getAdapter()
+    val wallpaperScrollingAdapter = prefs2.wallpaperScrolling.getAdapter()
     val wallpaperDepthEffectAdapter = prefs2.wallpaperDepthEffect.getAdapter()
     val showTopShadowAdapter = prefs2.showTopShadow.getAdapter()
     val lockHomeScreenAdapter = prefs2.lockHomeScreen.getAdapter()
@@ -447,15 +444,15 @@ fun PreferencesDashboard(
     val isHotseatEnabled = isHotseatEnabledAdapter.state.value
     val hotseatModeValue = prefs2.hotseatMode.getAdapter().state.value
     val isLawnchairHotseat = hotseatModeValue == LawnchairHotseat && hotseatModeValue != DisabledHotseat
-    val hotseatBgAdapter = prefs.hotseatBG.getAdapter()
+    val hotseatBgAdapter = prefs2.hotseatBG.getAdapter()
     val hotseatBgEnabled = hotseatBgAdapter.state.value
     val enableLabelInDockAdapter = prefs2.enableLabelInDock.getAdapter()
     val twoLineDockAdapter = prefs2.twoLineDock.getAdapter()
     val themedHotseatQsbAdapter = prefs2.themedHotseatQsb.getAdapter()
-    val hotseatQsbStrokeWidth = prefs.hotseatQsbStrokeWidth.getAdapter().state.value
+    val hotseatQsbStrokeWidth = prefs2.hotseatQsbStrokeWidth.getAdapter().state.value
 
     // App drawer & predictions state
-    val drawerListEnabled = prefs.drawerList.getAdapter().state.value
+    val drawerListEnabled = prefs2.drawerList.getAdapter().state.value
     val hiddenApps = prefs2.hiddenApps.getAdapter().state.value
     val showIconLabelsInDrawerAdapterObj = prefs2.showIconLabelsInDrawer.getAdapter()
     val showDrawerLabels = showIconLabelsInDrawerAdapterObj.state.value
@@ -519,14 +516,14 @@ fun PreferencesDashboard(
     val isLocalSearch = searchAlgorithmValue == LawnchairSearchAlgorithm.LOCAL_SEARCH
     val autoShowKeyboardInDrawerAdapter = prefs2.autoShowKeyboardInDrawer.getAdapter()
     val matchHotseatQsbStyleAdapter = prefs2.matchHotseatQsbStyle.getAdapter()
-    val searchResultShortcutsAdapter = prefs.searchResultShortcuts.getAdapter()
-    val searchResultPeopleAdapter = prefs.searchResultPeople.getAdapter()
-    val searchResultPixelTipsAdapter = prefs.searchResultPixelTips.getAdapter()
-    val searchResultSettingsAdapter = prefs.searchResultSettings.getAdapter()
-    val searchResultStartPageSuggestionAdapter = prefs.searchResultStartPageSuggestion.getAdapter()
-    val searchResultSettingsEntryAdapter = prefs.searchResultSettingsEntry.getAdapter()
-    val searchResulRecentSuggestionAdapter = prefs.searchResulRecentSuggestion.getAdapter()
-    val searchResultCalculatorAdapter = prefs.searchResultCalculator.getAdapter()
+    val searchResultShortcutsAdapter = prefs2.searchResultShortcuts.getAdapter()
+    val searchResultPeopleAdapter = prefs2.searchResultPeople.getAdapter()
+    val searchResultPixelTipsAdapter = prefs2.searchResultPixelTips.getAdapter()
+    val searchResultSettingsAdapter = prefs2.searchResultSettings.getAdapter()
+    val searchResultStartPageSuggestionAdapter = prefs2.searchResultStartPageSuggestion.getAdapter()
+    val searchResultSettingsEntryAdapter = prefs2.searchResultSettingsEntry.getAdapter()
+    val searchResulRecentSuggestionAdapter = prefs2.searchResulRecentSuggestion.getAdapter()
+    val searchResultCalculatorAdapter = prefs2.searchResultCalculator.getAdapter()
 
     // Folders state
     val showIconLabelsOnHomeScreenFolderAdapterObj = prefs2.showIconLabelsOnHomeScreenFolder.getAdapter()
@@ -537,23 +534,23 @@ fun PreferencesDashboard(
     val lensAvailable = remember {
         context.packageManager.getLaunchIntentForPackage("com.google.ar.lens") != null
     }
-    val recentsTranslucentBackgroundAdapter = prefs.recentsTranslucentBackground.getAdapter()
+    val recentsTranslucentBackgroundAdapter = prefs2.recentsTranslucentBackground.getAdapter()
     val recentsTranslucentBackground = recentsTranslucentBackgroundAdapter.state.value
-    val recentsActionScreenshotAdapter = prefs.recentsActionScreenshot.getAdapter()
-    val recentsActionShareAdapter = prefs.recentsActionShare.getAdapter()
-    val recentsActionLensAdapter = prefs.recentsActionLens.getAdapter()
-    val recentsActionLockedAdapter = prefs.recentsActionLocked.getAdapter()
-    val recentsActionClearAllAdapter = prefs.recentsActionClearAll.getAdapter()
-    val overrideWindowCornerRadiusAdapter = prefs.overrideWindowCornerRadius.getAdapter()
+    val recentsActionScreenshotAdapter = prefs2.recentsActionScreenshot.getAdapter()
+    val recentsActionShareAdapter = prefs2.recentsActionShare.getAdapter()
+    val recentsActionLensAdapter = prefs2.recentsActionLens.getAdapter()
+    val recentsActionLockedAdapter = prefs2.recentsActionLocked.getAdapter()
+    val recentsActionClearAllAdapter = prefs2.recentsActionClearAll.getAdapter()
+    val overrideWindowCornerRadiusAdapter = prefs2.overrideWindowCornerRadius.getAdapter()
     val overrideWindowCornerRadius = overrideWindowCornerRadiusAdapter.state.value
     val enableTaskbarOnPhoneAdapter = prefs2.enableTaskbarOnPhone.getAdapter()
 
     // Extras & experimental state
-    val enableDebug by prefs.enableDebugMenu.observeAsState()
-    val workspaceIncreaseMaxGridSizeAdapter = prefs.workspaceIncreaseMaxGridSize.getAdapter()
-    val enableGncAdapter = prefs.enableGnc.getAdapter()
+    val enableDebug by prefs2.enableDebugMenu.asState()
+    val workspaceIncreaseMaxGridSizeAdapter = prefs2.workspaceIncreaseMaxGridSize.getAdapter()
+    val enableGncAdapter = prefs2.enableGnc.getAdapter()
 
-    val enableWallpaperBlurAdapter = prefs.enableWallpaperBlur.getAdapter()
+    val enableWallpaperBlurAdapter = prefs2.enableWallpaperBlur.getAdapter()
     val wallpaperBlurFileAccessManager = remember { FileAccessManager.getInstance(context) }
     val wallpaperBlurAllFilesAccessState by wallpaperBlurFileAccessManager.allFilesAccessState.collectAsStateWithLifecycle()
     val wallpaperBlurWallpaperAccessState by wallpaperBlurFileAccessManager.wallpaperAccessState.collectAsStateWithLifecycle()
@@ -1169,7 +1166,7 @@ private fun SearchOverlay(
         }
     }
 
-    val prefs = preferenceManager()
+    val prefs = preferenceManager2()
     val blurEnabled = prefs.settingsBlurBackground.getAdapter().state.value
     val blurIntensity = prefs.settingsBlurIntensity.getAdapter().state.value.toInt()
     val blurState = rememberSettingsBlurState(blurEnabled, blurIntensity)

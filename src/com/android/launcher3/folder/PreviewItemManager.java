@@ -56,7 +56,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
-import app.lawnchair.preferences.PreferenceManager;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
+import app.lawnchair.preferences2.PreferenceManager2;
 
 /**
  * Manages the drawing and animations of {@link PreviewItemDrawingParams} for a
@@ -441,10 +442,10 @@ public class PreviewItemManager {
         } else if (item instanceof ItemInfoWithIcon withIcon){
             // LC-Note: a folder on the workspace must follow the workspace themed-icon
             // preference; only folders inside the app drawer follow the drawer preference.
-            PreferenceManager prefs = PreferenceManager.getInstance(mContext);
+            PreferenceManager2 prefs = PreferenceManager2.getInstance(mContext);
             boolean themed = mIcon.isInAppDrawer()
-                    ? prefs.getDrawerThemedIcons().get()
-                    : prefs.getThemedIcons().get();
+                    ? PreferenceCacheExtensionsKt.firstCached(prefs.getDrawerThemedIcons())
+                    : PreferenceCacheExtensionsKt.firstCached(prefs.getThemedIcons());
             p.drawable = withIcon.newIcon(mContext, themed ? FLAG_THEMED : 0, themed);
             p.drawable.setBounds(0, 0, iconSize, iconSize);
         }

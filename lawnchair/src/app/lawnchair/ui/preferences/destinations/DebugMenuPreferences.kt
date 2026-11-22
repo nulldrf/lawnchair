@@ -10,9 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.Preferences
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
@@ -41,15 +39,13 @@ fun DebugMenuPreferences(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
     val liveInfoManager = liveInformationManager()
-    val flags = remember { prefs.debugFlags }
     val flags2 = remember { prefs2.debugFlags }
     val textFlags = remember { prefs2.textFlags }
     val navController = LocalNavController.current
 
-    val enableDebug = prefs.enableDebugMenu.getAdapter()
+    val enableDebug = prefs2.enableDebugMenu.getAdapter()
 
     PreferenceLayout(
         label = "Debug menu",
@@ -114,12 +110,6 @@ fun DebugMenuPreferences(
                         label = it.key.name,
                     )
                 }
-                flags.forEach {
-                    SwitchPreference(
-                        adapter = it.getAdapter(),
-                        label = it.key,
-                    )
-                }
                 textFlags.forEach {
                     TextPreference(
                         adapter = it.getAdapter(),
@@ -130,11 +120,11 @@ fun DebugMenuPreferences(
                 // Crash log will continue to show them normally.
                 TextPreference(
                     label = "Custom version info",
-                    adapter = prefs.pseudonymVersion.getAdapter(),
+                    adapter = prefs2.pseudonymVersion.getAdapter(),
                 )
             }
 
-            val hasOpenedSettings = prefs.hasOpenedSettings.getAdapter()
+            val hasOpenedSettings = prefs2.hasOpenedSettings.getAdapter()
             PreferenceGroup(heading = "Smartspace Onboarding") {
                 ClickablePreference(
                     label = "Reset All Apps Bounce",
@@ -164,10 +154,7 @@ fun DebugMenuPreferences(
 }
 
 private val PreferenceManager2.debugFlags: List<Preference<Boolean, Boolean, Preferences.Key<Boolean>>>
-    get() = listOf(showComponentNames, legacyPopupOptionsMigrated)
+    get() = listOf(showComponentNames, legacyPopupOptionsMigrated, ignoreFeedWhitelist, hideVersionInfo)
 
 private val PreferenceManager2.textFlags: List<Preference<String, String, Preferences.Key<String>>>
     get() = listOf(additionalFonts, launcherPopupOrder)
-
-private val PreferenceManager.debugFlags
-    get() = listOf(ignoreFeedWhitelist, hideVersionInfo)

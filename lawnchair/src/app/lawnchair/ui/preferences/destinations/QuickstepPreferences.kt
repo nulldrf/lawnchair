@@ -12,8 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.LawnchairApp
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.observeAsState
-import app.lawnchair.preferences.preferenceManager
+import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.QuickActionsPreferences
 import app.lawnchair.ui.preferences.components.RecentsQuickAction
@@ -37,7 +36,6 @@ import com.android.launcher3.Utilities
 fun QuickstepPreferences(
     modifier: Modifier = Modifier,
 ) {
-    val prefs = preferenceManager()
     val prefs2 = preferenceManager2()
     val context = LocalContext.current
     val lensAvailable = remember {
@@ -47,28 +45,28 @@ fun QuickstepPreferences(
     val recentActionsPreferences: List<RecentsQuickAction> = listOfNotNull(
         RecentsQuickAction(
             id = 0,
-            adapter = prefs.recentsActionScreenshot.getAdapter(),
+            adapter = prefs2.recentsActionScreenshot.getAdapter(),
             label = stringResource(id = R.string.action_screenshot),
         ).takeIf { !isOnePlusStock },
         RecentsQuickAction(
             id = 1,
-            adapter = prefs.recentsActionShare.getAdapter(),
+            adapter = prefs2.recentsActionShare.getAdapter(),
             label = stringResource(id = R.string.action_share),
         ),
         RecentsQuickAction(
             id = 2,
-            adapter = prefs.recentsActionLens.getAdapter(),
+            adapter = prefs2.recentsActionLens.getAdapter(),
             label = stringResource(id = R.string.action_lens),
         ).takeIf { lensAvailable },
         RecentsQuickAction(
             id = 3,
-            adapter = prefs.recentsActionLocked.getAdapter(),
+            adapter = prefs2.recentsActionLocked.getAdapter(),
             label = stringResource(id = R.string.recents_lock_unlock),
             description = stringResource(id = R.string.recents_lock_unlock_description),
         ),
         RecentsQuickAction(
             id = 4,
-            adapter = prefs.recentsActionClearAll.getAdapter(),
+            adapter = prefs2.recentsActionClearAll.getAdapter(),
             label = stringResource(id = R.string.recents_clear_all),
         ),
     )
@@ -78,19 +76,19 @@ fun QuickstepPreferences(
         modifier = modifier,
     ) {
         if (!LawnchairApp.isRecentsEnabled) QuickSwitchIgnoredWarning()
-        val recentsTranslucentBackground by prefs.recentsTranslucentBackground.observeAsState()
+        val recentsTranslucentBackground by prefs2.recentsTranslucentBackground.asState()
         val scrollState = rememberPreferenceScrollState()
         PreferenceGroup(heading = stringResource(id = R.string.general_label)) {
             ScrollAnchor(ScrollKeys.QS_TRANSLUCENT, scrollState) {
                 SwitchPreference(
-                    adapter = prefs.recentsTranslucentBackground.getAdapter(),
+                    adapter = prefs2.recentsTranslucentBackground.getAdapter(),
                     label = stringResource(id = R.string.translucent_background),
                 )
             }
             ExpandAndShrink(visible = recentsTranslucentBackground) {
                 ScrollAnchor(ScrollKeys.QS_TRANSLUCENT_ALPHA, scrollState) {
                     SliderPreference(
-                        adapter = prefs.recentsTranslucentBackgroundAlpha.getAdapter(),
+                        adapter = prefs2.recentsTranslucentBackgroundAlpha.getAdapter(),
                         label = stringResource(id = R.string.translucent_background_alpha),
                         step = 0.05f,
                         valueRange = 0f..0.95f,
@@ -103,11 +101,11 @@ fun QuickstepPreferences(
         ScrollAnchor(ScrollKeys.QS_RECENTS_ACTIONS, scrollState) {
             QuickActionsPreferences(
                 items = recentActionsPreferences,
-                adapter = prefs.recentActionOrder.getAdapter(),
+                adapter = prefs2.recentActionOrder.getAdapter(),
             )
         }
 
-        val overrideWindowCornerRadius by prefs.overrideWindowCornerRadius.observeAsState()
+        val overrideWindowCornerRadius by prefs2.overrideWindowCornerRadius.asState()
         PreferenceGroup(
             heading = stringResource(id = R.string.window_corner_radius_label),
             description = stringResource(id = (R.string.window_corner_radius_description)),
@@ -115,7 +113,7 @@ fun QuickstepPreferences(
         ) {
             ScrollAnchor(ScrollKeys.QS_CORNER_RADIUS, scrollState) {
                 SwitchPreference(
-                    adapter = prefs.overrideWindowCornerRadius.getAdapter(),
+                    adapter = prefs2.overrideWindowCornerRadius.getAdapter(),
                     label = stringResource(id = R.string.override_window_corner_radius_label),
                 )
             }
@@ -123,7 +121,7 @@ fun QuickstepPreferences(
                 ScrollAnchor(ScrollKeys.QS_CORNER_RADIUS_VALUE, scrollState) {
                     SliderPreference(
                         label = stringResource(id = R.string.window_corner_radius_label),
-                        adapter = prefs.windowCornerRadius.getAdapter(),
+                        adapter = prefs2.windowCornerRadius.getAdapter(),
                         step = 0,
                         valueRange = 70..150,
                     )

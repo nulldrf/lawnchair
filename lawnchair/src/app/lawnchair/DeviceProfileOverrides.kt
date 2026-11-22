@@ -1,9 +1,9 @@
 package app.lawnchair
 
 import android.content.Context
-import app.lawnchair.preferences.PreferenceManager
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
+import app.lawnchair.preferences2.setCached
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.InvariantDeviceProfile.INDEX_DEFAULT
 import com.android.launcher3.InvariantDeviceProfile.INDEX_LANDSCAPE
@@ -20,7 +20,6 @@ import javax.inject.Inject
 class DeviceProfileOverrides @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : SafeCloseable {
-    private val prefs = PreferenceManager.getInstance(context)
     private val preferenceManager2 = PreferenceManager2.getInstance(context)
 
     private val predefinedGrids = InvariantDeviceProfile.parseAllGridOptions(context)
@@ -33,7 +32,7 @@ class DeviceProfileOverrides @Inject constructor(
             gridInfo to option.name
         }
 
-    fun getGridInfo() = DBGridInfo(prefs)
+    fun getGridInfo() = DBGridInfo(preferenceManager2)
 
     fun getGridInfo(gridName: String) = predefinedGrids
         .first { it.second == gridName }
@@ -50,9 +49,12 @@ class DeviceProfileOverrides @Inject constructor(
 
     fun setCurrentGrid(gridName: String) {
         val gridInfo = getGridInfo(gridName)
-        prefs.workspaceRows.set(gridInfo.numRows)
-        prefs.workspaceColumns.set(gridInfo.numColumns)
-        prefs.hotseatColumns.set(gridInfo.numHotseatColumns)
+        preferenceManager2.batchEdit {
+            this[preferenceManager2.workspaceRows.key] = gridInfo.numRows
+            this[preferenceManager2.workspaceColumns.key] = gridInfo.numColumns
+            this[preferenceManager2.hotseatColumns.key] = gridInfo.numHotseatColumns
+        }
+        InvariantDeviceProfile.INSTANCE.get(context).onPreferencesChanged(context)
     }
 
     fun getOverrides(
@@ -60,7 +62,6 @@ class DeviceProfileOverrides @Inject constructor(
         deviceType: Int,
         previewOverrides: PreviewOverrides? = null,
     ) = Options(
-        prefs = prefs,
         prefs2 = preferenceManager2,
         defaultGrid = defaultGrid,
         deviceType = deviceType,
@@ -79,10 +80,10 @@ class DeviceProfileOverrides @Inject constructor(
     ) {
         val dbFile get() = "launcher_${numRows}_${numColumns}_$numHotseatColumns.db"
 
-        constructor(prefs: PreferenceManager) : this(
-            numHotseatColumns = prefs.hotseatColumns.get(),
-            numRows = prefs.workspaceRows.get(),
-            numColumns = prefs.workspaceColumns.get(),
+        constructor(prefs2: PreferenceManager2) : this(
+            numHotseatColumns = prefs2.hotseatColumns.firstCached(),
+            numRows = prefs2.workspaceRows.firstCached(),
+            numColumns = prefs2.workspaceColumns.firstCached(),
         )
     }
 
@@ -111,14 +112,13 @@ class DeviceProfileOverrides @Inject constructor(
         val foldableDatabaseAllAppsColumns: Int = -1,
     ) {
         constructor(
-            prefs: PreferenceManager,
             prefs2: PreferenceManager2,
             defaultGrid: InvariantDeviceProfile.GridOption,
             deviceType: Int,
             previewOverrides: PreviewOverrides,
         ) : this(
             numAllAppsColumns = prefs2.drawerColumns.firstCached(gridOption = defaultGrid),
-            numFolderRows = prefs.folderRows.get(defaultGrid),
+            numFolderRows = prefs2.folderRows.firstCached(gridOption = defaultGrid),
             numFolderColumns = prefs2.folderColumns.firstCached(gridOption = defaultGrid),
 
             iconSizeFactor = prefs2.homeIconSizeFactor.firstCached(),
@@ -132,18 +132,18 @@ class DeviceProfileOverrides @Inject constructor(
 
             enableTaskbarOnPhone = prefs2.enableTaskbarOnPhone.firstCached(),
 
-            numHotseatRows = prefs.hotseatRows.get().coerceIn(1, 2),
-            numDockPages = prefs.dockPages.get().coerceIn(1, 5),
+            numHotseatRows = prefs2.hotseatRows.firstCached().coerceIn(1, 2),
+            numDockPages = prefs2.dockPages.firstCached().coerceIn(1, 5),
 
             foldableShownHotseatIcons = if (deviceType == InvariantDeviceProfile.TYPE_MULTI_DISPLAY) {
-                val folded = prefs.hotseatColumns.get()
-                val unfolded = previewOverrides.foldableDatabaseHotseatIcons ?: prefs.hotseatColumnsUnfolded.get()
+                val folded = prefs2.hotseatColumns.firstCached()
+                val unfolded = previewOverrides.foldableDatabaseHotseatIcons ?: prefs2.hotseatColumnsUnfolded.firstCached()
                 folded.coerceAtMost(unfolded)
             } else {
                 -1
             },
             foldableDatabaseHotseatIcons = if (deviceType == InvariantDeviceProfile.TYPE_MULTI_DISPLAY) {
-                previewOverrides.foldableDatabaseHotseatIcons ?: prefs.hotseatColumnsUnfolded.get()
+                previewOverrides.foldableDatabaseHotseatIcons ?: prefs2.hotseatColumnsUnfolded.firstCached()
             } else {
                 -1
             },

@@ -40,6 +40,20 @@ class IdpPreference(
         }
         onSet(value)
     }
+
+    fun setCached(value: Int, gridOption: InvariantDeviceProfile.GridOption) {
+        runBlocking { set(value, gridOption) }
+    }
+
+    internal fun cachedValue(gridOption: InvariantDeviceProfile.GridOption): Int? {
+        val ds = preferencesDataStore as? CachedPreferencesDataStore ?: return null
+        val value = ds.currentPreferences[key]
+        return if (value == null || value == -1) {
+            defaultSelector(gridOption)
+        } else {
+            value
+        }
+    }
 }
 
 @Discouraged("This is a blocking read, use firstCached() for non-blocking reads")
@@ -48,9 +62,11 @@ fun IdpPreference.firstBlocking(gridOption: InvariantDeviceProfile.GridOption) =
 @JvmOverloads
 fun IdpPreference.firstCached(
     gridOption: InvariantDeviceProfile.GridOption,
-    prefs2: PreferenceManager2 = PreferenceManager2.getInstance(LawnchairApp.instance),
+    prefs2: PreferenceManager2? = null,
 ): Int {
-    val cached = prefs2.getCachedPreferences()
+    cachedValue(gridOption)?.let { return it }
+    val resolvedPrefs2 = prefs2 ?: PreferenceManager2.getInstance(LawnchairApp.instance)
+    val cached = resolvedPrefs2.getCachedPreferences()
     val value = cached[key]
     return if (value == null || value == -1) {
         defaultSelector(gridOption)

@@ -9,7 +9,7 @@ import android.os.Build.VERSION
 import android.os.UserHandle
 import android.util.Log
 import app.lawnchair.icons.getCustomAppNameForComponent
-import app.lawnchair.preferences.PreferenceManager
+import app.lawnchair.preferences2.PreferenceManager2
 import com.android.launcher3.Flags.useNewIconForArchivedApps
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
@@ -32,11 +32,11 @@ class LawnchairActivityCachingLogic @Inject constructor(
 ) : SafeCloseable,
     CachingLogic<LauncherActivityInfo> {
 
-    private val prefs = PreferenceManager.getInstance(context)
+    private val prefs = PreferenceManager2.getInstance(context)
 
     override fun getLabel(info: LauncherActivityInfo): CharSequence? {
         val key = ComponentKey(info.componentName, info.user)
-        val customLabel = prefs.customAppName[key]
+        val customLabel = prefs.getCustomAppName(key)
         if (!customLabel.isNullOrEmpty()) {
             return customLabel
         }

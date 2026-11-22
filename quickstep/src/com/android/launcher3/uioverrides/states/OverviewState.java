@@ -39,7 +39,8 @@ import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 
-import app.lawnchair.preferences.PreferenceManager;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
+import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.theme.color.tokens.ColorTokens;
 
 /**
@@ -117,7 +118,8 @@ public class OverviewState extends LauncherState {
 
     @Override
     public int getVisibleElements(Launcher launcher) {
-        if (PreferenceManager.getInstance(launcher).getRecentsActionClearAll().get()) {
+        if (PreferenceCacheExtensionsKt.firstCached(
+                PreferenceManager2.getInstance(launcher).getRecentsActionClearAll())) {
             return OVERVIEW_ACTIONS;
         }
         int elements = CLEAR_ALL_BUTTON | OVERVIEW_ACTIONS | ADD_DESK_BUTTON;

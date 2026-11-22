@@ -93,7 +93,6 @@ import app.lawnchair.DeviceProfileOverrides;
 import app.lawnchair.LawnchairApp;
 import app.lawnchair.LawnchairAppKt;
 import app.lawnchair.hotseat.HotseatMode;
-import app.lawnchair.preferences.PreferenceManager;
 import app.lawnchair.preferences2.PreferenceManager2;
 import app.lawnchair.theme.color.ColorOption;
 
@@ -524,8 +523,8 @@ public class DeviceProfile {
         boolean isQsbEnable = hotseatMode.getLayoutResourceId() != R.layout.empty_view;
 
         numShownHotseatIcons = displayOptionSpec.numShownHotseatIcons;
-        numHotseatRows = Math.max(1, Math.min(2, PreferenceManager.getInstance(context).getHotseatRows().get()));
-        numHotseatPages = Math.max(1, Math.min(5, PreferenceManager.getInstance(context).getDockPages().get()));
+        numHotseatRows = Math.max(1, Math.min(2, PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatRows())));
+        numHotseatPages = Math.max(1, Math.min(5, PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getDockPages())));
         mHotseatColumnSpan = inv.numColumns;
 
         numShownAllAppsColumns = displayOptionSpec.numAllAppsColumns;

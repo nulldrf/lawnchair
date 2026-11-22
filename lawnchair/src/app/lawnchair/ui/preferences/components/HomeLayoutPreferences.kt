@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import app.lawnchair.deck.LawndeckManager
 import app.lawnchair.gestures.config.GestureHandlerConfig
 import app.lawnchair.preferences.getAdapter
-import app.lawnchair.preferences.preferenceManager
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.controls.SwitchPreferenceWithPreview
 import app.lawnchair.util.BackHandler
@@ -51,11 +50,10 @@ fun HomeLayoutSettings(
     modifier: Modifier = Modifier,
 ) {
     val prefs2 = preferenceManager2()
-    val prefs = preferenceManager()
     val context = LocalContext.current
 
     val deskLayout = prefs2.deckLayout.getAdapter()
-    val addNewAppToHome = prefs.addIconToHome.getAdapter()
+    val addNewAppToHome = prefs2.addIconToHome.getAdapter()
 
     val deckManager = remember { LawndeckManager(context) }
     val coroutineScope = rememberCoroutineScope()

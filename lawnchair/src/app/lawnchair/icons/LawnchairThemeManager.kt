@@ -21,6 +21,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
@@ -60,18 +62,18 @@ constructor(
     init {
         val scope = MainScope() + CoroutineName("LawnchairThemeManager")
         merge(
-            prefs2.iconShape.get(),
-            prefs2.customIconShape.get(),
-            prefs2.folderShape.get(),
-            prefs2.customFolderShape.get(),
-            prefs2.wrapAdaptiveIcons.get(),
-            prefs2.transparentIconBackground.get(),
-            prefs2.shadowBGIcons.get(),
-            prefs2.coloredBackgroundLightness.get(),
-            prefs2.forceIconMonochrome.get(),
-            prefs2.launcherTheme.get(),
-            prefs2.colorizedBackgrounds.get(),
-            prefs2.treatWhiteAdaptiveIcons.get(),
+            prefs2.iconShape.get().distinctUntilChanged().drop(1),
+            prefs2.customIconShape.get().distinctUntilChanged().drop(1),
+            prefs2.folderShape.get().distinctUntilChanged().drop(1),
+            prefs2.customFolderShape.get().distinctUntilChanged().drop(1),
+            prefs2.wrapAdaptiveIcons.get().distinctUntilChanged().drop(1),
+            prefs2.transparentIconBackground.get().distinctUntilChanged().drop(1),
+            prefs2.shadowBGIcons.get().distinctUntilChanged().drop(1),
+            prefs2.coloredBackgroundLightness.get().distinctUntilChanged().drop(1),
+            prefs2.forceIconMonochrome.get().distinctUntilChanged().drop(1),
+            prefs2.launcherTheme.get().distinctUntilChanged().drop(1),
+            prefs2.colorizedBackgrounds.get().distinctUntilChanged().drop(1),
+            prefs2.treatWhiteAdaptiveIcons.get().distinctUntilChanged().drop(1),
         ).onEach { verifyIconState() }
             .launchIn(scope)
 

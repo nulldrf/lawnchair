@@ -1846,8 +1846,8 @@ class PreferenceManager2 @Inject constructor(
 
         initializeIconShape(iconShape.firstCached(this))
         iconShape.get()
-            .drop(1)
             .distinctUntilChanged()
+            .drop(1)
             .onEach { shape ->
                 initializeIconShape(shape)
                 L3ThemeManager.INSTANCE.get(context)
@@ -1856,14 +1856,14 @@ class PreferenceManager2 @Inject constructor(
             .launchIn(scope)
 
         hotseatMode.get()
-            .drop(1)
             .distinctUntilChanged()
+            .drop(1)
             .onEach { reloadHelper.restart() }
             .launchIn(scope)
 
         isHotseatEnabled.get()
-            .drop(1)
             .distinctUntilChanged()
+            .drop(1)
             .onEach {
                 reloadHelper.recreate()
                 reloadHelper.reloadGrid()
@@ -1871,14 +1871,14 @@ class PreferenceManager2 @Inject constructor(
             .launchIn(scope)
 
         hotseatQsbProvider.get()
-            .drop(1)
             .distinctUntilChanged()
+            .drop(1)
             .onEach { reloadHelper.recreate() }
             .launchIn(scope)
 
         enableLabelInDock.get()
-            .drop(1)
             .distinctUntilChanged()
+            .drop(1)
             .onEach { reloadHelper.reloadGrid() }
             .launchIn(scope)
     }

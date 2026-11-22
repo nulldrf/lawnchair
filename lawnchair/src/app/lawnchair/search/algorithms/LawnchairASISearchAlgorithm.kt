@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.merge
@@ -39,10 +40,10 @@ class LawnchairASISearchAlgorithm(context: Context) : LawnchairSearchAlgorithm(c
     init {
         createSearchSession()
         merge(
-            prefs.searchResultShortcuts.get().drop(1),
-            prefs.searchResultPeople.get().drop(1),
-            prefs.searchResultPixelTips.get().drop(1),
-            prefs.searchResultSettings.get().drop(1),
+            prefs.searchResultShortcuts.get().distinctUntilChanged().drop(1),
+            prefs.searchResultPeople.get().distinctUntilChanged().drop(1),
+            prefs.searchResultPixelTips.get().distinctUntilChanged().drop(1),
+            prefs.searchResultSettings.get().distinctUntilChanged().drop(1),
         ).onEach {
             createSearchSession()
         }.launchIn(scope)

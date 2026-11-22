@@ -56,9 +56,9 @@ fun <T> Flow<T>.subscribeBlocking(
 ) {
     block(firstBlocking())
     this
-        .onEach { block(it) }
-        .drop(1)
         .distinctUntilChanged()
+        .drop(1)
+        .onEach { block(it) }
         .launchIn(scope = scope)
 }
 

@@ -160,10 +160,12 @@ class LawnchairLauncher : QuickstepLauncher() {
         layoutInflater.factory2 = LawnchairLayoutFactory(this)
         super.onCreate(savedInstanceState)
 
-        preferenceManager2.launcherTheme.get().drop(1).distinctUntilChanged().onEach {
+        colorScheme = themeProvider.colorScheme
+
+        preferenceManager2.launcherTheme.get().distinctUntilChanged().drop(1).onEach {
             updateTheme()
         }.launchIn(scope = lifecycleScope)
-        preferenceManager2.feedProvider.get().drop(1).distinctUntilChanged().onEach {
+        preferenceManager2.feedProvider.get().distinctUntilChanged().drop(1).onEach {
             defaultOverlay.reconnect()
         }.launchIn(scope = lifecycleScope)
         preferenceManager2.enableFeed.get().distinctUntilChanged().onEach { enable ->
@@ -200,7 +202,7 @@ class LawnchairLauncher : QuickstepLauncher() {
                 }
             }
         }.launchIn(scope = lifecycleScope)
-        preferenceManager2.rememberPosition.get().onEach {
+        preferenceManager2.rememberPosition.get().distinctUntilChanged().onEach {
             with(launcher.stateManager) {
                 if (it) addStateListener(rememberPositionStateListener)
                 else removeStateListener(rememberPositionStateListener)
@@ -235,7 +237,6 @@ class LawnchairLauncher : QuickstepLauncher() {
             preferenceManager2.themedIcons.setCached(false)
         }
 
-        colorScheme = themeProvider.colorScheme
         showQuickstepWarningIfNecessary()
         reloadIconsIfNeeded()
         AppDatabase.INSTANCE.get(this).checkpointSync()

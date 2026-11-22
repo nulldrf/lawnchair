@@ -736,19 +736,18 @@ class PreferenceManager2 @Inject constructor(
         onSet = { reloadHelper.reloadGrid() },
     )
 
-    // ── App-open / launch animation (backported from Lawnchair 2) ─────────────
+    // ── App-open / launch animation (1:1 port from Lawnchair 9) ───────────────
     /**
-     * Controls the [ActivityOptions] and optional launcher-side animation used when
-     * the user taps an app icon to launch it.  Mirrors the old `pref_animationType`
-     * preference from ch.deletescape.lawnchair.animations.
+     * Controls the [ActivityOptions] and launcher-side animation used when launching
+     * an app. Mirrors `pref_animationType` from Lawnchair 9 (`AnimationType`).
      *
-     *  DEFAULT  → system clip-reveal (no change from base Launcher3 behaviour)
-     *  PIE      → Android 9 Pie-style: launcher zooms out while app zooms in
-     *  REVEAL   → circular clip-reveal from icon bounds
-     *  SLIDE_UP → app slides in from the bottom edge (task_open_enter)
-     *  SCALE_UP → app scales up from the icon position
-     *  BLINK    → quick blink flash then app appears
-     *  FADE     → simple cross-fade
+     *  DEFAULT  → system / Quickstep default launch animation
+     *  PIE      → emulated Android 9 Pie icon-to-splash launch + slide-down close
+     *  REVEAL   → system clip-reveal from icon bounds
+     *  SLIDE_UP → app slides in from the bottom edge (task_open_enter / no_anim)
+     *  SCALE_UP → system scale-up from icon bounds
+     *  BLINK    → stretch-blink transition (blink_open_* / blink_close_*)
+     *  FADE     → short fade transition (fade_in_short / fade_out_short)
      */
     val appOpenAnimation = preference(
         key = stringPreferencesKey(name = "app_open_animation"),

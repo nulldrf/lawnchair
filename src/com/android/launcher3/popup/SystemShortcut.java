@@ -245,6 +245,15 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
             options.onEndCallback.add(this::dismissTaskMenuView);
             PackageManagerHelper.startDetailsActivityForInfo(view.getContext(), mItemInfo,
                     sourceBounds, options.toBundle());
+            if (mTarget instanceof app.lawnchair.LawnchairLauncher lawnchair) {
+                android.content.Intent detailsIntent = mItemInfo.getTargetComponent() != null
+                        ? new android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package",
+                                        mItemInfo.getTargetComponent().getPackageName(), null))
+                        : null;
+                lawnchair.getAppTransitionController().playLaunchAnimation(null, detailsIntent);
+            }
             mTarget.getStatsLogManager().logger().withItemInfo(mItemInfo)
                     .log(LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP);
         }

@@ -81,8 +81,10 @@ import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.InsettableFrameLayout;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.Workspace;
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.allapps.search.AllAppsSearchUiDelegate;
 import com.android.launcher3.allapps.search.DefaultSearchAdapterProvider;
@@ -157,6 +159,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     private final SearchTransitionController mSearchTransitionController;
     private final Paint mHeaderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mBlurPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
+    private final Rect mBlurSrcRect = new Rect();
+    private final Rect mBlurDstRect = new Rect();
     private final Rect mInsets = new Rect();
     private final AllAppsStore<T> mAllAppsStore;
     private final RecyclerView.OnScrollListener mScrollListener =
@@ -188,8 +193,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     boolean showFastScroller;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
-    private final ViewTreeObserver.OnGlobalLayoutListener mSettleSearchContainerRetry =
-            this::settleSearchContainerPositionRetry;
+    private boolean mSearchContainerAnimating = false;
+    private int mLastSearchContainerHeight = 0;
     public SearchRecyclerView mSearchRecyclerView;
     protected SearchAdapterProvider<?> mMainAdapterProvider;
     private View mBottomSheetHandleArea;
@@ -211,12 +216,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     // -----------------------------------------------------------------------
     // HokoBlur drawer background
     //
-    // Computed once per wallpaper/rotation/intensity change event on a
-    // background thread via DrawerWallpaperBlurHelper, then drawn every frame
-    // from drawOnScrimWithScaleAndBottomOffset(). No per-frame GPU readback,
-    // no PixelCopy, no Choreographer loop — zero overhead while scrolling.
+    // Computed once per wallpaper/rotation/page-offset/intensity change event
+    // on a background thread via DrawerWallpaperBlurHelper, then drawn every
+    // frame from drawOnScrimWithScaleAndBottomOffset(). No per-frame GPU
+    // readback, no PixelCopy, no Choreographer loop — zero overhead while
+    // scrolling.
     // -----------------------------------------------------------------------
     @Nullable private Bitmap mBlurBitmap;
+    private int mBlurRequestId = 0;
 
     public ActivityAllAppsContainerView(Context context) {
         this(context, null);
@@ -459,9 +466,24 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (mSearchContainer.getHeight() == 0) return;
         updateContentTopMarginForSearchState();
         float targetTranslationY = getSearchContainerRestingTranslationY(goingToSearch);
+        mSearchContainer.animate().cancel();
+        mSearchContainerAnimating = true;
         mSearchContainer.animate()
                 .translationY(targetTranslationY)
                 .setDuration(durationMs)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        mSearchContainerAnimating = false;
+                        mSearchContainer.animate().setListener(null);
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        mSearchContainerAnimating = false;
+                        mSearchContainer.animate().setListener(null);
+                    }
+                })
                 .start();
     }
 
@@ -486,8 +508,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             int targetTop = getPaddingTop() + contentOverlap;
             return targetTop - mSearchContainer.getTop();
         } else {
-            int desiredBottom = getHeight() - mInsets.bottom;
-            return desiredBottom - mSearchContainer.getBottom();
+            int bottomInset = Math.max(mInsets.bottom, mNavBarScrimHeight);
+            int desiredBottom = getHeight() - bottomInset;
+            return Math.max(0f, desiredBottom - mSearchContainer.getBottom());
         }
     }
 
@@ -951,9 +974,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     private void settleSearchContainerPosition() {
-        if (mSearchContainer.getHeight() == 0) {
-            getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
-            getViewTreeObserver().addOnGlobalLayoutListener(mSettleSearchContainerRetry);
+        if (mSearchContainer == null || mSearchContainer.getHeight() == 0 || getHeight() == 0) {
             return;
         }
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
@@ -962,56 +983,24 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mSearchContainer.setTranslationY(0f);
             return;
         }
-        // LC-Note (phone landscape fix): on phones in landscape all-apps is
-        // fullscreen, not a bottom sheet. shouldShowAllAppsOnSheet() is false
-        // in that mode. Bottom-pinning via translationY only makes visual sense
-        // in the sheet (portrait) layout — in landscape the computed
-        // translationY (getHeight() - mInsets.bottom - getBottom()) can push
-        // the bar completely off the visible area since the container is much
-        // shorter. Reset to 0 (natural top position) in non-sheet mode so the
-        // bar is at least visible; the preference is still stored, and when the
-        // user rotates back to portrait (sheet mode) the retry mechanism will
-        // re-settle it at the bottom correctly.
-        if (!mActivityContext.getDeviceProfile().shouldShowAllAppsOnSheet()) {
-            mSearchContainer.setTranslationY(0f);
-            return;
-        }
         boolean searching = isSearching() || (mSearchUiManager.getEditText() != null
                 && mSearchUiManager.getEditText().hasFocus());
         mSearchContainer.setTranslationY(getSearchContainerRestingTranslationY(searching));
     }
 
-    private void settleSearchContainerPositionRetry() {
-        getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
-        if (!isAttachedToWindow()) return;
-        // LC-Note (portrait-restore width + position fix): after rotating back
-        // to portrait, mSearchContainer may still have landscape dimensions at
-        // this point (wrong width, wrong getBottom()). Two things need to happen
-        // before settleSearchContainerPosition() can compute a correct result:
-        //
-        // 1. The PARENT needs a full layout pass so the RV padding (which
-        //    AppsSearchContainerLayout.onMeasure() uses to compute its own
-        //    width) is recomputed for the new orientation. requestLayout() on
-        //    the parent triggers that.
-        //
-        // 2. settleSearchContainerPosition() must run AFTER that layout pass
-        //    completes — not via .post() which races against the Choreographer-
-        //    batched layout pass, but via another OnGlobalLayoutListener which
-        //    is guaranteed to fire after layout finishes.
-        //
-        // Use a fresh, anonymous listener for this second pass so it doesn't
-        // conflict with mSettleSearchContainerRetry (which was just removed
-        // above). It removes itself immediately on first fire so it's one-shot.
-        requestLayout();
-        getViewTreeObserver().addOnGlobalLayoutListener(
-                new ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        if (!isAttachedToWindow()) return;
-                        settleSearchContainerPosition();
-                    }
-                });
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        // Recompute bottom-pinned search bar translationY synchronously after every layout
+        // pass so orientation, inset, and size changes never leave stale offsets.
+        if (!mSearchContainerAnimating) {
+            settleSearchContainerPosition();
+        }
+        int searchHeight = mSearchContainer != null ? mSearchContainer.getHeight() : 0;
+        if (searchHeight != mLastSearchContainerHeight) {
+            mLastSearchContainerHeight = searchHeight;
+            applyAdapterSideAndBottomPaddings(mActivityContext.getDeviceProfile());
+        }
     }
 
     private void removeCustomRules(View v) {
@@ -1104,6 +1093,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             }
         }
         updateBackgroundVisibility(dp);
+        updateContainerPadding(dp);
+        applyAdapterSideAndBottomPaddings(dp);
 
         boolean needsInvalidate = false;
         int navBarScrimColor = Themes.getNavBarScrimColor(mActivityContext);
@@ -1115,30 +1106,22 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (needsInvalidate) invalidate();
 
         // LC-Note (rotation fix): null the stale bitmap immediately so it is
-        // not drawn at the wrong size even for one frame, then clear the helper
-        // cache (which now also checks w/h, so the dimension change alone would
-        // be a miss, but explicit clearCache() also recycles the old Bitmap).
-        // The recompute runs on a background thread and posts the new bitmap
-        // back once ready.
+        // not drawn at the wrong orientation even for one frame, then clear the
+        // helper cache and recompute for the new DeviceProfile viewport.
         mBlurBitmap = null;
         DrawerWallpaperBlurHelper.clearCache();
-        applyDrawerHokoBlur();
+        applyDrawerHokoBlur(dp);
 
-        // LC-Note (search-bar-at-bottom rotation fix): the view is REUSED on
-        // rotation so mSearchContainer.translationY from the old orientation
-        // survives. Reset to 0 immediately (before any layout pass) so there is
-        // no visible stale position, then queue a retry that runs after the new
-        // layout pass has fully settled (including a fresh measure of
-        // mSearchContainer itself) to compute and apply the correct resting
-        // translationY for the new orientation. The retry is deduped via the
-        // same mSettleSearchContainerRetry field used everywhere else.
-        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
-                pref2.getAppDrawerSearchBarAtBottom());
-        if (searchBarAtBottom && !isSearchBarFloating()) {
+        // Cancel any in-flight search-bar animation so stale translationY from the
+        // previous orientation cannot survive rotation. onLayout() will settle
+        // mSearchContainer cleanly once the new orientation layout pass completes.
+        if (mSearchContainer != null) {
+            mSearchContainer.animate().cancel();
+            mSearchContainerAnimating = false;
             mSearchContainer.setTranslationY(0f);
-            getViewTreeObserver().removeOnGlobalLayoutListener(mSettleSearchContainerRetry);
-            getViewTreeObserver().addOnGlobalLayoutListener(mSettleSearchContainerRetry);
+            mSearchContainer.requestLayout();
         }
+        requestLayout();
     }
 
     protected void updateBackgroundVisibility(DeviceProfile deviceProfile) {
@@ -1231,6 +1214,17 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     @Override
     public void onDropCompleted(View target, DragObject d, boolean success) {}
 
+    private void updateContainerPadding(DeviceProfile grid) {
+        if (!grid.isVerticalBarLayout() || FeatureFlags.enableResponsiveWorkspace()) {
+            int topPadding = grid.allAppsPadding.top;
+            if (isSearchBarFloating() && !grid.shouldShowAllAppsOnSheet()) {
+                topPadding += getResources().getDimensionPixelSize(
+                        R.dimen.all_apps_additional_top_padding_floating_search);
+            }
+            setPadding(grid.allAppsLeftRightMargin, topPadding, grid.allAppsLeftRightMargin, 0);
+        }
+    }
+
     @Override
     public void setInsets(Rect insets) {
         mInsets.set(insets);
@@ -1244,16 +1238,11 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mlp.rightMargin = insets.right;
         }
         setLayoutParams(mlp);
-        if (!grid.isVerticalBarLayout() || FeatureFlags.enableResponsiveWorkspace()) {
-            int topPadding = grid.allAppsPadding.top;
-            if (isSearchBarFloating() && !grid.shouldShowAllAppsOnSheet()) {
-                topPadding += getResources().getDimensionPixelSize(
-                        R.dimen.all_apps_additional_top_padding_floating_search);
-            }
-            setPadding(grid.allAppsLeftRightMargin, topPadding, grid.allAppsLeftRightMargin, 0);
-        }
+        updateContainerPadding(grid);
         InsettableFrameLayout.dispatchInsets(this, insets);
-        settleSearchContainerPosition();
+        if (!mSearchContainerAnimating) {
+            settleSearchContainerPosition();
+        }
 
         boolean hideHeader = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getHideAppDrawerSearchBar());
@@ -1275,7 +1264,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
         mNavBarScrimHeight = computeNavBarScrimHeight(insets);
         applyAdapterSideAndBottomPaddings(mActivityContext.getDeviceProfile());
-        settleSearchContainerPosition();
+        if (!mSearchContainerAnimating) {
+            settleSearchContainerPosition();
+        }
         return super.dispatchApplyWindowInsets(insets);
     }
 
@@ -1448,7 +1439,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         // ── HokoBlur wallpaper background ────────────────────────────────────
         final Bitmap hokoBlur = mBlurBitmap;
         if (hokoBlur != null && !hokoBlur.isRecycled() && !hasBottomSheet) {
-            canvas.drawBitmap(hokoBlur, 0f, 0f, null);
+            drawBlurBitmap(canvas, hokoBlur);
         }
         // ─────────────────────────────────────────────────────────────────────
 
@@ -1475,7 +1466,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             if (hokoBlur != null && !hokoBlur.isRecycled()) {
                 canvas.save();
                 canvas.clipPath(mTmpPath);
-                canvas.drawBitmap(hokoBlur, 0f, 0f, null);
+                drawBlurBitmap(canvas, hokoBlur);
                 canvas.restore();
                 canvas.drawPath(mTmpPath, mHeaderPaint);
             } else {
@@ -1535,6 +1526,32 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         }
     }
 
+    /**
+     * Draws the blurred screen-wallpaper bitmap aligned to the scrim canvas without stretching
+     * even if canvas bounds transiently differ from the bitmap dimensions (e.g. split-screen).
+     */
+    private void drawBlurBitmap(@NonNull Canvas canvas, @NonNull Bitmap blur) {
+        final int canvasW = canvas.getWidth();
+        final int canvasH = canvas.getHeight();
+        final int bmpW = blur.getWidth();
+        final int bmpH = blur.getHeight();
+        if (canvasW <= 0 || canvasH <= 0 || bmpW <= 0 || bmpH <= 0) {
+            return;
+        }
+        if (bmpW == canvasW && bmpH == canvasH) {
+            canvas.drawBitmap(blur, 0f, 0f, null);
+            return;
+        }
+        float scale = Math.max((float) canvasW / bmpW, (float) canvasH / bmpH);
+        int cropW = Math.max(1, Math.min(bmpW, Math.round(canvasW / scale)));
+        int cropH = Math.max(1, Math.min(bmpH, Math.round(canvasH / scale)));
+        int cropLeft = Math.max(0, (bmpW - cropW) / 2);
+        int cropTop = Math.max(0, (bmpH - cropH) / 2);
+        mBlurSrcRect.set(cropLeft, cropTop, cropLeft + cropW, cropTop + cropH);
+        mBlurDstRect.set(0, 0, canvasW, canvasH);
+        canvas.drawBitmap(blur, mBlurSrcRect, mBlurDstRect, mBlurPaint);
+    }
+
     float getHeaderProtectionHeight() {
         float headerBottom = getHeaderBottom() - getTranslationY();
         return mUsingTabs
@@ -1579,25 +1596,28 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     // -----------------------------------------------------------------------
 
     /**
-     * Dispatches a wallpaper-blur recompute to a background thread.
-     *
-     * Called on three discrete events — never per-frame:
-     *  1. {@link #onFinishInflate()} — initial compute when the view is created
-     *  2. {@link #onAttachedToWindow()} — retry in case the window token was
-     *     not yet live during inflate (some devices return null from
-     *     WallpaperManager before the window is attached)
-     *  3. {@link #onDeviceProfileChanged(DeviceProfile)} — rotation, which
-     *     changes screen dimensions and therefore requires a new bitmap
-     *
-     * {@link DrawerWallpaperBlurHelper} also clears its own cache when
-     * {@code drawerBlurIntensity} changes (via {@link PreferenceManager2}),
-     * so the next open of the drawer after a preference change will also
-     * trigger a recompute here.
+     * Refreshes the drawer wallpaper blur when opening All Apps so changes in
+     * workspace scroll offset (parallax wallpaper) or system wallpaper are
+     * picked up automatically. Cheap cache hit when nothing changed.
      */
+    public void refreshDrawerBlurIfNeeded() {
+        applyDrawerHokoBlur(mActivityContext.getDeviceProfile());
+    }
+
     private void applyDrawerHokoBlur() {
+        applyDrawerHokoBlur(mActivityContext.getDeviceProfile());
+    }
+
+    /**
+     * Dispatches a wallpaper-blur recompute to a background thread for the
+     * visible viewport defined by {@code dp} and the current workspace
+     * wallpaper horizontal offset.
+     */
+    private void applyDrawerHokoBlur(@NonNull DeviceProfile dp) {
         boolean blurEnabled = PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerBlurBackground());
 
         if (!blurEnabled) {
+            mBlurRequestId++;
             if (mBlurBitmap != null) {
                 mBlurBitmap = null;
                 invalidateHeader();
@@ -1605,17 +1625,37 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
 
-        int intensity = Math.round(
+        final int intensity = Math.round(
                 PreferenceCacheExtensionsKt.firstCached(pref2.getDrawerBlurIntensity()));
+        final int targetW = dp.getDeviceProperties().getWidthPx();
+        final int targetH = dp.getDeviceProperties().getHeightPx();
+        final float xOffset = getCurrentWallpaperOffsetX();
         final Context ctx = getContext();
+        final int requestId = ++mBlurRequestId;
 
         UI_HELPER_EXECUTOR.execute(() -> {
-            Bitmap blurred = DrawerWallpaperBlurHelper.getBlurredBitmap(ctx, intensity);
+            Bitmap blurred = DrawerWallpaperBlurHelper.getBlurredBitmap(
+                    ctx, intensity, targetW, targetH, xOffset);
             MAIN_EXECUTOR.getHandler().post(() -> {
-                mBlurBitmap = blurred;
-                invalidateHeader();
+                if (requestId != mBlurRequestId) {
+                    return;
+                }
+                if (mBlurBitmap != blurred) {
+                    mBlurBitmap = blurred;
+                    invalidateHeader();
+                }
             });
         });
+    }
+
+    private float getCurrentWallpaperOffsetX() {
+        if (mActivityContext instanceof Launcher launcher) {
+            Workspace<?> workspace = launcher.getWorkspace();
+            if (workspace != null && workspace.getChildCount() > 0) {
+                return workspace.getWallpaperOffsetForCenterPage();
+            }
+        }
+        return 0.5f;
     }
 
     // -----------------------------------------------------------------------

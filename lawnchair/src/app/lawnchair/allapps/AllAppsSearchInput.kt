@@ -108,6 +108,7 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     private var queryEmpty by mutableStateOf(true)
 
     private var bgAlphaState by mutableFloatStateOf(1f)
+
     // LC-Note: System cross-window blur replaced by HokoBlur. supportBlur is driven by
     // the drawerBlurBackground HokoBlur preference instead of BlurUtils.supportsBlursOnWindows().
     private val supportBlur = PreferenceManager2.getInstance(launcher).drawerBlurBackground.firstCached()
@@ -365,17 +366,15 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
         }
     }
 
-    private fun setupPadding() {
-        launcher.deviceProfile.let { dp ->
-            val padding = dp.getAllAppsIconStartMargin(context)
-            initialPaddingLeft = padding
-            initialPaddingRight = padding
-            // Keep the narrower padding of an active search (see the focus and text listeners)
-            paddingAnimator?.cancel()
-            val isSearchActive = ::input.isInitialized && (input.hasFocus() || !input.text.isNullOrEmpty())
-            val currentPadding = if (isSearchActive) padding / 2 else padding
-            setPadding(currentPadding, paddingTop, currentPadding, paddingBottom)
-        }
+    private fun setupPadding(dp: DeviceProfile = launcher.deviceProfile) {
+        val padding = dp.getAllAppsIconStartMargin(context).coerceAtLeast(0)
+        initialPaddingLeft = padding
+        initialPaddingRight = padding
+        // Keep the narrower padding of an active search (see the focus and text listeners)
+        paddingAnimator?.cancel()
+        val isSearchActive = ::input.isInitialized && (input.hasFocus() || !input.text.isNullOrEmpty())
+        val currentPadding = if (isSearchActive) padding / 2 else padding
+        setPadding(currentPadding, paddingTop, currentPadding, paddingBottom)
     }
 
     private fun animateHintVisibility(visible: Boolean) {
@@ -561,6 +560,12 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
                 else -> max(-allAppsSearchVerticalOffset, insets.top - qsbMarginTopAdjusting)
             }
         }
+        // Recompute horizontal padding after insets update because onDeviceProfileChanged()
+        // runs before LauncherRootView dispatches the new orientation's insets.
+        setupPadding()
+        if (::qsbShell.isInitialized) {
+            qsbShell.requestLayout()
+        }
         requestLayout()
     }
 
@@ -594,12 +599,18 @@ class AllAppsSearchInput(context: Context, attrs: AttributeSet?) :
     override fun onDeviceProfileChanged(dp: DeviceProfile) {
         // LC-Note: The paddings follow the device profile, which also changes without an IDP
         // change, e.g. on rotation or when a foldable is folded or unfolded.
-        setupPadding()
+        setupPadding(dp)
+        if (::qsbShell.isInitialized) {
+            qsbShell.requestLayout()
+        }
         requestLayout()
     }
 
     override fun onIdpChanged(modelPropertiesChanged: Boolean) {
         setupPadding()
+        if (::qsbShell.isInitialized) {
+            qsbShell.requestLayout()
+        }
         invalidate()
         requestLayout()
     }

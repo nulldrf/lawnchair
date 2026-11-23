@@ -459,6 +459,19 @@
     <!-- Fonts -->
     <string name="pref_fonts_add_fonts">Add fonts</string>
     <string name="pref_fonts_add_fonts_summary">OTF and TTF fonts are supported</string>
+    <string name="pref_fonts_search_placeholder">Search fonts</string>
+    <string name="pref_fonts_active_font">Active font</string>
+    <string name="pref_fonts_preview_sample">Aa Bb Cc 123 · The quick brown fox</string>
+    <string name="pref_fonts_filter_all">All</string>
+    <string name="pref_fonts_section_custom">Custom fonts</string>
+    <string name="pref_fonts_section_builtin">Built-in</string>
+    <string name="pref_fonts_section_google">Google Fonts</string>
+    <string name="pref_fonts_custom_tag">Custom</string>
+    <string name="pref_fonts_system_tag">System</string>
+    <string name="pref_fonts_style_count">%1$d styles</string>
+    <string name="pref_fonts_empty_title">No fonts found</string>
+    <string name="pref_fonts_empty_custom_summary">Tap + below to import a .ttf or .otf font file</string>
+    <string name="pref_fonts_empty_search_summary">Try a different search or tap + to import a custom font</string>
 
     <string name="pref_fonts_missing_font">Font not found</string>
 

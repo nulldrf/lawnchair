@@ -20,6 +20,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
@@ -29,6 +30,7 @@ import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -52,6 +54,8 @@ fun PreferenceCategory(
     endWidget: (@Composable () -> Unit)? = null,
     // Card shape override for dynamically sized lists such as search results.
     shapes: ListItemShapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+    iconContainerColor: Color? = null,
+    iconContentColor: Color? = null,
 ) {
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
     PreferenceTemplate(
@@ -67,16 +71,33 @@ fun PreferenceCategory(
             ),
         description = description?.let { { Text(text = description) } },
         startWidget = {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    painter = painterResource(id = iconResource),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (iconContainerColor != null) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(iconContainerColor),
+                ) {
+                    Icon(
+                        painter = painterResource(id = iconResource),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = iconContentColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(id = iconResource),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
         endWidget = endWidget,

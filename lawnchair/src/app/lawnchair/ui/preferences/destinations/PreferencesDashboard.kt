@@ -31,6 +31,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -162,6 +163,7 @@ import app.lawnchair.ui.preferences.navigation.PreferenceRoute
 import app.lawnchair.ui.preferences.navigation.Quickstep
 import app.lawnchair.ui.preferences.navigation.Search
 import app.lawnchair.ui.preferences.navigation.Smartspace
+import app.lawnchair.ui.theme.isSelectedThemeDark
 import app.lawnchair.util.FileAccessManager
 import app.lawnchair.util.FileAccessState
 import app.lawnchair.util.collectAsStateBlocking
@@ -194,6 +196,118 @@ private data class SearchableEntry(
     val scrollKey: String? = null,
     val toggle: ToggleAction? = null,
 )
+
+/**
+ * Android 16 / Material 3 Expressive extended palette tokens for Settings dashboard icon badges
+ * (`m3_ref_palette_*`: tone 90 light container, tone 80 dark container, tone 30 icon foreground).
+ */
+private enum class DashboardIconColor(
+    val lightContainer: Color,
+    val darkContainer: Color,
+    val content: Color,
+) {
+    Orange(
+        lightContainer = Color(0xFFFFDCC3),
+        darkContainer = Color(0xFFFFB683),
+        content = Color(0xFF753403),
+    ),
+    Blue(
+        lightContainer = Color(0xFFD0E4FF),
+        darkContainer = Color(0xFFA1C9FF),
+        content = Color(0xFF04409F),
+    ),
+    BlueVariant(
+        lightContainer = Color(0xFFBDE9FF),
+        darkContainer = Color(0xFF67D4FF),
+        content = Color(0xFF004D68),
+    ),
+    Yellow(
+        lightContainer = Color(0xFFFFE07C),
+        darkContainer = Color(0xFFFCBD00),
+        content = Color(0xFF6D3A01),
+    ),
+    Cyan(
+        lightContainer = Color(0xFFACEDFF),
+        darkContainer = Color(0xFF60D5F3),
+        content = Color(0xFF004E5D),
+    ),
+    Purple(
+        lightContainer = Color(0xFFEEDCFE),
+        darkContainer = Color(0xFFD9BAFD),
+        content = Color(0xFF5629A4),
+    ),
+    Pink(
+        lightContainer = Color(0xFFFFD8EF),
+        darkContainer = Color(0xFFFFAEE4),
+        content = Color(0xFF8D0053),
+    ),
+    Green(
+        lightContainer = Color(0xFFBEEFBB),
+        darkContainer = Color(0xFF80DA88),
+        content = Color(0xFF00522C),
+    ),
+    Red(
+        lightContainer = Color(0xFFFFDADC),
+        darkContainer = Color(0xFFFFB3AE),
+        content = Color(0xFF8A1A16),
+    ),
+    Grey(
+        lightContainer = Color(0xFFE3E3E3),
+        darkContainer = Color(0xFFC7C7C7),
+        content = Color(0xFF474747),
+    ),
+    ;
+
+    fun containerColor(isDark: Boolean): Color = if (isDark) darkContainer else lightContainer
+}
+
+private fun dashboardIconColorFor(@DrawableRes iconResource: Int): DashboardIconColor = when (iconResource) {
+    R.drawable.ic_general -> DashboardIconColor.Orange
+    R.drawable.ic_home_screen -> DashboardIconColor.Blue
+    R.drawable.ic_smartspace, R.drawable.ic_smartspace_off -> DashboardIconColor.Yellow
+    R.drawable.ic_dock -> DashboardIconColor.Cyan
+    R.drawable.ic_folder -> DashboardIconColor.Purple
+    R.drawable.ic_apps -> DashboardIconColor.Pink
+    R.drawable.ic_search -> DashboardIconColor.BlueVariant
+    R.drawable.ic_gestures -> DashboardIconColor.Green
+    R.drawable.ic_quickstep -> DashboardIconColor.Blue
+    R.drawable.backup_restore -> DashboardIconColor.Yellow
+    R.drawable.ic_extras -> DashboardIconColor.Red
+    R.drawable.ic_about -> DashboardIconColor.Grey
+    else -> DashboardIconColor.Grey
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun segmentedItemShapes(index: Int, count: Int): ListItemShapes = when {
+    count <= 1 -> ListItemDefaults.segmentedShapes(index = 0, count = 1)
+    index <= 0 -> ListItemDefaults.segmentedShapes(index = 0, count = 2)
+    index >= count - 1 -> ListItemDefaults.segmentedShapes(index = 1, count = 2)
+    else -> ListItemDefaults.segmentedShapes(index = 1, count = 3)
+}
+
+@Composable
+private fun DashboardCategory(
+    label: String,
+    description: String,
+    @DrawableRes iconResource: Int,
+    onNavigate: () -> Unit,
+    isSelected: Boolean,
+    shapes: ListItemShapes,
+    isDarkTheme: Boolean,
+) {
+    val badgeColor = dashboardIconColorFor(iconResource)
+    PreferenceCategory(
+        label = label,
+        description = description,
+        iconResource = iconResource,
+        onNavigate = onNavigate,
+        isSelected = isSelected,
+        shapes = shapes,
+        iconContainerColor = badgeColor.containerColor(isDarkTheme),
+        iconContentColor = badgeColor.content,
+    )
+}
 
 // Mirrors AppDrawerHapticFeedbackPreference so the search entry matches device support.
 private fun isDrawerHapticFeedbackSupported(context: Context): Boolean {
@@ -957,124 +1071,144 @@ fun PreferencesDashboard(
                     },
             )
 
+            Spacer(modifier = Modifier.height(6.dp))
+
+            val isDarkTheme = isSelectedThemeDark
             val showAppDrawerCategory = !deckLayout.state.value
             val showQuickstepCategory = LawnchairApp.isRecentsEnabled || BuildConfig.DEBUG
-            val categoryCount = 10 +
-                (if (showAppDrawerCategory) 1 else 0) +
-                (if (showQuickstepCategory) 1 else 0)
-
-            @Composable
-            fun categoryShape(index: Int): ListItemShapes = when {
-                categoryCount == 1 -> ListItemDefaults.segmentedShapes(index = 0, count = 1)
-                index == 0 -> ListItemDefaults.segmentedShapes(index = 0, count = 2)
-                index == categoryCount - 1 -> ListItemDefaults.segmentedShapes(index = 1, count = 2)
-                else -> ListItemDefaults.segmentedShapes(index = 1, count = 3)
-            }
-
-            var categoryIndex = 0
 
             PreferenceGroup {
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelGeneral,
                     description = descGeneral,
                     iconResource = R.drawable.ic_general,
                     onNavigate = { onNavigate(General) },
                     isSelected = currentRoute is General,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 0, count = 5),
+                    isDarkTheme = isDarkTheme,
                 )
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelHomeScreen,
                     description = descHomeScreen,
                     iconResource = R.drawable.ic_home_screen,
                     onNavigate = { onNavigate(HomeScreen) },
                     isSelected = currentRoute is HomeScreen,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 1, count = 5),
+                    isDarkTheme = isDarkTheme,
                 )
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelSmartspace,
                     description = descSmartspace,
                     iconResource = if (isSmartspaceEnabled) R.drawable.ic_smartspace else R.drawable.ic_smartspace_off,
                     onNavigate = { onNavigate(Smartspace) },
                     isSelected = currentRoute is Smartspace,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 2, count = 5),
+                    isDarkTheme = isDarkTheme,
                 )
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelDock,
                     description = descDock,
                     iconResource = R.drawable.ic_dock,
                     onNavigate = { onNavigate(Dock) },
                     isSelected = currentRoute is Dock,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 3, count = 5),
+                    isDarkTheme = isDarkTheme,
                 )
-                ExpandAndShrink(visible = showAppDrawerCategory) {
-                    PreferenceCategory(
-                        label = labelAppDrawer,
-                        description = descAppDrawer,
-                        iconResource = R.drawable.ic_apps,
-                        onNavigate = { onNavigate(AppDrawer) },
-                        isSelected = currentRoute is AppDrawer,
-                        shapes = categoryShape(categoryIndex),
-                    )
-                }
-                if (showAppDrawerCategory) categoryIndex++
-                PreferenceCategory(
-                    label = labelSearchBar,
-                    description = descSearchBar,
-                    iconResource = R.drawable.ic_search,
-                    onNavigate = { onNavigate(Search()) },
-                    isSelected = currentRoute is Search,
-                    shapes = categoryShape(categoryIndex++),
-                )
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelFolders,
                     description = descFolders,
                     iconResource = R.drawable.ic_folder,
                     onNavigate = { onNavigate(Folders) },
                     isSelected = currentRoute is Folders,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 4, count = 5),
+                    isDarkTheme = isDarkTheme,
                 )
-                PreferenceCategory(
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val appsAndSearchCount = if (showAppDrawerCategory) 2 else 1
+            PreferenceGroup {
+                ExpandAndShrink(visible = showAppDrawerCategory) {
+                    DashboardCategory(
+                        label = labelAppDrawer,
+                        description = descAppDrawer,
+                        iconResource = R.drawable.ic_apps,
+                        onNavigate = { onNavigate(AppDrawer) },
+                        isSelected = currentRoute is AppDrawer,
+                        shapes = segmentedItemShapes(index = 0, count = appsAndSearchCount),
+                        isDarkTheme = isDarkTheme,
+                    )
+                }
+                DashboardCategory(
+                    label = labelSearchBar,
+                    description = descSearchBar,
+                    iconResource = R.drawable.ic_search,
+                    onNavigate = { onNavigate(Search()) },
+                    isSelected = currentRoute is Search,
+                    shapes = segmentedItemShapes(
+                        index = if (showAppDrawerCategory) 1 else 0,
+                        count = appsAndSearchCount,
+                    ),
+                    isDarkTheme = isDarkTheme,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val controlsCount = if (showQuickstepCategory) 2 else 1
+            PreferenceGroup {
+                DashboardCategory(
                     label = labelGestures,
                     description = descGestures,
                     iconResource = R.drawable.ic_gestures,
                     onNavigate = { onNavigate(Gestures) },
                     isSelected = currentRoute is Gestures,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 0, count = controlsCount),
+                    isDarkTheme = isDarkTheme,
                 )
                 ExpandAndShrink(visible = showQuickstepCategory) {
-                    PreferenceCategory(
+                    DashboardCategory(
                         label = labelQuickstep,
                         description = descQuickstep,
                         iconResource = R.drawable.ic_quickstep,
                         onNavigate = { onNavigate(Quickstep) },
                         isSelected = currentRoute is Quickstep,
-                        shapes = categoryShape(categoryIndex),
+                        shapes = segmentedItemShapes(index = 1, count = controlsCount),
+                        isDarkTheme = isDarkTheme,
                     )
                 }
-                if (showQuickstepCategory) categoryIndex++
-                PreferenceCategory(
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            PreferenceGroup {
+                DashboardCategory(
                     label = labelBackup,
                     description = descBackup,
                     iconResource = R.drawable.backup_restore,
                     onNavigate = { onNavigate(BackupAndRestore) },
                     isSelected = currentRoute is BackupAndRestore,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 0, count = 3),
+                    isDarkTheme = isDarkTheme,
                 )
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelExtras,
                     description = descExtras,
                     iconResource = R.drawable.ic_extras,
                     onNavigate = { onNavigate(Extras) },
                     isSelected = currentRoute is Extras,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 1, count = 3),
+                    isDarkTheme = isDarkTheme,
                 )
-                PreferenceCategory(
+                DashboardCategory(
                     label = labelAbout,
                     description = aboutDescription,
                     iconResource = R.drawable.ic_about,
                     onNavigate = { onNavigate(About) },
                     isSelected = currentRoute is About,
-                    shapes = categoryShape(categoryIndex++),
+                    shapes = segmentedItemShapes(index = 2, count = 3),
+                    isDarkTheme = isDarkTheme,
                 )
             }
         }
@@ -1254,6 +1388,7 @@ private fun SearchOverlay(
                 }
 
                 else -> {
+                    val isDarkTheme = isSelectedThemeDark
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
@@ -1261,14 +1396,8 @@ private fun SearchOverlay(
                         items(filtered.size) { idx ->
                             val entry = filtered[idx]
                             val toggle = entry.toggle
-                            val resultCount = filtered.size
-                            // Derive segmented corners dynamically from the current filtered list size.
-                            val itemShapes = when {
-                                resultCount == 1 -> ListItemDefaults.segmentedShapes(index = 0, count = 1)
-                                idx == 0 -> ListItemDefaults.segmentedShapes(index = 0, count = 2)
-                                idx == resultCount - 1 -> ListItemDefaults.segmentedShapes(index = 1, count = 2)
-                                else -> ListItemDefaults.segmentedShapes(index = 1, count = 3)
-                            }
+                            val badgeColor = dashboardIconColorFor(entry.iconResource)
+                            val itemShapes = segmentedItemShapes(index = idx, count = filtered.size)
                             PreferenceCategory(
                                 label = entry.label,
                                 description = entry.breadcrumb,
@@ -1280,6 +1409,8 @@ private fun SearchOverlay(
                                 },
                                 isSelected = false,
                                 shapes = itemShapes,
+                                iconContainerColor = badgeColor.containerColor(isDarkTheme),
+                                iconContentColor = badgeColor.content,
                                 endWidget = if (toggle != null) {
                                     {
                                         Switch(

@@ -324,8 +324,10 @@ class LawnchairIconProvider @Inject constructor(
                 val calDrawable = loadCalendarDrawable(iconDpi, themeData)
                 when {
                     calDrawable is CustomAdaptiveIconDrawable -> calDrawable.monochrome
+
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && calDrawable is AdaptiveIconDrawable ->
                         calDrawable.monochrome
+
                     else -> themeData.loadPaddedDrawable()
                 }
             }

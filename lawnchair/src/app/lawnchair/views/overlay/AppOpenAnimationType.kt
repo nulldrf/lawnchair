@@ -26,7 +26,6 @@ enum class AppOpenAnimationType(val value: String, @StringRes val labelRes: Int)
     ;
 
     companion object {
-        fun fromValue(value: String): AppOpenAnimationType =
-            entries.find { it.value == value } ?: DEFAULT
+        fun fromValue(value: String): AppOpenAnimationType = entries.find { it.value == value } ?: DEFAULT
     }
 }

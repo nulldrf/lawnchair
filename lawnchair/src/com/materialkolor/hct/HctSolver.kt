@@ -385,12 +385,11 @@ public object HctSolver {
         source: DoubleArray,
         t: Double,
         target: DoubleArray,
-    ): DoubleArray =
-        doubleArrayOf(
-            source[0] + (target[0] - source[0]) * t,
-            source[1] + (target[1] - source[1]) * t,
-            source[2] + (target[2] - source[2]) * t,
-        )
+    ): DoubleArray = doubleArrayOf(
+        source[0] + (target[0] - source[0]) * t,
+        source[1] + (target[1] - source[1]) * t,
+        source[2] + (target[2] - source[2]) * t,
+    )
 
     /**
      * Intersects a segment with a plane.
@@ -441,6 +440,7 @@ public object HctSolver {
                     doubleArrayOf(-1.0, -1.0, -1.0)
                 }
             }
+
             n < 8 -> {
                 val g = (y - coordB * kR - coordA * kB) / kG
                 if (isBounded(g)) {
@@ -449,6 +449,7 @@ public object HctSolver {
                     doubleArrayOf(-1.0, -1.0, -1.0)
                 }
             }
+
             else -> {
                 val b = (y - coordA * kR - coordB * kG) / kB
                 if (isBounded(b)) {
@@ -509,12 +510,11 @@ public object HctSolver {
     private fun midpoint(
         a: DoubleArray,
         b: DoubleArray,
-    ): DoubleArray =
-        doubleArrayOf(
-            (a[0] + b[0]) / 2,
-            (a[1] + b[1]) / 2,
-            (a[2] + b[2]) / 2,
-        )
+    ): DoubleArray = doubleArrayOf(
+        (a[0] + b[0]) / 2,
+        (a[1] + b[1]) / 2,
+        (a[2] + b[2]) / 2,
+    )
 
     private fun criticalPlaneBelow(x: Double): Int = floor(x - 0.5).toInt()
 
@@ -612,7 +612,7 @@ public object HctSolver {
             val ac: Double = (
                 viewingConditions.aw
                     * jNormalized.pow(1.0 / viewingConditions.c / viewingConditions.z)
-            )
+                )
             val p2: Double = ac / viewingConditions.nbb
             val gamma = 23.0 * (p2 + 0.305) * t / (23.0 * p1 + 11 * t * hCos + 108.0 * t * hSin)
             val a = gamma * hCos

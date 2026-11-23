@@ -29,64 +29,64 @@ public class SchemeFruitSalad(
     specVersion: ColorSpec.SpecVersion = ColorSpec.SpecVersion.Default,
     platform: Platform = Platform.Default,
 ) : DynamicScheme(
-        sourceColorHct = sourceColorHct,
-        variant = Variant.FRUIT_SALAD,
-        isDark = isDark,
-        contrastLevel = contrastLevel,
-        specVersion = specVersion,
-        platform = platform,
-        primaryPalette = ColorSpecs
-            .get(specVersion)
-            .getPrimaryPalette(
-                variant = Variant.FRUIT_SALAD,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            ),
-        secondaryPalette = ColorSpecs
-            .get(specVersion)
-            .getSecondaryPalette(
-                variant = Variant.FRUIT_SALAD,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            ),
-        tertiaryPalette = ColorSpecs
-            .get(specVersion)
-            .getTertiaryPalette(
-                variant = Variant.FRUIT_SALAD,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            ),
-        neutralPalette = ColorSpecs
-            .get(specVersion)
-            .getNeutralPalette(
-                variant = Variant.FRUIT_SALAD,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            ),
-        neutralVariantPalette = ColorSpecs
-            .get(specVersion)
-            .getNeutralVariantPalette(
-                variant = Variant.FRUIT_SALAD,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            ),
-        errorPalette = ColorSpecs
-            .get(specVersion)
-            .getErrorPalette(
-                variant = Variant.FRUIT_SALAD,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            ),
-    )
+    sourceColorHct = sourceColorHct,
+    variant = Variant.FRUIT_SALAD,
+    isDark = isDark,
+    contrastLevel = contrastLevel,
+    specVersion = specVersion,
+    platform = platform,
+    primaryPalette = ColorSpecs
+        .get(specVersion)
+        .getPrimaryPalette(
+            variant = Variant.FRUIT_SALAD,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        ),
+    secondaryPalette = ColorSpecs
+        .get(specVersion)
+        .getSecondaryPalette(
+            variant = Variant.FRUIT_SALAD,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        ),
+    tertiaryPalette = ColorSpecs
+        .get(specVersion)
+        .getTertiaryPalette(
+            variant = Variant.FRUIT_SALAD,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        ),
+    neutralPalette = ColorSpecs
+        .get(specVersion)
+        .getNeutralPalette(
+            variant = Variant.FRUIT_SALAD,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        ),
+    neutralVariantPalette = ColorSpecs
+        .get(specVersion)
+        .getNeutralVariantPalette(
+            variant = Variant.FRUIT_SALAD,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        ),
+    errorPalette = ColorSpecs
+        .get(specVersion)
+        .getErrorPalette(
+            variant = Variant.FRUIT_SALAD,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        ),
+)

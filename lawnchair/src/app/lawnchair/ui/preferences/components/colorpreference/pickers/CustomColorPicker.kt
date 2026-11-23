@@ -39,12 +39,13 @@ import com.android.launcher3.R
 fun CustomColorPicker(
     selectedColor: Int,
     onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
     simple: Boolean = false,
 ) {
     var showCanvasDialog by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .padding(top = 20.dp, bottom = 16.dp),
@@ -90,7 +91,7 @@ fun CustomColorPicker(
         CanvasColorPickerDialog(
             initialColor = selectedColor,
             onDismiss = { showCanvasDialog = false },
-            onColorSelected = { newColor ->
+            onColorSelect = { newColor ->
                 onSelect(newColor)
             },
         )

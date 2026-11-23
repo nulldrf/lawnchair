@@ -30,7 +30,6 @@ import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
 import android.util.Log
-import app.lawnchair.icons.ThemedIconCompat
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.material3.Button
@@ -46,6 +45,7 @@ import androidx.core.content.FileProvider
 import androidx.profileinstaller.ProfileInstaller
 import app.lawnchair.backup.LawnchairBackup
 import app.lawnchair.flowerpot.Flowerpot
+import app.lawnchair.icons.ThemedIconCompat
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.ui.ModalBottomSheetContent
 import app.lawnchair.ui.preferences.destinations.openAppInfo
@@ -241,11 +241,11 @@ class LawnchairApp : LauncherApplication() {
                 // 1. Prefer the activity that is currently resumed and visible.
                 //    When the user is on the home screen this is the launcher itself.
                 (foregroundActivity as? LawnchairLauncher)
-                // 2. If the launcher is in background (e.g. user is inside Settings),
-                //    foregroundActivity is a settings Activity, not the launcher.
-                //    In that case return the most recently CREATED launcher — with
-                //    LinkedHashSet ordering that is always the new one after recreate(),
-                //    not the old one that is being destroyed.
+                    // 2. If the launcher is in background (e.g. user is inside Settings),
+                    //    foregroundActivity is a settings Activity, not the launcher.
+                    //    In that case return the most recently CREATED launcher — with
+                    //    LinkedHashSet ordering that is always the new one after recreate(),
+                    //    not the old one that is being destroyed.
                     ?: activities.filterIsInstance<LawnchairLauncher>().lastOrNull()
 
         fun finishAll() {

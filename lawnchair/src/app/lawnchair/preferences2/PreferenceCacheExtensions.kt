@@ -21,7 +21,9 @@ fun <C, S> PreferenceImpl<C, S>.firstCached(
     val ds = preferencesDataStore
     return when {
         ds is CachedPreferencesDataStore -> getFromPreferences(ds.currentPreferences)
+
         prefs2 != null && ds === prefs2.preferencesDataStore -> getFromPreferences(prefs2.getCachedPreferences())
+
         else -> {
             val resolvedPrefs2 = prefs2 ?: PreferenceManager2.getInstance(LawnchairApp.instance)
             if (ds === resolvedPrefs2.preferencesDataStore) {
@@ -41,4 +43,3 @@ fun <C, S> PreferenceImpl<C, S>.firstCached(
 fun <C, S> PreferenceImpl<C, S>.setCached(value: C) {
     setBlocking(value)
 }
-

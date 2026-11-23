@@ -132,18 +132,17 @@ public class DynamicColor(
      */
     public fun getTone(scheme: DynamicScheme): Double = ColorSpecs.get(scheme.specVersion).getTone(scheme, this)
 
-    public fun toBuilder(): Builder =
-        Builder()
-            .setName(this.name)
-            .setPalette(this.palette)
-            .setTone(this.tone)
-            .setIsBackground(this.isBackground)
-            .setChromaMultiplier(this.chromaMultiplier)
-            .setBackground(this.background)
-            .setSecondBackground(this.secondBackground)
-            .setContrastCurve(this.contrastCurve)
-            .setToneDeltaPair(this.toneDeltaPair)
-            .setOpacity(this.opacity)
+    public fun toBuilder(): Builder = Builder()
+        .setName(this.name)
+        .setPalette(this.palette)
+        .setTone(this.tone)
+        .setIsBackground(this.isBackground)
+        .setChromaMultiplier(this.chromaMultiplier)
+        .setBackground(this.background)
+        .setSecondBackground(this.secondBackground)
+        .setContrastCurve(this.contrastCurve)
+        .setToneDeltaPair(this.toneDeltaPair)
+        .setOpacity(this.opacity)
 
     public companion object {
         /**
@@ -171,17 +170,16 @@ public class DynamicColor(
             name: String,
             palette: (DynamicScheme) -> TonalPalette,
             tone: (DynamicScheme) -> Double,
-        ): DynamicColor =
-            DynamicColor(
-                name = name,
-                palette = palette,
-                tone = tone,
-                isBackground = false,
-                background = null,
-                secondBackground = null,
-                contrastCurve = null,
-                toneDeltaPair = null,
-            )
+        ): DynamicColor = DynamicColor(
+            name = name,
+            palette = palette,
+            tone = tone,
+            isBackground = false,
+            background = null,
+            secondBackground = null,
+            contrastCurve = null,
+            toneDeltaPair = null,
+        )
 
         /**
          * A convenience constructor for DynamicColor.
@@ -211,17 +209,16 @@ public class DynamicColor(
             palette: (DynamicScheme) -> TonalPalette,
             tone: (DynamicScheme) -> Double,
             isBackground: Boolean,
-        ): DynamicColor =
-            DynamicColor(
-                name = name,
-                palette = palette,
-                tone = tone,
-                isBackground = isBackground,
-                background = null,
-                secondBackground = null,
-                contrastCurve = null,
-                toneDeltaPair = null,
-            )
+        ): DynamicColor = DynamicColor(
+            name = name,
+            palette = palette,
+            tone = tone,
+            isBackground = isBackground,
+            background = null,
+            secondBackground = null,
+            contrastCurve = null,
+            toneDeltaPair = null,
+        )
 
         /**
          * Create a DynamicColor from a hex code.
@@ -279,12 +276,11 @@ public class DynamicColor(
          * Adjust a tone down such that white has 4.5 contrast, if the tone is reasonably close to
          * supporting it.
          */
-        public fun enableLightForeground(tone: Double): Double =
-            if (tonePrefersLightForeground(tone) && !toneAllowsLightForeground(tone)) {
-                49.0
-            } else {
-                tone
-            }
+        public fun enableLightForeground(tone: Double): Double = if (tonePrefersLightForeground(tone) && !toneAllowsLightForeground(tone)) {
+            49.0
+        } else {
+            tone
+        }
 
         /**
          * People prefer white foregrounds on ~T60-70. Observed over time, and also by Andrew Somers
@@ -325,53 +321,43 @@ public class DynamicColor(
             private var toneDeltaPair: ((DynamicScheme) -> ToneDeltaPair?)? = null
             private var opacity: ((DynamicScheme) -> Double?)? = null
 
-            public fun setName(name: String): Builder =
-                apply {
-                    this.name = name
-                }
+            public fun setName(name: String): Builder = apply {
+                this.name = name
+            }
 
-            public fun setPalette(palette: (DynamicScheme) -> TonalPalette): Builder =
-                apply {
-                    this.palette = palette
-                }
+            public fun setPalette(palette: (DynamicScheme) -> TonalPalette): Builder = apply {
+                this.palette = palette
+            }
 
-            public fun setTone(tone: (DynamicScheme) -> Double): Builder =
-                apply {
-                    this.tone = tone
-                }
+            public fun setTone(tone: (DynamicScheme) -> Double): Builder = apply {
+                this.tone = tone
+            }
 
-            public fun setIsBackground(isBackground: Boolean): Builder =
-                apply {
-                    this.isBackground = isBackground
-                }
+            public fun setIsBackground(isBackground: Boolean): Builder = apply {
+                this.isBackground = isBackground
+            }
 
-            public fun setChromaMultiplier(chromaMultiplier: ((DynamicScheme) -> Double?)?): Builder =
-                apply {
-                    this.chromaMultiplier = chromaMultiplier
-                }
+            public fun setChromaMultiplier(chromaMultiplier: ((DynamicScheme) -> Double?)?): Builder = apply {
+                this.chromaMultiplier = chromaMultiplier
+            }
 
-            public fun setBackground(background: ((DynamicScheme) -> DynamicColor?)?): Builder =
-                apply {
-                    this.background = background
-                }
+            public fun setBackground(background: ((DynamicScheme) -> DynamicColor?)?): Builder = apply {
+                this.background = background
+            }
 
-            public fun setSecondBackground(secondBackground: ((DynamicScheme) -> DynamicColor?)?): Builder =
-                apply { this.secondBackground = secondBackground }
+            public fun setSecondBackground(secondBackground: ((DynamicScheme) -> DynamicColor?)?): Builder = apply { this.secondBackground = secondBackground }
 
-            public fun setContrastCurve(contrastCurve: ((DynamicScheme) -> ContrastCurve?)?): Builder =
-                apply {
-                    this.contrastCurve = contrastCurve
-                }
+            public fun setContrastCurve(contrastCurve: ((DynamicScheme) -> ContrastCurve?)?): Builder = apply {
+                this.contrastCurve = contrastCurve
+            }
 
-            public fun setToneDeltaPair(toneDeltaPair: ((DynamicScheme) -> ToneDeltaPair?)?): Builder =
-                apply {
-                    this.toneDeltaPair = toneDeltaPair
-                }
+            public fun setToneDeltaPair(toneDeltaPair: ((DynamicScheme) -> ToneDeltaPair?)?): Builder = apply {
+                this.toneDeltaPair = toneDeltaPair
+            }
 
-            public fun setOpacity(opacity: ((DynamicScheme) -> Double?)?): Builder =
-                apply {
-                    this.opacity = opacity
-                }
+            public fun setOpacity(opacity: ((DynamicScheme) -> Double?)?): Builder = apply {
+                this.opacity = opacity
+            }
 
             public fun extendSpecVersion(
                 specVersion: ColorSpec.SpecVersion,
@@ -498,7 +484,7 @@ public class DynamicColor(
                             " of different name for spec version " +
                             specVersion +
                             "."
-                    )
+                        )
                 }
                 require(this.isBackground == extendedColor.isBackground) {
                     (
@@ -513,7 +499,7 @@ public class DynamicColor(
                             " for spec version " +
                             specVersion +
                             "."
-                    )
+                        )
                 }
             }
         }

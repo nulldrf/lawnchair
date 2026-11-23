@@ -27,12 +27,11 @@ internal object MathUtils {
      * @param[num] the number to check
      * @return 1 if num > 0, -1 if num < 0, and 0 if num = 0
      */
-    fun signum(num: Double): Int =
-        when {
-            num < 0 -> -1
-            num == 0.0 -> 0
-            else -> 1
-        }
+    fun signum(num: Double): Int = when {
+        num < 0 -> -1
+        num == 0.0 -> 0
+        else -> 1
+    }
 
     /**
      * The linear interpolation function.

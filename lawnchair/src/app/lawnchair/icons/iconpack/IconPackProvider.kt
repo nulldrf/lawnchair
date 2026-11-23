@@ -53,7 +53,8 @@ class IconPackProvider @Inject constructor(
     private val iconPacks: MutableMap<String, IconPack?> = object : LinkedHashMap<String, IconPack?>(
         MAX_CACHED_ICON_PACKS + 1,
         0.75f,
-        /* accessOrder = */ true,
+        /* accessOrder = */
+        true,
     ) {
         override fun removeEldestEntry(
             eldest: MutableMap.MutableEntry<String, IconPack?>,

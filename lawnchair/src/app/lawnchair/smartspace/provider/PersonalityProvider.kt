@@ -7,20 +7,21 @@ import app.lawnchair.smartspace.model.SmartspaceScores
 import app.lawnchair.smartspace.model.SmartspaceTarget
 import app.lawnchair.util.broadcastReceiverFlow
 import com.android.launcher3.R
+import java.util.Calendar
+import kotlin.math.abs
+import kotlin.random.Random
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.transformLatest
-import java.util.Calendar
-import kotlin.math.abs
-import kotlin.random.Random
 
-class PersonalityProvider(context: Context) : SmartspaceDataSource(
-    context,
-    R.string.smartspace_personality,
-    { smartspacePersonality },
-) {
+class PersonalityProvider(context: Context) :
+    SmartspaceDataSource(
+        context,
+        R.string.smartspace_personality,
+        { smartspacePersonality },
+    ) {
     private val morningStrings = context.resources.getStringArray(R.array.greetings_morning)
     private val eveningStrings = context.resources.getStringArray(R.array.greetings_evening)
     private val nightStrings = context.resources.getStringArray(R.array.greetings_night)
@@ -69,7 +70,7 @@ class PersonalityProvider(context: Context) : SmartspaceDataSource(
         val randomIndex = abs(Random(dayOfYear).nextInt())
 
         val message = when (hour) {
-            in 5 until 9  -> morningStrings[randomIndex % morningStrings.size]
+            in 5 until 9 -> morningStrings[randomIndex % morningStrings.size]
             in 19 until 21 -> eveningStrings[randomIndex % eveningStrings.size]
             in 22 until 24, in 0 until 4 -> nightStrings[randomIndex % nightStrings.size]
             else -> return emptyList() // daytime — no greeting card

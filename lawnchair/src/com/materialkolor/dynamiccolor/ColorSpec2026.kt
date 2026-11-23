@@ -72,18 +72,17 @@ public open class ColorSpec2026 : ColorSpec2025() {
         return answer.coerceIn(lowerBound, upperBound)
     }
 
-    private fun getContrastCurve(defaultContrast: Double): ContrastCurve =
-        when (defaultContrast) {
-            1.5 -> ContrastCurve(1.5, 1.5, 3.0, 5.5)
-            3.0 -> ContrastCurve(3.0, 3.0, 4.5, 7.0)
-            4.5 -> ContrastCurve(4.5, 4.5, 7.0, 11.0)
-            6.0 -> ContrastCurve(6.0, 6.0, 7.0, 11.0)
-            7.0 -> ContrastCurve(7.0, 7.0, 11.0, 21.0)
-            9.0 -> ContrastCurve(9.0, 9.0, 11.0, 21.0)
-            11.0 -> ContrastCurve(11.0, 11.0, 21.0, 21.0)
-            21.0 -> ContrastCurve(21.0, 21.0, 21.0, 21.0)
-            else -> ContrastCurve(defaultContrast, defaultContrast, 7.0, 21.0)
-        }
+    private fun getContrastCurve(defaultContrast: Double): ContrastCurve = when (defaultContrast) {
+        1.5 -> ContrastCurve(1.5, 1.5, 3.0, 5.5)
+        3.0 -> ContrastCurve(3.0, 3.0, 4.5, 7.0)
+        4.5 -> ContrastCurve(4.5, 4.5, 7.0, 11.0)
+        6.0 -> ContrastCurve(6.0, 6.0, 7.0, 11.0)
+        7.0 -> ContrastCurve(7.0, 7.0, 11.0, 21.0)
+        9.0 -> ContrastCurve(9.0, 9.0, 11.0, 21.0)
+        11.0 -> ContrastCurve(11.0, 11.0, 21.0, 21.0)
+        21.0 -> ContrastCurve(21.0, 21.0, 21.0, 21.0)
+        else -> ContrastCurve(defaultContrast, defaultContrast, 7.0, 21.0)
+    }
 
     // Surfaces [S]
 

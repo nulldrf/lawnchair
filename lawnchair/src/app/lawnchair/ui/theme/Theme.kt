@@ -47,10 +47,10 @@ import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.resolveEffectiveSpec
 import app.lawnchair.theme.toComposeColorScheme
 import app.lawnchair.theme.toComposeColorScheme2025
-import com.android.systemui.monet.SpecVersion
 import app.lawnchair.ui.preferences.components.ThemeChoice
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.Utilities
+import com.android.systemui.monet.SpecVersion
 
 @Composable
 fun LawnchairTheme(
@@ -97,9 +97,9 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
 
     val context = LocalContext.current
     val preferenceManager2 = preferenceManager2()
-    val accentColor       by preferenceManager2.accentColor.asState()
-    val colorStyle        by preferenceManager2.colorStyle.asState()
-    val colorSpec         by preferenceManager2.colorSpec.asState()
+    val accentColor by preferenceManager2.accentColor.asState()
+    val colorStyle by preferenceManager2.colorStyle.asState()
+    val colorSpec by preferenceManager2.colorSpec.asState()
     val colorSpecFallback by preferenceManager2.colorSpecFallback.asState()
 
     val isSystemAccent = accentColor == ColorOption.SystemAccent
@@ -164,8 +164,8 @@ val isSelectedThemeDark: Boolean
         val themeChoice by preferenceManager2().launcherTheme.asState()
         return when (themeChoice) {
             ThemeChoice.LIGHT -> false
-            ThemeChoice.DARK  -> true
-            else              -> isAutoThemeDark
+            ThemeChoice.DARK -> true
+            else -> isAutoThemeDark
         }
     }
 

@@ -64,6 +64,7 @@ import dev.kdrag0n.monet.theme.toComposeColor
 
 @Composable
 fun ColorStyleScreen(
+    modifier: Modifier = Modifier,
     showLegacyKdrag: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -84,15 +85,19 @@ fun ColorStyleScreen(
     val rawWallpaperSeed: Int = remember(accentColorValue, wallpaperColors) {
         when (accentColorValue) {
             is ColorOption.CustomColor -> accentColorValue.color
+
             is ColorOption.WallpaperPrimary ->
                 wallpaperColors?.primaryColor ?: fallbackSeed
+
             is ColorOption.WallpaperDerived -> accentColorValue.color
+
             else -> fallbackSeed
         }
     }
     val rawWallpaperSecondarySeed: Int? = remember(accentColorValue, wallpaperColors, rawWallpaperSeed) {
         when (accentColorValue) {
             is ColorOption.WallpaperPrimary -> wallpaperColors?.secondaryColor
+
             is ColorOption.WallpaperDerived -> {
                 val liveSecondary = wallpaperColors?.secondaryColor
                 val livePrimary = wallpaperColors?.primaryColor ?: accentColorValue.wallpaperPrimary
@@ -102,6 +107,7 @@ fun ColorStyleScreen(
                     else -> liveSecondary
                 }
             }
+
             else -> null
         }
     }
@@ -139,6 +145,7 @@ fun ColorStyleScreen(
     PreferenceLayoutLazyColumn(
         backArrowVisible = !LocalIsExpandedScreen.current,
         label = stringResource(id = R.string.color_style_label),
+        modifier = modifier,
     ) {
         items(
             items = styles,
@@ -297,12 +304,30 @@ private fun StylePreviewIcon(
             val arcTopLeft = Offset(cx - radius, cy - radius)
             val arcSize = Size(diameter, diameter)
 
-            drawArc(color = colors.primary, startAngle = 180f, sweepAngle = 180f,
-                useCenter = true, topLeft = arcTopLeft, size = arcSize)
-            drawArc(color = colors.tertiary, startAngle = 90f, sweepAngle = 90f,
-                useCenter = true, topLeft = arcTopLeft, size = arcSize)
-            drawArc(color = colors.secondary, startAngle = 0f, sweepAngle = 90f,
-                useCenter = true, topLeft = arcTopLeft, size = arcSize)
+            drawArc(
+                color = colors.primary,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = true,
+                topLeft = arcTopLeft,
+                size = arcSize,
+            )
+            drawArc(
+                color = colors.tertiary,
+                startAngle = 90f,
+                sweepAngle = 90f,
+                useCenter = true,
+                topLeft = arcTopLeft,
+                size = arcSize,
+            )
+            drawArc(
+                color = colors.secondary,
+                startAngle = 0f,
+                sweepAngle = 90f,
+                useCenter = true,
+                topLeft = arcTopLeft,
+                size = arcSize,
+            )
         }
     }
 }
@@ -330,6 +355,7 @@ private fun buildStylePreviewColors(
 ): StylePreviewColors {
     val scheme: KdragColorScheme = when (style) {
         is LegacyKdrag -> KdragMonetColorScheme(rawWallpaperSeed)
+
         is Cmf -> Spec2025CompatColorScheme(
             MonetColorSchemeCompat2025(
                 seedColor = rawWallpaperSeed,
@@ -339,6 +365,7 @@ private fun buildStylePreviewColors(
                 secondarySeedColor = rawWallpaperSecondarySeed,
             ),
         )
+
         else -> MonetColorSchemeCompat(rawWallpaperSeed, style.style, specVersion)
     }
 
@@ -358,5 +385,4 @@ private fun buildStylePreviewColors(
     )
 }
 
-private fun Map<Int, KdragColor>.composeColor(key: Int): Color =
-    this[key]?.toComposeColor() ?: Color.Gray
+private fun Map<Int, KdragColor>.composeColor(key: Int): Color = this[key]?.toComposeColor() ?: Color.Gray

@@ -175,14 +175,14 @@ internal class QuantizerWu : Quantizer {
                         moments[getIndex(cube!!.r1, cube.g1, cube.b1)] -
                             moments[getIndex(cube.r1, cube.g1, cube.b0)] -
                             moments[getIndex(cube.r1, cube.g0, cube.b1)]
-                    ) +
+                        ) +
                         moments[getIndex(cube.r1, cube.g0, cube.b0)] -
                         moments[getIndex(cube.r0, cube.g1, cube.b1)]
-                ) + moments[getIndex(cube.r0, cube.g1, cube.b0)] +
+                    ) + moments[getIndex(cube.r0, cube.g1, cube.b0)] +
                     moments[getIndex(cube.r0, cube.g0, cube.b1)]
-            ) -
+                ) -
                 moments[getIndex(cube.r0, cube.g0, cube.b0)]
-        )
+            )
         val hypotenuse = dr * dr + dg * dg + db * db
         val volume = volume(cube, weights)
         return xx - hypotenuse / volume.toDouble()
@@ -226,12 +226,14 @@ internal class QuantizerWu : Quantizer {
                 two.g0 = one.g0
                 two.b0 = one.b0
             }
+
             Direction.GREEN -> {
                 one.g1 = maxGResult.cutLocation
                 two.r0 = one.r0
                 two.g0 = one.g1
                 two.b0 = one.b0
             }
+
             Direction.BLUE -> {
                 one.b1 = maxBResult.cutLocation
                 two.r0 = one.r0
@@ -337,86 +339,87 @@ internal class QuantizerWu : Quantizer {
         fun volume(
             cube: Box?,
             moment: IntArray,
-        ): Int =
+        ): Int = (
             (
                 (
                     (
-                        (
-                            moment[getIndex(cube!!.r1, cube.g1, cube.b1)] -
-                                moment[getIndex(cube.r1, cube.g1, cube.b0)] -
-                                moment[getIndex(cube.r1, cube.g0, cube.b1)]
+                        moment[getIndex(cube!!.r1, cube.g1, cube.b1)] -
+                            moment[getIndex(cube.r1, cube.g1, cube.b0)] -
+                            moment[getIndex(cube.r1, cube.g0, cube.b1)]
                         ) +
-                            moment[getIndex(cube.r1, cube.g0, cube.b0)] -
-                            moment[getIndex(cube.r0, cube.g1, cube.b1)]
+                        moment[getIndex(cube.r1, cube.g0, cube.b0)] -
+                        moment[getIndex(cube.r0, cube.g1, cube.b1)]
                     ) + moment[getIndex(cube.r0, cube.g1, cube.b0)] +
-                        moment[getIndex(cube.r0, cube.g0, cube.b1)]
+                    moment[getIndex(cube.r0, cube.g0, cube.b1)]
                 ) -
-                    moment[getIndex(cube.r0, cube.g0, cube.b0)]
+                moment[getIndex(cube.r0, cube.g0, cube.b0)]
             )
 
         fun bottom(
             cube: Box?,
             direction: Direction,
             moment: IntArray,
-        ): Int =
-            when (direction) {
-                Direction.RED -> (
-                    (
-                        -moment[getIndex(cube!!.r0, cube.g1, cube.b1)] +
-                            moment[getIndex(cube.r0, cube.g1, cube.b0)] +
-                            moment[getIndex(cube.r0, cube.g0, cube.b1)]
+        ): Int = when (direction) {
+            Direction.RED -> (
+                (
+                    -moment[getIndex(cube!!.r0, cube.g1, cube.b1)] +
+                        moment[getIndex(cube.r0, cube.g1, cube.b0)] +
+                        moment[getIndex(cube.r0, cube.g0, cube.b1)]
                     ) -
-                        moment[getIndex(cube.r0, cube.g0, cube.b0)]
+                    moment[getIndex(cube.r0, cube.g0, cube.b0)]
                 )
-                Direction.GREEN -> (
-                    (
-                        -moment[getIndex(cube!!.r1, cube.g0, cube.b1)] +
-                            moment[getIndex(cube.r1, cube.g0, cube.b0)] +
-                            moment[getIndex(cube.r0, cube.g0, cube.b1)]
+
+            Direction.GREEN -> (
+                (
+                    -moment[getIndex(cube!!.r1, cube.g0, cube.b1)] +
+                        moment[getIndex(cube.r1, cube.g0, cube.b0)] +
+                        moment[getIndex(cube.r0, cube.g0, cube.b1)]
                     ) -
-                        moment[getIndex(cube.r0, cube.g0, cube.b0)]
+                    moment[getIndex(cube.r0, cube.g0, cube.b0)]
                 )
-                Direction.BLUE -> (
-                    (
-                        -moment[getIndex(cube!!.r1, cube.g1, cube.b0)] +
-                            moment[getIndex(cube.r1, cube.g0, cube.b0)] +
-                            moment[getIndex(cube.r0, cube.g1, cube.b0)]
+
+            Direction.BLUE -> (
+                (
+                    -moment[getIndex(cube!!.r1, cube.g1, cube.b0)] +
+                        moment[getIndex(cube.r1, cube.g0, cube.b0)] +
+                        moment[getIndex(cube.r0, cube.g1, cube.b0)]
                     ) -
-                        moment[getIndex(cube.r0, cube.g0, cube.b0)]
+                    moment[getIndex(cube.r0, cube.g0, cube.b0)]
                 )
-            }
+        }
 
         fun top(
             cube: Box?,
             direction: Direction,
             position: Int,
             moment: IntArray,
-        ): Int =
-            when (direction) {
-                Direction.RED -> (
-                    (
-                        moment[getIndex(position, cube!!.g1, cube.b1)] -
-                            moment[getIndex(position, cube.g1, cube.b0)] -
-                            moment[getIndex(position, cube.g0, cube.b1)]
+        ): Int = when (direction) {
+            Direction.RED -> (
+                (
+                    moment[getIndex(position, cube!!.g1, cube.b1)] -
+                        moment[getIndex(position, cube.g1, cube.b0)] -
+                        moment[getIndex(position, cube.g0, cube.b1)]
                     ) +
-                        moment[getIndex(position, cube.g0, cube.b0)]
+                    moment[getIndex(position, cube.g0, cube.b0)]
                 )
-                Direction.GREEN -> (
-                    (
-                        moment[getIndex(cube!!.r1, position, cube.b1)] -
-                            moment[getIndex(cube.r1, position, cube.b0)] -
-                            moment[getIndex(cube.r0, position, cube.b1)]
+
+            Direction.GREEN -> (
+                (
+                    moment[getIndex(cube!!.r1, position, cube.b1)] -
+                        moment[getIndex(cube.r1, position, cube.b0)] -
+                        moment[getIndex(cube.r0, position, cube.b1)]
                     ) +
-                        moment[getIndex(cube.r0, position, cube.b0)]
+                    moment[getIndex(cube.r0, position, cube.b0)]
                 )
-                Direction.BLUE -> (
-                    (
-                        moment[getIndex(cube!!.r1, cube.g1, position)] -
-                            moment[getIndex(cube.r1, cube.g0, position)] -
-                            moment[getIndex(cube.r0, cube.g1, position)]
+
+            Direction.BLUE -> (
+                (
+                    moment[getIndex(cube!!.r1, cube.g1, position)] -
+                        moment[getIndex(cube.r1, cube.g0, position)] -
+                        moment[getIndex(cube.r0, cube.g1, position)]
                     ) +
-                        moment[getIndex(cube.r0, cube.g0, position)]
+                    moment[getIndex(cube.r0, cube.g0, position)]
                 )
-            }
+        }
     }
 }

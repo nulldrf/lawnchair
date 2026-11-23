@@ -38,16 +38,15 @@ class Spec2025CompatColorScheme(
         Shade.S1000.lightness,
     )
 
-    private fun buildSwatch(palette: com.materialkolor.palettes.TonalPalette): ColorSwatch =
-        allShades.associateWith { shade ->
-            val tone = (1000 - shade) / 10
-            AndroidColor(palette.tone(tone))
-        }
+    private fun buildSwatch(palette: com.materialkolor.palettes.TonalPalette): ColorSwatch = allShades.associateWith { shade ->
+        val tone = (1000 - shade) / 10
+        AndroidColor(palette.tone(tone))
+    }
 
     // Map materialkolor palette roles to kdrag0n swatch names
     override val neutral1: ColorSwatch = buildSwatch(scheme2025.scheme.neutralPalette)
     override val neutral2: ColorSwatch = buildSwatch(scheme2025.scheme.neutralVariantPalette)
-    override val accent1: ColorSwatch  = buildSwatch(scheme2025.scheme.primaryPalette)
-    override val accent2: ColorSwatch  = buildSwatch(scheme2025.scheme.secondaryPalette)
-    override val accent3: ColorSwatch  = buildSwatch(scheme2025.scheme.tertiaryPalette)
+    override val accent1: ColorSwatch = buildSwatch(scheme2025.scheme.primaryPalette)
+    override val accent2: ColorSwatch = buildSwatch(scheme2025.scheme.secondaryPalette)
+    override val accent3: ColorSwatch = buildSwatch(scheme2025.scheme.tertiaryPalette)
 }

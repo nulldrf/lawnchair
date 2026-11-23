@@ -22,17 +22,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
-import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.preferences2.asState
+import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val MIN_SATURATION = 0.10f
 private const val PALETTE_MAX_COUNT = 32
@@ -222,6 +222,7 @@ private fun getBitmapFromWallpaper(wm: android.app.WallpaperManager): Bitmap? {
         ?: return null
     return when (drawable) {
         is BitmapDrawable -> drawable.bitmap
+
         else -> runCatching {
             val w = drawable.intrinsicWidth.takeIf { it > 0 }?.coerceAtMost(720) ?: 360
             val h = drawable.intrinsicHeight.takeIf { it > 0 }?.coerceAtMost(1280) ?: 640

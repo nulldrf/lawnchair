@@ -63,12 +63,16 @@ internal object Spec2025 {
     // We use light-mode/non-dark phone value (32.0) as the universal default
     // since TonalSpec has no isDark conditional.
     const val TONAL_SPOT_A1_CHROMA = 32.0
+
     // Source: ColorSpec2025.getSecondaryPalette(TONAL_SPOT) → chroma 16 (unchanged)
     const val TONAL_SPOT_A2_CHROMA = 16.0
+
     // Source: ColorSpec2025.getTertiaryPalette(TONAL_SPOT) → chroma 28/32
     const val TONAL_SPOT_A3_CHROMA = 28.0
+
     // Source: ColorSpec2025.getNeutralPalette(TONAL_SPOT) → chroma 5 (phone)
     const val TONAL_SPOT_N1_CHROMA = 5.0
+
     // Source: ColorSpec2025.getNeutralVariantPalette(TONAL_SPOT) → n1 * 1.7 = 8.5
     const val TONAL_SPOT_N2_CHROMA = 8.5
 
@@ -150,12 +154,16 @@ internal object Spec2025 {
     // ── SPRITZ (SchemeNeutral) ──────────────────────────────────────────────
     // Source: ColorSpec2025.getPrimaryPalette(NEUTRAL) → non-blue phone: 8.0
     const val SPRITZ_A1_CHROMA = 8.0
+
     // Source: ColorSpec2025.getSecondaryPalette(NEUTRAL) → non-blue phone: 4.0
     const val SPRITZ_A2_CHROMA = 4.0
+
     // Source: ColorSpec2025.getTertiaryPalette(NEUTRAL) → chroma 20 (phone)
     const val SPRITZ_A3_CHROMA = 20.0
+
     // Source: ColorSpec2025.getNeutralPalette(NEUTRAL) → 1.4 (phone)
     const val SPRITZ_N1_CHROMA = 1.4
+
     // Source: ColorSpec2025.getNeutralVariantPalette(NEUTRAL) → 1.4 * 2.2 = 3.08
     const val SPRITZ_N2_CHROMA = 3.08
 
@@ -263,33 +271,27 @@ internal class HueVibrantTertiary : Hue {
  * In 2021 SPRITZ used HueSource (no rotation) for all palettes.
  */
 internal class HueTonalSpotTertiary2025 : Hue {
-    override fun get(sourceColor: Cam): Double =
-        getHueRotation(sourceColor.hue, Spec2025.TONAL_SPOT_A3_HUE_ROTATIONS)
+    override fun get(sourceColor: Cam): Double = getHueRotation(sourceColor.hue, Spec2025.TONAL_SPOT_A3_HUE_ROTATIONS)
 }
 
 internal class HueVibrantSecondary2025 : Hue {
-    override fun get(sourceColor: Cam): Double =
-        getHueRotation(sourceColor.hue, Spec2025.VIBRANT_A2_HUE_ROTATIONS)
+    override fun get(sourceColor: Cam): Double = getHueRotation(sourceColor.hue, Spec2025.VIBRANT_A2_HUE_ROTATIONS)
 }
 
 internal class HueVibrantTertiary2025 : Hue {
-    override fun get(sourceColor: Cam): Double =
-        getHueRotation(sourceColor.hue, Spec2025.VIBRANT_A3_HUE_ROTATIONS)
+    override fun get(sourceColor: Cam): Double = getHueRotation(sourceColor.hue, Spec2025.VIBRANT_A3_HUE_ROTATIONS)
 }
 
 internal class HueSpritzTertiary2025 : Hue {
-    override fun get(sourceColor: Cam): Double =
-        getHueRotation(sourceColor.hue, Spec2025.SPRITZ_TERTIARY_HUE_ROTATIONS)
+    override fun get(sourceColor: Cam): Double = getHueRotation(sourceColor.hue, Spec2025.SPRITZ_TERTIARY_HUE_ROTATIONS)
 }
 
 internal class HueExpressiveSecondary2025 : Hue {
-    override fun get(sourceColor: Cam): Double =
-        getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_SECONDARY_HUE_ROTATIONS)
+    override fun get(sourceColor: Cam): Double = getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_SECONDARY_HUE_ROTATIONS)
 }
 
 internal class HueExpressiveTertiary2025 : Hue {
-    override fun get(sourceColor: Cam): Double =
-        getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_TERTIARY_HUE_ROTATIONS)
+    override fun get(sourceColor: Cam): Double = getHueRotation(sourceColor.hue, Spec2025.EXPRESSIVE_TERTIARY_HUE_ROTATIONS)
 }
 
 internal class HueExpressiveSecondary : Hue {
@@ -553,7 +555,8 @@ enum class Style(
             n1 = TonalSpec(HueSource(), ChromaConstant(0.0)),
             n2 = TonalSpec(HueSource(), ChromaConstant(0.0)),
         ),
-    );
+    ),
+    ;
 
     /**
      * Returns the correct [CoreSpec] for the requested [SpecVersion].

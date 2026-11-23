@@ -111,10 +111,10 @@ fun MainSwitchPreference(
         onCheckedChange(newValue)
     }
 
-        // Special case for SPEC_2025 schemes - especially "Vibrant"/"Expressive" style 
-        val switchColors = SwitchDefaults.colors(
-            checkedIconColor = MaterialTheme.colorScheme.primary,
-        )
+    // Special case for SPEC_2025 schemes - especially "Vibrant"/"Expressive" style
+    val switchColors = SwitchDefaults.colors(
+        checkedIconColor = MaterialTheme.colorScheme.primary,
+    )
 
     Column(
         modifier.padding(horizontal = contentPadding),

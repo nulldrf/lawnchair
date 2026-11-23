@@ -9,7 +9,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
-import app.lawnchair.qsb.SweepGradientDrawable
 import android.os.UserHandle
 import android.util.AttributeSet
 import android.view.View
@@ -17,6 +16,7 @@ import android.view.ViewGroup
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import app.lawnchair.launcher
+import app.lawnchair.qsb.SweepGradientDrawable
 import app.lawnchair.search.adapter.SearchTargetCompat
 import app.lawnchair.theme.color.tokens.ColorTokens
 import app.lawnchair.util.runOnMainThread
@@ -351,10 +351,10 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
      * [app.lawnchair.qsb.setThemedIconResource] (unthemed path).
      */
     private fun buildGoogleSweepDrawable(layerDrawable: LayerDrawable): SweepGradientDrawable {
-        val blue   = 0xFF4285F4.toInt()
-        val green  = 0xFF34A853.toInt()
+        val blue = 0xFF4285F4.toInt()
+        val green = 0xFF34A853.toInt()
         val yellow = 0xFFFBBC05.toInt()
-        val red    = 0xFFEA4335.toInt()
+        val red = 0xFFEA4335.toInt()
         val d = 0.05f
         return SweepGradientDrawable(
             layerDrawable,
@@ -367,9 +367,9 @@ class SearchResultIcon(context: Context, attrs: AttributeSet?) :
                 0.9000f - d, 0.9000f + d,
                 1.000f,
             ),
-            barExcludeLeft   = 0.500f,
-            barExcludeTop    = 0.417f,
-            barExcludeRight  = 1.000f,
+            barExcludeLeft = 0.500f,
+            barExcludeTop = 0.417f,
+            barExcludeRight = 1.000f,
             barExcludeBottom = 0.605f,
         )
     }

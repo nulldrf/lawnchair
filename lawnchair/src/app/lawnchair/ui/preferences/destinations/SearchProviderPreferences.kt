@@ -72,18 +72,21 @@ private val InnerCorner = 6.dp
 
 private fun segmentedItemShape(index: Int, count: Int): Shape = when {
     count <= 1 -> RoundedCornerShape(OuterCorner)
+
     index == 0 -> RoundedCornerShape(
         topStart = OuterCorner,
         topEnd = OuterCorner,
         bottomStart = InnerCorner,
         bottomEnd = InnerCorner,
     )
+
     index == count - 1 -> RoundedCornerShape(
         topStart = InnerCorner,
         topEnd = InnerCorner,
         bottomStart = OuterCorner,
         bottomEnd = OuterCorner,
     )
+
     else -> RoundedCornerShape(InnerCorner)
 }
 

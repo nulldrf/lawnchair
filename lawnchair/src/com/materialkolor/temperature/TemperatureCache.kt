@@ -309,8 +309,8 @@ public data class TemperatureCache(
                         0.02 *
                             chroma.pow(1.07) *
                             cos(MathUtils.toRadians(MathUtils.sanitizeDegrees(hue - 50.0)))
-                    )
-            )
+                        )
+                )
         }
 
         /**
@@ -320,11 +320,10 @@ public data class TemperatureCache(
             angle: Double,
             a: Double,
             b: Double,
-        ): Boolean =
-            if (a < b) {
-                angle in a..b
-            } else {
-                a <= angle || angle <= b
-            }
+        ): Boolean = if (a < b) {
+            angle in a..b
+        } else {
+            a <= angle || angle <= b
+        }
     }
 }

@@ -65,7 +65,7 @@ import com.android.launcher3.R
 fun CanvasColorPickerDialog(
     initialColor: Int,
     onDismiss: () -> Unit,
-    onColorSelected: (Int) -> Unit,
+    onColorSelect: (Int) -> Unit,
 ) {
     val initialHsv = remember(initialColor) {
         FloatArray(3).also { android.graphics.Color.colorToHSV(initialColor, it) }
@@ -217,7 +217,7 @@ fun CanvasColorPickerDialog(
 
                 Button(
                     onClick = {
-                        onColorSelected(currentColor)
+                        onColorSelect(currentColor)
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),

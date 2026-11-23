@@ -33,9 +33,9 @@ import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 @Composable
 fun PreferenceLayout(
     label: String,
+    modifier: Modifier = Modifier,
     expandedLabel: String = label,
     onExpandedTitleClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
     backArrowVisible: Boolean = true,
     isExpandedScreen: Boolean = LocalIsExpandedScreen.current,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),

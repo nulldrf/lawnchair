@@ -26,9 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -42,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.lawnchair.theme.color.ColorOption
@@ -153,8 +153,8 @@ fun <T> SimpleColorSwatch(
     // Default/Managed-by-Lawnchair: hardcoded gray outer circle, near-white inner
     // badge with near-black letter — always legible on light and dark backgrounds.
     val color = if (!isDefault) Color(colorInt) else Color(0xFF9E9E9E)
-    val defaultBadgeBg = Color(0xFFEEEEEE)   // Near-white — high contrast on gray
-    val defaultBadgeFg = Color(0xFF212121)    // Near-black on near-white
+    val defaultBadgeBg = Color(0xFFEEEEEE) // Near-white — high contrast on gray
+    val defaultBadgeFg = Color(0xFF212121) // Near-black on near-white
 
     // Ring stroke width — animate with no-bounce spring to avoid negative values
     val ringStroke by animateDpAsState(
@@ -332,17 +332,19 @@ fun <T> ColorSwatch(
     }
 }
 
-private fun buildScheme(seedColor: Int, colorStyle: ColorStyle?): ColorScheme =
-    when (colorStyle) {
-        is LegacyKdrag -> KdragMonetColorScheme(seedColor)
-        is app.lawnchair.theme.color.Cmf -> app.lawnchair.theme.color.Spec2025CompatColorScheme(
-            app.lawnchair.theme.color.MonetColorSchemeCompat2025(
-                seedColor = seedColor,
-                style = com.android.systemui.monet.Style.CMF,
-                isDark = false,
-                specVersion = com.materialkolor.dynamiccolor.ColorSpec.SpecVersion.SPEC_2026,
-            ),
-        )
-        null -> MonetColorSchemeCompat(seedColor, com.android.systemui.monet.Style.TONAL_SPOT)
-        else -> MonetColorSchemeCompat(seedColor, colorStyle.style)
-    }
+private fun buildScheme(seedColor: Int, colorStyle: ColorStyle?): ColorScheme = when (colorStyle) {
+    is LegacyKdrag -> KdragMonetColorScheme(seedColor)
+
+    is app.lawnchair.theme.color.Cmf -> app.lawnchair.theme.color.Spec2025CompatColorScheme(
+        app.lawnchair.theme.color.MonetColorSchemeCompat2025(
+            seedColor = seedColor,
+            style = com.android.systemui.monet.Style.CMF,
+            isDark = false,
+            specVersion = com.materialkolor.dynamiccolor.ColorSpec.SpecVersion.SPEC_2026,
+        ),
+    )
+
+    null -> MonetColorSchemeCompat(seedColor, com.android.systemui.monet.Style.TONAL_SPOT)
+
+    else -> MonetColorSchemeCompat(seedColor, colorStyle.style)
+}

@@ -152,6 +152,7 @@ fun ColorSelection(
                         includeDefault = includeDefault,
                         simple = useSimpleSwatches,
                     )
+
                     1 -> CustomColorPicker(
                         selectedColor = selectedColor.intValue,
                         onSelect = { newColor ->
@@ -186,8 +187,11 @@ private fun SelectionIndicator(
         appliedColor is ColorOption.WallpaperDerived -> appliedColor.color
         else -> appliedColor.colorPreferenceEntry.lightColor(context)
     }
-    val dotColor = if (dotColorInt != 0) ComposeColor(dotColorInt)
-        else MaterialTheme.colorScheme.primary
+    val dotColor = if (dotColorInt != 0) {
+        ComposeColor(dotColorInt)
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
 
     // Tint alpha is stronger on dark backgrounds so the wash registers.
     val containerTint = dotColor.copy(alpha = if (isDark) 0.28f else 0.14f)

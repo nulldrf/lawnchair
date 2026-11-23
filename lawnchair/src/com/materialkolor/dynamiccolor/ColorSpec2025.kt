@@ -411,7 +411,9 @@ public open class ColorSpec2025 : ColorSpec2021() {
                     if (s.platform === Platform.PHONE) {
                         when {
                             s.variant === Variant.NEUTRAL -> 2.2
+
                             s.variant === Variant.TONAL_SPOT -> 1.7
+
                             s.variant === Variant.EXPRESSIVE -> {
                                 if (s.neutralPalette.keyColor.isYellow()) {
                                     if (s.isDark) 3.0 else 2.3
@@ -419,6 +421,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     1.6
                                 }
                             }
+
                             else -> 1.0
                         }
                     } else {
@@ -431,8 +434,11 @@ public open class ColorSpec2025 : ColorSpec2021() {
                         return@setBackground surfaceContainerHigh()
                     }
                 }.setContrastCurve { s ->
-                    if (s.isDark && s.platform == Platform.PHONE) getContrastCurve(11.0)
-                    else getContrastCurve(9.0)
+                    if (s.isDark && s.platform == Platform.PHONE) {
+                        getContrastCurve(11.0)
+                    } else {
+                        getContrastCurve(9.0)
+                    }
                 }.build()
         return super
             .onSurface()
@@ -462,7 +468,9 @@ public open class ColorSpec2025 : ColorSpec2021() {
                     if (s.platform === Platform.PHONE) {
                         when {
                             s.variant === Variant.NEUTRAL -> 2.2
+
                             s.variant === Variant.TONAL_SPOT -> 1.7
+
                             s.variant === Variant.EXPRESSIVE -> {
                                 if (s.neutralPalette.keyColor.isYellow()) {
                                     if (s.isDark) 3.0 else 2.3
@@ -470,6 +478,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     1.6
                                 }
                             }
+
                             else -> 1.0
                         }
                     } else {
@@ -537,7 +546,9 @@ public open class ColorSpec2025 : ColorSpec2021() {
                     if (s.platform === Platform.PHONE) {
                         when {
                             s.variant === Variant.NEUTRAL -> 2.2
+
                             s.variant === Variant.TONAL_SPOT -> 1.7
+
                             s.variant === Variant.EXPRESSIVE -> {
                                 if (s.neutralPalette.keyColor.isYellow()) {
                                     if (s.isDark) 3.0 else 2.3
@@ -545,6 +556,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     1.6
                                 }
                             }
+
                             else -> 1.0
                         }
                     } else {
@@ -582,7 +594,9 @@ public open class ColorSpec2025 : ColorSpec2021() {
                     if (s.platform === Platform.PHONE) {
                         when {
                             s.variant === Variant.NEUTRAL -> 2.2
+
                             s.variant === Variant.TONAL_SPOT -> 1.7
+
                             s.variant === Variant.EXPRESSIVE -> {
                                 if (s.neutralPalette.keyColor.isYellow()) {
                                     if (s.isDark) 3.0 else 2.3
@@ -590,6 +604,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     1.6
                                 }
                             }
+
                             else -> 1.0
                         }
                     } else {
@@ -715,29 +730,28 @@ public open class ColorSpec2025 : ColorSpec2021() {
             .build()
     }
 
-    public override fun primaryDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("primary_dim")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s ->
-                when {
-                    s.variant === Variant.NEUTRAL -> 85.0
-                    s.variant === Variant.TONAL_SPOT -> tMaxC(s.primaryPalette, 0.0, 90.0)
-                    else -> tMaxC(s.primaryPalette)
-                }
-            }.setIsBackground(true)
-            .setBackground { surfaceContainerHigh() }
-            .setContrastCurve { getContrastCurve(4.5) }
-            .setToneDeltaPair {
-                ToneDeltaPair(
-                    roleA = primaryDim(),
-                    roleB = primary(),
-                    delta = 5.0,
-                    polarity = TonePolarity.DARKER,
-                    deltaConstraint = DeltaConstraint.FARTHER,
-                )
-            }.build()
+    public override fun primaryDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("primary_dim")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s ->
+            when {
+                s.variant === Variant.NEUTRAL -> 85.0
+                s.variant === Variant.TONAL_SPOT -> tMaxC(s.primaryPalette, 0.0, 90.0)
+                else -> tMaxC(s.primaryPalette)
+            }
+        }.setIsBackground(true)
+        .setBackground { surfaceContainerHigh() }
+        .setContrastCurve { getContrastCurve(4.5) }
+        .setToneDeltaPair {
+            ToneDeltaPair(
+                roleA = primaryDim(),
+                roleB = primary(),
+                delta = 5.0,
+                polarity = TonePolarity.DARKER,
+                deltaConstraint = DeltaConstraint.FARTHER,
+            )
+        }.build()
 
     public override fun onPrimary(): DynamicColor {
         val color2025 =
@@ -797,7 +811,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     } else {
                                         90
                                     }
-                                ).toDouble(),
+                                    ).toDouble(),
                             )
                         }
                     } else { // VIBRANT
@@ -813,7 +827,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                                     } else {
                                         93
                                     }
-                                ).toDouble(),
+                                    ).toDouble(),
                             )
                         }
                     }
@@ -972,29 +986,28 @@ public open class ColorSpec2025 : ColorSpec2021() {
             .build()
     }
 
-    public override fun secondaryDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("secondary_dim")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s ->
-                if (s.variant === Variant.NEUTRAL) {
-                    85.0
-                } else {
-                    tMaxC(s.secondaryPalette, 0.0, 90.0)
-                }
-            }.setIsBackground(true)
-            .setBackground { surfaceContainerHigh() }
-            .setContrastCurve { getContrastCurve(4.5) }
-            .setToneDeltaPair {
-                ToneDeltaPair(
-                    roleA = secondaryDim(),
-                    roleB = secondary(),
-                    delta = 5.0,
-                    polarity = TonePolarity.DARKER,
-                    deltaConstraint = DeltaConstraint.FARTHER,
-                )
-            }.build()
+    public override fun secondaryDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("secondary_dim")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s ->
+            if (s.variant === Variant.NEUTRAL) {
+                85.0
+            } else {
+                tMaxC(s.secondaryPalette, 0.0, 90.0)
+            }
+        }.setIsBackground(true)
+        .setBackground { surfaceContainerHigh() }
+        .setContrastCurve { getContrastCurve(4.5) }
+        .setToneDeltaPair {
+            ToneDeltaPair(
+                roleA = secondaryDim(),
+                roleB = secondary(),
+                delta = 5.0,
+                polarity = TonePolarity.DARKER,
+                deltaConstraint = DeltaConstraint.FARTHER,
+            )
+        }.build()
 
     public override fun onSecondary(): DynamicColor {
         val color2025 =
@@ -1027,6 +1040,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                 .setTone { s ->
                     when {
                         s.platform === Platform.WATCH -> 30.0
+
                         s.variant === Variant.VIBRANT -> {
                             if (s.isDark) {
                                 tMinC(s.secondaryPalette, 30.0, 40.0)
@@ -1165,29 +1179,28 @@ public open class ColorSpec2025 : ColorSpec2021() {
             .build()
     }
 
-    public override fun tertiaryDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("tertiary_dim")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s ->
-                if (s.variant === Variant.TONAL_SPOT) {
-                    tMaxC(s.tertiaryPalette, 0.0, 90.0)
-                } else {
-                    tMaxC(s.tertiaryPalette)
-                }
-            }.setIsBackground(true)
-            .setBackground { surfaceContainerHigh() }
-            .setContrastCurve { getContrastCurve(4.5) }
-            .setToneDeltaPair {
-                ToneDeltaPair(
-                    roleA = tertiaryDim(),
-                    roleB = tertiary(),
-                    delta = 5.0,
-                    polarity = TonePolarity.DARKER,
-                    deltaConstraint = DeltaConstraint.FARTHER,
-                )
-            }.build()
+    public override fun tertiaryDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("tertiary_dim")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s ->
+            if (s.variant === Variant.TONAL_SPOT) {
+                tMaxC(s.tertiaryPalette, 0.0, 90.0)
+            } else {
+                tMaxC(s.tertiaryPalette)
+            }
+        }.setIsBackground(true)
+        .setBackground { surfaceContainerHigh() }
+        .setContrastCurve { getContrastCurve(4.5) }
+        .setToneDeltaPair {
+            ToneDeltaPair(
+                roleA = tertiaryDim(),
+                roleB = tertiary(),
+                delta = 5.0,
+                polarity = TonePolarity.DARKER,
+                deltaConstraint = DeltaConstraint.FARTHER,
+            )
+        }.build()
 
     public override fun onTertiary(): DynamicColor {
         val color2025 =
@@ -1374,24 +1387,23 @@ public open class ColorSpec2025 : ColorSpec2021() {
             .build()
     }
 
-    public override fun errorDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("error_dim")
-            .setPalette { s -> s.errorPalette }
-            .setTone { s -> tMinC(s.errorPalette) }
-            .setIsBackground(true)
-            .setBackground { surfaceContainerHigh() }
-            .setContrastCurve { getContrastCurve(4.5) }
-            .setToneDeltaPair {
-                ToneDeltaPair(
-                    roleA = errorDim(),
-                    roleB = error(),
-                    delta = 5.0,
-                    polarity = TonePolarity.DARKER,
-                    deltaConstraint = DeltaConstraint.FARTHER,
-                )
-            }.build()
+    public override fun errorDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("error_dim")
+        .setPalette { s -> s.errorPalette }
+        .setTone { s -> tMinC(s.errorPalette) }
+        .setIsBackground(true)
+        .setBackground { surfaceContainerHigh() }
+        .setContrastCurve { getContrastCurve(4.5) }
+        .setToneDeltaPair {
+            ToneDeltaPair(
+                roleA = errorDim(),
+                roleB = error(),
+                delta = 5.0,
+                polarity = TonePolarity.DARKER,
+                deltaConstraint = DeltaConstraint.FARTHER,
+            )
+        }.build()
 
     public override fun onError(): DynamicColor {
         val color2025 =
@@ -1903,6 +1915,7 @@ public open class ColorSpec2025 : ColorSpec2021() {
                         answer.coerceIn(0.0, 49.0)
                     }
                 }
+
                 scheme.platform == Platform.WATCH && color.isBackground && 50 <= answer && answer < 60 -> {
                     answer = if (Contrast.ratioOfTones(49.0, bgTone) >= desiredRatio) 49.0 else 60.0
                 }
@@ -1959,40 +1972,39 @@ public open class ColorSpec2025 : ColorSpec2021() {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE) {
-                    (if (sourceColorHct.isBlue()) 12.0 else 8.0)
-                } else {
-                    (if (sourceColorHct.isBlue()) 16.0 else 12.0)
-                },
-            )
+    ): TonalPalette = when (variant) {
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE) {
+                (if (sourceColorHct.isBlue()) 12.0 else 8.0)
+            } else {
+                (if (sourceColorHct.isBlue()) 16.0 else 12.0)
+            },
+        )
 
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE && isDark) 26.0 else 32.0,
-            )
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE && isDark) 26.0 else 32.0,
+        )
 
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE) (if (isDark) 36.0 else 48.0) else 40.0,
-            )
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE) (if (isDark) 36.0 else 48.0) else 40.0,
+        )
 
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE) 74.0 else 56.0,
-            )
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE) 74.0 else 56.0,
+        )
 
-            else -> super.getPrimaryPalette(
-                variant = variant,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            )
-        }
+        else -> super.getPrimaryPalette(
+            variant = variant,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        )
+    }
 
     override fun getSecondaryPalette(
         variant: Variant,
@@ -2000,63 +2012,63 @@ public open class ColorSpec2025 : ColorSpec2021() {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE) {
-                    if (sourceColorHct.isBlue()) 6.0 else 4.0
-                } else {
-                    if (sourceColorHct.isBlue()) 10.0 else 6.0
-                },
-            )
+    ): TonalPalette = when (variant) {
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE) {
+                if (sourceColorHct.isBlue()) 6.0 else 4.0
+            } else {
+                if (sourceColorHct.isBlue()) 10.0 else 6.0
+            },
+        )
 
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(
-                        0.0,
-                        105.0,
-                        140.0,
-                        204.0,
-                        253.0,
-                        278.0,
-                        300.0,
-                        333.0,
-                        360.0,
-                    ),
-                    rotations = doubleArrayOf(
-                        -160.0,
-                        155.0,
-                        -100.0,
-                        96.0,
-                        -96.0,
-                        -156.0,
-                        -165.0,
-                        -160.0,
-                    ),
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
+
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(
+                    0.0,
+                    105.0,
+                    140.0,
+                    204.0,
+                    253.0,
+                    278.0,
+                    300.0,
+                    333.0,
+                    360.0,
                 ),
-                chroma = if (platform === Platform.PHONE) (if (isDark) 16.0 else 24.0) else 24.0,
-            )
-
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(0.0, 38.0, 105.0, 140.0, 333.0, 360.0),
-                    rotations = doubleArrayOf(-14.0, 10.0, -14.0, 10.0, -14.0),
+                rotations = doubleArrayOf(
+                    -160.0,
+                    155.0,
+                    -100.0,
+                    96.0,
+                    -96.0,
+                    -156.0,
+                    -165.0,
+                    -160.0,
                 ),
-                chroma = if (platform === Platform.PHONE) 56.0 else 36.0,
-            )
+            ),
+            chroma = if (platform === Platform.PHONE) (if (isDark) 16.0 else 24.0) else 24.0,
+        )
 
-            else -> super.getSecondaryPalette(
-                variant,
-                sourceColorHct,
-                isDark,
-                platform,
-                contrastLevel,
-            )
-        }
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(0.0, 38.0, 105.0, 140.0, 333.0, 360.0),
+                rotations = doubleArrayOf(-14.0, 10.0, -14.0, 10.0, -14.0),
+            ),
+            chroma = if (platform === Platform.PHONE) 56.0 else 36.0,
+        )
+
+        else -> super.getSecondaryPalette(
+            variant,
+            sourceColorHct,
+            isDark,
+            platform,
+            contrastLevel,
+        )
+    }
 
     override fun getTertiaryPalette(
         variant: Variant,
@@ -2064,90 +2076,89 @@ public open class ColorSpec2025 : ColorSpec2021() {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(
-                        0.0,
-                        38.0,
-                        105.0,
-                        161.0,
-                        204.0,
-                        278.0,
-                        333.0,
-                        360.0,
-                    ),
-                    rotations = doubleArrayOf(-32.0, 26.0, 10.0, -39.0, 24.0, -15.0, -32.0),
-                ),
-                chroma = if (platform === Platform.PHONE) 20.0 else 36.0,
-            )
-
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(0.0, 20.0, 71.0, 161.0, 333.0, 360.0),
-                    rotations = doubleArrayOf(-40.0, 48.0, -32.0, 40.0, -32.0),
-                ),
-                chroma = if (platform === Platform.PHONE) 28.0 else 32.0,
-            )
-
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(
-                        0.0,
-                        105.0,
-                        140.0,
-                        204.0,
-                        253.0,
-                        278.0,
-                        300.0,
-                        333.0,
-                        360.0,
-                    ),
-                    rotations = doubleArrayOf(
-                        -165.0,
-                        160.0,
-                        -105.0,
-                        101.0,
-                        -101.0,
-                        -160.0,
-                        -170.0,
-                        -165.0,
-                    ),
-                ),
-                chroma = 48.0,
-            )
-
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(
-                        0.0,
-                        38.0,
-                        71.0,
-                        105.0,
-                        140.0,
-                        161.0,
-                        253.0,
-                        333.0,
-                        360.0,
-                    ),
-                    rotations = doubleArrayOf(-72.0, 35.0, 24.0, -24.0, 62.0, 50.0, 62.0, -72.0),
-                ),
-                chroma = 56.0,
-            )
-
-            else -> super.getTertiaryPalette(
-                variant = variant,
+    ): TonalPalette = when (variant) {
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
                 sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            )
-        }
+                hueBreakpoints = doubleArrayOf(
+                    0.0,
+                    38.0,
+                    105.0,
+                    161.0,
+                    204.0,
+                    278.0,
+                    333.0,
+                    360.0,
+                ),
+                rotations = doubleArrayOf(-32.0, 26.0, 10.0, -39.0, 24.0, -15.0, -32.0),
+            ),
+            chroma = if (platform === Platform.PHONE) 20.0 else 36.0,
+        )
+
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(0.0, 20.0, 71.0, 161.0, 333.0, 360.0),
+                rotations = doubleArrayOf(-40.0, 48.0, -32.0, 40.0, -32.0),
+            ),
+            chroma = if (platform === Platform.PHONE) 28.0 else 32.0,
+        )
+
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(
+                    0.0,
+                    105.0,
+                    140.0,
+                    204.0,
+                    253.0,
+                    278.0,
+                    300.0,
+                    333.0,
+                    360.0,
+                ),
+                rotations = doubleArrayOf(
+                    -165.0,
+                    160.0,
+                    -105.0,
+                    101.0,
+                    -101.0,
+                    -160.0,
+                    -170.0,
+                    -165.0,
+                ),
+            ),
+            chroma = 48.0,
+        )
+
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(
+                    0.0,
+                    38.0,
+                    71.0,
+                    105.0,
+                    140.0,
+                    161.0,
+                    253.0,
+                    333.0,
+                    360.0,
+                ),
+                rotations = doubleArrayOf(-72.0, 35.0, 24.0, -24.0, 62.0, 50.0, 62.0, -72.0),
+            ),
+            chroma = 56.0,
+        )
+
+        else -> super.getTertiaryPalette(
+            variant = variant,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        )
+    }
 
     override fun getNeutralPalette(
         variant: Variant,
@@ -2155,36 +2166,35 @@ public open class ColorSpec2025 : ColorSpec2021() {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE) 1.4 else 6.0,
-            )
+    ): TonalPalette = when (variant) {
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE) 1.4 else 6.0,
+        )
 
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = if (platform === Platform.PHONE) 5.0 else 10.0,
-            )
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = if (platform === Platform.PHONE) 5.0 else 10.0,
+        )
 
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = getExpressiveNeutralHue(sourceColorHct),
-                chroma = getExpressiveNeutralChroma(sourceColorHct, isDark, platform),
-            )
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = getExpressiveNeutralHue(sourceColorHct),
+            chroma = getExpressiveNeutralChroma(sourceColorHct, isDark, platform),
+        )
 
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
-                hue = getVibrantNeutralHue(sourceColorHct),
-                chroma = getVibrantNeutralChroma(sourceColorHct, platform),
-            )
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
+            hue = getVibrantNeutralHue(sourceColorHct),
+            chroma = getVibrantNeutralChroma(sourceColorHct, platform),
+        )
 
-            else -> super.getNeutralPalette(
-                variant = variant,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
-            )
-        }
+        else -> super.getNeutralPalette(
+            variant = variant,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        )
+    }
 
     override fun getNeutralVariantPalette(
         variant: Variant,
@@ -2192,43 +2202,42 @@ public open class ColorSpec2025 : ColorSpec2021() {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = (if (platform === Platform.PHONE) 1.4 else 6.0) * 2.2,
-            )
+    ): TonalPalette = when (variant) {
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = (if (platform === Platform.PHONE) 1.4 else 6.0) * 2.2,
+        )
 
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = (if (platform === Platform.PHONE) 5.0 else 10.0) * 1.7,
-            )
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = (if (platform === Platform.PHONE) 5.0 else 10.0) * 1.7,
+        )
 
-            Variant.EXPRESSIVE -> {
-                val expressiveNeutralHue = getExpressiveNeutralHue(sourceColorHct)
-                val expressiveNeutralChroma =
-                    getExpressiveNeutralChroma(sourceColorHct, isDark, platform)
-                val d = if (expressiveNeutralHue in 105.0..<125.0) 1.6 else 2.3
-                TonalPalette.fromHueAndChroma(
-                    hue = expressiveNeutralHue,
-                    chroma = expressiveNeutralChroma * d,
-                )
-            }
-
-            Variant.VIBRANT -> {
-                val vibrantNeutralHue = getVibrantNeutralHue(sourceColorHct)
-                val vibrantNeutralChroma = getVibrantNeutralChroma(sourceColorHct, platform)
-                TonalPalette.fromHueAndChroma(vibrantNeutralHue, vibrantNeutralChroma * 1.29)
-            }
-
-            else -> super.getNeutralVariantPalette(
-                variant = variant,
-                sourceColorHct = sourceColorHct,
-                isDark = isDark,
-                platform = platform,
-                contrastLevel = contrastLevel,
+        Variant.EXPRESSIVE -> {
+            val expressiveNeutralHue = getExpressiveNeutralHue(sourceColorHct)
+            val expressiveNeutralChroma =
+                getExpressiveNeutralChroma(sourceColorHct, isDark, platform)
+            val d = if (expressiveNeutralHue in 105.0..<125.0) 1.6 else 2.3
+            TonalPalette.fromHueAndChroma(
+                hue = expressiveNeutralHue,
+                chroma = expressiveNeutralChroma * d,
             )
         }
+
+        Variant.VIBRANT -> {
+            val vibrantNeutralHue = getVibrantNeutralHue(sourceColorHct)
+            val vibrantNeutralChroma = getVibrantNeutralChroma(sourceColorHct, platform)
+            TonalPalette.fromHueAndChroma(vibrantNeutralHue, vibrantNeutralChroma * 1.29)
+        }
+
+        else -> super.getNeutralVariantPalette(
+            variant = variant,
+            sourceColorHct = sourceColorHct,
+            isDark = isDark,
+            platform = platform,
+            contrastLevel = contrastLevel,
+        )
+    }
 
     override fun getErrorPalette(
         variant: Variant,
@@ -2323,25 +2332,23 @@ public open class ColorSpec2025 : ColorSpec2021() {
             return answer.coerceIn(lowerBound, upperBound)
         }
 
-        private fun getContrastCurve(defaultContrast: Double): ContrastCurve =
-            when (defaultContrast) {
-                1.5 -> ContrastCurve(1.5, 1.5, 3.0, 5.5)
-                3.0 -> ContrastCurve(3.0, 3.0, 4.5, 7.0)
-                4.5 -> ContrastCurve(4.5, 4.5, 7.0, 11.0)
-                6.0 -> ContrastCurve(6.0, 6.0, 7.0, 11.0)
-                7.0 -> ContrastCurve(7.0, 7.0, 11.0, 21.0)
-                9.0 -> ContrastCurve(9.0, 9.0, 11.0, 21.0)
-                11.0 -> ContrastCurve(11.0, 11.0, 21.0, 21.0)
-                21.0 -> ContrastCurve(21.0, 21.0, 21.0, 21.0)
-                else -> ContrastCurve(defaultContrast, defaultContrast, 7.0, 21.0)
-            }
+        private fun getContrastCurve(defaultContrast: Double): ContrastCurve = when (defaultContrast) {
+            1.5 -> ContrastCurve(1.5, 1.5, 3.0, 5.5)
+            3.0 -> ContrastCurve(3.0, 3.0, 4.5, 7.0)
+            4.5 -> ContrastCurve(4.5, 4.5, 7.0, 11.0)
+            6.0 -> ContrastCurve(6.0, 6.0, 7.0, 11.0)
+            7.0 -> ContrastCurve(7.0, 7.0, 11.0, 21.0)
+            9.0 -> ContrastCurve(9.0, 9.0, 11.0, 21.0)
+            11.0 -> ContrastCurve(11.0, 11.0, 21.0, 21.0)
+            21.0 -> ContrastCurve(21.0, 21.0, 21.0, 21.0)
+            else -> ContrastCurve(defaultContrast, defaultContrast, 7.0, 21.0)
+        }
 
-        private fun getExpressiveNeutralHue(sourceColorHct: Hct): Double =
-            DynamicScheme.getRotatedHue(
-                sourceColorHct = sourceColorHct,
-                hueBreakpoints = doubleArrayOf(0.0, 71.0, 124.0, 253.0, 278.0, 300.0, 360.0),
-                rotations = doubleArrayOf(10.0, 0.0, 10.0, 0.0, 10.0, 0.0),
-            )
+        private fun getExpressiveNeutralHue(sourceColorHct: Hct): Double = DynamicScheme.getRotatedHue(
+            sourceColorHct = sourceColorHct,
+            hueBreakpoints = doubleArrayOf(0.0, 71.0, 124.0, 253.0, 278.0, 300.0, 360.0),
+            rotations = doubleArrayOf(10.0, 0.0, 10.0, 0.0, 10.0, 0.0),
+        )
 
         private fun getExpressiveNeutralChroma(
             sourceColorHct: Hct,
@@ -2363,12 +2370,11 @@ public open class ColorSpec2025 : ColorSpec2021() {
             return value.toDouble()
         }
 
-        private fun getVibrantNeutralHue(sourceColorHct: Hct): Double =
-            DynamicScheme.getRotatedHue(
-                sourceColorHct = sourceColorHct,
-                hueBreakpoints = doubleArrayOf(0.0, 38.0, 105.0, 140.0, 333.0, 360.0),
-                rotations = doubleArrayOf(-14.0, 10.0, -14.0, 10.0, -14.0),
-            )
+        private fun getVibrantNeutralHue(sourceColorHct: Hct): Double = DynamicScheme.getRotatedHue(
+            sourceColorHct = sourceColorHct,
+            hueBreakpoints = doubleArrayOf(0.0, 38.0, 105.0, 140.0, 333.0, 360.0),
+            rotations = doubleArrayOf(-14.0, 10.0, -14.0, 10.0, -14.0),
+        )
 
         private fun getVibrantNeutralChroma(
             sourceColorHct: Hct,

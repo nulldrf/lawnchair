@@ -129,10 +129,9 @@ public data class TonalPalette private constructor(
         }
 
         // Find the maximum chroma for a given tone
-        private fun maxChroma(tone: Int): Double =
-            chromaCache.getOrPut(tone) {
-                Hct.from(hue, MAX_CHROMA_VALUE, tone.toDouble()).chroma
-            }
+        private fun maxChroma(tone: Int): Double = chromaCache.getOrPut(tone) {
+            Hct.from(hue, MAX_CHROMA_VALUE, tone.toDouble()).chroma
+        }
 
         companion object {
             private const val MAX_CHROMA_VALUE = 200.0

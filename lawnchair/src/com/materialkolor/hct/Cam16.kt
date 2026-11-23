@@ -21,7 +21,6 @@ import com.materialkolor.utils.MathUtils
 import com.materialkolor.utils.MathUtils.signum
 import com.materialkolor.utils.MathUtils.toDegrees
 import com.materialkolor.utils.MathUtils.toRadians
-
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -125,7 +124,7 @@ public class Cam16 private constructor(
         val ac: Double = (
             viewingConditions.aw
                 * (j / 100.0).pow(1.0 / viewingConditions.c / viewingConditions.z)
-        )
+            )
         val p1: Double = eHue * (50000.0 / 13.0) * viewingConditions.nc * viewingConditions.ncb
         val p2: Double = ac / viewingConditions.nbb
         val hSin: Double = sin(hRad)
@@ -256,15 +255,15 @@ public class Cam16 private constructor(
             val j: Double = (
                 100.0 *
                     (ac / viewingConditions.aw).pow(viewingConditions.c * viewingConditions.z)
-            )
+                )
             val q: Double = (
                 (
                     4.0 /
                         viewingConditions.c
-                ) * sqrt(j / 100.0) *
+                    ) * sqrt(j / 100.0) *
                     (viewingConditions.aw + 4.0) *
                     viewingConditions.flRoot
-            )
+                )
 
             // CAM16 chroma, colorfulness, and saturation.
             val huePrime = if (hue < 20.14) hue + 360 else hue
@@ -313,10 +312,10 @@ public class Cam16 private constructor(
                 (
                     4.0 /
                         viewingConditions.c
-                ) * sqrt(j / 100.0) *
+                    ) * sqrt(j / 100.0) *
                     (viewingConditions.aw + 4.0) *
                     viewingConditions.flRoot
-            )
+                )
             val m: Double = c * viewingConditions.flRoot
             val alpha: Double = c / sqrt(j / 100.0)
             val s: Double = 50.0 * sqrt(alpha * viewingConditions.c / (viewingConditions.aw + 4.0))

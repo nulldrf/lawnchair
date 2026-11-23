@@ -107,6 +107,7 @@ class ThemeProvider @Inject constructor(
                         colorSchemeMap2025.clear()
                         notifyColorSchemeChanged()
                     }
+
                     is ColorOption.WallpaperDerived -> {
                         val newPrimary = wallpaperManager.wallpaperColors?.primaryColor
                             ?: return
@@ -128,6 +129,7 @@ class ThemeProvider @Inject constructor(
                             }
                         }
                     }
+
                     else -> Unit
                 }
             }
@@ -297,28 +299,27 @@ class ThemeProvider @Inject constructor(
      * [isDark] is required because [DynamicScheme] bakes dark/light into palette
      * generation — surface tones and chroma multipliers differ per mode.
      */
-    fun colorScheme2025(isDark: Boolean): MonetColorSchemeCompat2025? =
-        resolveColorScheme2025(accentColor, isDark)
+    fun colorScheme2025(isDark: Boolean): MonetColorSchemeCompat2025? = resolveColorScheme2025(accentColor, isDark)
 
-    private fun effectiveColorStyle(style: ColorStyle = colorStyle): ColorStyle =
-        if (colorSpec != SpecVersion.SPEC_2026 && style is Cmf) TonalSpot else style
+    private fun effectiveColorStyle(style: ColorStyle = colorStyle): ColorStyle = if (colorSpec != SpecVersion.SPEC_2026 && style is Cmf) TonalSpot else style
 
-    private fun resolveSecondarySeedForCmf(primarySeed: Int, accentColor: ColorOption): Int? =
-        when (accentColor) {
-            is ColorOption.WallpaperPrimary -> wallpaperManager.wallpaperColors?.secondaryColor
-            is ColorOption.WallpaperDerived -> {
-                val liveSecondary = freshWallpaperSecondary ?: wallpaperManager.wallpaperColors?.secondaryColor
-                val livePrimary = freshWallpaperPrimary
-                    ?: wallpaperManager.wallpaperColors?.primaryColor
-                    ?: accentColor.wallpaperPrimary
-                when {
-                    liveSecondary != null && liveSecondary != primarySeed -> liveSecondary
-                    livePrimary != primarySeed -> livePrimary
-                    else -> liveSecondary
-                }
+    private fun resolveSecondarySeedForCmf(primarySeed: Int, accentColor: ColorOption): Int? = when (accentColor) {
+        is ColorOption.WallpaperPrimary -> wallpaperManager.wallpaperColors?.secondaryColor
+
+        is ColorOption.WallpaperDerived -> {
+            val liveSecondary = freshWallpaperSecondary ?: wallpaperManager.wallpaperColors?.secondaryColor
+            val livePrimary = freshWallpaperPrimary
+                ?: wallpaperManager.wallpaperColors?.primaryColor
+                ?: accentColor.wallpaperPrimary
+            when {
+                liveSecondary != null && liveSecondary != primarySeed -> liveSecondary
+                livePrimary != primarySeed -> livePrimary
+                else -> liveSecondary
             }
-            else -> null
         }
+
+        else -> null
+    }
 
     private fun resolveColorScheme(accentColor: ColorOption): ColorScheme {
         val activeStyle = effectiveColorStyle()
@@ -337,8 +338,11 @@ class ThemeProvider @Inject constructor(
 
             is ColorOption.WallpaperDerived -> {
                 val fresh = freshWallpaperPrimary
-                val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
-                           else accentColor.color
+                val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) {
+                    fresh
+                } else {
+                    accentColor.color
+                }
                 getLegacyColorScheme(seed, activeStyle, effectiveSpec)
             }
 
@@ -379,7 +383,9 @@ class ThemeProvider @Inject constructor(
             is app.lawnchair.theme.color.Rainbow,
             is app.lawnchair.theme.color.FruitSalad,
             is app.lawnchair.theme.color.Content,
-            is app.lawnchair.theme.color.Monochromatic -> true
+            is app.lawnchair.theme.color.Monochromatic,
+            -> true
+
             else -> false
         }
         if (styleHasNo2025Variant) return null
@@ -403,8 +409,11 @@ class ThemeProvider @Inject constructor(
 
             is ColorOption.WallpaperDerived -> {
                 val fresh = freshWallpaperPrimary
-                val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) fresh
-                           else accentColor.color
+                val seed = if (fresh != null && fresh != accentColor.wallpaperPrimary) {
+                    fresh
+                } else {
+                    accentColor.color
+                }
                 val secondarySeed = if (activeStyle is Cmf) resolveSecondarySeedForCmf(seed, accentColor) else null
                 get2025ColorScheme(seed, activeStyle, isDark, mkSpec, secondarySeed)
             }

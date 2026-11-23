@@ -1,6 +1,7 @@
 package app.lawnchair.theme.color
 
 import androidx.annotation.ColorInt
+import com.android.systemui.monet.Style
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.hct.Hct
 import com.materialkolor.scheme.DynamicScheme
@@ -13,7 +14,6 @@ import com.materialkolor.scheme.SchemeNeutral
 import com.materialkolor.scheme.SchemeRainbow
 import com.materialkolor.scheme.SchemeTonalSpot
 import com.materialkolor.scheme.SchemeVibrant
-import com.android.systemui.monet.Style
 
 /**
  * Holds a materialkolor [DynamicScheme] for the SPEC_2025 / SPEC_2026 path.
@@ -78,11 +78,11 @@ class MonetColorSchemeCompat2025(
             }
         }
 
-        addPalette(scheme.primaryPalette,        accent1Res)
-        addPalette(scheme.secondaryPalette,       accent2Res)
-        addPalette(scheme.tertiaryPalette,        accent3Res)
-        addPalette(scheme.neutralPalette,         neutral1Res)
-        addPalette(scheme.neutralVariantPalette,  neutral2Res)
+        addPalette(scheme.primaryPalette, accent1Res)
+        addPalette(scheme.secondaryPalette, accent2Res)
+        addPalette(scheme.tertiaryPalette, accent3Res)
+        addPalette(scheme.neutralPalette, neutral1Res)
+        addPalette(scheme.neutralVariantPalette, neutral2Res)
 
         return result
     }
@@ -118,15 +118,22 @@ class MonetColorSchemeCompat2025(
             }
 
             return when (style) {
-                Style.VIBRANT       -> SchemeVibrant(sourceHct, isDark, contrast, spec)
-                Style.EXPRESSIVE    -> SchemeExpressive(sourceHct, isDark, contrast, spec)
-                Style.SPRITZ        -> SchemeNeutral(sourceHct, isDark, contrast, spec)
-                Style.RAINBOW       -> SchemeRainbow(sourceHct, isDark, contrast, spec)
-                Style.FRUIT_SALAD   -> SchemeFruitSalad(sourceHct, isDark, contrast, spec)
-                Style.CONTENT       -> SchemeContent(sourceHct, isDark, contrast, spec)
+                Style.VIBRANT -> SchemeVibrant(sourceHct, isDark, contrast, spec)
+
+                Style.EXPRESSIVE -> SchemeExpressive(sourceHct, isDark, contrast, spec)
+
+                Style.SPRITZ -> SchemeNeutral(sourceHct, isDark, contrast, spec)
+
+                Style.RAINBOW -> SchemeRainbow(sourceHct, isDark, contrast, spec)
+
+                Style.FRUIT_SALAD -> SchemeFruitSalad(sourceHct, isDark, contrast, spec)
+
+                Style.CONTENT -> SchemeContent(sourceHct, isDark, contrast, spec)
+
                 Style.MONOCHROMATIC -> SchemeMonochrome(sourceHct, isDark, contrast, spec)
+
                 // TONAL_SPOT and anything else (including LegacyKdrag placeholder TONAL_SPOT)
-                else                -> SchemeTonalSpot(sourceHct, isDark, contrast, spec)
+                else -> SchemeTonalSpot(sourceHct, isDark, contrast, spec)
             }
         }
     }

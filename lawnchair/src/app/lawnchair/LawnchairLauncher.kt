@@ -139,6 +139,7 @@ class LawnchairLauncher : QuickstepLauncher() {
                 is OverviewState,
                 is AllAppsState,
                 -> LawnchairApp.instance.restoreClockInStatusBar()
+
                 else -> workspace.updateStatusbarClock()
             }
         }
@@ -185,12 +186,18 @@ class LawnchairLauncher : QuickstepLauncher() {
 
         preferenceManager2.showStatusBar.get().distinctUntilChanged().onEach {
             with(insetsController) {
-                if (it) show(WindowInsetsCompat.Type.statusBars())
-                else hide(WindowInsetsCompat.Type.statusBars())
+                if (it) {
+                    show(WindowInsetsCompat.Type.statusBars())
+                } else {
+                    hide(WindowInsetsCompat.Type.statusBars())
+                }
             }
             with(launcher.stateManager) {
-                if (it) removeStateListener(noStatusBarStateListener)
-                else addStateListener(noStatusBarStateListener)
+                if (it) {
+                    removeStateListener(noStatusBarStateListener)
+                } else {
+                    addStateListener(noStatusBarStateListener)
+                }
             }
         }.launchIn(scope = lifecycleScope)
 
@@ -206,8 +213,11 @@ class LawnchairLauncher : QuickstepLauncher() {
         }.launchIn(scope = lifecycleScope)
         preferenceManager2.rememberPosition.get().distinctUntilChanged().onEach {
             with(launcher.stateManager) {
-                if (it) addStateListener(rememberPositionStateListener)
-                else removeStateListener(rememberPositionStateListener)
+                if (it) {
+                    addStateListener(rememberPositionStateListener)
+                } else {
+                    removeStateListener(rememberPositionStateListener)
+                }
             }
         }.launchIn(scope = lifecycleScope)
 
@@ -343,7 +353,9 @@ class LawnchairLauncher : QuickstepLauncher() {
             val gnc = GestureNavContract.fromIntent(intent)
             if (gnc != null) {
                 AbstractFloatingView.closeOpenViews(
-                    this, false, AbstractFloatingView.TYPE_ICON_SURFACE,
+                    this,
+                    false,
+                    AbstractFloatingView.TYPE_ICON_SURFACE,
                 )
                 LawnchairFloatingSurfaceView.show(this, gnc)
             }
@@ -360,7 +372,9 @@ class LawnchairLauncher : QuickstepLauncher() {
         val showWallpaperCarousel = "+carousel" in preferenceManager2.launcherPopupOrder.firstCached()
         if (showWallpaperCarousel) {
             show<LawnchairLauncher>(
-                this, getPopupTarget(x, y), OptionsPopupView.getOptions(this),
+                this,
+                getPopupTarget(x, y),
+                OptionsPopupView.getOptions(this),
             )
         } else {
             super.showDefaultOptions(x, y)
@@ -378,7 +392,9 @@ class LawnchairLauncher : QuickstepLauncher() {
         val isEmpty = WallpaperService.INSTANCE.get(this).getTopWallpapers().isEmpty()
         val layout = if (isEmpty) R.layout.longpress_options_menu else R.layout.wallpaper_options_popup
         val popup = activityContext.layoutInflater.inflate(
-            layout, activityContext.dragLayer, false,
+            layout,
+            activityContext.dragLayer,
+            false,
         ) as OptionsPopupView<T>
         popup.setTargetRect(targetRect)
         popup.setShouldAddArrow(shouldAddArrow)
@@ -408,7 +424,11 @@ class LawnchairLauncher : QuickstepLauncher() {
         val callbacks = RunnableList()
         val options = if (Utilities.ATLEAST_Q) {
             LawnchairQuickstepCompat.activityOptionsCompat.makeCustomAnimation(
-                this, 0, 0, Executors.MAIN_EXECUTOR.handler, null,
+                this,
+                0,
+                0,
+                Executors.MAIN_EXECUTOR.handler,
+                null,
             ) { callbacks.executeAllAndDestroy() }
         } else {
             ActivityOptions.makeBasic()
@@ -652,13 +672,19 @@ class LawnchairLauncher : QuickstepLauncher() {
             isClickable = true
             isFocusable = true
         }
-        scrim.addView(indicator, FrameLayout.LayoutParams(indicatorSize, indicatorSize).apply {
-            gravity = android.view.Gravity.CENTER
-        })
-        dragLayer.addView(scrim, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT,
-        ))
+        scrim.addView(
+            indicator,
+            FrameLayout.LayoutParams(indicatorSize, indicatorSize).apply {
+                gravity = android.view.Gravity.CENTER
+            },
+        )
+        dragLayer.addView(
+            scrim,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
         if (immediate) {
             scrim.alpha = 1f
         } else {
@@ -712,7 +738,8 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     private fun restartIfPending() {
         when {
-            sRestartFlags and FLAG_RESTART  != 0 -> lawnchairApp.restart(false)
+            sRestartFlags and FLAG_RESTART != 0 -> lawnchairApp.restart(false)
+
             sRestartFlags and FLAG_RECREATE != 0 -> {
                 sRestartFlags = 0
                 // Same guard as updateTheme(): skip if already finishing so rapid
@@ -752,7 +779,7 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     companion object {
         private const val FLAG_RECREATE = 1 shl 0
-        private const val FLAG_RESTART  = 1 shl 1
+        private const val FLAG_RESTART = 1 shl 1
 
         /**
          * How long to wait after the last [updateTheme] call before actually calling

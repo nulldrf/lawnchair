@@ -40,7 +40,9 @@ import com.android.launcher3.views.ActivityContext
  * Implements [Insettable] so [com.android.launcher3.LauncherRootView] delivers window insets
  * directly to [setInsets] instead of shifting this view with margins.
  */
-class SplashLayout(context: Context) : FrameLayout(context), Insettable {
+class SplashLayout(context: Context) :
+    FrameLayout(context),
+    Insettable {
 
     private val statusView = View(context)
     private val navView = View(context)

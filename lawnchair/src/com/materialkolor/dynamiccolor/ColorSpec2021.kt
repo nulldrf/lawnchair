@@ -34,817 +34,762 @@ import kotlin.math.min
 public open class ColorSpec2021 : ColorSpec {
     // Main Palettes
 
-    override fun primaryPaletteKeyColor(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("primary_palette_key_color")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> s.primaryPalette.keyColor.tone }
-            .build()
+    override fun primaryPaletteKeyColor(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("primary_palette_key_color")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> s.primaryPalette.keyColor.tone }
+        .build()
 
-    override fun secondaryPaletteKeyColor(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("secondary_palette_key_color")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s -> s.secondaryPalette.keyColor.tone }
-            .build()
+    override fun secondaryPaletteKeyColor(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("secondary_palette_key_color")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s -> s.secondaryPalette.keyColor.tone }
+        .build()
 
-    override fun tertiaryPaletteKeyColor(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("tertiary_palette_key_color")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s -> s.tertiaryPalette.keyColor.tone }
-            .build()
+    override fun tertiaryPaletteKeyColor(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("tertiary_palette_key_color")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s -> s.tertiaryPalette.keyColor.tone }
+        .build()
 
-    override fun neutralPaletteKeyColor(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("neutral_palette_key_color")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> s.neutralPalette.keyColor.tone }
-            .build()
+    override fun neutralPaletteKeyColor(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("neutral_palette_key_color")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> s.neutralPalette.keyColor.tone }
+        .build()
 
-    override fun neutralVariantPaletteKeyColor(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("neutral_variant_palette_key_color")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> s.neutralVariantPalette.keyColor.tone }
-            .build()
+    override fun neutralVariantPaletteKeyColor(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("neutral_variant_palette_key_color")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> s.neutralVariantPalette.keyColor.tone }
+        .build()
 
-    override fun errorPaletteKeyColor(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("error_palette_key_color")
-            .setPalette { s -> s.errorPalette }
-            .setTone { s -> s.errorPalette.keyColor.tone }
-            .build()
+    override fun errorPaletteKeyColor(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("error_palette_key_color")
+        .setPalette { s -> s.errorPalette }
+        .setTone { s -> s.errorPalette.keyColor.tone }
+        .build()
 
     // Surfaces [S]
 
-    override fun background(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("background")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 6.0 else 98.0 }
-            .setIsBackground(true)
-            .build()
+    override fun background(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("background")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 6.0 else 98.0 }
+        .setIsBackground(true)
+        .build()
 
-    override fun onBackground(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_background")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 90.0 else 10.0 }
-            .setBackground { s -> background() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 3.0, 4.5, 7.0) }
-            .build()
+    override fun onBackground(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_background")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 90.0 else 10.0 }
+        .setBackground { s -> background() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 3.0, 4.5, 7.0) }
+        .build()
 
-    override fun surface(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 6.0 else 98.0 }
-            .setIsBackground(true)
-            .build()
+    override fun surface(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 6.0 else 98.0 }
+        .setIsBackground(true)
+        .build()
 
-    override fun surfaceDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_dim")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    6.0
-                } else {
-                    ContrastCurve(
-                        low = 87.0,
-                        normal = 87.0,
-                        medium = 80.0,
-                        high = 75.0,
-                    ).get(s.contrastLevel)
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_dim")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                6.0
+            } else {
+                ContrastCurve(
+                    low = 87.0,
+                    normal = 87.0,
+                    medium = 80.0,
+                    high = 75.0,
+                ).get(s.contrastLevel)
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun surfaceBright(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_bright")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    ContrastCurve(
-                        low = 24.0,
-                        normal = 24.0,
-                        medium = 29.0,
-                        high = 34.0,
-                    ).get(s.contrastLevel)
-                } else {
-                    98.0
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceBright(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_bright")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                ContrastCurve(
+                    low = 24.0,
+                    normal = 24.0,
+                    medium = 29.0,
+                    high = 34.0,
+                ).get(s.contrastLevel)
+            } else {
+                98.0
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun surfaceContainerLowest(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_container_lowest")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    ContrastCurve(
-                        low = 4.0,
-                        normal = 4.0,
-                        medium = 2.0,
-                        high = 0.0,
-                    ).get(s.contrastLevel)
-                } else {
-                    100.0
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceContainerLowest(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_container_lowest")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                ContrastCurve(
+                    low = 4.0,
+                    normal = 4.0,
+                    medium = 2.0,
+                    high = 0.0,
+                ).get(s.contrastLevel)
+            } else {
+                100.0
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun surfaceContainerLow(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_container_low")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    ContrastCurve(10.0, 10.0, 11.0, 12.0).get(s.contrastLevel)
-                } else {
-                    ContrastCurve(96.0, 96.0, 96.0, 95.0).get(s.contrastLevel)
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceContainerLow(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_container_low")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                ContrastCurve(10.0, 10.0, 11.0, 12.0).get(s.contrastLevel)
+            } else {
+                ContrastCurve(96.0, 96.0, 96.0, 95.0).get(s.contrastLevel)
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun surfaceContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_container")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    ContrastCurve(12.0, 12.0, 16.0, 20.0).get(s.contrastLevel)
-                } else {
-                    ContrastCurve(94.0, 94.0, 92.0, 90.0).get(s.contrastLevel)
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_container")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                ContrastCurve(12.0, 12.0, 16.0, 20.0).get(s.contrastLevel)
+            } else {
+                ContrastCurve(94.0, 94.0, 92.0, 90.0).get(s.contrastLevel)
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun surfaceContainerHigh(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_container_high")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    ContrastCurve(17.0, 17.0, 21.0, 25.0).get(s.contrastLevel)
-                } else {
-                    ContrastCurve(92.0, 92.0, 88.0, 85.0).get(s.contrastLevel)
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceContainerHigh(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_container_high")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                ContrastCurve(17.0, 17.0, 21.0, 25.0).get(s.contrastLevel)
+            } else {
+                ContrastCurve(92.0, 92.0, 88.0, 85.0).get(s.contrastLevel)
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun surfaceContainerHighest(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_container_highest")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s ->
-                if (s.isDark) {
-                    ContrastCurve(22.0, 22.0, 26.0, 30.0).get(s.contrastLevel)
-                } else {
-                    ContrastCurve(90.0, 90.0, 84.0, 80.0).get(s.contrastLevel)
-                }
-            }.setIsBackground(true)
-            .build()
+    override fun surfaceContainerHighest(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_container_highest")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s ->
+            if (s.isDark) {
+                ContrastCurve(22.0, 22.0, 26.0, 30.0).get(s.contrastLevel)
+            } else {
+                ContrastCurve(90.0, 90.0, 84.0, 80.0).get(s.contrastLevel)
+            }
+        }.setIsBackground(true)
+        .build()
 
-    override fun onSurface(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_surface")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 90.0 else 10.0 }
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onSurface(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_surface")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 90.0 else 10.0 }
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun surfaceVariant(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_variant")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> if (s.isDark) 30.0 else 90.0 }
-            .setIsBackground(true)
-            .build()
+    override fun surfaceVariant(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_variant")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> if (s.isDark) 30.0 else 90.0 }
+        .setIsBackground(true)
+        .build()
 
-    override fun onSurfaceVariant(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_surface_variant")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> if (s.isDark) 80.0 else 30.0 }
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onSurfaceVariant(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_surface_variant")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> if (s.isDark) 80.0 else 30.0 }
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
-    override fun inverseSurface(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("inverse_surface")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 90.0 else 20.0 }
-            .setIsBackground(true)
-            .build()
+    override fun inverseSurface(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("inverse_surface")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 90.0 else 20.0 }
+        .setIsBackground(true)
+        .build()
 
-    override fun inverseOnSurface(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("inverse_on_surface")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 20.0 else 95.0 }
-            .setBackground { s -> inverseSurface() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun inverseOnSurface(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("inverse_on_surface")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 20.0 else 95.0 }
+        .setBackground { s -> inverseSurface() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun outline(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("outline")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> if (s.isDark) 60.0 else 50.0 }
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.5, 3.0, 4.5, 7.0) }
-            .build()
+    override fun outline(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("outline")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> if (s.isDark) 60.0 else 50.0 }
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.5, 3.0, 4.5, 7.0) }
+        .build()
 
-    override fun outlineVariant(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("outline_variant")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> if (s.isDark) 30.0 else 80.0 }
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .build()
+    override fun outlineVariant(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("outline_variant")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> if (s.isDark) 30.0 else 80.0 }
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .build()
 
-    override fun shadow(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("shadow")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> 0.0 }
-            .build()
+    override fun shadow(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("shadow")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> 0.0 }
+        .build()
 
-    override fun scrim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("scrim")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> 0.0 }
-            .build()
+    override fun scrim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("scrim")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> 0.0 }
+        .build()
 
-    override fun surfaceTint(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("surface_tint")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (s.isDark) 80.0 else 40.0 }
-            .setIsBackground(true)
-            .build()
+    override fun surfaceTint(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("surface_tint")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (s.isDark) 80.0 else 40.0 }
+        .setIsBackground(true)
+        .build()
 
     // Primaries [P]
 
-    override fun primary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("primary")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 100.0 else 0.0
-                }
-                if (s.isDark) 80.0 else 40.0
-            }.setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = primaryContainer(),
-                    roleB = primary(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun primary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("primary")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 100.0 else 0.0
+            }
+            if (s.isDark) 80.0 else 40.0
+        }.setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = primaryContainer(),
+                roleB = primary(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
     override fun primaryDim(): DynamicColor? = null
 
-    override fun onPrimary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_primary")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 10.0 else 90.0
-                }
-                if (s.isDark) 20.0 else 100.0
-            }.setBackground { s -> primary() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onPrimary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_primary")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 10.0 else 90.0
+            }
+            if (s.isDark) 20.0 else 100.0
+        }.setBackground { s -> primary() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun primaryContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("primary_container")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s ->
-                if (isFidelity(s)) {
-                    return@setTone s.sourceColorHct.tone
-                }
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 85.0 else 25.0
-                }
-                if (s.isDark) 30.0 else 90.0
-            }.setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = primaryContainer(),
-                    roleB = primary(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
+    override fun primaryContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("primary_container")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s ->
+            if (isFidelity(s)) {
+                return@setTone s.sourceColorHct.tone
+            }
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 85.0 else 25.0
+            }
+            if (s.isDark) 30.0 else 90.0
+        }.setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = primaryContainer(),
+                roleB = primary(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
+
+    override fun onPrimaryContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_primary_container")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s ->
+            if (isFidelity(s)) {
+                return@setTone DynamicColor.foregroundTone(
+                    bgTone = primaryContainer().tone(s),
+                    ratio = 4.5,
                 )
-            }.build()
+            }
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 0.0 else 100.0
+            }
+            if (s.isDark) 90.0 else 30.0
+        }.setBackground { s -> primaryContainer() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
-    override fun onPrimaryContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_primary_container")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s ->
-                if (isFidelity(s)) {
-                    return@setTone DynamicColor.foregroundTone(
-                        bgTone = primaryContainer().tone(s),
-                        ratio = 4.5,
-                    )
-                }
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 0.0 else 100.0
-                }
-                if (s.isDark) 90.0 else 30.0
-            }.setBackground { s -> primaryContainer() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
-
-    override fun inversePrimary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("inverse_primary")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (s.isDark) 40.0 else 80.0 }
-            .setBackground { s -> inverseSurface() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
-            .build()
+    override fun inversePrimary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("inverse_primary")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (s.isDark) 40.0 else 80.0 }
+        .setBackground { s -> inverseSurface() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
+        .build()
 
     // Secondaries [Q]
 
-    override fun secondary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("secondary")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s -> if (s.isDark) 80.0 else 40.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = secondaryContainer(),
-                    roleB = secondary(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun secondary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("secondary")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s -> if (s.isDark) 80.0 else 40.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = secondaryContainer(),
+                roleB = secondary(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
     override fun secondaryDim(): DynamicColor? = null
 
-    override fun onSecondary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_secondary")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 10.0 else 100.0
-                }
-                if (s.isDark) 20.0 else 100.0
-            }.setBackground { s -> secondary() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onSecondary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_secondary")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 10.0 else 100.0
+            }
+            if (s.isDark) 20.0 else 100.0
+        }.setBackground { s -> secondary() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun secondaryContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("secondary_container")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s ->
-                val initialTone = if (s.isDark) 30.0 else 90.0
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 30.0 else 85.0
-                }
-                if (!isFidelity(s)) {
-                    return@setTone initialTone
-                }
-                findDesiredChromaByTone(
-                    hue = s.secondaryPalette.hue,
-                    chroma = s.secondaryPalette.chroma,
-                    tone = initialTone,
-                    byDecreasingTone = !s.isDark,
-                )
-            }.setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = secondaryContainer(),
-                    roleB = secondary(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun secondaryContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("secondary_container")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s ->
+            val initialTone = if (s.isDark) 30.0 else 90.0
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 30.0 else 85.0
+            }
+            if (!isFidelity(s)) {
+                return@setTone initialTone
+            }
+            findDesiredChromaByTone(
+                hue = s.secondaryPalette.hue,
+                chroma = s.secondaryPalette.chroma,
+                tone = initialTone,
+                byDecreasingTone = !s.isDark,
+            )
+        }.setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = secondaryContainer(),
+                roleB = secondary(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
-    override fun onSecondaryContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_secondary_container")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 90.0 else 10.0
-                }
-                if (!isFidelity(s)) {
-                    return@setTone if (s.isDark) 90.0 else 30.0
-                }
-                DynamicColor.foregroundTone(secondaryContainer().tone(s), 4.5)
-            }.setBackground { s -> secondaryContainer() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onSecondaryContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_secondary_container")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 90.0 else 10.0
+            }
+            if (!isFidelity(s)) {
+                return@setTone if (s.isDark) 90.0 else 30.0
+            }
+            DynamicColor.foregroundTone(secondaryContainer().tone(s), 4.5)
+        }.setBackground { s -> secondaryContainer() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
     // Tertiaries [T]
 
-    override fun tertiary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("tertiary")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 90.0 else 25.0
-                }
-                if (s.isDark) 80.0 else 40.0
-            }.setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = tertiaryContainer(),
-                    roleB = tertiary(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun tertiary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("tertiary")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 90.0 else 25.0
+            }
+            if (s.isDark) 80.0 else 40.0
+        }.setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = tertiaryContainer(),
+                roleB = tertiary(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
     override fun tertiaryDim(): DynamicColor? = null
 
-    override fun onTertiary(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_tertiary")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 10.0 else 90.0
-                }
-                if (s.isDark) 20.0 else 100.0
-            }.setBackground { s -> tertiary() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onTertiary(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_tertiary")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 10.0 else 90.0
+            }
+            if (s.isDark) 20.0 else 100.0
+        }.setBackground { s -> tertiary() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun tertiaryContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("tertiary_container")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 60.0 else 49.0
-                }
-                if (!isFidelity(s)) {
-                    return@setTone if (s.isDark) 30.0 else 90.0
-                }
-                val proposedHct = s.tertiaryPalette.getHct(s.sourceColorHct.tone)
-                DislikeAnalyzer.fixIfDisliked(proposedHct).tone
-            }.setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = tertiaryContainer(),
-                    roleB = tertiary(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun tertiaryContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("tertiary_container")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 60.0 else 49.0
+            }
+            if (!isFidelity(s)) {
+                return@setTone if (s.isDark) 30.0 else 90.0
+            }
+            val proposedHct = s.tertiaryPalette.getHct(s.sourceColorHct.tone)
+            DislikeAnalyzer.fixIfDisliked(proposedHct).tone
+        }.setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = tertiaryContainer(),
+                roleB = tertiary(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
-    override fun onTertiaryContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_tertiary_container")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 0.0 else 100.0
-                }
-                if (!isFidelity(s)) {
-                    return@setTone if (s.isDark) 90.0 else 30.0
-                }
-                DynamicColor.foregroundTone(tertiaryContainer().tone(s), 4.5)
-            }.setBackground { s -> tertiaryContainer() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onTertiaryContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_tertiary_container")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 0.0 else 100.0
+            }
+            if (!isFidelity(s)) {
+                return@setTone if (s.isDark) 90.0 else 30.0
+            }
+            DynamicColor.foregroundTone(tertiaryContainer().tone(s), 4.5)
+        }.setBackground { s -> tertiaryContainer() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
     // Errors [E]
 
-    override fun error(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("error")
-            .setPalette { s -> s.errorPalette }
-            .setTone { s -> if (s.isDark) 80.0 else 40.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = errorContainer(),
-                    roleB = error(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun error(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("error")
+        .setPalette { s -> s.errorPalette }
+        .setTone { s -> if (s.isDark) 80.0 else 40.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 7.0) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = errorContainer(),
+                roleB = error(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
     override fun errorDim(): DynamicColor? = null
 
-    override fun onError(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_error")
-            .setPalette { s -> s.errorPalette }
-            .setTone { s -> if (s.isDark) 20.0 else 100.0 }
-            .setBackground { s -> error() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onError(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_error")
+        .setPalette { s -> s.errorPalette }
+        .setTone { s -> if (s.isDark) 20.0 else 100.0 }
+        .setBackground { s -> error() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun errorContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("error_container")
-            .setPalette { s -> s.errorPalette }
-            .setTone { s -> if (s.isDark) 30.0 else 90.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                @Suppress("DEPRECATION")
-                ToneDeltaPair(
-                    roleA = errorContainer(),
-                    roleB = error(),
-                    delta = 10.0,
-                    polarity = TonePolarity.NEARER,
-                    stayTogether = false,
-                )
-            }.build()
+    override fun errorContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("error_container")
+        .setPalette { s -> s.errorPalette }
+        .setTone { s -> if (s.isDark) 30.0 else 90.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            @Suppress("DEPRECATION")
+            ToneDeltaPair(
+                roleA = errorContainer(),
+                roleB = error(),
+                delta = 10.0,
+                polarity = TonePolarity.NEARER,
+                stayTogether = false,
+            )
+        }.build()
 
-    override fun onErrorContainer(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_error_container")
-            .setPalette { s -> s.errorPalette }
-            .setTone { s ->
-                if (isMonochrome(s)) {
-                    return@setTone if (s.isDark) 90.0 else 10.0
-                }
-                if (s.isDark) 90.0 else 30.0
-            }.setBackground { s -> errorContainer() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onErrorContainer(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_error_container")
+        .setPalette { s -> s.errorPalette }
+        .setTone { s ->
+            if (isMonochrome(s)) {
+                return@setTone if (s.isDark) 90.0 else 10.0
+            }
+            if (s.isDark) 90.0 else 30.0
+        }.setBackground { s -> errorContainer() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
     // Primary Fixed Colors [PF]
 
-    override fun primaryFixed(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("primary_fixed")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 40.0 else 90.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                ToneDeltaPair(
-                    roleA = this.primaryFixed(),
-                    roleB = this.primaryFixedDim(),
-                    delta = 10.0,
-                    polarity = TonePolarity.LIGHTER,
-                    stayTogether = true,
-                )
-            }.build()
+    override fun primaryFixed(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("primary_fixed")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 40.0 else 90.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            ToneDeltaPair(
+                roleA = this.primaryFixed(),
+                roleB = this.primaryFixedDim(),
+                delta = 10.0,
+                polarity = TonePolarity.LIGHTER,
+                stayTogether = true,
+            )
+        }.build()
 
-    override fun primaryFixedDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("primary_fixed_dim")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 30.0 else 80.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                ToneDeltaPair(
-                    roleA = primaryFixed(),
-                    roleB = primaryFixedDim(),
-                    delta = 10.0,
-                    polarity = TonePolarity.LIGHTER,
-                    stayTogether = true,
-                )
-            }.build()
+    override fun primaryFixedDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("primary_fixed_dim")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 30.0 else 80.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            ToneDeltaPair(
+                roleA = primaryFixed(),
+                roleB = primaryFixedDim(),
+                delta = 10.0,
+                polarity = TonePolarity.LIGHTER,
+                stayTogether = true,
+            )
+        }.build()
 
-    override fun onPrimaryFixed(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_primary_fixed")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 100.0 else 10.0 }
-            .setBackground { s -> primaryFixedDim() }
-            .setSecondBackground { s -> primaryFixed() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onPrimaryFixed(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_primary_fixed")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 100.0 else 10.0 }
+        .setBackground { s -> primaryFixedDim() }
+        .setSecondBackground { s -> primaryFixed() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun onPrimaryFixedVariant(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_primary_fixed_variant")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 90.0 else 30.0 }
-            .setBackground { s -> primaryFixedDim() }
-            .setSecondBackground { s -> primaryFixed() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onPrimaryFixedVariant(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_primary_fixed_variant")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 90.0 else 30.0 }
+        .setBackground { s -> primaryFixedDim() }
+        .setSecondBackground { s -> primaryFixed() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
     // Secondary Fixed Colors [QF]
 
-    override fun secondaryFixed(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("secondary_fixed")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 80.0 else 90.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                ToneDeltaPair(
-                    roleA = secondaryFixed(),
-                    roleB = secondaryFixedDim(),
-                    delta = 10.0,
-                    polarity = TonePolarity.LIGHTER,
-                    stayTogether = true,
-                )
-            }.build()
+    override fun secondaryFixed(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("secondary_fixed")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 80.0 else 90.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            ToneDeltaPair(
+                roleA = secondaryFixed(),
+                roleB = secondaryFixedDim(),
+                delta = 10.0,
+                polarity = TonePolarity.LIGHTER,
+                stayTogether = true,
+            )
+        }.build()
 
-    override fun secondaryFixedDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("secondary_fixed_dim")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 70.0 else 80.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                ToneDeltaPair(
-                    roleA = secondaryFixed(),
-                    roleB = secondaryFixedDim(),
-                    delta = 10.0,
-                    polarity = TonePolarity.LIGHTER,
-                    stayTogether = true,
-                )
-            }.build()
+    override fun secondaryFixedDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("secondary_fixed_dim")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 70.0 else 80.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            ToneDeltaPair(
+                roleA = secondaryFixed(),
+                roleB = secondaryFixedDim(),
+                delta = 10.0,
+                polarity = TonePolarity.LIGHTER,
+                stayTogether = true,
+            )
+        }.build()
 
-    override fun onSecondaryFixed(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_secondary_fixed")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s -> 10.0 }
-            .setBackground { s -> secondaryFixedDim() }
-            .setSecondBackground { s -> secondaryFixed() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onSecondaryFixed(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_secondary_fixed")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s -> 10.0 }
+        .setBackground { s -> secondaryFixedDim() }
+        .setSecondBackground { s -> secondaryFixed() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun onSecondaryFixedVariant(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_secondary_fixed_variant")
-            .setPalette { s -> s.secondaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 25.0 else 30.0 }
-            .setBackground { s -> secondaryFixedDim() }
-            .setSecondBackground { s -> secondaryFixed() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onSecondaryFixedVariant(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_secondary_fixed_variant")
+        .setPalette { s -> s.secondaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 25.0 else 30.0 }
+        .setBackground { s -> secondaryFixedDim() }
+        .setSecondBackground { s -> secondaryFixed() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
     // Tertiary Fixed Colors [TF]
 
-    override fun tertiaryFixed(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("tertiary_fixed")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 40.0 else 90.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                ToneDeltaPair(
-                    roleA = tertiaryFixed(),
-                    roleB = tertiaryFixedDim(),
-                    delta = 10.0,
-                    polarity = TonePolarity.LIGHTER,
-                    stayTogether = true,
-                )
-            }.build()
+    override fun tertiaryFixed(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("tertiary_fixed")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 40.0 else 90.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            ToneDeltaPair(
+                roleA = tertiaryFixed(),
+                roleB = tertiaryFixedDim(),
+                delta = 10.0,
+                polarity = TonePolarity.LIGHTER,
+                stayTogether = true,
+            )
+        }.build()
 
-    override fun tertiaryFixedDim(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("tertiary_fixed_dim")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 30.0 else 80.0 }
-            .setIsBackground(true)
-            .setBackground(this::highestSurface)
-            .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
-            .setToneDeltaPair { s ->
-                ToneDeltaPair(
-                    roleA = tertiaryFixed(),
-                    roleB = tertiaryFixedDim(),
-                    delta = 10.0,
-                    polarity = TonePolarity.LIGHTER,
-                    stayTogether = true,
-                )
-            }.build()
+    override fun tertiaryFixedDim(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("tertiary_fixed_dim")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 30.0 else 80.0 }
+        .setIsBackground(true)
+        .setBackground(this::highestSurface)
+        .setContrastCurve { s -> ContrastCurve(1.0, 1.0, 3.0, 4.5) }
+        .setToneDeltaPair { s ->
+            ToneDeltaPair(
+                roleA = tertiaryFixed(),
+                roleB = tertiaryFixedDim(),
+                delta = 10.0,
+                polarity = TonePolarity.LIGHTER,
+                stayTogether = true,
+            )
+        }.build()
 
-    override fun onTertiaryFixed(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_tertiary_fixed")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 100.0 else 10.0 }
-            .setBackground { s -> tertiaryFixedDim() }
-            .setSecondBackground { s -> tertiaryFixed() }
-            .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
-            .build()
+    override fun onTertiaryFixed(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_tertiary_fixed")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 100.0 else 10.0 }
+        .setBackground { s -> tertiaryFixedDim() }
+        .setSecondBackground { s -> tertiaryFixed() }
+        .setContrastCurve { s -> ContrastCurve(4.5, 7.0, 11.0, 21.0) }
+        .build()
 
-    override fun onTertiaryFixedVariant(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("on_tertiary_fixed_variant")
-            .setPalette { s -> s.tertiaryPalette }
-            .setTone { s -> if (isMonochrome(s)) 90.0 else 30.0 }
-            .setBackground { s -> tertiaryFixedDim() }
-            .setSecondBackground { s -> tertiaryFixed() }
-            .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
-            .build()
+    override fun onTertiaryFixedVariant(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("on_tertiary_fixed_variant")
+        .setPalette { s -> s.tertiaryPalette }
+        .setTone { s -> if (isMonochrome(s)) 90.0 else 30.0 }
+        .setBackground { s -> tertiaryFixedDim() }
+        .setSecondBackground { s -> tertiaryFixed() }
+        .setContrastCurve { s -> ContrastCurve(3.0, 4.5, 7.0, 11.0) }
+        .build()
 
     /*
      * Android-only Colors
@@ -864,27 +809,25 @@ public open class ColorSpec2021 : ColorSpec {
      * Android used Material's Container as Primary/Secondary/Tertiary at launch.
      * Therefore, this is a duplicated version of Primary Container.
      */
-    override fun controlActivated(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("control_activated")
-            .setPalette { s -> s.primaryPalette }
-            .setTone { s -> if (s.isDark) 30.0 else 90.0 }
-            .setIsBackground(true)
-            .build()
+    override fun controlActivated(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("control_activated")
+        .setPalette { s -> s.primaryPalette }
+        .setTone { s -> if (s.isDark) 30.0 else 90.0 }
+        .setIsBackground(true)
+        .build()
 
     /**
      * colorControlNormal documented as textColorSecondary in M3 & GM3.
      * In Material, textColorSecondary points to onSurfaceVariant in the non-disabled state,
      * which is Neutral Variant T30/80 in light/dark.
      */
-    override fun controlNormal(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("control_normal")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> if (s.isDark) 80.0 else 30.0 }
-            .build()
+    override fun controlNormal(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("control_normal")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> if (s.isDark) 80.0 else 30.0 }
+        .build()
 
     /**
      * colorControlHighlight documented, in both M3 & GM3:
@@ -896,78 +839,71 @@ public open class ColorSpec2021 : ColorSpec {
      * depending on how MDC resolved alpha for the other cases.
      * Returning black in dark mode, white in light mode.
      */
-    override fun controlHighlight(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("control_highlight")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 100.0 else 0.0 }
-            .setOpacity { s -> if (s.isDark) 0.20 else 0.12 }
-            .build()
+    override fun controlHighlight(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("control_highlight")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 100.0 else 0.0 }
+        .setOpacity { s -> if (s.isDark) 0.20 else 0.12 }
+        .build()
 
     /**
      * textColorPrimaryInverse documented, in both M3 & GM3, documented as N10/N90.
      */
-    override fun textPrimaryInverse(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("text_primary_inverse")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 10.0 else 90.0 }
-            .build()
+    override fun textPrimaryInverse(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("text_primary_inverse")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 10.0 else 90.0 }
+        .build()
 
     /**
      * textColorSecondaryInverse and textColorTertiaryInverse both documented, in both M3 & GM3, as
      * NV30/NV80
      */
-    override fun textSecondaryAndTertiaryInverse(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("text_secondary_and_tertiary_inverse")
-            .setPalette { s -> s.neutralVariantPalette }
-            .setTone { s -> if (s.isDark) 30.0 else 80.0 }
-            .build()
+    override fun textSecondaryAndTertiaryInverse(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("text_secondary_and_tertiary_inverse")
+        .setPalette { s -> s.neutralVariantPalette }
+        .setTone { s -> if (s.isDark) 30.0 else 80.0 }
+        .build()
 
     /**
      * textColorPrimaryInverseDisableOnly documented, in both M3 & GM3, as N10/N90
      */
-    override fun textPrimaryInverseDisableOnly(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("text_primary_inverse_disable_only")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 10.0 else 90.0 }
-            .build()
+    override fun textPrimaryInverseDisableOnly(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("text_primary_inverse_disable_only")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 10.0 else 90.0 }
+        .build()
 
     /**
      * textColorSecondaryInverse and textColorTertiaryInverse in disabled state both documented,
      * in both M3 & GM3, as N10/N90
      */
-    override fun textSecondaryAndTertiaryInverseDisabled(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("text_secondary_and_tertiary_inverse_disabled")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 10.0 else 90.0 }
-            .build()
+    override fun textSecondaryAndTertiaryInverseDisabled(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("text_secondary_and_tertiary_inverse_disabled")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 10.0 else 90.0 }
+        .build()
 
     /**
      * textColorHintInverse documented, in both M3 & GM3, as N10/N90
      */
-    override fun textHintInverse(): DynamicColor =
-        DynamicColor.Companion
-            .Builder()
-            .setName("text_hint_inverse")
-            .setPalette { s -> s.neutralPalette }
-            .setTone { s -> if (s.isDark) 10.0 else 90.0 }
-            .build()
+    override fun textHintInverse(): DynamicColor = DynamicColor.Companion
+        .Builder()
+        .setName("text_hint_inverse")
+        .setPalette { s -> s.neutralPalette }
+        .setTone { s -> if (s.isDark) 10.0 else 90.0 }
+        .build()
 
     // Other
 
     override fun highestSurface(s: DynamicScheme): DynamicColor = if (s.isDark) surfaceBright() else surfaceDim()
 
-    private fun isFidelity(scheme: DynamicScheme): Boolean =
-        scheme.variant == Variant.FIDELITY || scheme.variant == Variant.CONTENT
+    private fun isFidelity(scheme: DynamicScheme): Boolean = scheme.variant == Variant.FIDELITY || scheme.variant == Variant.CONTENT
 
     // Color value calculations
 
@@ -1007,7 +943,7 @@ public open class ColorSpec2021 : ColorSpec {
                     polarity == TonePolarity.NEARER ||
                         (polarity == TonePolarity.LIGHTER && !scheme.isDark) ||
                         (polarity == TonePolarity.DARKER && !scheme.isDark)
-                )
+                    )
             val nearer = if (aIsNearer) roleA else roleB
             val farther = if (aIsNearer) roleB else roleA
             val amNearer = color.name == nearer.name
@@ -1181,29 +1117,36 @@ public open class ColorSpec2021 : ColorSpec {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.CONTENT,
-            Variant.FIDELITY,
-            -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = sourceColorHct.chroma,
-            )
-            Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(
-                hue = MathUtils.sanitizeDegrees(sourceColorHct.hue - 50.0),
-                chroma = 48.0,
-            )
-            Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 12.0)
-            Variant.RAINBOW -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 48.0)
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 36.0)
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 240),
-                chroma = 40.0,
-            )
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 200.0)
-            else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
-        }
+    ): TonalPalette = when (variant) {
+        Variant.CONTENT,
+        Variant.FIDELITY,
+        -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = sourceColorHct.chroma,
+        )
+
+        Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(
+            hue = MathUtils.sanitizeDegrees(sourceColorHct.hue - 50.0),
+            chroma = 48.0,
+        )
+
+        Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 12.0)
+
+        Variant.RAINBOW -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 48.0)
+
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 36.0)
+
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 240),
+            chroma = 40.0,
+        )
+
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 200.0)
+
+        else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
+    }
 
     public override fun getSecondaryPalette(
         variant: Variant,
@@ -1224,8 +1167,11 @@ public open class ColorSpec2021 : ColorSpec {
             )
 
             Variant.MONOCHROME -> return TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
             Variant.NEUTRAL -> return TonalPalette.fromHueAndChroma(sourceColorHct.hue, 8.0)
+
             Variant.RAINBOW -> return TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
+
             Variant.TONAL_SPOT -> return TonalPalette.fromHueAndChroma(
                 sourceColorHct.hue,
                 16.0,
@@ -1259,78 +1205,83 @@ public open class ColorSpec2021 : ColorSpec {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.CONTENT -> TonalPalette.fromHct(
-                DislikeAnalyzer.fixIfDisliked(
-                    TemperatureCache(
-                        sourceColorHct,
-                    ).getAnalogousColors(count = 3, divisions = 6)[2],
-                ),
-            )
-            Variant.FIDELITY -> TonalPalette.fromHct(
-                DislikeAnalyzer.fixIfDisliked(TemperatureCache(sourceColorHct).complement),
-            )
-            Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = 36.0,
-            )
-            Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
-            Variant.RAINBOW, Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
-                hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 60.0),
-                chroma = 24.0,
-            )
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(
-                        0.0,
-                        21.0,
-                        51.0,
-                        121.0,
-                        151.0,
-                        191.0,
-                        271.0,
-                        321.0,
-                        360.0,
-                    ),
-                    rotations = doubleArrayOf(
-                        120.0,
-                        120.0,
-                        20.0,
-                        45.0,
-                        20.0,
-                        15.0,
-                        20.0,
-                        120.0,
-                        120.0,
-                    ),
-                ),
-                chroma = 32.0,
-            )
+    ): TonalPalette = when (variant) {
+        Variant.CONTENT -> TonalPalette.fromHct(
+            DislikeAnalyzer.fixIfDisliked(
+                TemperatureCache(
+                    sourceColorHct,
+                ).getAnalogousColors(count = 3, divisions = 6)[2],
+            ),
+        )
 
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
-                hue = DynamicScheme.getRotatedHue(
-                    sourceColorHct = sourceColorHct,
-                    hueBreakpoints = doubleArrayOf(
-                        0.0,
-                        41.0,
-                        61.0,
-                        101.0,
-                        131.0,
-                        181.0,
-                        251.0,
-                        301.0,
-                        360.0,
-                    ),
-                    rotations = doubleArrayOf(35.0, 30.0, 20.0, 25.0, 30.0, 35.0, 30.0, 25.0, 25.0),
-                ),
-                chroma = 32.0,
-            )
+        Variant.FIDELITY -> TonalPalette.fromHct(
+            DislikeAnalyzer.fixIfDisliked(TemperatureCache(sourceColorHct).complement),
+        )
 
-            else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
-        }
+        Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = 36.0,
+        )
+
+        Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
+
+        Variant.RAINBOW, Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(
+            hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 60.0),
+            chroma = 24.0,
+        )
+
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(
+                    0.0,
+                    21.0,
+                    51.0,
+                    121.0,
+                    151.0,
+                    191.0,
+                    271.0,
+                    321.0,
+                    360.0,
+                ),
+                rotations = doubleArrayOf(
+                    120.0,
+                    120.0,
+                    20.0,
+                    45.0,
+                    20.0,
+                    15.0,
+                    20.0,
+                    120.0,
+                    120.0,
+                ),
+            ),
+            chroma = 32.0,
+        )
+
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(
+            hue = DynamicScheme.getRotatedHue(
+                sourceColorHct = sourceColorHct,
+                hueBreakpoints = doubleArrayOf(
+                    0.0,
+                    41.0,
+                    61.0,
+                    101.0,
+                    131.0,
+                    181.0,
+                    251.0,
+                    301.0,
+                    360.0,
+                ),
+                rotations = doubleArrayOf(35.0, 30.0, 20.0, 25.0, 30.0, 35.0, 30.0, 25.0, 25.0),
+            ),
+            chroma = 32.0,
+        )
+
+        else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
+    }
 
     public override fun getNeutralPalette(
         variant: Variant,
@@ -1338,24 +1289,31 @@ public open class ColorSpec2021 : ColorSpec {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.CONTENT, Variant.FIDELITY -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = sourceColorHct.chroma / 8.0,
-            )
-            Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 10.0)
-            Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 2.0)
-            Variant.RAINBOW -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 6.0)
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 15),
-                chroma = 8.0,
-            )
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 10.0)
-            else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
-        }
+    ): TonalPalette = when (variant) {
+        Variant.CONTENT, Variant.FIDELITY -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = sourceColorHct.chroma / 8.0,
+        )
+
+        Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 10.0)
+
+        Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 2.0)
+
+        Variant.RAINBOW -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 6.0)
+
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 15),
+            chroma = 8.0,
+        )
+
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 10.0)
+
+        else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
+    }
 
     public override fun getNeutralVariantPalette(
         variant: Variant,
@@ -1363,28 +1321,36 @@ public open class ColorSpec2021 : ColorSpec {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette =
-        when (variant) {
-            Variant.CONTENT -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = (sourceColorHct.chroma / 8.0) + 4.0,
-            )
-            Variant.FIDELITY -> TonalPalette.fromHueAndChroma(
-                hue = sourceColorHct.hue,
-                chroma = (sourceColorHct.chroma / 8.0) + 4.0,
-            )
-            Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
-            Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
-            Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 2.0)
-            Variant.RAINBOW -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
-            Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 8.0)
-            Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
-                hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 15),
-                chroma = 12.0,
-            )
-            Variant.VIBRANT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 12.0)
-            else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
-        }
+    ): TonalPalette = when (variant) {
+        Variant.CONTENT -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = (sourceColorHct.chroma / 8.0) + 4.0,
+        )
+
+        Variant.FIDELITY -> TonalPalette.fromHueAndChroma(
+            hue = sourceColorHct.hue,
+            chroma = (sourceColorHct.chroma / 8.0) + 4.0,
+        )
+
+        Variant.FRUIT_SALAD -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 16.0)
+
+        Variant.MONOCHROME -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
+        Variant.NEUTRAL -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 2.0)
+
+        Variant.RAINBOW -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 0.0)
+
+        Variant.TONAL_SPOT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 8.0)
+
+        Variant.EXPRESSIVE -> TonalPalette.fromHueAndChroma(
+            hue = MathUtils.sanitizeDegrees(sourceColorHct.hue + 15),
+            chroma = 12.0,
+        )
+
+        Variant.VIBRANT -> TonalPalette.fromHueAndChroma(sourceColorHct.hue, 12.0)
+
+        else -> throw IllegalArgumentException("$variant variant is not supported in current spec.")
+    }
 
     public override fun getErrorPalette(
         variant: Variant,
@@ -1392,20 +1358,20 @@ public open class ColorSpec2021 : ColorSpec {
         isDark: Boolean,
         platform: Platform,
         contrastLevel: Double,
-    ): TonalPalette? =
-        when (variant) {
-            Variant.CONTENT,
-            Variant.FIDELITY,
-            Variant.FRUIT_SALAD,
-            Variant.MONOCHROME,
-            Variant.NEUTRAL,
-            Variant.RAINBOW,
-            Variant.TONAL_SPOT,
-            Variant.EXPRESSIVE,
-            Variant.VIBRANT,
-            -> null
-            else -> null
-        }
+    ): TonalPalette? = when (variant) {
+        Variant.CONTENT,
+        Variant.FIDELITY,
+        Variant.FRUIT_SALAD,
+        Variant.MONOCHROME,
+        Variant.NEUTRAL,
+        Variant.RAINBOW,
+        Variant.TONAL_SPOT,
+        Variant.EXPRESSIVE,
+        Variant.VIBRANT,
+        -> null
+
+        else -> null
+    }
 
     public companion object {
         private fun isMonochrome(scheme: DynamicScheme): Boolean = scheme.variant == Variant.MONOCHROME

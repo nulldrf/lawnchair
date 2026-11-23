@@ -22,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -124,11 +125,11 @@ private fun AnnouncementItemContent(
     val coroutineScope = rememberCoroutineScope()
 
     val offsetX = remember { Animatable(0f) }
-    val itemWidth = remember { mutableStateOf(0) }
+    val itemWidth = remember { mutableIntStateOf(0) }
 
     // Fade starts at 20% of width travelled, reaches 0 at 100%
-    val alpha = remember(offsetX.value, itemWidth.value) {
-        val width = itemWidth.value.toFloat().coerceAtLeast(1f)
+    val alpha = remember(offsetX.value, itemWidth.intValue) {
+        val width = itemWidth.intValue.toFloat().coerceAtLeast(1f)
         val normalized = abs(offsetX.value) / width
         when {
             normalized < 0.2f -> 1f
@@ -139,7 +140,7 @@ private fun AnnouncementItemContent(
 
     Box(
         modifier = modifier
-            .onSizeChanged { itemWidth.value = it.width }
+            .onSizeChanged { itemWidth.intValue = it.width }
             .graphicsLayer {
                 translationX = offsetX.value
                 this.alpha = alpha
@@ -147,7 +148,7 @@ private fun AnnouncementItemContent(
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
-                        val width = itemWidth.value.toFloat()
+                        val width = itemWidth.intValue.toFloat()
                         if (abs(offsetX.value) > width * 0.35f) {
                             coroutineScope.launch {
                                 val target = if (offsetX.value > 0) width else -width

@@ -133,7 +133,7 @@ fun PreferenceNavigation(
             val route: GeneralIconShape = backStackEntry.toRoute()
             ShapePreference(currentTab = route.selectedId)
         }
-		composable<GeneralColorStyle> { backStackEntry ->
+        composable<GeneralColorStyle> { backStackEntry ->
             val route: GeneralColorStyle = backStackEntry.toRoute()
             ColorStyleScreen(showLegacyKdrag = route.showLegacyKdrag)
         }

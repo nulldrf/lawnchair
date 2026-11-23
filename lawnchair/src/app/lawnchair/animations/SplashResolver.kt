@@ -40,8 +40,10 @@ class SplashResolver(private val context: Context) {
     fun loadSplash(intent: Intent?): SplashData {
         val activityInfo = intent?.resolveActivityInfo(context.packageManager, 0)
         val themedContext: Context = if (activityInfo == null ||
-            (activityInfo.packageName == BuildConfig.APPLICATION_ID &&
-                activityInfo.name == PreferenceActivity::class.java.name)
+            (
+                activityInfo.packageName == BuildConfig.APPLICATION_ID &&
+                    activityInfo.name == PreferenceActivity::class.java.name
+                )
         ) {
             context
         } else {

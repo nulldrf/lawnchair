@@ -752,6 +752,7 @@ class PreferenceManager2 @Inject constructor(
     )
 
     // ── App-open / launch animation (1:1 port from Lawnchair 9) ───────────────
+
     /**
      * Controls the [ActivityOptions] and launcher-side animation used when launching
      * an app. Mirrors `pref_animationType` from Lawnchair 9 (`AnimationType`).
@@ -959,14 +960,14 @@ class PreferenceManager2 @Inject constructor(
     val smartspaceOnboarding = preference(
         key = booleanPreferencesKey("enable_smartspace_onboarding"),
         defaultValue = true,
-	)
+    )
 	
-	val smartspacePersonality = preference(
+    val smartspacePersonality = preference(
         key = booleanPreferencesKey("enable_smartspace_personality"),
         defaultValue = true,
     )
 	
-	val smartspaceWeatherEnabled = preference(
+    val smartspaceWeatherEnabled = preference(
         key = booleanPreferencesKey("enable_smartspace_weather"),
         defaultValue = true,
     )

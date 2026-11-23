@@ -217,6 +217,7 @@ private fun TwoTabShapePreference(
                         customIconShape = customIconShape.value,
                         currentTab = ShapeRoute.APP_SHAPE,
                     )
+
                     1 -> ShapeGridContent(
                         entries = entries,
                         shapeAdapter = folderShapeAdapter,

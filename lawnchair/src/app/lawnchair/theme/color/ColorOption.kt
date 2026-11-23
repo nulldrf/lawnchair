@@ -64,15 +64,13 @@ sealed class ColorOption {
         constructor(color: Long, wallpaperPrimary: Long = color) :
             this(color.toInt(), wallpaperPrimary.toInt())
 
-        override fun equals(other: Any?) =
-            other is WallpaperDerived &&
-                other.color == color &&
-                other.wallpaperPrimary == wallpaperPrimary
+        override fun equals(other: Any?) = other is WallpaperDerived &&
+            other.color == color &&
+            other.wallpaperPrimary == wallpaperPrimary
 
         override fun hashCode() = 31 * color + wallpaperPrimary
 
-        override fun toString() =
-            "wallpaper_derived|#${String.format("%08x", color)}|#${String.format("%08x", wallpaperPrimary)}"
+        override fun toString() = "wallpaper_derived|#${String.format("%08x", color)}|#${String.format("%08x", wallpaperPrimary)}"
     }
 
     class CustomColor(val color: Int) : ColorOption() {

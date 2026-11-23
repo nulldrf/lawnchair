@@ -343,21 +343,20 @@ public open class DynamicScheme(
             other: DynamicScheme,
             isDark: Boolean,
             contrastLevel: Double = other.contrastLevel,
-        ): DynamicScheme =
-            DynamicScheme(
-                sourceColorHctList = other.sourceColorHctList,
-                variant = other.variant,
-                isDark = isDark,
-                contrastLevel = contrastLevel,
-                primaryPalette = other.primaryPalette,
-                secondaryPalette = other.secondaryPalette,
-                tertiaryPalette = other.tertiaryPalette,
-                neutralPalette = other.neutralPalette,
-                neutralVariantPalette = other.neutralVariantPalette,
-                platform = other.platform,
-                specVersion = other.specVersion,
-                errorPalette = other.errorPalette,
-            )
+        ): DynamicScheme = DynamicScheme(
+            sourceColorHctList = other.sourceColorHctList,
+            variant = other.variant,
+            isDark = isDark,
+            contrastLevel = contrastLevel,
+            primaryPalette = other.primaryPalette,
+            secondaryPalette = other.secondaryPalette,
+            tertiaryPalette = other.tertiaryPalette,
+            neutralPalette = other.neutralPalette,
+            neutralVariantPalette = other.neutralVariantPalette,
+            platform = other.platform,
+            specVersion = other.specVersion,
+            errorPalette = other.errorPalette,
+        )
 
         /**
          * Returns a new hue based on a piecewise function and input color hue.

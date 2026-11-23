@@ -56,7 +56,9 @@ object ThemeChoice {
  * [PreferenceGroup], so the mockup has the full content width.
  */
 @Composable
-fun ThemePreference() {
+fun ThemePreference(
+    modifier: Modifier = Modifier,
+) {
     val adapter = preferenceManager2().launcherTheme.getAdapter()
 
     // Optimistic local state: updated immediately on tap so the mockup animation
@@ -90,7 +92,7 @@ fun ThemePreference() {
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -99,8 +101,8 @@ fun ThemePreference() {
         ThemeSegmentedControl(
             options = themeOptions,
             selectedOption = selectedTheme,
-            onOptionSelected = { newValue ->
-                selectedTheme = newValue   // instant — drives the animation immediately
+            onOptionSelect = { newValue ->
+                selectedTheme = newValue // instant — drives the animation immediately
                 adapter.onChange(newValue) // async — persists to DataStore
             },
         )
@@ -127,11 +129,11 @@ private fun ThemePreviewMockup(currentTheme: String) {
 
     // Pull the current accents from the live theme so every surface is tinted
     // from the same palette the user has chosen.
-    val primary   = MaterialTheme.colorScheme.primary
-    val tertiary  = MaterialTheme.colorScheme.tertiary
+    val primary = MaterialTheme.colorScheme.primary
+    val tertiary = MaterialTheme.colorScheme.tertiary
     // The settings screen's own background — we derive the phone wallpaper from
     // this so the relationship is always relative, never hardcoded.
-    val schemeBg  = MaterialTheme.colorScheme.background
+    val schemeBg = MaterialTheme.colorScheme.background
 
     // All surfaces are derived exclusively from schemeBg + primary/tertiary —
     // zero residual hue from any hardcoded hex constant, so the palette
@@ -139,43 +141,48 @@ private fun ThemePreviewMockup(currentTheme: String) {
 
     // Phone wallpaper: push schemeBg noticeably away from the page behind it —
     // darker in dark mode, lighter in light mode — then add a whisper of primary.
-    val wallpaperBgTarget = if (isDark)
+    val wallpaperBgTarget = if (isDark) {
         lerp(lerp(schemeBg, Color.Black, 0.35f), primary, 0.06f)
-    else
+    } else {
         lerp(lerp(schemeBg, Color.White, 0.55f), primary, 0.04f)
+    }
 
     // Card / dock base: lifted slightly above wallpaper then tinted from the accent.
     // Derived from schemeBg so it carries no foreign hue of its own.
-    val cardBase = if (isDark)
-        lerp(schemeBg, Color.White, 0.10f)   // a little lighter than the wallpaper
-    else
-        lerp(schemeBg, Color.Black, 0.04f)   // a little darker than the wallpaper
+    val cardBase = if (isDark) {
+        lerp(schemeBg, Color.White, 0.10f) // a little lighter than the wallpaper
+    } else {
+        lerp(schemeBg, Color.Black, 0.04f) // a little darker than the wallpaper
+    }
 
-    val cardColorTarget   = lerp(cardBase, primary,  if (isDark) 0.10f else 0.05f)
-    val widgetCardTarget  = lerp(cardBase, tertiary, if (isDark) 0.14f else 0.07f)
+    val cardColorTarget = lerp(cardBase, primary, if (isDark) 0.10f else 0.05f)
+    val widgetCardTarget = lerp(cardBase, tertiary, if (isDark) 0.14f else 0.07f)
 
     // Subtle elements (status-bar clock, text-line placeholders): same neutral
     // base, just a bit more primary tint so they're distinct but not glaring.
     val subtleColorTarget = lerp(cardBase, primary, if (isDark) 0.22f else 0.15f)
 
     // Border: thin tinted ring
-    val borderColorTarget = if (isDark) primary.copy(alpha = 0.28f)
-                            else        primary.copy(alpha = 0.18f)
+    val borderColorTarget = if (isDark) {
+        primary.copy(alpha = 0.28f)
+    } else {
+        primary.copy(alpha = 0.18f)
+    }
 
     // Accent icon squares — pure primary / tertiary with alpha, no grey base at all.
-    val accentStrongTarget = primary.copy(alpha  = if (isDark) 0.85f else 0.80f)
-    val accentMidTarget    = primary.copy(alpha  = if (isDark) 0.45f else 0.40f)
+    val accentStrongTarget = primary.copy(alpha = if (isDark) 0.85f else 0.80f)
+    val accentMidTarget = primary.copy(alpha = if (isDark) 0.45f else 0.40f)
     val widgetAccentTarget = tertiary.copy(alpha = if (isDark) 0.85f else 0.80f)
 
     val spec = tween<Color>(durationMillis = 400)
-    val wallpaperBg   by animateColorAsState(wallpaperBgTarget,  spec, "mock_bg")
-    val cardColor     by animateColorAsState(cardColorTarget,    spec, "mock_card")
-    val widgetCard    by animateColorAsState(widgetCardTarget,   spec, "mock_widget_card")
-    val subtleColor   by animateColorAsState(subtleColorTarget,  spec, "mock_subtle")
-    val borderColor   by animateColorAsState(borderColorTarget,  spec, "mock_border")
-    val accentStrong  by animateColorAsState(accentStrongTarget, spec, "mock_acc_strong")
-    val accentMid     by animateColorAsState(accentMidTarget,    spec, "mock_acc_mid")
-    val widgetAccent  by animateColorAsState(widgetAccentTarget, spec, "mock_widget_acc")
+    val wallpaperBg by animateColorAsState(wallpaperBgTarget, spec, "mock_bg")
+    val cardColor by animateColorAsState(cardColorTarget, spec, "mock_card")
+    val widgetCard by animateColorAsState(widgetCardTarget, spec, "mock_widget_card")
+    val subtleColor by animateColorAsState(subtleColorTarget, spec, "mock_subtle")
+    val borderColor by animateColorAsState(borderColorTarget, spec, "mock_border")
+    val accentStrong by animateColorAsState(accentStrongTarget, spec, "mock_acc_strong")
+    val accentMid by animateColorAsState(accentMidTarget, spec, "mock_acc_mid")
+    val widgetAccent by animateColorAsState(widgetAccentTarget, spec, "mock_widget_acc")
 
     val phoneShape = RoundedCornerShape(32.dp)
 
@@ -336,14 +343,14 @@ private fun ThemePreviewMockup(currentTheme: String) {
 fun ThemeSegmentedControl(
     options: List<Pair<String, String>>,
     selectedOption: String,
-    onOptionSelected: (String) -> Unit,
+    onOptionSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selectedIndex = options.indexOfFirst { it.first == selectedOption }.coerceAtLeast(0)
     ConnectedButtonGroup(
         options = options.map { it.second },
         selectedIndex = selectedIndex,
-        onSelect = { index -> onOptionSelected(options[index].first) },
+        onSelect = { index -> onOptionSelect(options[index].first) },
         modifier = modifier,
     )
 }

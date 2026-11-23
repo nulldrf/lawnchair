@@ -146,13 +146,12 @@ public class ViewingConditions private constructor(
          *
          * @param[lstar] The lightness of the area surrounding the color. measured by L* in L*a*b*.
          */
-        public fun defaultWithBackgroundLstar(lstar: Double): ViewingConditions =
-            make(
-                whitePoint = whitePointD65(),
-                adaptingLuminance = 200.0 / PI * yFromLstar(50.0) / 100f,
-                backgroundLstar = lstar,
-                surround = 2.0,
-                discountingIlluminant = false,
-            )
+        public fun defaultWithBackgroundLstar(lstar: Double): ViewingConditions = make(
+            whitePoint = whitePointD65(),
+            adaptingLuminance = 200.0 / PI * yFromLstar(50.0) / 100f,
+            backgroundLstar = lstar,
+            surround = 2.0,
+            discountingIlluminant = false,
+        )
     }
 }

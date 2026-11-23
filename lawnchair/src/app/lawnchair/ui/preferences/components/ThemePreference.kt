@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,8 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
@@ -50,10 +59,9 @@ object ThemeChoice {
 /**
  * Full redesign of the theme preference.
  *
- * Shows an animated phone-frame mockup that reflects the currently selected
- * theme, followed by a three-segment pill control (Light / Dark / System).
- * Intended to be placed at the top of [GeneralPreferences], outside any
- * [PreferenceGroup], so the mockup has the full content width.
+ * Shows a compact dual-surface phone preview (Launcher home + Settings UI)
+ * that reflects the currently selected theme and dynamic accent palette,
+ * followed by a three-segment pill control (Light / Dark / System).
  */
 @Composable
 fun ThemePreference(
@@ -110,225 +118,612 @@ fun ThemePreference(
 }
 
 // ---------------------------------------------------------------------------
-// Phone-frame preview
+// Dual-surface phone preview (Launcher home + Settings UI, icon-only)
 // ---------------------------------------------------------------------------
 
-/**
- * An animated phone-frame mockup that smoothly transitions between the light
- * and dark colour palettes whenever [currentTheme] changes, giving the user
- * immediate visual feedback before they commit to a choice.
- */
+private data class MockupPalette(
+    val pageBg: Color,
+    val wallTop: Color,
+    val wallBottom: Color,
+    val surface: Color,
+    val surfaceHigh: Color,
+    val primary: Color,
+    val onPrimary: Color,
+    val primaryContainer: Color,
+    val onPrimaryContainer: Color,
+    val secondaryContainer: Color,
+    val onSecondaryContainer: Color,
+    val tertiaryContainer: Color,
+    val onTertiaryContainer: Color,
+    val subtle: Color,
+    val border: Color,
+)
+
+@Composable
+private fun rememberAnimatedMockupPalette(isDark: Boolean): MockupPalette {
+    val scheme = MaterialTheme.colorScheme
+    val primary = scheme.primary
+    val secondary = scheme.secondary
+    val tertiary = scheme.tertiary
+
+    val targetPageBg = if (isDark) {
+        lerp(Color(0xFF111318), primary, 0.04f)
+    } else {
+        lerp(Color(0xFFF3F5FA), primary, 0.04f)
+    }
+    val targetWallTop = if (isDark) {
+        lerp(Color(0xFF161A22), primary, 0.14f)
+    } else {
+        lerp(Color(0xFFEAEFF8), primary, 0.16f)
+    }
+    val targetWallBottom = if (isDark) {
+        lerp(Color(0xFF1A1E28), tertiary, 0.16f)
+    } else {
+        lerp(Color(0xFFE3E9F4), tertiary, 0.18f)
+    }
+    val targetSurface = if (isDark) {
+        lerp(Color(0xFF1D2026), primary, 0.05f)
+    } else {
+        Color.White
+    }
+    val targetSurfaceHigh = if (isDark) {
+        lerp(Color(0xFF282C34), primary, 0.08f)
+    } else {
+        lerp(Color(0xFFE6EAF2), primary, 0.08f)
+    }
+    val targetPrimary = if (isDark) {
+        lerp(primary, Color.White, 0.25f)
+    } else {
+        lerp(primary, Color.Black, 0.12f)
+    }
+    val targetOnPrimary = if (isDark) {
+        lerp(primary, Color.Black, 0.72f)
+    } else {
+        Color.White
+    }
+    val targetPrimaryContainer = if (isDark) {
+        lerp(primary, Color.Black, 0.42f)
+    } else {
+        lerp(primary, Color.White, 0.72f)
+    }
+    val targetOnPrimaryContainer = if (isDark) {
+        lerp(primary, Color.White, 0.78f)
+    } else {
+        lerp(primary, Color.Black, 0.58f)
+    }
+    val targetSecondaryContainer = if (isDark) {
+        lerp(secondary, Color.Black, 0.48f)
+    } else {
+        lerp(secondary, Color.White, 0.76f)
+    }
+    val targetOnSecondaryContainer = if (isDark) {
+        lerp(secondary, Color.White, 0.74f)
+    } else {
+        lerp(secondary, Color.Black, 0.55f)
+    }
+    val targetTertiaryContainer = if (isDark) {
+        lerp(tertiary, Color.Black, 0.44f)
+    } else {
+        lerp(tertiary, Color.White, 0.74f)
+    }
+    val targetOnTertiaryContainer = if (isDark) {
+        lerp(tertiary, Color.White, 0.78f)
+    } else {
+        lerp(tertiary, Color.Black, 0.55f)
+    }
+    val targetSubtle = if (isDark) {
+        Color.White.copy(alpha = 0.22f)
+    } else {
+        Color.Black.copy(alpha = 0.16f)
+    }
+    val targetBorder = primary.copy(alpha = if (isDark) 0.28f else 0.20f)
+
+    val spec = tween<Color>(durationMillis = 360)
+    return MockupPalette(
+        pageBg = animateColorAsState(targetPageBg, spec, "m_page").value,
+        wallTop = animateColorAsState(targetWallTop, spec, "m_wt").value,
+        wallBottom = animateColorAsState(targetWallBottom, spec, "m_wb").value,
+        surface = animateColorAsState(targetSurface, spec, "m_surf").value,
+        surfaceHigh = animateColorAsState(targetSurfaceHigh, spec, "m_surf_hi").value,
+        primary = animateColorAsState(targetPrimary, spec, "m_pri").value,
+        onPrimary = animateColorAsState(targetOnPrimary, spec, "m_on_pri").value,
+        primaryContainer = animateColorAsState(targetPrimaryContainer, spec, "m_pri_c").value,
+        onPrimaryContainer = animateColorAsState(targetOnPrimaryContainer, spec, "m_on_pri_c").value,
+        secondaryContainer = animateColorAsState(targetSecondaryContainer, spec, "m_sec_c").value,
+        onSecondaryContainer = animateColorAsState(targetOnSecondaryContainer, spec, "m_on_sec_c").value,
+        tertiaryContainer = animateColorAsState(targetTertiaryContainer, spec, "m_ter_c").value,
+        onTertiaryContainer = animateColorAsState(targetOnTertiaryContainer, spec, "m_on_ter_c").value,
+        subtle = animateColorAsState(targetSubtle, spec, "m_subtle").value,
+        border = animateColorAsState(targetBorder, spec, "m_border").value,
+    )
+}
+
 @Composable
 private fun ThemePreviewMockup(currentTheme: String) {
-    val isSystemDark = isSystemInDarkTheme()
-    val isDark = when (currentTheme) {
-        ThemeChoice.DARK -> true
-        ThemeChoice.LIGHT -> false
-        else -> isSystemDark
-    }
+    // In System mode, show Light on the left tile and Dark on the right tile
+    // so both adaptive palettes are visible side-by-side without any text labels.
+    val leftDark = currentTheme == ThemeChoice.DARK
+    val rightDark = currentTheme == ThemeChoice.DARK || currentTheme == ThemeChoice.SYSTEM
 
-    // Pull the current accents from the live theme so every surface is tinted
-    // from the same palette the user has chosen.
-    val primary = MaterialTheme.colorScheme.primary
-    val tertiary = MaterialTheme.colorScheme.tertiary
-    // The settings screen's own background — we derive the phone wallpaper from
-    // this so the relationship is always relative, never hardcoded.
-    val schemeBg = MaterialTheme.colorScheme.background
-
-    // All surfaces are derived exclusively from schemeBg + primary/tertiary —
-    // zero residual hue from any hardcoded hex constant, so the palette
-    // accurately reflects whichever accent color the user has picked.
-
-    // Phone wallpaper: push schemeBg noticeably away from the page behind it —
-    // darker in dark mode, lighter in light mode — then add a whisper of primary.
-    val wallpaperBgTarget = if (isDark) {
-        lerp(lerp(schemeBg, Color.Black, 0.35f), primary, 0.06f)
-    } else {
-        lerp(lerp(schemeBg, Color.White, 0.55f), primary, 0.04f)
-    }
-
-    // Card / dock base: lifted slightly above wallpaper then tinted from the accent.
-    // Derived from schemeBg so it carries no foreign hue of its own.
-    val cardBase = if (isDark) {
-        lerp(schemeBg, Color.White, 0.10f) // a little lighter than the wallpaper
-    } else {
-        lerp(schemeBg, Color.Black, 0.04f) // a little darker than the wallpaper
-    }
-
-    val cardColorTarget = lerp(cardBase, primary, if (isDark) 0.10f else 0.05f)
-    val widgetCardTarget = lerp(cardBase, tertiary, if (isDark) 0.14f else 0.07f)
-
-    // Subtle elements (status-bar clock, text-line placeholders): same neutral
-    // base, just a bit more primary tint so they're distinct but not glaring.
-    val subtleColorTarget = lerp(cardBase, primary, if (isDark) 0.22f else 0.15f)
-
-    // Border: thin tinted ring
-    val borderColorTarget = if (isDark) {
-        primary.copy(alpha = 0.28f)
-    } else {
-        primary.copy(alpha = 0.18f)
-    }
-
-    // Accent icon squares — pure primary / tertiary with alpha, no grey base at all.
-    val accentStrongTarget = primary.copy(alpha = if (isDark) 0.85f else 0.80f)
-    val accentMidTarget = primary.copy(alpha = if (isDark) 0.45f else 0.40f)
-    val widgetAccentTarget = tertiary.copy(alpha = if (isDark) 0.85f else 0.80f)
-
-    val spec = tween<Color>(durationMillis = 400)
-    val wallpaperBg by animateColorAsState(wallpaperBgTarget, spec, "mock_bg")
-    val cardColor by animateColorAsState(cardColorTarget, spec, "mock_card")
-    val widgetCard by animateColorAsState(widgetCardTarget, spec, "mock_widget_card")
-    val subtleColor by animateColorAsState(subtleColorTarget, spec, "mock_subtle")
-    val borderColor by animateColorAsState(borderColorTarget, spec, "mock_border")
-    val accentStrong by animateColorAsState(accentStrongTarget, spec, "mock_acc_strong")
-    val accentMid by animateColorAsState(accentMidTarget, spec, "mock_acc_mid")
-    val widgetAccent by animateColorAsState(widgetAccentTarget, spec, "mock_widget_acc")
-
-    val phoneShape = RoundedCornerShape(32.dp)
+    val leftPalette = rememberAnimatedMockupPalette(isDark = leftDark)
+    val rightPalette = rememberAnimatedMockupPalette(isDark = rightDark)
 
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center,
     ) {
-        // Phone shell — thin border, no shadow
-        Box(
+        Row(
             modifier = Modifier
-                .width(224.dp)
-                .height(308.dp)
-                .clip(phoneShape)
-                .background(wallpaperBg)
-                .border(width = 1.dp, color = borderColor, shape = phoneShape),
+                .fillMaxWidth()
+                .widthIn(max = 360.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(14.dp),
+            HomeMiniPhoneTile(
+                palette = leftPalette,
+                modifier = Modifier.weight(1f),
+            )
+            SettingsMiniPhoneTile(
+                palette = rightPalette,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeMiniPhoneTile(
+    palette: MockupPalette,
+    modifier: Modifier = Modifier,
+) {
+    val frameShape = RoundedCornerShape(24.dp)
+    Box(
+        modifier = modifier
+            .height(218.dp)
+            .clip(frameShape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(palette.wallTop, palette.wallBottom),
+                ),
+            )
+            .border(width = 1.dp, color = palette.border, shape = frameShape),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(11.dp),
+        ) {
+            MiniStatusBar(subtle = palette.subtle)
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Icon-only At a Glance accent strip
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                // ── Status bar ──────────────────────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Clock placeholder — tinted from subtleColor
+                Icon(
+                    imageVector = Icons.Rounded.WbSunny,
+                    contentDescription = null,
+                    tint = palette.primary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .width(44.dp)
+                            .height(5.dp)
+                            .clip(CircleShape)
+                            .background(palette.onPrimaryContainer.copy(alpha = 0.65f)),
+                    )
                     Box(
                         modifier = Modifier
                             .width(30.dp)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(subtleColor),
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(palette.subtle),
                     )
-                    // System icon dots — same tint family
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        repeat(3) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(subtleColor),
-                            )
-                        }
-                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-                // ── Large widget card ────────────────────────────────────────
-                // Uses tertiary (accent3) so it reads as a visually distinct zone
-                // from the primary-tinted shortcut cards and dock below it.
+            // Widget tile + 2x2 themed icons & mini folder
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Tertiary widget block (pure icon + bar)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(92.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(widgetCard),
+                        .weight(1f)
+                        .height(58.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(palette.tertiaryContainer)
+                        .padding(8.dp),
                 ) {
-                    Column(
+                    Icon(
+                        imageVector = Icons.Rounded.WbSunny,
+                        contentDescription = null,
+                        tint = palette.onTertiaryContainer.copy(alpha = 0.8f),
                         modifier = Modifier
-                            .padding(14.dp)
-                            .fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        // Accent stripe — tertiary tint to match the card zone
-                        Box(
-                            modifier = Modifier
-                                .width(48.dp)
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(2.5.dp))
-                                .background(widgetAccent),
-                        )
-                        // Body text placeholders — subtle tint
-                        Box(
-                            modifier = Modifier
-                                .width(80.dp)
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(2.5.dp))
-                                .background(subtleColor),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .width(60.dp)
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(2.5.dp))
-                                .background(subtleColor),
-                        )
-                    }
+                            .size(16.dp)
+                            .align(Alignment.TopStart),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(26.dp)
+                            .height(5.dp)
+                            .clip(CircleShape)
+                            .background(palette.onTertiaryContainer.copy(alpha = 0.45f))
+                            .align(Alignment.BottomStart),
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // ── Two smaller shortcut cards ───────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // 2x2 icons + folder bubble
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    // First card: strong accent icon; second: mid accent icon
-                    listOf(accentStrong, accentMid).forEach { iconTint ->
-                        Box(
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        MiniAppIcon(
+                            containerColor = palette.primaryContainer,
+                            glyphColor = palette.primary,
+                            isCircleGlyph = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        MiniAppIcon(
+                            containerColor = palette.secondaryContainer,
+                            glyphColor = palette.onSecondaryContainer.copy(alpha = 0.65f),
+                            isCircleGlyph = false,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        MiniAppIcon(
+                            containerColor = palette.tertiaryContainer,
+                            glyphColor = palette.onTertiaryContainer.copy(alpha = 0.65f),
+                            isCircleGlyph = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // Mini 2x2 folder
+                        Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(60.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(cardColor),
+                                .height(26.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(palette.surface)
+                                .border(0.75.dp, palette.border, RoundedCornerShape(8.dp))
+                                .padding(4.dp),
+                            verticalArrangement = Arrangement.SpaceEvenly,
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(10.dp)
-                                    .size(20.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(iconTint),
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                            ) {
+                                Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primary))
+                                Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primary.copy(alpha = 0.45f)))
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                            ) {
+                                Box(Modifier.size(6.dp).clip(CircleShape).background(palette.onTertiaryContainer.copy(alpha = 0.6f)))
+                                Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primary.copy(alpha = 0.7f)))
+                            }
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // ── Dock ─────────────────────────────────────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(27.dp))
-                        .background(cardColor)
-                        .padding(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // First icon: strong accent; rest: subtle tint
-                    repeat(4) { index ->
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (index == 0) accentStrong else subtleColor),
-                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Dock icons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                MiniAppIcon(
+                    containerColor = palette.primary,
+                    glyphColor = palette.onPrimary,
+                    isCircleGlyph = true,
+                    modifier = Modifier.weight(1f),
+                )
+                MiniAppIcon(
+                    containerColor = palette.primaryContainer,
+                    glyphColor = palette.primary,
+                    isCircleGlyph = false,
+                    modifier = Modifier.weight(1f),
+                )
+                MiniAppIcon(
+                    containerColor = palette.secondaryContainer,
+                    glyphColor = palette.onSecondaryContainer.copy(alpha = 0.7f),
+                    isCircleGlyph = true,
+                    modifier = Modifier.weight(1f),
+                )
+                MiniAppIcon(
+                    containerColor = palette.tertiaryContainer,
+                    glyphColor = palette.onTertiaryContainer.copy(alpha = 0.7f),
+                    isCircleGlyph = false,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(7.dp))
+
+            // Pill QSB search bar (icon-only)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(24.dp)
+                    .clip(CircleShape)
+                    .background(palette.surface)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = palette.primary,
+                    modifier = Modifier.size(13.dp),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .height(8.dp)
+                            .clip(CircleShape)
+                            .background(palette.subtle),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .border(1.2.dp, palette.subtle, RoundedCornerShape(2.dp)),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            MiniGesturePill(subtle = palette.subtle)
         }
+    }
+}
+
+@Composable
+private fun SettingsMiniPhoneTile(
+    palette: MockupPalette,
+    modifier: Modifier = Modifier,
+) {
+    val frameShape = RoundedCornerShape(24.dp)
+    Box(
+        modifier = modifier
+            .height(218.dp)
+            .clip(frameShape)
+            .background(palette.pageBg)
+            .border(width = 1.dp, color = palette.border, shape = frameShape),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(11.dp),
+        ) {
+            MiniStatusBar(subtle = palette.subtle)
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Pill search bar (icon + bar)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(22.dp)
+                    .clip(CircleShape)
+                    .background(palette.surfaceHigh)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = palette.subtle.copy(alpha = 0.7f),
+                    modifier = Modifier.size(12.dp),
+                )
+                Box(
+                    modifier = Modifier
+                        .width(46.dp)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(palette.subtle),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Mini M3E MainSwitch pill
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .clip(CircleShape)
+                    .background(palette.primaryContainer)
+                    .padding(start = 12.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(46.dp)
+                        .height(5.dp)
+                        .clip(CircleShape)
+                        .background(palette.onPrimaryContainer.copy(alpha = 0.75f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .width(22.dp)
+                        .height(13.dp)
+                        .clip(CircleShape)
+                        .background(palette.primary)
+                        .padding(2.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .clip(CircleShape)
+                            .background(palette.onPrimary),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Segmented settings cards with circular icon badges (icon-only)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MiniSettingsRow(
+                    surfaceColor = palette.surface,
+                    badgeContainer = palette.primaryContainer,
+                    badgeContent = palette.onPrimaryContainer,
+                    icon = Icons.Rounded.Tune,
+                    barColor = palette.subtle,
+                    shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 4.dp, bottomEnd = 4.dp),
+                )
+                MiniSettingsRow(
+                    surfaceColor = palette.surface,
+                    badgeContainer = palette.tertiaryContainer,
+                    badgeContent = palette.onTertiaryContainer,
+                    icon = Icons.Rounded.Home,
+                    barColor = palette.subtle,
+                    shape = RoundedCornerShape(4.dp),
+                )
+                MiniSettingsRow(
+                    surfaceColor = palette.surface,
+                    badgeContainer = palette.secondaryContainer,
+                    badgeContent = palette.onSecondaryContainer,
+                    icon = Icons.Rounded.Palette,
+                    barColor = palette.subtle,
+                    shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 12.dp, bottomEnd = 12.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+            MiniGesturePill(subtle = palette.subtle)
+        }
+    }
+}
+
+@Composable
+private fun MiniStatusBar(subtle: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(20.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(subtle),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Box(Modifier.size(4.dp).clip(CircleShape).background(subtle))
+            Box(Modifier.width(9.dp).height(4.dp).clip(RoundedCornerShape(1.5.dp)).background(subtle))
+        }
+    }
+}
+
+@Composable
+private fun MiniAppIcon(
+    containerColor: Color,
+    glyphColor: Color,
+    isCircleGlyph: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(26.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(11.dp)
+                .clip(if (isCircleGlyph) CircleShape else RoundedCornerShape(3.dp))
+                .background(glyphColor),
+        )
+    }
+}
+
+@Composable
+private fun MiniSettingsRow(
+    surfaceColor: Color,
+    badgeContainer: Color,
+    badgeContent: Color,
+    icon: ImageVector,
+    barColor: Color,
+    shape: RoundedCornerShape,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(surfaceColor)
+            .padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(badgeContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = badgeContent,
+                modifier = Modifier.size(11.dp),
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Box(
+                modifier = Modifier
+                    .width(48.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(barColor.copy(alpha = 0.85f)),
+            )
+            Box(
+                modifier = Modifier
+                    .width(34.dp)
+                    .height(3.dp)
+                    .clip(CircleShape)
+                    .background(barColor.copy(alpha = 0.45f)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiniGesturePill(subtle: Color) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(38.dp)
+                .height(3.dp)
+                .clip(CircleShape)
+                .background(subtle),
+        )
     }
 }
 

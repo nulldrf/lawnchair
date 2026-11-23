@@ -425,6 +425,10 @@
     <string name="custom_icon_shape_top_right">Top right</string>
     <string name="custom_icon_shape_bottom_left">Bottom left</string>
     <string name="custom_icon_shape_bottom_right">Bottom right</string>
+    <string name="custom_icon_shape_all">All</string>
+    <string name="custom_icon_shape_all_corners">All corners</string>
+    <string name="custom_icon_shape_corner_roundness">Corner roundness</string>
+    <string name="custom_icon_shape_mixed">Mixed</string>
 
     <string name="export_to_clipboard">Export to clipboard</string>
     <string name="import_from_clipboard">Import from clipboard</string>

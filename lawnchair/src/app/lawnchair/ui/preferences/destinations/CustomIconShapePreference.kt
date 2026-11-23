@@ -524,7 +524,7 @@ private fun SharedCornerControlsCard(
                     selectedIndex = selectedStyleIndex,
                     onSelect = { index -> onCornerStyleChange(styleOptions[index]) },
                     minHeight = 44.dp,
-                    colors = ToggleButtonDefaults.toggleButtonColors(
+                    colors = ToggleButtonDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     ),
                 )

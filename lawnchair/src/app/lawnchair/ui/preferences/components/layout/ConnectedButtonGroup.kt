@@ -35,7 +35,7 @@ fun ConnectedButtonGroup(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     minHeight: Dp = 48.dp,
-    colors: ToggleButtonColors = ToggleButtonDefaults.toggleButtonColors(),
+    colors: ToggleButtonColors = ToggleButtonDefaults.colors(),
 ) {
     val context = LocalContext.current
     val msdlPlayer = remember(context) { MSDLPlayerWrapper.INSTANCE.get(context) }

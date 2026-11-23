@@ -17,7 +17,7 @@
 package app.lawnchair.ui.preferences.about
 
 import android.content.Intent
-import androidx.compose.foundation.Image
+import android.widget.ImageView
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,11 +43,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.lawnchair.preferences2.PreferenceManager2
@@ -59,6 +63,8 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceGroupItem
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayoutLazyColumn
 import app.lawnchair.ui.preferences.components.layout.preferenceGroupItems
 import app.lawnchair.ui.preferences.navigation.AboutLicenses
+import com.airbnb.lottie.LottieAnimationView
+import com.airbnb.lottie.LottieDrawable
 import com.android.launcher3.BuildConfig
 import com.android.launcher3.R
 import kotlinx.coroutines.launch
@@ -109,9 +115,7 @@ fun About(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher_home_comp),
-                    contentDescription = null,
+                LawnchairAnimatedLogo(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape),
@@ -251,6 +255,51 @@ fun About(
             }
         }
     }
+}
+
+@Composable
+private fun LawnchairAnimatedLogo(
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lottieView = remember(context) {
+        LottieAnimationView(context).apply {
+            setAnimation(R.raw.lawnchair_logo_anim)
+            repeatCount = LottieDrawable.INFINITE
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, lottieView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    lottieView.cancelAnimation()
+                    lottieView.progress = 0f
+                    lottieView.playAnimation()
+                }
+
+                Lifecycle.Event.ON_PAUSE -> {
+                    lottieView.cancelAnimation()
+                    lottieView.progress = 0f
+                }
+
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            lottieView.cancelAnimation()
+            lottieView.progress = 0f
+        }
+    }
+
+    AndroidView(
+        factory = { lottieView },
+        modifier = modifier,
+    )
 }
 
 private const val PRIVACY_POLICY = "https://lawnchair.app/privacy_policy"

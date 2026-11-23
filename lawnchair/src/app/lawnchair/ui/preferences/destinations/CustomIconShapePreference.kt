@@ -2,16 +2,12 @@ package app.lawnchair.ui.preferences.destinations
 
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,12 +19,15 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -38,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -307,26 +307,6 @@ private fun CornerHandleDot(
 ) {
     val isDirectlySelected = selectedTarget == corner
     val isActive = selectedTarget == CornerTarget.ALL || isDirectlySelected
-    val dotSize by animateDpAsState(
-        targetValue = if (isDirectlySelected) 16.dp else 11.dp,
-        label = "corner_dot_size",
-    )
-    val fillColor by animateColorAsState(
-        targetValue = if (isActive) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHighest
-        },
-        label = "corner_dot_fill",
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (isDirectlySelected) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.primary.copy(alpha = if (isActive) 0.85f else 0.35f)
-        },
-        label = "corner_dot_border",
-    )
     val description = corner.label()
 
     Box(
@@ -341,12 +321,10 @@ private fun CornerHandleDot(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(dotSize)
-                .clip(CircleShape)
-                .background(fillColor)
-                .border(width = 2.dp, color = borderColor, shape = CircleShape),
+        RadioButton(
+            selected = isActive,
+            onClick = null,
+            modifier = Modifier.scale(0.8f),
         )
     }
 }
@@ -469,6 +447,7 @@ private fun CornerBracketIcon(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SharedCornerControlsCard(
     iconShape: IconShape.CustomCornerBased,
@@ -494,7 +473,7 @@ private fun SharedCornerControlsCard(
 
     val activeCornerShape = iconShape.resolvedCornerShape(selectedTarget)
     val selectedStyleIndex = activeCornerShape?.let { active ->
-        styleOptions.indexOfFirst { it::class.java == active::class.java }
+        styleOptions.indexOfFirst { it.isSameCornerStyle(active) }
     } ?: -1
 
     val step = 0.1f
@@ -545,6 +524,9 @@ private fun SharedCornerControlsCard(
                     selectedIndex = selectedStyleIndex,
                     onSelect = { index -> onCornerStyleChange(styleOptions[index]) },
                     minHeight = 44.dp,
+                    colors = ToggleButtonDefaults.toggleButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    ),
                 )
             }
 
@@ -581,6 +563,8 @@ private fun SharedCornerControlsCard(
     }
 }
 
+private fun IconCornerShape.isSameCornerStyle(other: IconCornerShape): Boolean = this === other || this.toString() == other.toString()
+
 private fun IconShape.CustomCornerBased.resolvedCornerShape(target: CornerTarget): IconCornerShape? = when (target) {
     CornerTarget.TOP_LEFT -> topLeft.shape
 
@@ -591,11 +575,11 @@ private fun IconShape.CustomCornerBased.resolvedCornerShape(target: CornerTarget
     CornerTarget.BOTTOM_RIGHT -> bottomRight.shape
 
     CornerTarget.ALL -> {
-        val first = topLeft.shape::class.java
-        val uniform = topRight.shape::class.java == first &&
-            bottomLeft.shape::class.java == first &&
-            bottomRight.shape::class.java == first
-        if (uniform) topLeft.shape else null
+        val first = topLeft.shape
+        val uniform = topRight.shape.isSameCornerStyle(first) &&
+            bottomLeft.shape.isSameCornerStyle(first) &&
+            bottomRight.shape.isSameCornerStyle(first)
+        if (uniform) first else null
     }
 }
 

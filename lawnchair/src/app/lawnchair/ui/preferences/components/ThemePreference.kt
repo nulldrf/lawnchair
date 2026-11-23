@@ -21,11 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,11 +36,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.components.layout.ConnectedButtonGroup
+import app.lawnchair.ui.theme.getColorScheme
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 
@@ -141,82 +141,31 @@ private data class MockupPalette(
 
 @Composable
 private fun rememberAnimatedMockupPalette(isDark: Boolean): MockupPalette {
-    val scheme = MaterialTheme.colorScheme
-    val primary = scheme.primary
-    val secondary = scheme.secondary
-    val tertiary = scheme.tertiary
+    val scheme = getColorScheme(darkTheme = isDark)
 
-    val targetPageBg = if (isDark) {
-        lerp(Color(0xFF111318), primary, 0.04f)
-    } else {
-        lerp(Color(0xFFF3F5FA), primary, 0.04f)
-    }
-    val targetWallTop = if (isDark) {
-        lerp(Color(0xFF161A22), primary, 0.14f)
-    } else {
-        lerp(Color(0xFFEAEFF8), primary, 0.16f)
-    }
-    val targetWallBottom = if (isDark) {
-        lerp(Color(0xFF1A1E28), tertiary, 0.16f)
-    } else {
-        lerp(Color(0xFFE3E9F4), tertiary, 0.18f)
-    }
-    val targetSurface = if (isDark) {
-        lerp(Color(0xFF1D2026), primary, 0.05f)
-    } else {
-        Color.White
-    }
-    val targetSurfaceHigh = if (isDark) {
-        lerp(Color(0xFF282C34), primary, 0.08f)
-    } else {
-        lerp(Color(0xFFE6EAF2), primary, 0.08f)
-    }
-    val targetPrimary = if (isDark) {
-        lerp(primary, Color.White, 0.25f)
-    } else {
-        lerp(primary, Color.Black, 0.12f)
-    }
-    val targetOnPrimary = if (isDark) {
-        lerp(primary, Color.Black, 0.72f)
-    } else {
-        Color.White
-    }
-    val targetPrimaryContainer = if (isDark) {
-        lerp(primary, Color.Black, 0.42f)
-    } else {
-        lerp(primary, Color.White, 0.72f)
-    }
-    val targetOnPrimaryContainer = if (isDark) {
-        lerp(primary, Color.White, 0.78f)
-    } else {
-        lerp(primary, Color.Black, 0.58f)
-    }
-    val targetSecondaryContainer = if (isDark) {
-        lerp(secondary, Color.Black, 0.48f)
-    } else {
-        lerp(secondary, Color.White, 0.76f)
-    }
-    val targetOnSecondaryContainer = if (isDark) {
-        lerp(secondary, Color.White, 0.74f)
-    } else {
-        lerp(secondary, Color.Black, 0.55f)
-    }
-    val targetTertiaryContainer = if (isDark) {
-        lerp(tertiary, Color.Black, 0.44f)
-    } else {
-        lerp(tertiary, Color.White, 0.74f)
-    }
-    val targetOnTertiaryContainer = if (isDark) {
-        lerp(tertiary, Color.White, 0.78f)
-    } else {
-        lerp(tertiary, Color.Black, 0.55f)
-    }
-    val targetSubtle = if (isDark) {
-        Color.White.copy(alpha = 0.22f)
-    } else {
-        Color.Black.copy(alpha = 0.16f)
-    }
-    val targetBorder = primary.copy(alpha = if (isDark) 0.28f else 0.20f)
+    val targetPageBg = scheme.surface
+    val targetWallTop = lerp(
+        scheme.surfaceContainerLow,
+        scheme.primaryContainer,
+        if (isDark) 0.22f else 0.36f,
+    )
+    val targetWallBottom = lerp(
+        scheme.surfaceContainer,
+        scheme.tertiaryContainer,
+        if (isDark) 0.24f else 0.32f,
+    )
+    val targetSurface = scheme.surfaceContainer
+    val targetSurfaceHigh = scheme.surfaceContainerHighest
+    val targetPrimary = scheme.primary
+    val targetOnPrimary = scheme.onPrimary
+    val targetPrimaryContainer = scheme.primaryContainer
+    val targetOnPrimaryContainer = scheme.onPrimaryContainer
+    val targetSecondaryContainer = scheme.secondaryContainer
+    val targetOnSecondaryContainer = scheme.onSecondaryContainer
+    val targetTertiaryContainer = scheme.tertiaryContainer
+    val targetOnTertiaryContainer = scheme.onTertiaryContainer
+    val targetSubtle = scheme.onSurfaceVariant.copy(alpha = if (isDark) 0.32f else 0.26f)
+    val targetBorder = scheme.outlineVariant
 
     val spec = tween<Color>(durationMillis = 360)
     return MockupPalette(
@@ -463,7 +412,7 @@ private fun HomeMiniPhoneTile(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Search,
+                    painter = painterResource(id = R.drawable.ic_search),
                     contentDescription = null,
                     tint = palette.primary,
                     modifier = Modifier.size(13.dp),
@@ -528,7 +477,7 @@ private fun SettingsMiniPhoneTile(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Search,
+                    painter = painterResource(id = R.drawable.ic_search),
                     contentDescription = null,
                     tint = palette.subtle.copy(alpha = 0.7f),
                     modifier = Modifier.size(12.dp),

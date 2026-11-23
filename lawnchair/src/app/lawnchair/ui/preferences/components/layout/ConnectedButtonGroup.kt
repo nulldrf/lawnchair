@@ -9,6 +9,8 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonColors
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -33,6 +35,7 @@ fun ConnectedButtonGroup(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     minHeight: Dp = 48.dp,
+    colors: ToggleButtonColors = ToggleButtonDefaults.toggleButtonColors(),
 ) {
     val context = LocalContext.current
     val msdlPlayer = remember(context) { MSDLPlayerWrapper.INSTANCE.get(context) }
@@ -51,6 +54,7 @@ fun ConnectedButtonGroup(
                         onSelect(index)
                     }
                 },
+                colors = colors,
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()

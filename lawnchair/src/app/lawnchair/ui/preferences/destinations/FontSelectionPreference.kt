@@ -37,20 +37,24 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -60,8 +64,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.SelectableDropdownMenuItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
@@ -78,6 +88,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -90,7 +101,6 @@ import app.lawnchair.font.googlefonts.GoogleFontsListing
 import app.lawnchair.preferences.PreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.ui.AndroidText
-import app.lawnchair.ui.OverflowMenu
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.layout.PreferenceGroupHeading
 import app.lawnchair.ui.preferences.components.layout.PreferenceLazyColumn
@@ -256,18 +266,12 @@ fun FontSelection(
         isExpandedScreen = LocalIsExpandedScreen.current,
         modifier = modifier,
         actions = {
-            OverflowMenu {
-                DropdownMenuItem(
-                    onClick = {
-                        mMSDLPlayerWrapper.playToken(MSDLToken.SUCCESS)
-                        adapter.onChange(fontPref.defaultValue)
-                        hideMenu()
-                    },
-                    text = {
-                        Text(text = stringResource(id = R.string.action_reset))
-                    },
-                )
-            }
+            ResetFontActionButton(
+                onClick = {
+                    mMSDLPlayerWrapper.playToken(MSDLToken.SUCCESS)
+                    adapter.onChange(fontPref.defaultValue)
+                },
+            )
         },
         bottomBar = {
             BottomFontToolbar(
@@ -787,7 +791,7 @@ private fun BottomFontToolbar(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Search,
+                    painter = painterResource(id = R.drawable.ic_search),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),
@@ -889,6 +893,40 @@ private fun EmptyFontsCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResetFontActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val resetLabel = stringResource(id = R.string.action_reset)
+    val tooltipState = rememberTooltipState()
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            PlainTooltip {
+                Text(text = resetLabel)
+            }
+        },
+        state = tooltipState,
+        modifier = modifier,
+    ) {
+        FilledTonalIconButton(
+            onClick = onClick,
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.RestartAlt,
+                contentDescription = resetLabel,
+            )
+        }
+    }
+}
+
 @Composable
 private fun VariantDropdown(
     adapter: PreferenceAdapter<FontCache.Font>,
@@ -898,6 +936,7 @@ private fun VariantDropdown(
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
     Box(modifier = modifier.wrapContentWidth()) {
         val selectedFont = adapter.state.value
+        val selectedVariantLabel = variantDisplayLabel(family, selectedFont)
         var showVariants by remember { mutableStateOf(false) }
 
         val context = LocalContext.current
@@ -908,7 +947,10 @@ private fun VariantDropdown(
         }
 
         Surface(
-            onClick = { showVariants = true },
+            onClick = {
+                mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
+                showVariants = true
+            },
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
@@ -919,7 +961,7 @@ private fun VariantDropdown(
                 AndroidText(
                     modifier = Modifier.wrapContentWidth(),
                     update = {
-                        it.text = variantDisplayLabel(family, selectedFont)
+                        it.text = selectedVariantLabel
                         it.setFont(selectedFont)
                     },
                 )
@@ -930,24 +972,45 @@ private fun VariantDropdown(
                 )
             }
         }
-        DropdownMenu(
+
+        val sortedVariants = family.sortedVariants
+        DropdownMenuPopup(
             expanded = showVariants,
             onDismissRequest = { showVariants = false },
         ) {
-            family.sortedVariants.forEach { font ->
-                DropdownMenuItem(
-                    onClick = {
-                        adapter.onChange(font)
-                        showVariants = false
-                        mMSDLPlayerWrapper.playToken(MSDLToken.TAP_MEDIUM_EMPHASIS)
-                    },
-                    text = {
-                        Text(
-                            text = variantDisplayLabel(family, font),
-                            fontFamily = font.composeFontFamily,
-                        )
-                    },
-                )
+            DropdownMenuGroup(
+                shapes = MenuDefaults.groupShape(0, 1),
+                containerColor = MenuDefaults.groupStandardContainerColor,
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                sortedVariants.forEachIndexed { index, font ->
+                    val label = variantDisplayLabel(family, font)
+                    val isSelected = font == selectedFont ||
+                        (selectedFont !in family.variants.values && label == selectedVariantLabel)
+                    SelectableDropdownMenuItem(
+                        selected = isSelected,
+                        onClick = {
+                            mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
+                            adapter.onChange(font)
+                            showVariants = false
+                        },
+                        text = {
+                            Text(
+                                text = label,
+                                fontFamily = font.composeFontFamily,
+                            )
+                        },
+                        shapes = MenuDefaults.itemShape(index, sortedVariants.size),
+                        colors = MenuDefaults.selectableItemColors(),
+                        selectedLeadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(MenuDefaults.LeadingIconSize),
+                            )
+                        },
+                    )
+                }
             }
         }
     }

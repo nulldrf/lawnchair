@@ -18,19 +18,18 @@ package app.lawnchair.ui.preferences.components.layout
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ListItemShapes
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 /***
  * A template used to create most preference-related components in the Preference UI.
@@ -52,6 +51,7 @@ fun PreferenceTemplate(
         disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         supportingContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     ),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
     interactionSource: MutableInteractionSource? = null,
 ) {
     val titleContent = @Composable {
@@ -80,6 +80,7 @@ fun PreferenceTemplate(
                 supportingContent = descriptionContent,
                 verticalAlignment = verticalAlignment,
                 colors = colors,
+                contentPadding = contentPadding,
             )
         } else {
             SegmentedListItem(
@@ -93,6 +94,7 @@ fun PreferenceTemplate(
                 supportingContent = descriptionContent,
                 verticalAlignment = verticalAlignment,
                 colors = colors,
+                contentPadding = contentPadding,
                 interactionSource = interactionSource,
             )
         }

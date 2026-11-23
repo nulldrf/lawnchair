@@ -104,13 +104,12 @@ fun SwitchPreference(
             ) {
                 if (onClick != null) {
                     VerticalDivider(
-                        modifier = Modifier.height(32.dp),
+                        modifier = Modifier.height(28.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
                 Switch(
-                    modifier = Modifier
-                        .padding(start = if (onClick != null) 12.dp else 0.dp)
-                        .height(24.dp),
+                    modifier = Modifier.padding(start = if (onClick != null) 16.dp else 0.dp),
                     checked = checked,
                     onCheckedChange = wrappedOnCheckedChange,
                     enabled = enabled,

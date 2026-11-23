@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -38,6 +44,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences2.asState
 import app.lawnchair.ui.preferences.components.layout.ExpandAndShrink
@@ -181,7 +188,8 @@ private fun AnnouncementItemContent(
             text = text,
             url = url,
             icon = icon,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            onClose = onClose,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
     }
 }
@@ -191,21 +199,13 @@ private fun AnnouncementPreferenceItemContent(
     text: String,
     url: String?,
     icon: ImageVector,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val hasLink = !url.isNullOrBlank()
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(context)
 
-    // A true pill: RoundedCornerShape(percent = 50) rounds each corner to
-    // 50% of the shorter side, so it stays a full capsule regardless of
-    // height — no fixed dp radius to look "correct" at one height and
-    // wrong at another.
-    //
-    // Surface's own onClick (rather than a plain .clickable in the modifier
-    // chain) is what bounds the press/long-press ripple to `shape` — a
-    // .clickable added to the incoming modifier draws its ripple in the
-    // full rectangular layout bounds, ignoring the pill clip entirely.
     Surface(
         onClick = {
             mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
@@ -217,24 +217,50 @@ private fun AnnouncementPreferenceItemContent(
         },
         enabled = hasLink,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(percent = 50),
-        color = MaterialTheme.colorScheme.primary,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = icon,
-                tint = MaterialTheme.colorScheme.background,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    tint = MaterialTheme.colorScheme.onTertiary,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text = text,
-                color = MaterialTheme.colorScheme.background,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.weight(1f),
             )
+            IconButton(
+                onClick = {
+                    mMSDLPlayerWrapper.playToken(MSDLToken.TAP_LOW_EMPHASIS)
+                    onClose()
+                },
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(id = android.R.string.cancel),
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

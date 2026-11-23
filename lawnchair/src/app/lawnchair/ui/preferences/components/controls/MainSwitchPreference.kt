@@ -3,8 +3,9 @@ package app.lawnchair.ui.preferences.components.controls
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -122,6 +123,7 @@ fun MainSwitchPreference(
         SegmentedListItem(
             onClick = { wrappedOnCheckedChange(!checked) },
             selected = checked,
+            modifier = Modifier.defaultMinSize(minHeight = 72.dp),
             shapes = ListItemDefaults.shapes().copy(
                 shape = CircleShape,
                 selectedShape = CircleShape,
@@ -130,11 +132,10 @@ fun MainSwitchPreference(
                 hoveredShape = CircleShape,
             ),
             enabled = enabled,
+            contentPadding = PaddingValues(start = 32.dp, top = 16.dp, end = 20.dp, bottom = 16.dp),
             trailingContent = {
                 Switch(
-                    modifier = Modifier
-                        .padding(top = contentPadding, bottom = contentPadding, start = contentPadding)
-                        .height(24.dp),
+                    modifier = Modifier.padding(start = 12.dp),
                     checked = checked,
                     onCheckedChange = wrappedOnCheckedChange,
                     enabled = enabled,

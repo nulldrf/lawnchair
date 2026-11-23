@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,7 +74,7 @@ fun ComponentActivity.EdgeToEdge() {
     val scrimColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f).toArgb()
     val contentColor = MaterialTheme.colorScheme.onSurface.toArgb()
 
-    LaunchedEffect(darkTheme) {
+    LaunchedEffect(darkTheme, scrimColor, contentColor) {
         val statusBarStyle = SystemBarStyle.auto(
             Color.TRANSPARENT,
             Color.TRANSPARENT,
@@ -96,11 +97,25 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     if (LocalInspectionMode.current) return getPreviewColorScheme(darkTheme)
 
     val context = LocalContext.current
+    val themeProvider = remember(context) { ThemeProvider.INSTANCE.get(context) }
     val preferenceManager2 = preferenceManager2()
     val accentColor by preferenceManager2.accentColor.asState()
     val colorStyle by preferenceManager2.colorStyle.asState()
     val colorSpec by preferenceManager2.colorSpec.asState()
     val colorSpecFallback by preferenceManager2.colorSpecFallback.asState()
+
+    // Track external palette updates (wallpaper color changes, system overlay changes) so
+    // an open Settings screen refreshes live without having to close and re-enter it.
+    var themeVersion by remember(themeProvider) { mutableIntStateOf(0) }
+    DisposableEffect(themeProvider) {
+        val listener = object : ThemeProvider.ColorSchemeChangeListener {
+            override fun onColorSchemeChanged() {
+                themeVersion++
+            }
+        }
+        themeProvider.addListener(listener)
+        onDispose { themeProvider.removeListener(listener) }
+    }
 
     val isSystemAccent = accentColor == ColorOption.SystemAccent
     val effectiveStyle = if (colorSpec != SpecVersion.SPEC_2026 && colorStyle is Cmf) {
@@ -135,8 +150,21 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
             effectiveStyle !is LegacyKdrag
 
     if (useMaterialKolor) {
-        val scheme2025 = remember(accentColor, effectiveStyle, colorSpec, colorSpecFallback, darkTheme) {
-            ThemeProvider.INSTANCE.get(context).colorScheme2025(isDark = darkTheme)
+        val scheme2025 = remember(
+            accentColor,
+            effectiveStyle,
+            colorSpec,
+            colorSpecFallback,
+            darkTheme,
+            themeVersion,
+        ) {
+            themeProvider.colorScheme2025(
+                isDark = darkTheme,
+                accentColor = accentColor,
+                colorStyle = effectiveStyle,
+                colorSpec = colorSpec,
+                colorSpecFallback = colorSpecFallback,
+            )
         }
         if (scheme2025 != null) {
             return scheme2025.toComposeColorScheme2025(isDark = darkTheme)
@@ -145,8 +173,18 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
 
     // Legacy path: SPEC_2021, SystemAccent, LegacyKdrag, or a style with no
     // SPEC_2025/2026 implementation. Uses the kdrag0n ColorScheme engine.
-    val colorScheme = remember(accentColor, effectiveStyle, if (isSystemAccent) null else effectiveSpec) {
-        ThemeProvider.INSTANCE.get(context).colorScheme
+    val colorScheme = remember(
+        accentColor,
+        effectiveStyle,
+        if (isSystemAccent) null else effectiveSpec,
+        themeVersion,
+    ) {
+        themeProvider.colorSchemeFor(
+            accentColor = accentColor,
+            colorStyle = effectiveStyle,
+            colorSpec = colorSpec,
+            colorSpecFallback = colorSpecFallback,
+        )
     }
     return colorScheme.toComposeColorScheme(isDark = darkTheme)
 }

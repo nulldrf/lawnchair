@@ -302,23 +302,21 @@ class LawnchairLauncher : QuickstepLauncher() {
      * theme-change events within [RECREATE_DEBOUNCE_MS] collapse into one recreate.
      */
     private val recreateDebounceRunnable = Runnable {
-        if (!isFinishing && !isDestroyed && themeProvider.colorScheme != colorScheme) {
+        if (isFinishing || isDestroyed) return@Runnable
+        if (themeProvider.colorScheme != colorScheme) {
             recreate()
+        } else {
+            mWallpaperThemeManager.updateTheme()
         }
     }
 
     fun updateTheme() {
         if (isFinishing || isDestroyed) return
-        if (themeProvider.colorScheme != colorScheme) {
-            // Debounce: cancel any pending recreate and schedule a fresh one.
-            // Multiple rapid theme emissions (e.g. from a single icon pack change)
-            // collapse into one recreate rather than stacking instances.
-            dragLayer.removeCallbacks(recreateDebounceRunnable)
-            dragLayer.postDelayed(recreateDebounceRunnable, RECREATE_DEBOUNCE_MS)
-        } else {
-            dragLayer.removeCallbacks(recreateDebounceRunnable)
-            mWallpaperThemeManager.updateTheme()
-        }
+        // Debounce both color-scheme and Light/Dark/System theme switches so rapid taps in
+        // Settings finish animating cleanly and collapse into at most one background recreate
+        // (or zero if the final effective Light/Dark theme matches the current activity theme).
+        Executors.MAIN_EXECUTOR.handler.removeCallbacks(recreateDebounceRunnable)
+        Executors.MAIN_EXECUTOR.handler.postDelayed(recreateDebounceRunnable, RECREATE_DEBOUNCE_MS)
     }
 
     override fun onStateBack() {
@@ -564,7 +562,7 @@ class LawnchairLauncher : QuickstepLauncher() {
         // Cancel any pending debounced recreate — this activity is stopping, so
         // there is no point recreating it. If the theme change is still relevant,
         // the new active instance will receive it via its own subscription.
-        dragLayer.removeCallbacks(recreateDebounceRunnable)
+        Executors.MAIN_EXECUTOR.handler.removeCallbacks(recreateDebounceRunnable)
         // Force-remove the icon pack switch overlay immediately when stopping.
         //
         // When recreate() replaces this activity, onStop() is called before onDestroy().
@@ -599,7 +597,8 @@ class LawnchairLauncher : QuickstepLauncher() {
         SmartspacerClient.close()
         // Belt-and-suspenders: cancel pending recreate and remove any overlay re-added
         // between onStop() and onDestroy(). Primary cleanup happens in onStop() above.
-        dragLayer.removeCallbacks(recreateDebounceRunnable)
+        Executors.MAIN_EXECUTOR.handler.removeCallbacks(recreateDebounceRunnable)
+        Executors.MAIN_EXECUTOR.handler.removeCallbacks(pendingRecreateRunnable)
         dragLayer.removeCallbacks(iconPackIdleRunnable)
         dragLayer.removeCallbacks(iconPackSafetyRunnable)
         iconPackOverlay?.let { overlay ->
@@ -611,8 +610,23 @@ class LawnchairLauncher : QuickstepLauncher() {
 
     override fun getDefaultOverlay(): LauncherOverlayManager = defaultOverlay
 
+    private val pendingRecreateRunnable = Runnable {
+        if (sRestartFlags == 0 && !isFinishing && !isDestroyed) {
+            recreate()
+        }
+    }
+
     fun recreateIfNotScheduled() {
-        if (sRestartFlags == 0) recreate()
+        if (sRestartFlags != 0) return
+        val handler = Executors.MAIN_EXECUTOR.handler
+        handler.removeCallbacks(pendingRecreateRunnable)
+        if (hasBeenResumed()) {
+            handler.post(pendingRecreateRunnable)
+        } else {
+            // Launcher is paused behind Settings: debounce rapid taps (e.g. browsing
+            // Color Styles / Accent Colors) into one background recreate after Settings settles.
+            handler.postDelayed(pendingRecreateRunnable, RECREATE_DEBOUNCE_MS)
+        }
     }
 
     // ── Icon pack switch loading overlay ──────────────────────────────────
@@ -786,7 +800,7 @@ class LawnchairLauncher : QuickstepLauncher() {
          * [recreate]. Theme providers can emit multiple rapid changes for a single
          * icon pack switch; this collapses them into one recreate.
          */
-        private const val RECREATE_DEBOUNCE_MS = 150L
+        private const val RECREATE_DEBOUNCE_MS = 250L
         private const val MIN_OVERLAY_VISIBLE_MS = 450L
         private const val SETTLE_AFTER_BIND_MS = 200L
         private const val MAX_OVERLAY_TIMEOUT_MS = 4_000L

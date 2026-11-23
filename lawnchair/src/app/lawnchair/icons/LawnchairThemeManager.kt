@@ -46,13 +46,17 @@ constructor(
     iconControllerFactory,
     lifecycle,
 ) {
+    // Note: launcherTheme is intentionally NOT included here. Non-themed icons do not depend
+    // on Light/Dark mode, and themed icons already encode the resolved palette in
+    // themedColorsKey (ThemedIconDrawable.getColors(context)). Keeping launcherTheme out of
+    // statePrefs prevents unnecessary full icon cache wipes and model reloads when switching
+    // Light/Dark/System with Themed Icons off or when effective dark mode does not change.
     private val statePrefs = listOf(
         prefs2.wrapAdaptiveIcons,
         prefs2.transparentIconBackground,
         prefs2.shadowBGIcons,
         prefs2.coloredBackgroundLightness,
         prefs2.forceIconMonochrome,
-        prefs2.launcherTheme,
         prefs2.colorizedBackgrounds,
         prefs2.treatWhiteAdaptiveIcons,
     )

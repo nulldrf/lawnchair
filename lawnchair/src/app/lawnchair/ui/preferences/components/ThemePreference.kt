@@ -25,10 +25,6 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,19 +64,9 @@ fun ThemePreference(
     modifier: Modifier = Modifier,
 ) {
     val adapter = preferenceManager2().launcherTheme.getAdapter()
-
-    // Optimistic local state: updated immediately on tap so the mockup animation
-    // and segment highlight fire at the moment of the gesture, not after the
-    // DataStore write round-trip (which can add a visible frame or two of lag).
-    // The adapter write still happens so the preference is persisted; the
-    // side-effect below keeps local state in sync in case it ever drifts
-    // (e.g. deep-link or backup restore changing the value externally).
-    var selectedTheme by remember { mutableStateOf(adapter.state.value) }
-
-    val persistedTheme = adapter.state.value
-    if (persistedTheme != selectedTheme) {
-        selectedTheme = persistedTheme
-    }
+    // CachedPreferencesDataStore updates in-memory state synchronously on write,
+    // so adapter.state.value reflects taps on the very next frame with zero lag.
+    val selectedTheme = adapter.state.value
 
     // Build the option list, conditionally adding System on supported API levels.
     // Mirrors the original filter logic from ThemeChoice / themeEntries.
@@ -110,8 +96,9 @@ fun ThemePreference(
             options = themeOptions,
             selectedOption = selectedTheme,
             onOptionSelect = { newValue ->
-                selectedTheme = newValue // instant — drives the animation immediately
-                adapter.onChange(newValue) // async — persists to DataStore
+                if (newValue != selectedTheme) {
+                    adapter.onChange(newValue)
+                }
             },
         )
     }
@@ -167,7 +154,7 @@ private fun rememberAnimatedMockupPalette(isDark: Boolean): MockupPalette {
     val targetSubtle = scheme.onSurfaceVariant.copy(alpha = if (isDark) 0.32f else 0.26f)
     val targetBorder = scheme.outlineVariant
 
-    val spec = tween<Color>(durationMillis = 360)
+    val spec = tween<Color>(durationMillis = 250)
     return MockupPalette(
         pageBg = animateColorAsState(targetPageBg, spec, "m_page").value,
         wallTop = animateColorAsState(targetWallTop, spec, "m_wt").value,

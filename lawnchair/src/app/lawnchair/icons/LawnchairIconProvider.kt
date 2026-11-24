@@ -22,6 +22,7 @@ import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
+import android.os.PowerManager
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.ArrayMap
@@ -51,6 +52,7 @@ import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.SafeCloseable
 import com.android.quickstep.RecentsModel
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -416,21 +418,60 @@ class LawnchairIconProvider @Inject constructor(
         return themedIconMap
     }
 
+    private data class ListenerRegistration(
+        val callback: IconChangeListener,
+        val handler: Handler,
+    )
+
+    private val listenerLock = Any()
+    private val iconChangeListeners = CopyOnWriteArrayList<ListenerRegistration>()
+    private var sharedIconPackChangeReceiver: IconPackChangeReceiver? = null
+    private var sharedLawniconsChangeReceiver: LawniconsChangeReceiver? = null
+
+    private fun dispatchAppIconChanged(packageName: String, user: UserHandle) {
+        iconChangeListeners.forEach { registration ->
+            registration.handler.post {
+                registration.callback.onAppIconChanged(packageName, user)
+            }
+        }
+    }
+
     override fun registerIconChangeListener(
         callback: IconChangeListener,
         handler: Handler,
     ): SafeCloseable {
+        val registration = ListenerRegistration(callback, handler)
+        synchronized(listenerLock) {
+            val wasEmpty = iconChangeListeners.isEmpty()
+            iconChangeListeners.add(registration)
+            if (wasEmpty) {
+                val receiverHandler = Executors.MODEL_EXECUTOR.handler
+                sharedIconPackChangeReceiver = IconPackChangeReceiver(context, receiverHandler)
+                sharedLawniconsChangeReceiver = LawniconsChangeReceiver(context, receiverHandler)
+            }
+        }
+        val superCloseable = super.registerIconChangeListener(callback, handler)
         return MultiSafeCloseable().apply {
-            add(super.registerIconChangeListener(callback, handler))
-            add(IconPackChangeReceiver(context, handler, callback))
-            add(LawniconsChangeReceiver(context, handler))
+            add(superCloseable)
+            add(
+                SafeCloseable {
+                    synchronized(listenerLock) {
+                        iconChangeListeners.remove(registration)
+                        if (iconChangeListeners.isEmpty()) {
+                            sharedIconPackChangeReceiver?.close()
+                            sharedIconPackChangeReceiver = null
+                            sharedLawniconsChangeReceiver?.close()
+                            sharedLawniconsChangeReceiver = null
+                        }
+                    }
+                },
+            )
         }
     }
 
     private inner class IconPackChangeReceiver(
         private val context: Context,
         private val handler: Handler,
-        private val callback: IconChangeListener,
     ) : SafeCloseable {
 
         private var calendarAndClockChangeReceiver: CalendarAndClockChangeReceiver? = null
@@ -490,7 +531,7 @@ class LawnchairIconProvider @Inject constructor(
         private fun recreateCalendarAndClockChangeReceiver() {
             val iconPack = IconPackProvider.INSTANCE.get(context).getIconPack(iconPackPref.firstCached())
             calendarAndClockChangeReceiver = if (iconPack != null) {
-                CalendarAndClockChangeReceiver(context, handler, iconPack, callback)
+                CalendarAndClockChangeReceiver(context, handler, iconPack, ::dispatchAppIconChanged)
             } else {
                 null
             }
@@ -506,9 +547,12 @@ class LawnchairIconProvider @Inject constructor(
         private val context: Context,
         handler: Handler,
         private val iconPack: IconPack,
-        private val callback: IconChangeListener,
+        private val onAppIconChanged: (String, UserHandle) -> Unit,
     ) : BroadcastReceiver(),
         SafeCloseable {
+
+        private val powerManager = context.getSystemService<PowerManager>()
+        private val launcherApps = context.getSystemService<LauncherApps>()
 
         init {
             val filter = IntentFilter(ACTION_TIMEZONE_CHANGED)
@@ -520,22 +564,33 @@ class LawnchairIconProvider @Inject constructor(
 
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                ACTION_TIMEZONE_CHANGED, ACTION_TIME_CHANGED, ACTION_TIME_TICK -> {
-                    context.getSystemService<UserManager>()?.userProfiles?.forEach { user ->
-                        iconPack.getClocks().forEach { componentName ->
-                            callback.onAppIconChanged(
-                                componentName.packageName,
-                                user,
-                            )
-                        }
-                    }
+                ACTION_TIME_TICK -> {
+                    // Never wake launcher model / recents to redraw dynamic clocks while screen is off.
+                    if (powerManager?.isInteractive == false) return
+                    notifyInstalledPackages(iconPack.getClocks())
+                }
+
+                ACTION_TIMEZONE_CHANGED, ACTION_TIME_CHANGED -> {
+                    notifyInstalledPackages(iconPack.getClocks())
                 }
 
                 ACTION_DATE_CHANGED -> {
-                    context.getSystemService<UserManager>()?.userProfiles?.forEach { user ->
-                        iconPack.getCalendars().forEach { componentName ->
-                            callback.onAppIconChanged(componentName.packageName, user)
-                        }
+                    notifyInstalledPackages(iconPack.getCalendars())
+                }
+            }
+        }
+
+        private fun notifyInstalledPackages(components: Set<ComponentName>) {
+            if (components.isEmpty()) return
+            val uniquePackages = components.mapTo(HashSet(components.size)) { it.packageName }
+            val profiles = context.getSystemService<UserManager>()?.userProfiles ?: return
+            for (user in profiles) {
+                for (packageName in uniquePackages) {
+                    val isInstalled = launcherApps?.let { la ->
+                        runCatching { la.isPackageEnabled(packageName, user) }.getOrDefault(false)
+                    } ?: context.packageManager.isPackageInstalled(packageName)
+                    if (isInstalled) {
+                        onAppIconChanged(packageName, user)
                     }
                 }
             }

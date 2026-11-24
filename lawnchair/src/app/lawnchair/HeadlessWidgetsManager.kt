@@ -38,10 +38,8 @@ class HeadlessWidgetsManager @Inject constructor(
     private val widgetManager = AppWidgetManager.getInstance(context)
     private val host = HeadlessAppWidgetHost(context)
     private val widgetsMap = mutableMapOf<String, Widget>()
-
-    init {
-        host.startListening()
-    }
+    private val listenLock = Any()
+    private var activeSubscribers = 0
 
     @Synchronized
     fun getWidget(info: AppWidgetProviderInfo, prefKey: String): Widget {
@@ -63,9 +61,28 @@ class HeadlessWidgetsManager @Inject constructor(
         return widget.updates
     }
 
+    private fun onSubscriberStarted() {
+        synchronized(listenLock) {
+            if (activeSubscribers++ == 0) {
+                runCatching { host.startListening() }
+            }
+        }
+    }
+
+    private fun onSubscriberStopped() {
+        synchronized(listenLock) {
+            if (activeSubscribers > 0 && --activeSubscribers == 0) {
+                runCatching { host.stopListening() }
+            }
+        }
+    }
+
     override fun close() {
         scope.cancel()
-        host.stopListening()
+        synchronized(listenLock) {
+            activeSubscribers = 0
+            runCatching { host.stopListening() }
+        }
         widgetsMap.clear()
     }
 
@@ -98,10 +115,14 @@ class HeadlessWidgetsManager @Inject constructor(
         val isBound: Boolean
             get() = widgetId > -1 && widgetManager.getAppWidgetInfo(widgetId)?.provider == info.provider
         val updates = callbackFlow {
+            onSubscriberStarted()
             val view = host.createView(context, widgetId, info) as HeadlessAppWidgetHostView
             trySend(view)
             view.updateCallback = { trySend(it) }
-            awaitClose { view.updateCallback = null }
+            awaitClose {
+                view.updateCallback = null
+                onSubscriberStopped()
+            }
         }
             .onStart { if (!isBound) throw WidgetNotBoundException() }
             .shareIn(

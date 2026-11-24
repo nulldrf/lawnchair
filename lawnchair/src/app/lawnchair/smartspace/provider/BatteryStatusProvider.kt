@@ -15,6 +15,7 @@ import app.lawnchair.util.formatShortElapsedTimeRoundingUpToMinutes
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import kotlin.math.abs
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 // pE-TODO(JimfXJ91): Allow customising on/off behaviour for fast/slow charging
@@ -31,26 +32,55 @@ class BatteryStatusProvider(context: Context) :
      * */
     private val showBatteryChargingSpeedsFlag = false
     private val batteryManager = context.getSystemService<BatteryManager>()
+    private val chargingIcon = Icon.createWithResource(context, R.drawable.ic_charging)
+    private val lowBatteryIcon = Icon.createWithResource(context, R.drawable.ic_battery_low)
+
+    private data class BatterySnapshot(
+        val charging: Boolean,
+        val full: Boolean,
+        val level: Int,
+        val wattageBucket: Int,
+    )
 
     override val internalTargets = broadcastReceiverFlow(context, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         .map { intent ->
             val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
             val charging = status == BatteryManager.BATTERY_STATUS_CHARGING
             val full = status == BatteryManager.BATTERY_STATUS_FULL
-            val level = (
-                100f *
-                    intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0) /
-                    intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-                ).toInt()
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+            val level = (100f * intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0) / scale).toInt()
             val wattage = if (showBatteryChargingSpeedsFlag && charging) getChargingWattage(intent) else 0f
-            listOfNotNull(getSmartspaceTarget(charging, full, level, wattage))
+            val wattageBucket = when {
+                !showBatteryChargingSpeedsFlag || !charging -> 0
+                wattage >= ChargingPower.FAST -> 2
+                wattage > 0f && wattage <= ChargingPower.SLOW -> 1
+                else -> 0
+            }
+            BatterySnapshot(charging, full, level, wattageBucket)
         }
+        .distinctUntilChanged()
+        .map { snapshot ->
+            listOfNotNull(
+                getSmartspaceTarget(
+                    charging = snapshot.charging,
+                    full = snapshot.full,
+                    level = snapshot.level,
+                    wattageBucket = snapshot.wattageBucket,
+                ),
+            )
+        }
+        .distinctUntilChanged()
 
-    private fun getSmartspaceTarget(charging: Boolean, full: Boolean, level: Int, wattage: Float): SmartspaceTarget? {
+    private fun getSmartspaceTarget(
+        charging: Boolean,
+        full: Boolean,
+        level: Int,
+        wattageBucket: Int,
+    ): SmartspaceTarget? {
         val title = when {
             full || level == 100 -> return null
-            showBatteryChargingSpeedsFlag && charging && (wattage >= ChargingPower.FAST) -> context.getString(R.string.smartspace_battery_fast_charging)
-            showBatteryChargingSpeedsFlag && charging && (wattage > 0f && wattage <= ChargingPower.SLOW) -> context.getString(R.string.smartspace_battery_slow_charging)
+            showBatteryChargingSpeedsFlag && charging && wattageBucket == 2 -> context.getString(R.string.smartspace_battery_fast_charging)
+            showBatteryChargingSpeedsFlag && charging && wattageBucket == 1 -> context.getString(R.string.smartspace_battery_slow_charging)
             charging -> context.getString(R.string.smartspace_battery_charging)
             level <= 15 -> context.getString(R.string.smartspace_battery_low)
             else -> return null
@@ -71,12 +101,12 @@ class BatteryStatusProvider(context: Context) :
         } else {
             context.getString(R.string.n_percent, level)
         }
-        val iconResId = if (charging) R.drawable.ic_charging else R.drawable.ic_battery_low
+        val icon = if (charging) chargingIcon else lowBatteryIcon
         return SmartspaceTarget(
             id = "batteryStatus",
             headerAction = SmartspaceAction(
                 id = "batteryStatusAction",
-                icon = Icon.createWithResource(context, iconResId),
+                icon = icon,
                 title = title,
                 subtitle = subtitle,
             ),

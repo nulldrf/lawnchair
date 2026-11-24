@@ -16,7 +16,7 @@ import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.smartspace.model.SmartspaceTarget
 import app.lawnchair.smartspace.provider.SmartspaceProvider
 import app.lawnchair.theme.color.ColorOption
-import app.lawnchair.util.repeatOnAttached
+import app.lawnchair.util.repeatOnAttachedAndStarted
 import com.android.launcher3.R
 import com.android.launcher3.util.Themes
 import kotlin.math.roundToInt
@@ -43,6 +43,7 @@ class BcSmartspaceView @JvmOverloads constructor(
         super.onFinishInflate()
         viewPager = findViewById<ViewPager>(R.id.smartspace_card_pager)!!
         viewPager.isSaveEnabled = false
+        viewPager.adapter = adapter
         indicator = findViewById<PageIndicator>(R.id.smartspace_page_indicator)!!
 
         viewPager.addOnPageChangeListener(object : ViewPager.OnPageChangeListener {
@@ -69,9 +70,7 @@ class BcSmartspaceView @JvmOverloads constructor(
         })
 
         val targets = if (previewMode) provider.previewTargets else provider.targets
-        repeatOnAttached {
-            viewPager.adapter = adapter
-
+        repeatOnAttachedAndStarted {
             // Follow the user's custom workspace icon text color preference, falling back
             // to the existing theme-derived workspaceTextColor when set to Default.
             // This mirrors the same logic BubbleTextView uses for home screen icon labels,

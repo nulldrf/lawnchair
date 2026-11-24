@@ -29,8 +29,11 @@ import com.android.launcher3.util.SafeCloseable
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 
@@ -38,10 +41,11 @@ import org.json.JSONObject
 class GoogleFontsListing @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : SafeCloseable {
-    private val scope = CoroutineScope(CoroutineName("GoogleFontsListing"))
+    private val scope = CoroutineScope(SupervisorJob() + CoroutineName("GoogleFontsListing"))
 
     private val dataProvider = MockDataProvider(context.resources)
-    private val fonts by lazy { scope.async(Dispatchers.IO) { loadFontListing() } }
+    private val fontsLock = Any()
+    private var fontsDeferred: Deferred<List<GoogleFontInfo>>? = null
 
     private suspend fun loadFontListing(): List<GoogleFontInfo> {
         val json = dataProvider.getFontListing()
@@ -71,11 +75,23 @@ class GoogleFontsListing @Inject constructor(
     }
 
     suspend fun getFonts(): List<GoogleFontInfo> {
-        return fonts.await()
+        val deferred = synchronized(fontsLock) {
+            fontsDeferred?.takeIf { !it.isCancelled }
+                ?: scope.async(Dispatchers.IO) { loadFontListing() }.also { fontsDeferred = it }
+        }
+        return deferred.await()
+    }
+
+    fun clearCache() {
+        synchronized(fontsLock) {
+            fontsDeferred?.cancel()
+            fontsDeferred = null
+        }
     }
 
     override fun close() {
-        TODO("Not yet implemented")
+        clearCache()
+        scope.cancel()
     }
 
     sealed interface DataProvider {

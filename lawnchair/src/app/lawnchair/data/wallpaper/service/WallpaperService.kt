@@ -1,10 +1,9 @@
-﻿package app.lawnchair.data.wallpaper.service
+package app.lawnchair.data.wallpaper.service
 
 import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
 import android.util.Log
-import androidx.core.graphics.drawable.toBitmap
 import app.lawnchair.data.AppDatabase
 import app.lawnchair.data.wallpaper.Wallpaper
 import app.lawnchair.util.bitmapToByteArray
@@ -28,14 +27,16 @@ class WallpaperService @Inject constructor(
 
     suspend fun saveWallpaper(wallpaperManager: WallpaperManager) {
         try {
-            val wallpaperDrawable = wallpaperManager.drawable
-            val currentBitmap = (wallpaperDrawable as BitmapDrawable).toBitmap()
+            val wallpaperDrawable = wallpaperManager.drawable as? BitmapDrawable ?: return
+            val currentBitmap = wallpaperDrawable.bitmap ?: return
 
             val byteArray = bitmapToByteArray(currentBitmap)
 
             saveWallpaper(byteArray)
         } catch (e: Exception) {
             Log.e("WallpaperChange", "Error detecting wallpaper change: ${e.message}")
+        } finally {
+            runCatching { wallpaperManager.forgetLoadedWallpaper() }
         }
     }
 
@@ -132,9 +133,7 @@ class WallpaperService @Inject constructor(
         return imageFile.absolutePath
     }
 
-    override fun close() {
-        TODO("Not yet implemented")
-    }
+    override fun close() = Unit
     companion object {
         @JvmField
         val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getWallpaperService)

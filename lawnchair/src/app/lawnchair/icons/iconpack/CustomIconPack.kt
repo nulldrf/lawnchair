@@ -73,12 +73,13 @@ class CustomIconPack(context: Context, packPackageName: String) : IconPack(conte
     }
 
     override fun loadInternal() {
-        val parseXml = getXml("appfilter") ?: return
         val compStart = "ComponentInfo{"
         val compStartLength = compStart.length
         val compEnd = "}"
         val compEndLength = compEnd.length
+        val xml = openXml("appfilter") ?: return
         try {
+            val parseXml = xml.parser
             while (parseXml.next() != XmlPullParser.END_DOCUMENT) {
                 if (parseXml.eventType != XmlPullParser.START_TAG) continue
                 val name = parseXml.name
@@ -132,6 +133,8 @@ class CustomIconPack(context: Context, packPackageName: String) : IconPack(conte
             e.printStackTrace()
         } catch (e: IllegalStateException) {
             e.printStackTrace()
+        } finally {
+            xml.close()
         }
     }
 
@@ -152,25 +155,30 @@ class CustomIconPack(context: Context, packPackageName: String) : IconPack(conte
             emit(ArrayList(result))
         }
 
-        val parser = getXml("drawable")
-        while (parser != null && parser.next() != XmlPullParser.END_DOCUMENT) {
-            if (parser.eventType != XmlPullParser.START_TAG) continue
-            when (parser.name) {
-                "category" -> {
-                    val title = parser["title"] ?: continue
-                    endCategory()
-                    currentTitle = title
-                }
+        val xml = openXml("drawable")
+        try {
+            val parser = xml?.parser
+            while (parser != null && parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType != XmlPullParser.START_TAG) continue
+                when (parser.name) {
+                    "category" -> {
+                        val title = parser["title"] ?: continue
+                        endCategory()
+                        currentTitle = title
+                    }
 
-                "item" -> {
-                    val drawableName = parser["drawable"] ?: continue
-                    val resId = getDrawableId(drawableName)
-                    if (resId != 0) {
-                        val item = IconPickerItem(packPackageName, drawableName, drawableName, IconType.Normal)
-                        currentItems.add(item)
+                    "item" -> {
+                        val drawableName = parser["drawable"] ?: continue
+                        val resId = getDrawableId(drawableName)
+                        if (resId != 0) {
+                            val item = IconPickerItem(packPackageName, drawableName, drawableName, IconType.Normal)
+                            currentItems.add(item)
+                        }
                     }
                 }
             }
+        } finally {
+            xml?.close()
         }
         endCategory()
     }.flowOn(Dispatchers.IO)
@@ -180,25 +188,46 @@ class CustomIconPack(context: Context, packPackageName: String) : IconPack(conte
         packResources.getIdentifier(name, "drawable", packPackageName)
     }
 
+    private class CloseableXmlParser(
+        val parser: XmlPullParser,
+        private val stream: java.io.Closeable? = null,
+    ) : java.io.Closeable {
+        override fun close() {
+            runCatching {
+                if (parser is XmlResourceParser) {
+                    parser.close()
+                }
+            }
+            runCatching { stream?.close() }
+        }
+    }
+
     /**
-     * Returns an [XmlPullParser] for the named XML resource inside the icon pack.
+     * Opens a closeable [XmlPullParser] for the named XML resource inside the icon pack.
      *
      * Previously this method redundantly called [PackageManager.getResourcesForApplication]
      * on every invocation, creating a new [Resources] object (and therefore a new APK mmap
      * entry) each time — even though [packResources] was already available as a field.
      * It now uses [packResources] directly, so no additional APK mapping is created.
      */
-    private fun getXml(name: String): XmlPullParser? {
+    private fun openXml(name: String): CloseableXmlParser? {
         try {
             @SuppressLint("DiscouragedApi")
             val resourceId = packResources.getIdentifier(name, "xml", packPackageName)
             return if (resourceId != 0) {
-                context.packageManager.getXml(packPackageName, resourceId, null)
+                val parser = context.packageManager.getXml(packPackageName, resourceId, null) ?: return null
+                CloseableXmlParser(parser)
             } else {
-                val factory = XmlPullParserFactory.newInstance()
-                val parser = factory.newPullParser()
-                parser.setInput(packResources.assets.open("$name.xml"), Xml.Encoding.UTF_8.toString())
-                parser
+                val inputStream = packResources.assets.open("$name.xml")
+                try {
+                    val factory = XmlPullParserFactory.newInstance()
+                    val parser = factory.newPullParser()
+                    parser.setInput(inputStream, Xml.Encoding.UTF_8.toString())
+                    CloseableXmlParser(parser, inputStream)
+                } catch (t: Throwable) {
+                    runCatching { inputStream.close() }
+                    throw t
+                }
             }
         } catch (_: PackageManager.NameNotFoundException) {
         } catch (_: IOException) {

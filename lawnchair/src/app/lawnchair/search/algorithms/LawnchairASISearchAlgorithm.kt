@@ -63,9 +63,13 @@ class LawnchairASISearchAlgorithm(context: Context) : LawnchairSearchAlgorithm(c
 
     override fun destroy() {
         super.destroy()
+        activeQuery?.cancel()
+        activeQuery = null
         scope.cancel()
+        val session = searchSession
+        searchSession = null
         Executors.UI_HELPER_EXECUTOR.execute {
-            searchSession?.destroy()
+            session?.destroy()
         }
     }
 

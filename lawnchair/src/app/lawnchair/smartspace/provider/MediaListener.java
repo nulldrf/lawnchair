@@ -56,8 +56,10 @@ public class MediaListener extends MediaController.Callback {
     }
 
     public void onPause() {
-        updateTracking();
         mFlowCollector.stop();
+        mHandler.removeCallbacksAndMessages(null);
+        updateControllers(Collections.emptyList());
+        mTracking = null;
     }
 
     public MediaNotificationController getTracking() {

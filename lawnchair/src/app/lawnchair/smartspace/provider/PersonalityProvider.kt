@@ -32,16 +32,16 @@ class PersonalityProvider(context: Context) :
     /**
      * Emits on:
      * 1. Startup immediately
-     * 2. Every minute (so the greeting updates at the hour boundary)
+     * 2. Each hour boundary (greetings only change by hour of day)
      * 3. DATE_CHANGED / TIME_CHANGED / TIMEZONE_CHANGED broadcasts
      */
     private fun tickerFlow(): Flow<List<SmartspaceTarget>> {
-        val minuteTicker = flow {
+        val hourTicker = flow {
             while (true) {
                 emit(Unit)
-                // Sleep until the next minute boundary
+                // Sleep until the next hour boundary (+1s buffer to land cleanly in the new hour)
                 val now = System.currentTimeMillis()
-                kotlinx.coroutines.delay(60_000L - now % 60_000L)
+                kotlinx.coroutines.delay(3_600_000L - now % 3_600_000L + 1_000L)
             }
         }
 
@@ -54,7 +54,7 @@ class PersonalityProvider(context: Context) :
             },
         )
 
-        return merge(minuteTicker, broadcastTrigger.transformLatest { emit(Unit) })
+        return merge(hourTicker, broadcastTrigger.transformLatest { emit(Unit) })
             .transformLatest {
                 emit(buildTargets())
             }

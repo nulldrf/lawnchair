@@ -11,6 +11,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.HandlerThread
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -33,6 +34,7 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -91,6 +93,8 @@ class WeatherDataProvider(context: Context) :
 
     private val prefs = PreferenceManager2.getInstance(context)
     private val iconProvider = WeatherIconProvider(context)
+    private val powerManager = context.getSystemService<PowerManager>()
+    private val forceNextFetch = AtomicBoolean(false)
     private val sp: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -146,6 +150,7 @@ class WeatherDataProvider(context: Context) :
     }.flowOn(Dispatchers.IO)
 
     fun refreshNow() {
+        forceNextFetch.set(true)
         restart()
     }
 
@@ -160,8 +165,24 @@ class WeatherDataProvider(context: Context) :
         // unit & icon pack immediately when those settings change.
         emit(buildCachedTargets(config).ifEmpty { listOf(emptyWeatherTarget()) })
 
+        // Avoid firing redundant network/GPS fetches when returning home from another app
+        // or unlocking the phone if the cached forecast for this provider/city is still fresh.
+        val initialDelayMs = if (forceNextFetch.getAndSet(false)) {
+            0L
+        } else {
+            remainingCacheDelayMs(config)
+        }
+        if (initialDelayMs > 0L) {
+            delay(initialDelayMs)
+        }
+
         var consecutiveFailures = 0
         while (true) {
+            // Belt-and-suspenders guard: never wake network or location radios while the screen is off.
+            if (powerManager != null && !powerManager.isInteractive) {
+                delay(config.refreshInterval.minutes)
+                continue
+            }
             val fresh = fetch()
             if (fresh.isNotEmpty()) {
                 consecutiveFailures = 0
@@ -170,16 +191,30 @@ class WeatherDataProvider(context: Context) :
             } else {
                 consecutiveFailures++
                 emit(buildCachedTargets(config).ifEmpty { listOf(emptyWeatherTarget()) })
-                // Short progressive retry backoff (1m -> 2m -> 5m, capped at refreshInterval)
-                // so temporary boot/network/GPS failures recover quickly.
+                // Progressive retry backoff (2m -> 5m -> 15m -> refreshInterval) so transient
+                // failures recover without hammering network/GPS in a tight loop.
                 val retryMinutes = when (consecutiveFailures) {
-                    1 -> 1L
-                    2 -> 2L
-                    else -> 5L
+                    1 -> 2L
+                    2 -> 5L
+                    3 -> 15L
+                    else -> config.refreshInterval
                 }.coerceAtMost(config.refreshInterval)
                 delay(retryMinutes.minutes)
             }
         }
+    }
+
+    private fun remainingCacheDelayMs(config: WeatherConfig): Long {
+        if (!sp.contains(KEY_TEMP)) return 0L
+        val cachedProvider = sp.getString(KEY_PROVIDER, null)
+        val cachedCity = sp.getString(KEY_CITY, null)
+        if (cachedProvider != config.provider.name) return 0L
+        if (cachedCity != config.city.lowercase(Locale.ROOT)) return 0L
+        val timestamp = sp.getLong(KEY_TIMESTAMP, 0L)
+        if (timestamp <= 0L) return 0L
+        val ageMs = System.currentTimeMillis() - timestamp
+        val refreshMs = config.refreshInterval.minutes.inWholeMilliseconds
+        return if (ageMs in 0 until refreshMs) refreshMs - ageMs else 0L
     }
 
     // ── Cache ─────────────────────────────────────────────────────────────────
@@ -583,7 +618,13 @@ class WeatherDataProvider(context: Context) :
                 add(LocationManager.FUSED_PROVIDER)
             }
             add(LocationManager.NETWORK_PROVIDER)
-            add(LocationManager.GPS_PROVIDER)
+            // Weather only needs city-level accuracy: avoid spinning up the high-power GPS
+            // radio when we already have a reasonably recent cached fix (< 6h).
+            val hasUsableCachedFix = bestCached != null &&
+                System.currentTimeMillis() - bestCached.time <= MAX_CACHE_AGE_MS
+            if (!hasUsableCachedFix) {
+                add(LocationManager.GPS_PROVIDER)
+            }
         }.filter { provider -> runCatching { lm.isProviderEnabled(provider) }.getOrDefault(false) }
 
         for (provider in activeProviders) {

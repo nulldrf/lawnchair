@@ -97,11 +97,18 @@ class LawnchairActivityCachingLogic @Inject constructor(
     override fun getFreshnessIdentifier(
         item: LauncherActivityInfo,
         provider: IconProvider,
-    ): String? = provider.getStateForApp(getApplicationInfo(item))
-
-    override fun close() {
-        TODO("Not yet implemented")
+    ): String? {
+        val base = provider.getStateForApp(getApplicationInfo(item)) ?: return null
+        val key = ComponentKey(item.componentName, item.user)
+        val customLabel = prefs.getCustomAppName(key)
+        return if (!customLabel.isNullOrEmpty()) {
+            "$base,cn=$customLabel"
+        } else {
+            base
+        }
     }
+
+    override fun close() = Unit
 
     companion object {
         @JvmField

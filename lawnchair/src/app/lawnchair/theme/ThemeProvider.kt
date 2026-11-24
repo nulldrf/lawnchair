@@ -529,9 +529,16 @@ class ThemeProvider @Inject constructor(
         listeners.forEach(ColorSchemeChangeListener::onColorSchemeChanged)
     }
 
+    fun trimMemory() {
+        colorSchemeMap.clear()
+        colorSchemeMap2025.clear()
+        kdragColorSchemeMap.clear()
+    }
+
     override fun close() {
         isClosed = true
         coroutineScope.cancel()
+        trimMemory()
         wallpaperManager.removeOnChangeListener(wallpaperColorsChangedListener)
         if (Utilities.ATLEAST_O_MR1) {
             systemWallpaperColorsListener?.let {

@@ -20,6 +20,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
+import android.app.WallpaperManager
 import android.content.ComponentCallbacks2
 import android.content.ComponentName
 import android.content.Context
@@ -45,9 +46,14 @@ import androidx.core.content.FileProvider
 import androidx.profileinstaller.ProfileInstaller
 import app.lawnchair.backup.LawnchairBackup
 import app.lawnchair.flowerpot.Flowerpot
+import app.lawnchair.font.FontCache
+import app.lawnchair.font.googlefonts.GoogleFontsListing
 import app.lawnchair.icons.ThemedIconCompat
+import app.lawnchair.icons.iconpack.IconPackProvider
 import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.theme.ThemeProvider
 import app.lawnchair.ui.ModalBottomSheetContent
+import app.lawnchair.ui.preferences.SettingsWallpaperBlurHelper
 import app.lawnchair.ui.preferences.destinations.openAppInfo
 import app.lawnchair.util.DecorReattachGuard
 import app.lawnchair.util.restartLauncher
@@ -127,20 +133,33 @@ class LawnchairApp : LauncherApplication() {
     /**
      * Releases memory caches when the system requests it.
      *
-     * [ThemedIconCompat] holds up to 100 [android.content.res.Resources] objects, each
-     * of which memory-maps the target app's APK. Under memory pressure these pages are
-     * safe to release — icons reload from the disk cache ([BaseIconCache]'s SQLite DB)
-     * on next access with only a minor latency cost.
-     *
-     * [TRIM_MEMORY_MODERATE] is chosen as the threshold rather than [TRIM_MEMORY_BACKGROUND]
-     * because a launcher is always "running" from the user's perspective; we want to stay
-     * responsive at low-memory states but still release significant caches before the system
-     * is forced to kill the process.
+     * On Android 14+ (API 34+), [TRIM_MEMORY_MODERATE] and [TRIM_MEMORY_COMPLETE] are deprecated
+     * and the OS predominantly dispatches [TRIM_MEMORY_UI_HIDDEN] (20) and
+     * [TRIM_MEMORY_BACKGROUND] (40). Gating on those levels ensures caches are actually reclaimed
+     * on modern Android before LMK kills the launcher process.
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE) {
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+            SettingsWallpaperBlurHelper.clearCache()
+            runCatching {
+                WallpaperManager.getInstance(this).forgetLoadedWallpaper()
+            }
+            runCatching {
+                GoogleFontsListing.INSTANCE.get(this).clearCache()
+            }
+        }
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
             ThemedIconCompat.clearResourcesCache()
+            runCatching {
+                FontCache.INSTANCE.get(this).clearCache()
+            }
+            runCatching {
+                IconPackProvider.INSTANCE.get(this).trimMemory()
+            }
+            runCatching {
+                ThemeProvider.INSTANCE.get(this).trimMemory()
+            }
         }
     }
 

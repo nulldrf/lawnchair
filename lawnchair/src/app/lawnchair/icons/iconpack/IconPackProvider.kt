@@ -10,6 +10,8 @@ import app.lawnchair.icons.ClockMetadata
 import app.lawnchair.icons.CustomAdaptiveIconDrawable
 import app.lawnchair.icons.picker.IconEntry
 import app.lawnchair.icons.shouldTransparentBGIcons
+import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
@@ -119,6 +121,21 @@ class IconPackProvider @Inject constructor(
         }
 
         return drawable
+    }
+
+    /**
+     * Evicts cached [IconPack] instances that are not the currently active icon pack or
+     * themed icon source, releasing unused APK mmaps under memory pressure.
+     */
+    fun trimMemory() {
+        val prefs = PreferenceManager2.getInstance(context)
+        val keep = buildSet {
+            prefs.iconPackPackage.firstCached(prefs).takeIf { it.isNotEmpty() }?.let(::add)
+            prefs.themedIconPackPackage.firstCached(prefs).takeIf { it.isNotEmpty() }?.let(::add)
+        }
+        synchronized(iconPacksLock) {
+            iconPacks.keys.retainAll(keep)
+        }
     }
 
     /**

@@ -18,7 +18,7 @@ sealed class WallpaperManagerCompat(val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val colorHints: Int get() = wallpaperColors?.colorHints ?: 0
     val wallpaperManager: WallpaperManager = context.requireSystemService()
-    val service = WallpaperService(context)
+    val service: WallpaperService get() = WallpaperService.INSTANCE.get(context)
 
     abstract val wallpaperColors: WallpaperColorsCompat?
 

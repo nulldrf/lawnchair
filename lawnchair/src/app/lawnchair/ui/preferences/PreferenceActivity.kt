@@ -68,6 +68,11 @@ class PreferenceActivity : ComponentActivity() {
         SettingsWallpaperBlurHelper.clearCache()
     }
 
+    override fun onDestroy() {
+        SettingsWallpaperBlurHelper.clearCache()
+        super.onDestroy()
+    }
+
     companion object {
 
         private const val EXTRA_DESTINATION_ROUTE = "app.lawnchair.ui.preferences.DESTINATION_ROUTE"

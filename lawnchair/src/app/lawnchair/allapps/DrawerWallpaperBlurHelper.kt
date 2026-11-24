@@ -42,6 +42,7 @@ object DrawerWallpaperBlurHelper {
 
     private const val TAG = "DrawerWallpaperBlur"
     private const val DEFAULT_Y_OFFSET = 0.5f
+    private const val BLUR_DOWNSCALE_FACTOR = 4
 
     @Volatile private var cachedBitmap: Bitmap? = null
 
@@ -258,6 +259,7 @@ object DrawerWallpaperBlurHelper {
         tag: String,
     ): Bitmap? {
         val isLandscapeTarget = targetW > targetH
+        val (blurW, blurH) = blurDimensions(targetW, targetH)
 
         // Attempt 1: In landscape, prefer the original uncropped wallpaper file so we take
         // a genuine landscape crop instead of zooming into a portrait-cropped wallpaper.
@@ -265,8 +267,8 @@ object DrawerWallpaperBlurHelper {
             decodeWallpaperFileCropped(
                 wm = wm,
                 getCropped = false,
-                targetW = targetW,
-                targetH = targetH,
+                targetW = blurW,
+                targetH = blurH,
                 xOffset = xOffset,
                 yOffset = yOffset,
                 tag = tag,
@@ -288,8 +290,8 @@ object DrawerWallpaperBlurHelper {
                     decodeWallpaperFileCropped(
                         wm = wm,
                         getCropped = false,
-                        targetW = targetW,
-                        targetH = targetH,
+                        targetW = blurW,
+                        targetH = blurH,
                         xOffset = xOffset,
                         yOffset = yOffset,
                         tag = tag,
@@ -297,8 +299,8 @@ object DrawerWallpaperBlurHelper {
                 }
                 decodeFileDescriptorCropped(
                     fd = pfd.fileDescriptor,
-                    targetW = targetW,
-                    targetH = targetH,
+                    targetW = blurW,
+                    targetH = blurH,
                     xOffset = xOffset,
                     yOffset = yOffset,
                     tag = tag,
@@ -312,24 +314,37 @@ object DrawerWallpaperBlurHelper {
         if (croppedFileBitmap != null) return croppedFileBitmap
 
         // Attempt 3: WallpaperManager.drawable fallback. Clear WallpaperManager's in-process
-        // drawable cache first so a previous orientation's bitmap is never reused.
+        // drawable cache before (so a stale orientation is not reused) and after (so the full
+        // uncompressed wallpaper bitmap does not stay pinned in WallpaperManager.Globals).
         return runCatching {
             runCatching { wm.forgetLoadedWallpaper() }
-            val drawable = wm.drawable ?: run {
-                Log.e(tag, "getDrawable() null — likely live wallpaper")
-                return null
-            }
-            Log.d(tag, "wallpaper via getDrawable() — cropping to ${targetW}x$targetH (xOffset=$xOffset)")
-            val bm = (drawable as? BitmapDrawable)?.bitmap
-            if (bm != null && !bm.isRecycled) {
-                cropBitmapToViewport(bm, targetW, targetH, xOffset, yOffset, recycleSource = false)
-            } else {
-                renderDrawableCropped(drawable, targetW, targetH, xOffset, yOffset)
+            try {
+                val drawable = wm.drawable ?: run {
+                    Log.e(tag, "getDrawable() null — likely live wallpaper")
+                    return null
+                }
+                Log.d(tag, "wallpaper via getDrawable() — cropping to ${blurW}x$blurH (xOffset=$xOffset)")
+                val bm = (drawable as? BitmapDrawable)?.bitmap
+                if (bm != null && !bm.isRecycled) {
+                    cropBitmapToViewport(bm, blurW, blurH, xOffset, yOffset, recycleSource = false)
+                } else {
+                    renderDrawableCropped(drawable, blurW, blurH, xOffset, yOffset)
+                }
+            } finally {
+                runCatching { wm.forgetLoadedWallpaper() }
             }
         }.getOrElse { e ->
             Log.e(tag, "getDrawable() threw: $e")
             null
         }
+    }
+
+    internal fun blurDimensions(targetW: Int, targetH: Int): Pair<Int, Int> {
+        var bw = (targetW / BLUR_DOWNSCALE_FACTOR).coerceAtLeast(1)
+        var bh = (targetH / BLUR_DOWNSCALE_FACTOR).coerceAtLeast(1)
+        if (targetW > targetH && bw <= bh) bw = bh + 1
+        if (targetH > targetW && bh <= bw) bh = bw + 1
+        return bw to bh
     }
 
     internal fun blurCroppedBitmap(
@@ -339,8 +354,12 @@ object DrawerWallpaperBlurHelper {
         tag: String,
     ): Bitmap? {
         val clamped = blurIntensity.coerceIn(10, 150)
-        val hokoRadius = min(clamped, 25)
-        val sampleFactor = (clamped / 25f).coerceAtLeast(1f)
+        // Scale blur radius proportionally to BLUR_DOWNSCALE_FACTOR so the visual blur
+        // strength when upscaled to the full viewport matches full-resolution blurring
+        // while using ~1/16th the bitmap memory.
+        val scaledIntensity = clamped / BLUR_DOWNSCALE_FACTOR.toFloat()
+        val hokoRadius = min(scaledIntensity, 25f).roundToInt().coerceAtLeast(1)
+        val sampleFactor = (scaledIntensity / 25f).coerceAtLeast(1f)
 
         val blurred: Bitmap? = runCatching<Bitmap?> {
             HokoBlur.with(context)

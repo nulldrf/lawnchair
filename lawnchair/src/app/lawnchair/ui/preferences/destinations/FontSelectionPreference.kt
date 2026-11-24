@@ -170,11 +170,12 @@ fun FontSelection(
     }
 
     val googleFonts by produceState(initialValue = emptyList<FontCache.Family>()) {
-        value = GoogleFontsListing.INSTANCE.get(context).getFonts().map { font ->
+        val appContext = context.applicationContext
+        value = GoogleFontsListing.INSTANCE.get(appContext).getFonts().map { font ->
             val variantsMap = HashMap<String, FontCache.Font>()
             val variants = font.variants.toTypedArray()
             font.variants.forEach { variant ->
-                variantsMap[variant] = FontCache.GoogleFont(context, font.family, variant, variants)
+                variantsMap[variant] = FontCache.GoogleFont(appContext, font.family, variant, variants)
             }
             FontCache.Family(font.family, variantsMap)
         }

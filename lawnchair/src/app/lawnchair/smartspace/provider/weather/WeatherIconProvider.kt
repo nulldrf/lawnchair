@@ -28,12 +28,24 @@ import org.xmlpull.v1.XmlPullParser
 class WeatherIconProvider(private val context: Context) {
 
     /**
-     * Cache of resource-only [Context] objects created per icon pack package name.
+     * Bounded LRU cache of resource-only [Context] objects created per icon pack package name.
      *
      * We only read XML/drawable resources from external packs, so we omit
      * [Context.CONTEXT_INCLUDE_CODE] to avoid loading foreign classloaders/DEX files.
+     * Bounding to 2 entries prevents accumulating foreign APK mmaps when browsing weather packs.
      */
-    private val packContextCache = mutableMapOf<String, Context>()
+    private val cacheLock = Any()
+    private val packContextCache: MutableMap<String, Context> =
+        object : LinkedHashMap<String, Context>(
+            MAX_CACHED_WEATHER_PACKS + 1,
+            0.75f,
+            /* accessOrder = */
+            true,
+        ) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<String, Context>,
+            ): Boolean = size > MAX_CACHED_WEATHER_PACKS
+        }
 
     /** Cache of resolved [PackType] per external icon pack package name. */
     private val packTypeCache = mutableMapOf<String, PackType>()
@@ -42,6 +54,14 @@ class WeatherIconProvider(private val context: Context) {
      * Cache of drawable-filter maps keyed by "$packageName/$metaKey".
      */
     private val filterCache = mutableMapOf<String, Map<String, String>>()
+
+    fun clearCaches() {
+        synchronized(cacheLock) {
+            packContextCache.clear()
+            packTypeCache.clear()
+            filterCache.clear()
+        }
+    }
 
     fun getIcon(condition: WeatherCondition, isDay: Boolean, packPackageName: String?): Icon? {
         if (packPackageName == ICON_PACK_NONE) return null
@@ -92,8 +112,10 @@ class WeatherIconProvider(private val context: Context) {
             Icon.createWithBitmap(res.getDrawable(resId, null)?.toBitmap() ?: return null)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to load icon from $packPackageName", e)
-            packContextCache.remove(packPackageName)
-            packTypeCache.remove(packPackageName)
+            synchronized(cacheLock) {
+                packContextCache.remove(packPackageName)
+                packTypeCache.remove(packPackageName)
+            }
             null
         }
     }
@@ -102,15 +124,23 @@ class WeatherIconProvider(private val context: Context) {
      * Returns a cached resource [Context] for [packPackageName], creating one on first access.
      */
     private fun getOrCreatePackContext(packPackageName: String): Context? {
-        packContextCache[packPackageName]?.let { return it }
+        synchronized(cacheLock) {
+            packContextCache[packPackageName]?.let { return it }
+        }
         return try {
             context.createPackageContext(
                 packPackageName,
                 Context.CONTEXT_IGNORE_SECURITY,
-            ).also { packContextCache[packPackageName] = it }
+            ).also { created ->
+                synchronized(cacheLock) {
+                    packContextCache[packPackageName] = created
+                }
+            }
         } catch (e: PackageManager.NameNotFoundException) {
             Log.w(TAG, "Pack not found when creating context: $packPackageName", e)
-            packTypeCache.remove(packPackageName)
+            synchronized(cacheLock) {
+                packTypeCache.remove(packPackageName)
+            }
             null
         }
     }
@@ -125,9 +155,13 @@ class WeatherIconProvider(private val context: Context) {
         metaKey: String,
     ): Map<String, String> {
         val cacheKey = "$packPackageName/$metaKey"
-        filterCache[cacheKey]?.let { return it }
+        synchronized(cacheLock) {
+            filterCache[cacheKey]?.let { return it }
+        }
         val loaded = readDrawableFilter(packContext, packPackageName, metaKey)
-        filterCache[cacheKey] = loaded
+        synchronized(cacheLock) {
+            filterCache[cacheKey] = loaded
+        }
         return loaded
     }
 
@@ -147,7 +181,11 @@ class WeatherIconProvider(private val context: Context) {
             if (resId == 0) return emptyMap()
 
             val parser = packContext.resources.getXml(resId)
-            parseFilterMap(parser)
+            try {
+                parseFilterMap(parser)
+            } finally {
+                parser.close()
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read drawable filter from $packPackageName", e)
             emptyMap()
@@ -178,7 +216,9 @@ class WeatherIconProvider(private val context: Context) {
     }
 
     private fun resolvePackType(packageName: String): PackType? {
-        packTypeCache[packageName]?.let { return it }
+        synchronized(cacheLock) {
+            packTypeCache[packageName]?.let { return it }
+        }
         val pm = context.packageManager
         val resolved = when {
             pm.queryIntentActivities(Intent(ACTION_BREEZY), PackageManager.GET_RESOLVED_FILTER)
@@ -195,7 +235,9 @@ class WeatherIconProvider(private val context: Context) {
             else -> null
         }
         if (resolved != null) {
-            packTypeCache[packageName] = resolved
+            synchronized(cacheLock) {
+                packTypeCache[packageName] = resolved
+            }
         }
         return resolved
     }
@@ -204,6 +246,7 @@ class WeatherIconProvider(private val context: Context) {
 
     companion object {
         private const val TAG = "WeatherIconProvider"
+        private const val MAX_CACHED_WEATHER_PACKS = 2
         const val ICON_PACK_BUILTIN = ""
         const val ICON_PACK_NONE = "none"
 

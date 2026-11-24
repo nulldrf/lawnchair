@@ -3,6 +3,7 @@ package app.lawnchair.search.algorithms
 import android.content.Context
 import android.os.Handler
 import app.lawnchair.preferences2.PreferenceManager2
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.search.adapter.SPACE
 import app.lawnchair.search.adapter.SearchTargetCompat
 import app.lawnchair.search.adapter.SearchTargetFactory
@@ -12,10 +13,11 @@ import com.android.launcher3.allapps.BaseAllAppsAdapter
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.search.SearchCallback
 import com.android.launcher3.util.Executors
-import com.patrykmichalik.opto.core.onEach
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class LawnchairAppSearchAlgorithm(context: Context) : LawnchairSearchAlgorithm(context) {
@@ -26,33 +28,12 @@ class LawnchairAppSearchAlgorithm(context: Context) : LawnchairSearchAlgorithm(c
     // todo maybe use D.I.?
     private val searchTargetFactory = SearchTargetFactory(context)
 
-    private var hiddenApps: Set<String> = setOf()
-
-    private var hiddenAppsInSearch = ""
-    private var enableFuzzySearch = false
-    private var maxResultsCount = 5
-
     private val prefs2 = PreferenceManager2.getInstance(context)
 
-    val coroutineScope = CoroutineScope(context = Dispatchers.IO)
+    val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var modelRetryJob: Job? = null
     private var currentJob: Job? = null
-
-    init {
-        prefs2.enableFuzzySearch.onEach(launchIn = coroutineScope) {
-            enableFuzzySearch = it
-        }
-        prefs2.hiddenApps.onEach(launchIn = coroutineScope) {
-            hiddenApps = it
-        }
-        prefs2.hiddenAppsInSearch.onEach(launchIn = coroutineScope) {
-            hiddenAppsInSearch = it
-        }
-        prefs2.maxAppSearchResultCount.onEach(launchIn = coroutineScope) {
-            maxResultsCount = it
-        }
-    }
 
     override fun doSearch(query: String, callback: SearchCallback<BaseAllAppsAdapter.AdapterItem>) {
         modelRetryJob?.cancel()
@@ -75,10 +56,21 @@ class LawnchairAppSearchAlgorithm(context: Context) : LawnchairSearchAlgorithm(c
         }
     }
 
+    override fun destroy() {
+        cancel(true)
+        coroutineScope.cancel()
+        super.destroy()
+    }
+
     private fun getResult(
         apps: MutableList<AppInfo>,
         query: String,
     ): ArrayList<BaseAllAppsAdapter.AdapterItem> {
+        val enableFuzzySearch = prefs2.enableFuzzySearch.firstCached()
+        val maxResultsCount = prefs2.maxAppSearchResultCount.firstCached()
+        val hiddenApps = prefs2.hiddenApps.firstCached()
+        val hiddenAppsInSearch = prefs2.hiddenAppsInSearch.firstCached()
+
         val appResults = if (enableFuzzySearch) {
             SearchUtils.fuzzySearch(apps, query, maxResultsCount, hiddenApps, hiddenAppsInSearch)
         } else {

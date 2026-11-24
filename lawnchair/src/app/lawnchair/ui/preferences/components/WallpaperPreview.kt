@@ -133,10 +133,14 @@ fun wallpaperDrawable(
 
             hasPermission -> {
                 withContext(Dispatchers.IO) {
-                    wallpaperManager.drawable?.let {
-                        val size = Size(it.intrinsicWidth, it.intrinsicHeight).scaleDownToDisplaySize(context)
-                        val bitmap = it.toBitmap(size.width, size.height)
-                        bitmap.toDrawable(context.resources)
+                    try {
+                        wallpaperManager.drawable?.let {
+                            val size = Size(it.intrinsicWidth, it.intrinsicHeight).scaleDownToDisplaySize(context)
+                            val bitmap = it.toBitmap(size.width, size.height)
+                            bitmap.toDrawable(context.resources)
+                        }
+                    } finally {
+                        runCatching { wallpaperManager.forgetLoadedWallpaper() }
                     }
                 }
             }

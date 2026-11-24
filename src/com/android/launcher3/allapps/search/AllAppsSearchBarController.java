@@ -61,11 +61,30 @@ public class AllAppsSearchBarController
         mCallback = callback;
         mLauncher = launcher;
 
+        if (mInput != null) {
+            mInput.removeTextChangedListener(this);
+        }
         mInput = input;
         mInput.addTextChangedListener(this);
         mInput.setOnEditorActionListener(this);
         mInput.setOnBackKeyListener(this);
         mSearchAlgorithm = searchAlgorithm;
+    }
+
+    /**
+     * Tears down listeners and destroys the active {@link SearchAlgorithm} so background
+     * scopes/sessions do not outlive the search view or host activity.
+     */
+    public void destroy() {
+        if (mInput != null) {
+            mInput.removeTextChangedListener(this);
+            mInput.setOnEditorActionListener(null);
+            mInput.setOnBackKeyListener(null);
+        }
+        if (mSearchAlgorithm != null) {
+            mSearchAlgorithm.destroy();
+            mSearchAlgorithm = null;
+        }
     }
 
     @Override
@@ -99,14 +118,14 @@ public class AllAppsSearchBarController
         mQuery = Utilities.trim(s);
         if (mQuery.isEmpty()) {
             mCallback.clearSearchResult();
-        } else {
+        } else if (mSearchAlgorithm != null) {
             mSearchAlgorithm.cancel(false);
             mSearchAlgorithm.doSearch(mQuery, mTextConversions, mCallback);
         }
     }
 
     public void refreshSearchResult() {
-        if (TextUtils.isEmpty(mQuery)) {
+        if (TextUtils.isEmpty(mQuery) || mSearchAlgorithm == null) {
             return;
         }
         // If play store continues auto updating an app, we want to show partial result.

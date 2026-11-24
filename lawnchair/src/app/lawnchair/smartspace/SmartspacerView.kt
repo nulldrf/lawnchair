@@ -10,7 +10,7 @@ import androidx.viewpager.widget.ViewPager
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.launcher
 import app.lawnchair.preferences2.PreferenceManager2
-import app.lawnchair.preferences2.subscribeBlocking
+import app.lawnchair.preferences2.firstCached
 import app.lawnchair.ui.preferences.PreferenceActivity
 import app.lawnchair.ui.preferences.navigation.Smartspace
 import com.android.launcher3.R
@@ -23,19 +23,13 @@ import com.kieronquinn.app.smartspacer.sdk.client.views.popup.PopupFactory
 import com.kieronquinn.app.smartspacer.sdk.model.SmartspaceConfig
 import com.kieronquinn.app.smartspacer.sdk.model.SmartspaceTarget
 import com.kieronquinn.app.smartspacer.sdk.model.UiSurface
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 
 class SmartspacerView(context: Context, attrs: AttributeSet?) : BcSmartspaceView(context, attrs) {
     private lateinit var viewPager: ViewPager
     private val prefs2 = PreferenceManager2.getInstance(context)
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
-    private var targetCount = 5
+    private val targetCount = prefs2.smartspacerMaxCount.firstCached()
 
     init {
-        prefs2.smartspacerMaxCount.subscribeBlocking(prefs2 = prefs2, scope = coroutineScope) {
-            targetCount = it
-        }
 
         popupFactory = object : PopupFactory {
             override fun createPopup(

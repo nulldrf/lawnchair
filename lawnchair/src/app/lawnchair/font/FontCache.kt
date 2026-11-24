@@ -50,6 +50,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.plus
 import org.json.JSONArray
@@ -62,7 +63,18 @@ class FontCache @Inject constructor(
 
     private val scope = MainScope() + CoroutineName("FontCache")
 
-    private val deferredFonts = mutableMapOf<Font, Deferred<LoadedFont?>>()
+    private val deferredFontsLock = Any()
+    private val deferredFonts: MutableMap<Font, Deferred<LoadedFont?>> =
+        object : LinkedHashMap<Font, Deferred<LoadedFont?>>(
+            MAX_CACHED_FONTS + 1,
+            0.75f,
+            /* accessOrder = */
+            true,
+        ) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<Font, Deferred<LoadedFont?>>,
+            ): Boolean = size > MAX_CACHED_FONTS
+        }
 
     private val cacheDir = context.cacheDir.apply { mkdirs() }
     private val customFontsDir = TTFFont.getFontsDir(context)
@@ -143,16 +155,22 @@ class FontCache @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getLoadedFont(font: Font): LoadedFont? {
-        val deferredFont = deferredFonts[font] ?: return null
-        if (!deferredFont.isCompleted) return null
+        val deferredFont = synchronized(deferredFontsLock) { deferredFonts[font] } ?: return null
+        if (!deferredFont.isCompleted || deferredFont.isCancelled) return null
         return deferredFont.getCompleted()
     }
 
-    private fun loadFontAsync(font: Font): Deferred<LoadedFont?> {
-        return deferredFonts.getOrPut(font) {
-            scope.async {
+    private fun loadFontAsync(font: Font): Deferred<LoadedFont?> = synchronized(deferredFontsLock) {
+        deferredFonts[font]?.takeIf { !it.isCancelled }
+            ?: scope.async {
                 font.load()?.let { LoadedFont(it) }
-            }
+            }.also { deferredFonts[font] = it }
+    }
+
+    fun clearCache() {
+        synchronized(deferredFontsLock) {
+            deferredFonts.values.forEach { if (!it.isCompleted) it.cancel() }
+            deferredFonts.clear()
         }
     }
 
@@ -177,12 +195,15 @@ class FontCache @Inject constructor(
         tmpFile.setLastModified(System.currentTimeMillis())
         tmpFile.renameTo(file)
 
-        @Suppress("DeferredResultUnused")
-        deferredFonts.remove(TTFFont(context, file))
+        synchronized(deferredFontsLock) {
+            @Suppress("DeferredResultUnused")
+            deferredFonts.remove(TTFFont(context, file))
+        }
     }
 
     override fun close() {
-        TODO("Not yet implemented")
+        clearCache()
+        scope.cancel()
     }
 
     class Family(val displayName: String, val variants: Map<String, Font>) {
@@ -489,12 +510,13 @@ class FontCache @Inject constructor(
     }
 
     class GoogleFont(
-        private val context: Context,
+        context: Context,
         private val family: String,
         private val variant: String = "regular",
         private val variants: Array<String> = emptyArray(),
     ) : Font() {
 
+        private val appContext: Context = context.applicationContext
         private val hashCode = "GoogleFont|$family|$variant".hashCode()
 
         override val displayName = createVariantName()
@@ -511,11 +533,11 @@ class FontCache @Inject constructor(
         )
 
         private fun createVariantName(): String {
-            if (variant == "italic") return context.getString(R.string.font_variant_italic)
+            if (variant == "italic") return appContext.getString(R.string.font_variant_italic)
             val weight = GoogleFontsListing.getWeight(variant)
-            val weightString = weightNameMap[weight]?.let(context::getString) ?: weight
+            val weightString = weightNameMap[weight]?.let(appContext::getString) ?: weight
             val italicString = if (GoogleFontsListing.isItalic(variant)) {
-                " " + context.getString(R.string.font_variant_italic)
+                " " + appContext.getString(R.string.font_variant_italic)
             } else {
                 ""
             }
@@ -535,7 +557,7 @@ class FontCache @Inject constructor(
 
             return suspendCoroutine {
                 FontsContractCompat.requestFont(
-                    context,
+                    appContext,
                     request,
                     object : FontsContractCompat.FontRequestCallback() {
                         override fun onTypefaceRetrieved(typeface: Typeface) {
@@ -578,7 +600,7 @@ class FontCache @Inject constructor(
                 findLighter(weight, currentWeight, GoogleFontsListing.isItalic(variant))
             }
             if (newVariant != null) {
-                return GoogleFont(context, family, newVariant, variants)
+                return GoogleFont(appContext, family, newVariant, variants)
             }
             return super.createWithWeight(weight)
         }
@@ -623,6 +645,7 @@ class FontCache @Inject constructor(
         @JvmField
         val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getFontCache)
 
+        private const val MAX_CACHED_FONTS = 32
         private const val KEY_CLASS_NAME = "className"
         private const val KEY_FAMILY_NAME = "family"
         private const val KEY_STYLE = "style"

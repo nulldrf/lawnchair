@@ -77,9 +77,11 @@ import com.android.launcher3.widget.WidgetSections;
 import com.android.launcher3.widget.WidgetSections.WidgetSection;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -90,6 +92,7 @@ import javax.inject.Named;
 import app.lawnchair.LawnchairActivityCachingLogic;
 import app.lawnchair.gestures.ui.LawnchairShortcutActivity;
 import app.lawnchair.icons.LawnchairIconProvider;
+import app.lawnchair.preferences2.PreferenceManager2;
 
 /**
  * Cache of application icons.  Icons can be made from any thread.
@@ -522,6 +525,7 @@ public class IconCache extends BaseIconCache {
             List<IconRequestInfo<T>> filteredList,
             Map<ComponentName, List<IconRequestInfo<T>>> duplicateIconRequestsMap) {
         Trace.beginSection("loadIconSubsectionWithDatabase");
+        Set<ComponentName> loadedFromDb = new HashSet<>();
         try (Cursor c = createBulkQueryCursor(
                 filteredList,
                 /* user = */ sectionKey.first,
@@ -543,6 +547,7 @@ public class IconCache extends BaseIconCache {
                             LawnchairActivityCachingLogic.INSTANCE.get(context),
                                 sectionKey.second,
                                 c);
+                        loadedFromDb.add(cn);
 
                         for (IconRequestInfo<T> iconRequest : duplicateIconRequests) {
                             applyCacheEntry(entry, iconRequest.itemInfo);
@@ -565,7 +570,12 @@ public class IconCache extends BaseIconCache {
             IconRequestInfo<T> iconRequestInfo = duplicateIconRequestsMap.get(cn).get(0);
             ItemInfoWithIcon itemInfo = iconRequestInfo.itemInfo;
             BitmapInfo icon = itemInfo.bitmap;
-            boolean loadFallbackTitle = TextUtils.isEmpty(itemInfo.title);
+            // AllAppsList.add(..., loadIcon = false) pre-populates itemInfo.title with the
+            // system default label. When the icon DB was cleared (e.g. Dark/Light mode or
+            // wallpaper/theme reload), force fallback title resolution via
+            // LawnchairActivityCachingLogic so custom app names are not lost.
+            boolean loadedFromDatabase = loadedFromDb.contains(cn);
+            boolean loadFallbackTitle = !loadedFromDatabase || TextUtils.isEmpty(itemInfo.title);
             boolean loadFallbackIcon = icon == null
                     || isDefaultIcon(icon, itemInfo.user)
                     || icon == BitmapInfo.LOW_RES_INFO;
@@ -591,11 +601,11 @@ public class IconCache extends BaseIconCache {
                             entry,
                         LawnchairActivityCachingLogic.INSTANCE.get(context),
                             DEFAULT_LOOKUP_FLAG.withUsePackageIcon(false),
-                            /* usePackageTitle= */ loadFallbackTitle,
+                            /* usePackageTitle= */ TextUtils.isEmpty(itemInfo.title),
                             cn,
                             sectionKey.first);
                 }
-                if (loadFallbackTitle && TextUtils.isEmpty(entry.title) && lai != null) {
+                if (loadFallbackTitle && lai != null) {
                     loadFallbackTitle(
                             lai,
                             entry,
@@ -679,9 +689,19 @@ public class IconCache extends BaseIconCache {
         if (packageEntry == null || packageEntry.bitmap.isLowRes()) {
             return;
         }
+        ComponentName targetComponent = info.getTargetComponent();
+        String customTitle = targetComponent != null
+                ? PreferenceManager2.getInstance(context)
+                        .getCustomAppName(new ComponentKey(targetComponent, info.user))
+                : null;
         info.appTitle = Utilities.trim(info.title);
-        info.title = Utilities.trim(packageEntry.title);
-        info.contentDescription = packageEntry.contentDescription;
+        if (!TextUtils.isEmpty(customTitle)) {
+            info.title = Utilities.trim(customTitle);
+            info.contentDescription = getUserBadgedLabel(info.title, info.user);
+        } else {
+            info.title = Utilities.trim(packageEntry.title);
+            info.contentDescription = packageEntry.contentDescription;
+        }
         info.bitmap = packageEntry.bitmap;
     }
 

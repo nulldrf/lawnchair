@@ -51,6 +51,7 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherState
 import com.android.launcher3.R
 import com.android.launcher3.util.ComponentKey
+import com.android.launcher3.util.Executors
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import kotlinx.coroutines.launch
 
@@ -172,7 +173,9 @@ fun CustomizeAppDialog(
             if (newTitle != previousTitle) {
                 preferenceManager2.setCustomAppName(componentKey, newTitle)
                 val model = launcherAppState.model
-                model.onAppIconChanged(componentKey.componentName.packageName, componentKey.user)
+                Executors.MODEL_EXECUTOR.execute {
+                    model.onAppIconChanged(componentKey.componentName.packageName, componentKey.user)
+                }
             }
         }
     }

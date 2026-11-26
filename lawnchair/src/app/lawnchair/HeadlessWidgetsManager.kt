@@ -116,7 +116,12 @@ class HeadlessWidgetsManager @Inject constructor(
             get() = widgetId > -1 && widgetManager.getAppWidgetInfo(widgetId)?.provider == info.provider
         val updates = callbackFlow {
             onSubscriberStarted()
-            val view = host.createView(context, widgetId, info) as HeadlessAppWidgetHostView
+            val view = try {
+                host.createView(context, widgetId, info) as HeadlessAppWidgetHostView
+            } catch (t: Throwable) {
+                onSubscriberStopped()
+                throw t
+            }
             trySend(view)
             view.updateCallback = { trySend(it) }
             awaitClose {

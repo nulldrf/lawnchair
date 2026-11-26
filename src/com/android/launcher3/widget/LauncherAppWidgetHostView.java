@@ -146,7 +146,7 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
         if (!mTrackingWidgetUpdate && appWidgetId != -1) {
             mTrackingWidgetUpdate = true;
             Log.i(TAG, "App widget created with id: " + appWidgetId);
-            if (ATLEAST_Q) {
+            if (ATLEAST_Q && info != null && info.provider != null) {
                 Trace.beginAsyncSection(TRACE_METHOD_NAME + info.provider, appWidgetId);
             }
         }
@@ -156,9 +156,10 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     public void updateAppWidget(RemoteViews remoteViews) {
         if (mTrackingWidgetUpdate && remoteViews != null) {
             Log.i(TAG, "App widget with id: " + getAppWidgetId() + " loaded");
-            if (ATLEAST_Q) {
+            AppWidgetProviderInfo info = getAppWidgetInfo();
+            if (ATLEAST_Q && info != null && info.provider != null) {
                 Trace.endAsyncSection(
-                    TRACE_METHOD_NAME + getAppWidgetInfo().provider, getAppWidgetId());
+                    TRACE_METHOD_NAME + info.provider, getAppWidgetId());
             }
             mTrackingWidgetUpdate = false;
         }
@@ -242,7 +243,10 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     public void endDeferringUpdates() {
         mDeferUpdatesUntilMillis = 0;
         if (mReapplyOnResumeUpdates) {
-            updateAppWidget(mLastRemoteViews);
+            mReapplyOnResumeUpdates = false;
+            if (mLastRemoteViews != null) {
+                updateAppWidget(mLastRemoteViews);
+            }
         }
     }
 

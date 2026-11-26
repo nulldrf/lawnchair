@@ -39,7 +39,7 @@ import java.util.List;
  * Utilities to compute the enforced the use of rounded corners on App Widgets.
  */
 public class RoundedCornerEnforcement {
-    public static boolean sRoundedCornerEnabled;
+    public static boolean sRoundedCornerEnabled = true;
 
     // This class is only a namespace and not meant to be instantiated.
     private RoundedCornerEnforcement() {
@@ -75,6 +75,16 @@ public class RoundedCornerEnforcement {
     }
 
     /**
+     * Checks whether the app widget already defines its own outline clipping (either via
+     * {@code @android:id/background} or on a descendant background view with
+     * {@link View#getClipToOutline()} enabled).
+     */
+    public static boolean hasAppWidgetOptedOut(@NonNull View appWidget, @NonNull View background) {
+        return hasAppWidgetOptedOut(background)
+                || (background != appWidget && background.getClipToOutline());
+    }
+
+    /**
      * Computes the rounded rectangle needed for this app widget.
      *
      * @param appWidget View onto which the rounded rectangle will be applied.
@@ -89,9 +99,17 @@ public class RoundedCornerEnforcement {
         outRect.right = background.getWidth();
         outRect.top = 0;
         outRect.bottom = background.getHeight();
-        while (background != appWidget) {
-            outRect.offset(background.getLeft(), background.getTop());
-            background = (View) background.getParent();
+        if (outRect.isEmpty()) {
+            return;
+        }
+        View current = background;
+        while (current != appWidget) {
+            outRect.offset(current.getLeft(), current.getTop());
+            if (!(current.getParent() instanceof View parent)) {
+                outRect.setEmpty();
+                return;
+            }
+            current = parent;
         }
     }
 
@@ -100,6 +118,9 @@ public class RoundedCornerEnforcement {
      * in the given context.
      */
     public static float computeEnforcedRadius(@NonNull Context context) {
+        if (!sRoundedCornerEnabled) {
+            return 0f;
+        }
         Resources res = context.getResources();
         if (!Utilities.ATLEAST_S) {
             return res.getDimension(R.dimen.enforced_rounded_corner_max_radius);

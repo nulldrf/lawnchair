@@ -551,7 +551,14 @@ class WorkspaceItemProcessor(
      * widgets, installing / restoring widgets are treated differently, etc.
      */
     private fun processWidget() {
-        val component = ComponentName.unflattenFromString(c.appWidgetProvider)!!
+        val component = ComponentName.unflattenFromString(c.appWidgetProvider)
+        if (component == null) {
+            c.markDeleted(
+                "processWidget: Invalid component name: ${c.appWidgetProvider}, id=${c.id}",
+                RestoreError.OTHER_WIDGET_INFLATION_FAIL,
+            )
+            return
+        }
         val appWidgetInfo = LauncherAppWidgetInfo(c.appWidgetId, component)
         c.applyCommonProperties(appWidgetInfo)
         appWidgetInfo.spanX = c.spanX
@@ -585,6 +592,8 @@ class WorkspaceItemProcessor(
         if (appWidgetInfo.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_DIRECT_CONFIG)) {
             appWidgetInfo.bindOptions = c.parseIntent()
         }
+        val isUserUnlocked = unlockedUsers[c.serialNumber] ?: false
+        val isEnvironmentPending = !isUserUnlocked || !Utilities.isBootCompleted() || !isSdCardReady
         val inflationResult = widgetInflater.inflateAppWidget(appWidgetInfo)
         var shouldUpdate = inflationResult.isUpdate
         val lapi = inflationResult.widgetInfo
@@ -596,14 +605,39 @@ class WorkspaceItemProcessor(
         )
         when (inflationResult.type) {
             WidgetInflater.TYPE_DELETE -> {
-                appWidgetInfo.widgetStackId?.let { stackId ->
-                    LauncherAppState.getInstance(context).model.modelDbController.db?.let { db ->
-                        WidgetStackManager.pruneInvalidWidgetFromStack(db, stackId, appWidgetInfo.appWidgetId)
+                if (isEnvironmentPending) {
+                    // During early boot, locked profile (Work / Private Space), or before
+                    // external storage is mounted, AppWidgetManager may temporarily return null
+                    // for valid widgets. Keep the widget pending instead of deleting it from DB.
+                    FileLog.d(
+                        TAG,
+                        "processWidget: Deferring deletion of widget id=${c.id}" +
+                            ", appWidgetId=${c.appWidgetId} (unlocked=$isUserUnlocked" +
+                            ", bootCompleted=${Utilities.isBootCompleted()}" +
+                            ", sdCardReady=$isSdCardReady)",
+                    )
+                    pendingPackages.add(PackageUserKey(component.packageName, c.user))
+                    appWidgetInfo.pendingItemInfo =
+                        WidgetsModel.newPendingItemInfo(
+                            context,
+                            appWidgetInfo.providerName,
+                            appWidgetInfo.user,
+                        )
+                    iconCache.getTitleAndIconForApp(
+                        appWidgetInfo.pendingItemInfo,
+                        DEFAULT_LOOKUP_FLAG,
+                    )
+                } else {
+                    appWidgetInfo.widgetStackId?.let { stackId ->
+                        LauncherAppState.getInstance(context).model.modelDbController.db?.let { db ->
+                            WidgetStackManager.pruneInvalidWidgetFromStack(db, stackId, appWidgetInfo.appWidgetId)
+                        }
                     }
+                    c.markDeleted(inflationResult.reason, inflationResult.restoreErrorType)
+                    return
                 }
-                c.markDeleted(inflationResult.reason, inflationResult.restoreErrorType)
-                return
             }
+
             WidgetInflater.TYPE_PENDING -> {
                 tempPackageKey.update(component.packageName, c.user)
                 val si = installingPkgs[tempPackageKey]
@@ -612,6 +646,7 @@ class WorkspaceItemProcessor(
                 if (
                     !c.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_RESTORE_STARTED) &&
                         !isSafeMode &&
+                        !isEnvironmentPending &&
                         (si == null) &&
                         (lapi == null) &&
                         !isArchived
@@ -631,6 +666,8 @@ class WorkspaceItemProcessor(
                         RestoreError.UNRESTORED_PENDING_WIDGET,
                     )
                     return
+                } else if (isEnvironmentPending && lapi == null) {
+                    pendingPackages.add(PackageUserKey(component.packageName, c.user))
                 } else if (
                     !c.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_RESTORE_STARTED) && si != null
                 ) {

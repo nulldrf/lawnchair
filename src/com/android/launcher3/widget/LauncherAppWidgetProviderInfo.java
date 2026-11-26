@@ -77,6 +77,9 @@ public class LauncherAppWidgetProviderInfo extends AppWidgetProviderInfo impleme
 
     public static LauncherAppWidgetProviderInfo fromProviderInfo(Context context,
             AppWidgetProviderInfo info) {
+        if (info == null) {
+            return null;
+        }
         final LauncherAppWidgetProviderInfo launcherInfo;
         if (info instanceof LauncherAppWidgetProviderInfo) {
             launcherInfo = (LauncherAppWidgetProviderInfo) info;

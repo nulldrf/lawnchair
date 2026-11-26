@@ -403,9 +403,12 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             DragLayer dragLayer, boolean force, boolean unlimited) {
         mCellLayout = cellLayout;
         mWidgetView = widgetView;
-        LauncherAppWidgetProviderInfo info = (LauncherAppWidgetProviderInfo)
-                widgetView.getAppWidgetInfo();
         mDragLayer = dragLayer;
+        if (!(widgetView.getAppWidgetInfo() instanceof LauncherAppWidgetProviderInfo info)
+                || !(mWidgetView.getTag() instanceof LauncherAppWidgetInfo widgetInfoOnView)) {
+            close(false);
+            return;
+        }
         InvariantDeviceProfile idp = LauncherAppState.getIDP(cellLayout.getContext());
 
         int resizeMode;
@@ -432,7 +435,6 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             mMaxVSpan = info.maxSpanY;
         }
 
-        LauncherAppWidgetInfo widgetInfoOnView = (LauncherAppWidgetInfo) mWidgetView.getTag();
         // Only show resize handles for the directions in which resizing is possible.
 
         // on font / display change, the dp/px size of a cell changes, which means, existing spans
@@ -466,18 +468,25 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         if (info.isReconfigurable()) {
             mReconfigureButton.setVisibility(VISIBLE);
             mReconfigureButton.setOnClickListener(view -> {
+                Object tag = mWidgetView != null ? mWidgetView.getTag() : null;
+                if (!(tag instanceof ItemInfo itemInfo)) {
+                    close(false);
+                    return;
+                }
+                int appWidgetId = mWidgetView.getAppWidgetId();
+                close(false);
                 mLauncher.setWaitingForResult(
                         PendingRequestArgs.forWidgetInfo(
-                                mWidgetView.getAppWidgetId(),
+                                appWidgetId,
                                 // Widget add handler is null since we're reconfiguring an existing
                                 // widget.
                                 /* widgetHandler= */ null,
-                                (ItemInfo) mWidgetView.getTag()));
+                                itemInfo));
                 mLauncher
                         .getAppWidgetHolder()
                         .startConfigActivity(
                                 mLauncher,
-                                mWidgetView.getAppWidgetId(),
+                                appWidgetId,
                                 ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET);
             });
             if (!hasSeenReconfigurableWidgetEducationTip()) {

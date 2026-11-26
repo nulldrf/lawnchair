@@ -368,20 +368,17 @@ public class ModelDbController {
 
         DatabaseHelper oldHelper = mOpenHelper;
 
-        // We save the existing db's before creating the destination db helper so we know what logic
-        // to run in grid migration based on if that grid already existed before migration or not.
-        List<String> existingDBs = LauncherFiles.GRID_DB_FILES.stream()
-                .filter(dbName -> mContext.getDatabasePath(dbName).exists())
-                .collect(Collectors.toList());
+        // Check whether the destination grid DB already existed before creating mOpenHelper,
+        // including Lawnchair's custom launcher_R_C_H.db naming convention.
+        DeviceGridState destDeviceState = new DeviceGridState(mIdp);
+        String destDbFile = destDeviceState.getDbFile();
+        boolean isDestNewDb = destDbFile == null || !mContext.getDatabasePath(destDbFile).exists();
 
-        mOpenHelper = createDatabaseHelper(true, new DeviceGridState(mIdp).getDbFile());
+        mOpenHelper = createDatabaseHelper(true, destDbFile);
         try {
             // This is the current grid we have, given by the mContext
             DeviceGridState srcDeviceState = new DeviceGridState(mContext);
-            // This is the state we want to migrate to that is given by the idp
-            DeviceGridState destDeviceState = new DeviceGridState(mIdp);
 
-            boolean isDestNewDb = !existingDBs.contains(destDeviceState.getDbFile());
             GridSizeMigrationLogic gridSizeMigrationLogic = new GridSizeMigrationLogic();
             gridSizeMigrationLogic.migrateGrid(mContext, srcDeviceState, destDeviceState,
                     mOpenHelper, oldHelper.getWritableDatabase(), isDestNewDb, modelDelegate);

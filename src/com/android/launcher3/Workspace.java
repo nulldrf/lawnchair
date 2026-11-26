@@ -425,8 +425,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     private void updateCellLayoutMeasures() {
-        Rect padding = mLauncher.getDeviceProfile().cellLayoutPaddingPx;
+        DeviceProfile grid = mLauncher.getDeviceProfile();
+        Rect padding = grid.cellLayoutPaddingPx;
         mWorkspaceScreens.forEach(cellLayout -> {
+            cellLayout.resetCellSize(grid);
             cellLayout.setPadding(padding.left, padding.top, padding.right, padding.bottom);
             cellLayout.setSpaceBetweenCellLayoutsPx(getPageSpacing() / 4);
         });
@@ -446,6 +448,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                             (LauncherAppWidgetInfo) view.getTag();
                     WidgetSizes.updateWidgetSizeRanges((LauncherAppWidgetHostView) view,
                             mLauncher, launcherAppWidgetInfo.spanX, launcherAppWidgetInfo.spanY);
+                } else if (view instanceof app.lawnchair.widget.view.WidgetStackView stackView
+                        && stackView.getStackInfo() != null) {
+                    app.lawnchair.widget.model.WidgetStackInfo stackInfo = stackView.getStackInfo();
+                    stackView.updateMemberWidgetSizeRanges(stackInfo.getSpanX(), stackInfo.getSpanY());
                 }
             }
         }
@@ -3270,6 +3276,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 item.spanY = resultSpan[1];
             }
 
+            final int[] finalTargetCell = mTargetCell != null
+                    ? new int[] { mTargetCell[0], mTargetCell[1] }
+                    : null;
+            final int finalSpanX = item.spanX;
+            final int finalSpanY = item.spanY;
             Runnable onAnimationCompleteRunnable = new Runnable() {
                 @Override
                 public void run() {
@@ -3280,8 +3291,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
                     // When dragging and dropping from customization tray, we deal with creating
                     // widgets/shortcuts/folders in a slightly different way
-                    mLauncher.addPendingItem(pendingInfo, container, screenId, mTargetCell,
-                            item.spanX, item.spanY);
+                    mLauncher.addPendingItem(pendingInfo, container, screenId, finalTargetCell,
+                            finalSpanX, finalSpanY);
                     mStatsLogManager.logger().withItemInfo(d.dragInfo)
                             .withInstanceId(d.logInstanceId)
                             .log(LauncherEvent.LAUNCHER_ITEM_DROP_COMPLETED);
@@ -3832,6 +3843,14 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      */
     public void removeWidget(int appWidgetId) {
         mapOverItems((info, view) -> {
+            if (view instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+                app.lawnchair.widget.model.WidgetStackInfo stackInfo = stackView.getStackInfo();
+                if (stackInfo != null && stackInfo.getWidgetIds().contains(appWidgetId)) {
+                    stackView.removeWidget(appWidgetId);
+                    return true;
+                }
+                return false;
+            }
             if (info instanceof LauncherAppWidgetInfo) {
                 LauncherAppWidgetInfo appWidgetInfo = (LauncherAppWidgetInfo) info;
                 if (appWidgetInfo.appWidgetId == appWidgetId) {
@@ -3932,8 +3951,27 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     public LauncherAppWidgetHostView getWidgetForAppWidgetId(final int appWidgetId) {
-        return (LauncherAppWidgetHostView) mapOverItems((info, v) ->
-                (info instanceof LauncherAppWidgetInfo lawi) && lawi.appWidgetId == appWidgetId);
+        final LauncherAppWidgetHostView[] result = new LauncherAppWidgetHostView[1];
+        mapOverItems((info, v) -> {
+            if (v instanceof LauncherAppWidgetHostView hostView
+                    && info instanceof LauncherAppWidgetInfo lawi
+                    && lawi.appWidgetId == appWidgetId) {
+                result[0] = hostView;
+                return true;
+            }
+            if (v instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+                for (LauncherAppWidgetHostView memberView : stackView.getWidgetViews()) {
+                    if (memberView.getAppWidgetId() == appWidgetId
+                            || (memberView.getTag() instanceof LauncherAppWidgetInfo memberInfo
+                                    && memberInfo.appWidgetId == appWidgetId)) {
+                        result[0] = memberView;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+        return result[0];
     }
 
     void clearDropTargets() {

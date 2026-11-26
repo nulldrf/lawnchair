@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -52,6 +53,7 @@ data class WidgetStackMemberUi(
 /**
  * Renders a single widget preview card inside the One UI-style horizontal stack strip.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun WidgetStackPreviewCard(
     member: WidgetStackMemberUi,
@@ -121,6 +123,7 @@ fun WidgetStackPreviewCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
                         .size(34.dp),
+                    shapes = IconButtonDefaults.shapes(),
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,

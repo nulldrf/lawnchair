@@ -68,6 +68,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.launcher3.testing.shared.TestProtocol.QUICK_SWITCH_STATE_ORDINAL;
 import static com.android.launcher3.util.DisplayController.CHANGE_ACTIVE_SCREEN;
 import static com.android.launcher3.util.DisplayController.CHANGE_NAVIGATION_MODE;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
@@ -1136,11 +1137,14 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         mTaskbarUIController.onTaskbarInAppDisplayProgressUpdate(progress, flag);
     }
 
+    private long mPendingActivityRequestToken = 0L;
+
     @Override
     public void startIntentSenderForResult(IntentSender intent, int requestCode,
             Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags, Bundle options) {
         if (requestCode != -1) {
             mPendingActivityRequestCode = requestCode;
+            mPendingActivityRequestToken++;
             StartActivityParams params = new StartActivityParams(this, requestCode);
             params.intentSender = intent;
             params.fillInIntent = fillInIntent;
@@ -1159,6 +1163,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
         if (requestCode != -1) {
             mPendingActivityRequestCode = requestCode;
+            mPendingActivityRequestToken++;
             StartActivityParams params = new StartActivityParams(this, requestCode);
             params.intent = intent;
             params.options = options;
@@ -1191,13 +1196,25 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     }
 
     private void handlePendingActivityRequest() {
-        if (mPendingActivityRequestCode != -1 && isInState(NORMAL)
+        final int requestCode = mPendingActivityRequestCode;
+        final long token = mPendingActivityRequestToken;
+        if (requestCode != -1 && isInState(NORMAL)
                 && ((getActivityFlags() & ACTIVITY_STATE_DEFERRED_RESUMED) != 0)) {
-            // Remove any active ProxyActivityStarter task and send RESULT_CANCELED to Launcher.
-            onActivityResult(mPendingActivityRequestCode, RESULT_CANCELED, null);
-            // ProxyActivityStarter is started with clear task to reset the task after which it
-            // removes the task itself.
-            startActivity(ProxyActivityStarter.getLaunchIntent(this, null));
+            // ProxyActivityStarter delivers its result asynchronously via PendingIntent after
+            // finishing. Delay fallback cancellation briefly so an in-flight RESULT_OK is not
+            // cancelled before the PendingIntent message is processed.
+            MAIN_EXECUTOR.getHandler().postDelayed(() -> {
+                if (mPendingActivityRequestCode == requestCode
+                        && mPendingActivityRequestToken == token
+                        && isInState(NORMAL)
+                        && ((getActivityFlags() & ACTIVITY_STATE_DEFERRED_RESUMED) != 0)) {
+                    // Remove any active ProxyActivityStarter task and send RESULT_CANCELED.
+                    onActivityResult(mPendingActivityRequestCode, RESULT_CANCELED, null);
+                    // ProxyActivityStarter is started with clear task to reset the task after
+                    // which it removes the task itself.
+                    startActivity(ProxyActivityStarter.getLaunchIntent(this, null));
+                }
+            }, 350L);
         }
     }
 

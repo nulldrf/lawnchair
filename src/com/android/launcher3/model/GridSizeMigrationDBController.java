@@ -438,7 +438,7 @@ public class GridSizeMigrationDBController {
         for (int y = next.y; y < trg.y; y++) {
             for (int x = next.x; x < trg.x; x++) {
                 boolean fits = occupied.isRegionVacant(x, y, entry.spanX, entry.spanY);
-                boolean minFits = occupied.isRegionVacant(x, y, entry.minSpanX,
+                boolean minFits = !fits && occupied.isRegionVacant(x, y, entry.minSpanX,
                         entry.minSpanY);
                 if (minFits) {
                     entry.spanX = entry.minSpanX;

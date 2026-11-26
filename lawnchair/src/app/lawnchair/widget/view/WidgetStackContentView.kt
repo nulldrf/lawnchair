@@ -576,13 +576,21 @@ class WidgetStackContentView @JvmOverloads constructor(
             indicator.setNumPages(count)
         } else {
             mainHandler.removeCallbacks(hideIndicatorRunnable)
-            indicator.animate().cancel()
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                indicator.animate().cancel()
+            } else {
+                mainHandler.post { indicator.animate().cancel() }
+            }
             indicator.visibility = View.GONE
         }
     }
 
     private fun showIndicatorTemporarily(autoHide: Boolean = true) {
         if (widgetViews.size <= 1) return
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { showIndicatorTemporarily(autoHide) }
+            return
+        }
         mainHandler.removeCallbacks(hideIndicatorRunnable)
         indicator.visibility = View.VISIBLE
         indicator.animate().cancel()

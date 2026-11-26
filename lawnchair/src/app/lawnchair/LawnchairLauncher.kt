@@ -55,6 +55,7 @@ import app.lawnchair.util.getThemedIconPacksInstalled
 import app.lawnchair.util.unsafeLazy
 import app.lawnchair.views.LawnchairFloatingSurfaceView
 import app.lawnchair.views.createContainedLoadingIndicator
+import app.lawnchair.widget.view.WidgetStackView
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.BaseActivity
 import com.android.launcher3.BubbleTextView
@@ -87,6 +88,7 @@ import com.android.launcher3.util.TouchController
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.OptionsPopupView
 import com.android.launcher3.views.OptionsPopupView.OptionItem
+import com.android.launcher3.widget.BaseLauncherAppWidgetHostView
 import com.android.launcher3.widget.LauncherWidgetHolder
 import com.android.launcher3.widget.RoundedCornerEnforcement
 import com.android.systemui.plugins.shared.LauncherOverlayManager
@@ -160,6 +162,7 @@ class LawnchairLauncher : QuickstepLauncher() {
     val appTransitionController by unsafeLazy { LawnchairAppTransitionController(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        RoundedCornerEnforcement.sRoundedCornerEnabled = preferenceManager2.roundedWidgets.firstCached()
         layoutInflater.factory2 = LawnchairLayoutFactory(this)
         super.onCreate(savedInstanceState)
 
@@ -227,8 +230,15 @@ class LawnchairLauncher : QuickstepLauncher() {
         preferenceManager2.windowCornerRadius.onEach(launchIn = lifecycleScope) {
             QuickStepContract.sCustomCornerRadius = it.toFloat()
         }
-        preferenceManager2.roundedWidgets.onEach(launchIn = lifecycleScope) {
-            RoundedCornerEnforcement.sRoundedCornerEnabled = it
+        preferenceManager2.roundedWidgets.onEach(launchIn = lifecycleScope) { enabled ->
+            RoundedCornerEnforcement.sRoundedCornerEnabled = enabled
+            workspace?.mapOverItems { _, view ->
+                when (view) {
+                    is BaseLauncherAppWidgetHostView -> view.enforceRoundedCorners()
+                    is WidgetStackView -> view.getWidgetViews().forEach { it.enforceRoundedCorners() }
+                }
+                false
+            }
         }
         val isWorkspaceDarkText = Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText)
         preferenceManager2.darkStatusBar.onEach(launchIn = lifecycleScope) { darkStatusBar ->

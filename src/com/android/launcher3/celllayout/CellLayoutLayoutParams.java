@@ -152,8 +152,12 @@ public class CellLayoutLayoutParams extends ViewGroup.MarginLayoutParams {
             if (inset != null) {
                 x += inset.left;
                 y += inset.top;
-                width -= inset.left + inset.right;
-                height -= inset.top + inset.bottom;
+                width -= cellScaleX > 0f
+                        ? Math.round((inset.left + inset.right) / cellScaleX)
+                        : (inset.left + inset.right);
+                height -= cellScaleY > 0f
+                        ? Math.round((inset.top + inset.bottom) / cellScaleY)
+                        : (inset.top + inset.bottom);
             }
         }
     }

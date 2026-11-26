@@ -27,9 +27,11 @@ import android.os.RemoteException;
 import android.util.Log;
 import android.util.Pair;
 import android.view.View;
+import android.view.ViewParent;
 import android.widget.RemoteViews;
 import android.window.SplashScreen;
 
+import com.android.launcher3.Utilities;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.ActivityOptionsWrapper;
@@ -64,8 +66,13 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler,
         LauncherAppWidgetHostView hostView = findHostViewAncestor(view);
         if (hostView == null) {
             Log.e(TAG, "View did not have a LauncherAppWidgetHostView ancestor.");
-            return RemoteViews.startPendingIntent(hostView, pendingIntent,
-                    remoteResponse.getLaunchOptions(view));
+            Pair<Intent, ActivityOptions> fallback = remoteResponse.getLaunchOptions(view);
+            ActivityOptions fallbackOptions = fallback.second != null
+                    ? fallback.second
+                    : ActivityOptions.makeBasic();
+            Utilities.allowBGLaunch(fallbackOptions);
+            return RemoteViews.startPendingIntent(
+                    view, pendingIntent, Pair.create(fallback.first, fallbackOptions));
         }
         if (mLauncher.isSplitSelectionActive()) {
             // Log metric
@@ -83,7 +90,7 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler,
         } catch (NullPointerException e) {
             Log.e("pE(C7evQZDJ)", "Failed to get activity launch options");
         }
-        if (!pendingIntent.isActivity()) {
+        if (!pendingIntent.isActivity() && activityOptions != null) {
             // In the event this pending intent eventually launches an activity, i.e. a trampoline,
             // use the Quickstep transition animation.
             try {
@@ -103,28 +110,21 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler,
                 // Do nothing.
             }
         }
+        ActivityOptions resolvedOptions = activityOptions != null
+                ? activityOptions.options
+                : (options.second != null ? options.second : ActivityOptions.makeBasic());
         try {
-            activityOptions.options.setPendingIntentLaunchFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            activityOptions.options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
-            activityOptions.options.setPendingIntentBackgroundActivityStartMode(
-                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+            resolvedOptions.setPendingIntentLaunchFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            resolvedOptions.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+            Utilities.allowBGLaunch(resolvedOptions);
         } catch (Throwable t) {
             // ignore
         }
-        // pE-TODO(C7evQZDJ): Remove activityOptions null check
-        if (activityOptions != null) {
-            options = Pair.create(options.first, activityOptions.options);
-        }
+        options = Pair.create(options.first, resolvedOptions);
         if (pendingIntent.isActivity()) {
             logAppLaunch(hostView.getTag());
         }
-        if (activityOptions != null) {
-            return RemoteViews.startPendingIntent(hostView, pendingIntent, options);
-        } else {
-            Log.d("pE(C7evQZDJ)", "activityOptions is null!");
-            return RemoteViews.startPendingIntent(hostView, pendingIntent,
-                remoteResponse.getLaunchOptions(view));
-        }
+        return RemoteViews.startPendingIntent(hostView, pendingIntent, options);
     }
 
     /**
@@ -142,7 +142,8 @@ class QuickstepInteractionHandler implements RemoteViews.InteractionHandler,
     private LauncherAppWidgetHostView findHostViewAncestor(View v) {
         while (v != null) {
             if (v instanceof LauncherAppWidgetHostView) return (LauncherAppWidgetHostView) v;
-            v = (View) v.getParent();
+            ViewParent parent = v.getParent();
+            v = parent instanceof View ? (View) parent : null;
         }
         return null;
     }

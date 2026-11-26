@@ -328,6 +328,10 @@ public class DatabaseHelper extends NoLocaleSQLiteHelper implements
      * in our model.
      */
     public void removeGhostWidgets(SQLiteDatabase db) {
+        if (!com.android.launcher3.Utilities.isBootCompleted()) {
+            // Avoid deleting host widgets before boot completes and all profiles/storage are ready.
+            return;
+        }
         // Get all existing widget ids.
         final LauncherWidgetHolder holder = newLauncherWidgetHolder();
         try {
@@ -345,7 +349,8 @@ public class DatabaseHelper extends NoLocaleSQLiteHelper implements
                     "itemType=" + Favorites.ITEM_TYPE_APPWIDGET, null, null));
             boolean isAnyWidgetRemoved = false;
             for (int widgetId : allWidgets) {
-                if (!validWidgets.contains(widgetId)) {
+                if (!validWidgets.contains(widgetId)
+                        && !LauncherWidgetHolder.isPendingAppWidgetId(widgetId)) {
                     try {
                         FileLog.d(TAG, "Deleting widget not found in db: appWidgetId=" + widgetId);
                         holder.deleteAppWidgetId(widgetId);

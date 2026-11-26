@@ -134,10 +134,12 @@ constructor(
                         item.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_DIRECT_CONFIG)
                     if (isDirectConfig && item.bindOptions != null) {
                         val newOptions = item.bindOptions.extras
-                        if (options != null) {
-                            newOptions!!.putAll(options)
+                        if (newOptions != null) {
+                            if (options != null) {
+                                newOptions.putAll(options)
+                            }
+                            options = newOptions
                         }
-                        options = newOptions
                     }
                     val success =
                         widgetHelper.bindAppWidgetIdIfAllowed(

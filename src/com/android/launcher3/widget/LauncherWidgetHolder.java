@@ -62,6 +62,8 @@ import dagger.assisted.AssistedInject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -90,6 +92,25 @@ public class LauncherWidgetHolder {
     private static final String KEY_SPLASH_SCREEN_STYLE = "android.activity.splashScreenStyle";
     // TODO(b/191735836): Replace with SplashScreen.SPLASH_SCREEN_STYLE_EMPTY when un-hidden
     private static final int SPLASH_SCREEN_STYLE_EMPTY = 0;
+
+    private static final Set<Integer> sPendingAppWidgetIds = ConcurrentHashMap.newKeySet();
+
+    /** Marks a widget ID as actively being bound or configured so ghost cleanup skips it. */
+    public static void addPendingAppWidgetId(int appWidgetId) {
+        if (appWidgetId > AppWidgetManager.INVALID_APPWIDGET_ID) {
+            sPendingAppWidgetIds.add(appWidgetId);
+        }
+    }
+
+    /** Clears an in-flight widget ID once placement completes or is cancelled. */
+    public static void removePendingAppWidgetId(int appWidgetId) {
+        sPendingAppWidgetIds.remove(appWidgetId);
+    }
+
+    /** Returns true if the given widget ID is currently in an active bind/config flow. */
+    public static boolean isPendingAppWidgetId(int appWidgetId) {
+        return sPendingAppWidgetIds.contains(appWidgetId);
+    }
 
     @NonNull
     protected final Context mContext;
@@ -133,24 +154,27 @@ public class LauncherWidgetHolder {
             return;
         }
 
-        getWidgetHolderExecutor().execute(() -> {
-            try {
-                mWidgetHost.startListening();
-            } catch (Exception e) {
-                if (!Utilities.isBinderSizeError(e)) {
-                    Log.e(TAG, "RuntimeException 1");
-                    return;
-                }
-                // We're willing to let this slide. The exception is being caused by the list of
-                // RemoteViews which is being passed back. The startListening relationship will
-                // have been established by this point, and we will end up populating the
-                // widgets upon bind anyway. See issue 14255011 for more context.
-            }
-        // TODO: Investigate why widgetHost.startListening() always return non-empty updates
-            setListeningFlag(true);
+        getWidgetHolderExecutor().execute(this::startListeningInternal);
+    }
 
-            MAIN_EXECUTOR.execute(this::updateDeferredView);
-        });
+    @WorkerThread
+    private void startListeningInternal() {
+        try {
+            mWidgetHost.startListening();
+        } catch (Exception e) {
+            if (!Utilities.isBinderSizeError(e)) {
+                Log.e(TAG, "Failed to start listening for app widget updates", e);
+                return;
+            }
+            // We're willing to let this slide. The exception is being caused by the list of
+            // RemoteViews which is being passed back. The startListening relationship will
+            // have been established by this point, and we will end up populating the
+            // widgets upon bind anyway. See issue 14255011 for more context.
+        }
+        // TODO: Investigate why widgetHost.startListening() always return non-empty updates
+        setListeningFlag(true);
+
+        MAIN_EXECUTOR.execute(this::updateDeferredView);
     }
 
     /** Update any views which have been deferred because the host was not listening */
@@ -192,6 +216,7 @@ public class LauncherWidgetHolder {
      * @param appWidgetId The ID of the app widget to be deleted
      */
     public void deleteAppWidgetId(int appWidgetId) {
+        removePendingAppWidgetId(appWidgetId);
         mWidgetHost.deleteAppWidgetId(appWidgetId);
         mViews.remove(appWidgetId);
     }
@@ -256,27 +281,7 @@ public class LauncherWidgetHolder {
      * @param requestCode The request code
      */
     public void startConfigActivity(@NonNull BaseActivity activity, int widgetId, int requestCode) {
-        startConfigActivity(activity, widgetId, requestCode, 0);
-    }
-
-    /**
-     * Starts the configuration activity for the widget with retry counter
-     * 
-     * @param activity    The activity in which to start the configuration page
-     * @param widgetId    The ID of the widget
-     * @param requestCode The request code
-     * @param retryCount  The number of retries attempted
-     */
-    private void startConfigActivity(@NonNull BaseActivity activity, int widgetId,
-            int requestCode, int retryCount) {
         if (!WIDGETS_ENABLED) {
-            sendActionCancelled(activity, requestCode);
-            return;
-        }
-
-        // Prevent infinite loops by limiting retries
-        if (retryCount >= 3) {
-            Log.e(this.getClass().getName(), "Too many retries for widget configuration, cancelling");
             sendActionCancelled(activity, requestCode);
             return;
         }
@@ -285,28 +290,9 @@ public class LauncherWidgetHolder {
             TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "start: startConfigActivity");
             mWidgetHost.startAppWidgetConfigureActivityForResult(activity, widgetId, 0, requestCode,
                     getConfigurationActivityOptions(activity, widgetId));
-        } catch (ActivityNotFoundException | SecurityException e) {
+        } catch (ActivityNotFoundException | SecurityException | RuntimeException e) {
+            Log.e(TAG, "Failed to start configuration activity for widgetId=" + widgetId, e);
             Toast.makeText(activity, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
-            sendActionCancelled(activity, requestCode);
-        } catch (IllegalArgumentException e) {
-            // Widget ID became invalid, possibly due to two-step configuration some cases
-            Log.e(this.getClass().getName(), "Widget ID became invalid during configuration (retry " + retryCount + ")", e);
-            handleInvalidWidgetId(activity, widgetId, requestCode, retryCount + 1);
-        }
-    }
-
-    private void handleInvalidWidgetId(BaseActivity activity, int widgetId, int requestCode) {
-        handleInvalidWidgetId(activity, widgetId, requestCode, 0);
-    }
-
-    private void handleInvalidWidgetId(BaseActivity activity, int widgetId, int requestCode, int retryCount) {
-        // Remove the invalid widget
-        deleteAppWidgetId(widgetId);
-
-        int newWidgetId = allocateAppWidgetId();
-        if (newWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-            startConfigActivity(activity, newWidgetId, requestCode, retryCount);
-        } else {
             sendActionCancelled(activity, requestCode);
         }
     }
@@ -353,18 +339,24 @@ public class LauncherWidgetHolder {
      */
     public void startBindFlow(@NonNull BaseActivity activity,
             int appWidgetId, @NonNull AppWidgetProviderInfo info, int requestCode) {
-        if (!WIDGETS_ENABLED) {
+        if (!WIDGETS_ENABLED || info == null || info.provider == null) {
             sendActionCancelled(activity, requestCode);
             return;
         }
 
+        addPendingAppWidgetId(appWidgetId);
         Intent intent = new Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER_PROFILE, info.getProfile());
         // TODO: we need to make sure that this accounts for the options bundle.
         // intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_OPTIONS, options);
-        activity.startActivityForResult(intent, requestCode);
+        try {
+            activity.startActivityForResult(intent, requestCode);
+        } catch (ActivityNotFoundException | SecurityException | RuntimeException e) {
+            Log.e(TAG, "Failed to start bind flow for widgetId=" + appWidgetId, e);
+            sendActionCancelled(activity, requestCode);
+        }
     }
 
     /** Stop the host from listening to the widget updates */
@@ -454,7 +446,16 @@ public class LauncherWidgetHolder {
                 || pw.isDeferredWidget())
                 && view.getAppWidgetInfo() != null;
         if (isRealWidget && mViews.get(view.getAppWidgetId()) != view) {
-            view = recycleExistingView(view);
+            LauncherAppWidgetHostView recycled = recycleExistingView(view);
+            if (recycled != view) {
+                recycled.setTag(view.getTag());
+                recycled.setFocusable(view.isFocusable());
+                recycled.setOnFocusChangeListener(view.getOnFocusChangeListener());
+                if (mOnViewCreationCallback != null) {
+                    mOnViewCreationCallback.accept(recycled);
+                }
+            }
+            view = recycled;
             mViews.put(view.getAppWidgetId(), view);
         }
         return view;
@@ -471,12 +472,17 @@ public class LauncherWidgetHolder {
      *      as a result of using the same flow.
      */
     protected LauncherAppWidgetHostView recycleExistingView(LauncherAppWidgetHostView view) {
+        LauncherAppWidgetProviderInfo providerInfo =
+                fromProviderInfo(mContext, view.getAppWidgetInfo());
+        if (providerInfo == null) {
+            return view;
+        }
         if ((mFlags.get() & FLAG_LISTENING) == 0) {
             if (view instanceof PendingAppWidgetHostView pv && pv.isDeferredWidget()) {
                 return view;
             } else {
-                return new PendingAppWidgetHostView(mContext, this, view.getAppWidgetId(),
-                        fromProviderInfo(mContext, view.getAppWidgetInfo()));
+                return new PendingAppWidgetHostView(
+                        mContext, this, view.getAppWidgetId(), providerInfo);
             }
         }
         LauncherAppWidgetHost host = (LauncherAppWidgetHost) mWidgetHost;
@@ -484,8 +490,7 @@ public class LauncherWidgetHolder {
             host.recycleViewForNextCreation(lhv);
         }
 
-        view = createViewInternal(
-                view.getAppWidgetId(), fromProviderInfo(mContext, view.getAppWidgetInfo()));
+        view = createViewInternal(view.getAppWidgetId(), providerInfo);
         host.recycleViewForNextCreation(null);
         return view;
     }
@@ -558,15 +563,20 @@ public class LauncherWidgetHolder {
             mFlags.updateAndGet(old -> old & ~flag);
         }
 
-        final boolean listening = isListening();
-        int currentFlag = mFlags.get();
-        if (!listening && shouldListen(currentFlag)) {
-            // Postpone starting listening until all flags are on.
-            startListening();
-        } else if (listening && (currentFlag & FLAG_ACTIVITY_STARTED) == 0) {
-            // Postpone stopping listening until the activity is stopped.
-            stopListening();
+        if (!WIDGETS_ENABLED) {
+            return;
         }
+        // Reconcile listening state on the serialized widget holder executor so rapid
+        // stop -> start/resume transitions cannot observe a stale async FLAG_LISTENING value.
+        getWidgetHolderExecutor().execute(() -> {
+            final boolean listening = isListening();
+            int currentFlag = mFlags.get();
+            if (!listening && shouldListen(currentFlag)) {
+                startListeningInternal();
+            } else if (listening && (currentFlag & FLAG_ACTIVITY_STARTED) == 0) {
+                stopListening();
+            }
+        });
     }
 
     /**

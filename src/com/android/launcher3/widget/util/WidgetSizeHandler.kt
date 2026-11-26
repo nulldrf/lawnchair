@@ -17,6 +17,10 @@
 package com.android.launcher3.widget.util
 
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT
+import android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH
+import android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT
+import android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH
 import android.appwidget.AppWidgetManager.OPTION_APPWIDGET_SIZES
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
@@ -50,7 +54,21 @@ open class WidgetSizeHandler @Inject constructor(@ApplicationContext private val
                 val widgetManager = AppWidgetManager.getInstance(context)
                 val sizeOptions = WidgetSizes.getWidgetSizeOptions(context, info.provider, spanX, spanY) ?: return@execute
                 val currentOptions = widgetManager.getAppWidgetOptions(widgetId)
-                if (sizeOptions.getWidgetSizeList() != currentOptions?.getWidgetSizeList()) {
+                val newSizes = sizeOptions.getWidgetSizeList()
+                val needsUpdate = if (newSizes != null) {
+                    newSizes != currentOptions?.getWidgetSizeList()
+                } else {
+                    currentOptions == null ||
+                        sizeOptions.getInt(OPTION_APPWIDGET_MIN_WIDTH) !=
+                        currentOptions.getInt(OPTION_APPWIDGET_MIN_WIDTH) ||
+                        sizeOptions.getInt(OPTION_APPWIDGET_MIN_HEIGHT) !=
+                        currentOptions.getInt(OPTION_APPWIDGET_MIN_HEIGHT) ||
+                        sizeOptions.getInt(OPTION_APPWIDGET_MAX_WIDTH) !=
+                        currentOptions.getInt(OPTION_APPWIDGET_MAX_WIDTH) ||
+                        sizeOptions.getInt(OPTION_APPWIDGET_MAX_HEIGHT) !=
+                        currentOptions.getInt(OPTION_APPWIDGET_MAX_HEIGHT)
+                }
+                if (needsUpdate) {
                     widgetManager.updateAppWidgetOptions(widgetId, sizeOptions)
                 }
             } catch (e: Exception) {

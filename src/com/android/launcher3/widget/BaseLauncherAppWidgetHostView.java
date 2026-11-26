@@ -16,6 +16,7 @@
 
 package com.android.launcher3.widget;
 
+import android.appwidget.AppWidgetProviderInfo;
 import android.content.Context;
 import android.graphics.Outline;
 import android.graphics.Rect;
@@ -48,12 +49,13 @@ public abstract class BaseLauncherAppWidgetHostView extends NavigableAppWidgetHo
     protected final LayoutInflater mInflater;
 
     private final Rect mEnforcedRectangle = new Rect();
-    private final float mEnforcedCornerRadius;
+    private float mEnforcedCornerRadius;
     private final ViewOutlineProvider mCornerRadiusEnforcementOutline = new ViewOutlineProvider() {
         @Override
         public void getOutline(View view, Outline outline) {
             if (mEnforcedRectangle.isEmpty() || mEnforcedCornerRadius <= 0) {
-                outline.setEmpty();
+                outline.setRect(0, 0, view.getWidth(), view.getHeight());
+                outline.setAlpha(.0f);
             } else {
                 outline.setRoundRect(mEnforcedRectangle, mEnforcedCornerRadius);
             }
@@ -85,8 +87,22 @@ public abstract class BaseLauncherAppWidgetHostView extends NavigableAppWidgetHo
      * Fall back to error layout instead of showing widget.
      */
     public void switchToErrorView() {
-        // Update the widget with 0 Layout id, to reset the view to error view.
-        updateAppWidget(new RemoteViews(getAppWidgetInfo().provider.getPackageName(), 0));
+        AppWidgetProviderInfo info = getAppWidgetInfo();
+        if (info != null && info.provider != null) {
+            // Update the widget with 0 Layout id, to reset the view to error view.
+            updateAppWidget(new RemoteViews(info.provider.getPackageName(), 0));
+        } else {
+            removeAllViews();
+            addView(getErrorView());
+        }
+    }
+
+    @Override
+    public void updateAppWidget(RemoteViews remoteViews) {
+        super.updateAppWidget(remoteViews);
+        // RemoteViews updates can modify child visibility/layout in place without relayouting
+        // the host view; refresh rounded corner bounds after the update settles.
+        post(this::enforceRoundedCorners);
     }
 
     @Override
@@ -107,6 +123,7 @@ public abstract class BaseLauncherAppWidgetHostView extends NavigableAppWidgetHo
             super.onLayout(changed, left, top, right, bottom);
         } catch (final RuntimeException e) {
             post(this::switchToErrorView);
+            return;
         }
 
         enforceRoundedCorners();
@@ -116,23 +133,29 @@ public abstract class BaseLauncherAppWidgetHostView extends NavigableAppWidgetHo
     private void resetRoundedCorners() {
         setOutlineProvider(VIEW_OUTLINE_PROVIDER);
         mIsCornerRadiusEnforced = false;
+        invalidateOutline();
     }
 
     @UiThread
-    private void enforceRoundedCorners() {
+    public void enforceRoundedCorners() {
+        mEnforcedCornerRadius = RoundedCornerEnforcement.computeEnforcedRadius(getContext());
         if (mEnforcedCornerRadius <= 0) {
             resetRoundedCorners();
             return;
         }
         View background = RoundedCornerEnforcement.findBackground(this);
         if (background == null
-                || RoundedCornerEnforcement.hasAppWidgetOptedOut(background)) {
+                || RoundedCornerEnforcement.hasAppWidgetOptedOut(this, background)) {
             resetRoundedCorners();
             return;
         }
         RoundedCornerEnforcement.computeRoundedRectangle(this,
                 background,
                 mEnforcedRectangle);
+        if (mEnforcedRectangle.isEmpty()) {
+            resetRoundedCorners();
+            return;
+        }
         setOutlineProvider(mCornerRadiusEnforcementOutline);
         mIsCornerRadiusEnforced = true;
         invalidateOutline();

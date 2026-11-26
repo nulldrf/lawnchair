@@ -43,9 +43,6 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.NavigableAppWidgetHostView;
-import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
-
-import app.lawnchair.preferences2.PreferenceManager2;
 
 public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.FolderIconParent {
     static final String TAG = "ShortcutAndWidgetContainer";
@@ -71,7 +68,6 @@ public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.
     private boolean mInvertIfRtl = false;
     public boolean mHasOnLayoutBeenCalled = false;
 
-    private final PreferenceManager2 mPreferenceManager2;
     @Nullable
     private TranslationProvider mTranslationProvider = null;
 
@@ -81,16 +77,7 @@ public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.
         mWallpaperManager = WallpaperManager.getInstance(context);
         mContainerType = containerType;
         setClipChildren(false);
-        mPreferenceManager2 = PreferenceManager2.getInstance(context);
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        boolean mAllowWidgetOverlap = PreferenceCacheExtensionsKt.firstCached(mPreferenceManager2.getAllowWidgetOverlap());
-        setClipChildren(!mAllowWidgetOverlap);
-        setClipToPadding(!mAllowWidgetOverlap);
-        setClipToOutline(!mAllowWidgetOverlap);
+        setClipToPadding(false);
     }
 
     public void setCellDimensions(int cellWidth, int cellHeight, int countX, int countY,

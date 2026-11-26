@@ -366,10 +366,11 @@ public class InvariantDeviceProfile {
                 mPrefs.get(FIXED_LANDSCAPE_MODE)
         );
 
-        // Filter out options that don't have the same number of columns as the grid
-        DeviceGridState deviceGridState = new DeviceGridState(mPrefs);
+        // Filter out options that don't have the same number of columns as the target grid
+        DeviceProfileOverrides.DBGridInfo dbGridInfo = DeviceProfileOverrides.INSTANCE.get(context)
+                .getGridInfo();
         List<DisplayOption> allOptionsFilteredByColCount =
-                filterByColumnCount(allOptions, deviceGridState.getColumns());
+                filterByColumnCount(allOptions, dbGridInfo.getNumColumns());
 
         DisplayOption displayOption =
                 invDistWeightedInterpolate(displayInfo, allOptionsFilteredByColCount.isEmpty()
@@ -380,8 +381,6 @@ public class InvariantDeviceProfile {
         if (!displayOption.grid.name.equals(gridName)) {
             mPrefs.put(GRID_NAME, displayOption.grid.name);
         }
-        DeviceProfileOverrides.DBGridInfo dbGridInfo = DeviceProfileOverrides.INSTANCE.get(context)
-            .getGridInfo();
         initGrid(context, displayInfo, displayOption, dbGridInfo, null);
         FileLog.d(TAG, "After initGrid:"
                 + "gridName:" + gridName

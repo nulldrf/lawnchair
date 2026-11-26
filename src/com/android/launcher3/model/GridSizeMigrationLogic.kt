@@ -347,15 +347,6 @@ class GridSizeMigrationLogic {
                     preserveOriginal = true,
                 )
             placeItems(itemsToPlace, helper, srcReader, destReader, idsInUse)
-            while (itemsToPlace.mPlacementSolution.isNotEmpty()) {
-                GridSizeMigrationDBController.insertEntryInDb(
-                    helper,
-                    itemsToPlace.mPlacementSolution.removeAt(0),
-                    srcReader.mTableName,
-                    destReader.mTableName,
-                    idsInUse,
-                )
-            }
             if (itemsToPlace.mRemainingItemsToPlace.isEmpty()) {
                 break
             }
@@ -363,7 +354,7 @@ class GridSizeMigrationLogic {
 
         // In case the new grid is smaller, there might be some leftover items that don't fit on
         // any of the screens, in this case we add them to new screens until all of them are placed.
-        var screenId = destReader.mLastScreenId + 1
+        var screenId = lastScreen + 1
         while (itemsToPlace.mRemainingItemsToPlace.isNotEmpty()) {
             itemsToPlace =
                 solveGridPlacement(
@@ -583,11 +574,27 @@ class GridSizeMigrationLogic {
         trg: Point,
         occupied: GridOccupancy,
     ): CellAndSpan? {
+        // First try keeping the widget's original span (clamped to the target grid bounds) before
+        // shrinking it down to minSpanX/minSpanY so widgets aren't unexpectedly cropped on grid
+        // resize.
+        val desiredSpanX = entry.spanX.coerceIn(entry.minSpanX, trg.x)
+        val desiredSpanY = entry.spanY.coerceIn(entry.minSpanY, trg.y)
+        if (desiredSpanX != entry.minSpanX || desiredSpanY != entry.minSpanY) {
+            var desiredStartX = startPosX
+            for (y in startPosY until trg.y) {
+                for (x in desiredStartX until trg.x) {
+                    if (occupied.isRegionVacant(x, y, desiredSpanX, desiredSpanY)) {
+                        return CellAndSpan(x, y, desiredSpanX, desiredSpanY)
+                    }
+                }
+                desiredStartX = 0
+            }
+        }
         var newStartPosX = startPosX
         for (y in startPosY until trg.y) {
             for (x in newStartPosX until trg.x) {
                 if (occupied.isRegionVacant(x, y, entry.minSpanX, entry.minSpanY)) {
-                    return (CellAndSpan(x, y, entry.minSpanX, entry.minSpanY))
+                    return CellAndSpan(x, y, entry.minSpanX, entry.minSpanY)
                 }
             }
             newStartPosX = 0

@@ -19,14 +19,16 @@ class LawnchairAppWidgetHostView @JvmOverloads constructor(
 
     private var customView: ViewGroup? = null
 
-    override fun setAppWidget(appWidgetId: Int, info: AppWidgetProviderInfo) {
-        inflateCustomView(info)
+    override fun setAppWidget(appWidgetId: Int, info: AppWidgetProviderInfo?) {
+        if (info != null) {
+            inflateCustomView(info)
+        }
         super.setAppWidget(appWidgetId, info)
     }
 
     fun disablePreviewMode() {
         previewMode = false
-        inflateCustomView(appWidgetInfo)
+        appWidgetInfo?.let { inflateCustomView(it) }
     }
 
     private fun inflateCustomView(info: AppWidgetProviderInfo) {

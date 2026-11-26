@@ -18,6 +18,7 @@ package com.android.launcher3.util
 
 import android.appwidget.AppWidgetHostView
 import android.content.Context
+import android.os.UserManager
 import android.view.LayoutInflater
 import android.view.View
 import android.view.View.OnClickListener
@@ -27,6 +28,7 @@ import com.android.launcher3.BubbleTextView
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.R
+import com.android.launcher3.Utilities
 import com.android.launcher3.apppairs.AppPairIcon
 import com.android.launcher3.folder.FolderIcon
 import com.android.launcher3.model.ModelWriter
@@ -151,6 +153,13 @@ class ItemInflater<T>(
         try {
             val (type, reason, _, isUpdate, widgetInfo) = widgetInflater.inflateAppWidget(item)
             if (type == WidgetInflater.TYPE_DELETE) {
+                val userManager = context.getSystemService(UserManager::class.java)
+                val isUserUnlocked = userManager?.isUserUnlocked(item.user) ?: true
+                if (!Utilities.isBootCompleted() || !isUserUnlocked) {
+                    val pendingView = PendingAppWidgetHostView(context, widgetHolder, item, null)
+                    prepareAppWidget(pendingView, item)
+                    return pendingView
+                }
                 writer.deleteItemFromDatabase(item, reason)
                 return null
             }

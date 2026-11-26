@@ -8,6 +8,7 @@ import android.util.Pair
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
 import androidx.annotation.VisibleForTesting
+import app.lawnchair.widget.view.WidgetStackView
 import com.android.launcher3.LauncherConstants.TraceEvents.DISPLAY_WORKSPACE_TRACE_METHOD_NAME
 import com.android.launcher3.LauncherConstants.TraceEvents.SINGLE_TRACE_COOKIE
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
@@ -23,6 +24,7 @@ import com.android.launcher3.model.ModelUtils.currentScreenContentFilter
 import com.android.launcher3.model.StringCache
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.ItemInfo
+import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.model.data.PredictedContainerInfo
 import com.android.launcher3.model.data.WorkspaceData
 import com.android.launcher3.popup.PopupContainerWithArrow
@@ -232,8 +234,28 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
             .forEach { launcher.bindPredictedContainerInfo(it) }
 
         if (itemsToRebind.isEmpty()) return
-        workspace.removeItemsByMatcher(ItemInfoMatcher.ofItems(itemsToRebind), false)
-        itemsToRebind
+        val stackIdsToRefresh = itemsToRebind
+            .mapNotNull { (it as? LauncherAppWidgetInfo)?.widgetStackId }
+            .toMutableSet()
+        val refreshedStackIds = mutableSetOf<Long>()
+        if (stackIdsToRefresh.isNotEmpty()) {
+            workspace.mapOverItems { _, view ->
+                if (view is WidgetStackView) {
+                    val stackId = view.getStackInfo()?.stackId
+                    if (stackId != null && stackId in stackIdsToRefresh) {
+                        view.refreshPendingWidgets()
+                        refreshedStackIds.add(stackId)
+                    }
+                }
+                false
+            }
+        }
+        val remainingToRebind = itemsToRebind.filterNot { item ->
+            item is LauncherAppWidgetInfo && item.widgetStackId in refreshedStackIds
+        }
+        if (remainingToRebind.isEmpty()) return
+        workspace.removeItemsByMatcher(ItemInfoMatcher.ofItems(remainingToRebind), false)
+        remainingToRebind
             .filter { workspace.isContainerSupported(it.container) }
             .let {
                 if (it.isNotEmpty()) {

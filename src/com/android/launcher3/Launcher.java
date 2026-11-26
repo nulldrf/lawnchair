@@ -850,11 +850,13 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         if (requestCode == REQUEST_BIND_APPWIDGET) {
             // This is called only if the user did not previously have permissions to bind widgets
-            final int appWidgetId = data != null ?
-                    data.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) : -1;
+            int widgetId = data != null
+                    ? data.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
+                    : -1;
+            final int appWidgetId = widgetId < 0 ? pendingAddWidgetId : widgetId;
             app.lawnchair.widget.helper.WidgetStackLauncherHelper.handleBindWidgetResult(
                     resultCode, requestArgs.getTargetComponent(), appWidgetId);
-            if (resultCode == RESULT_CANCELED) {
+            if (resultCode == RESULT_CANCELED || requestArgs.getWidgetHandler() == null) {
                 completeTwoStageWidgetDrop(RESULT_CANCELED, appWidgetId, requestArgs);
                 mWorkspace.removeExtraEmptyScreenDelayed(
                         ON_ACTIVITY_RESULT_ANIMATION_DELAY, false, exitSpringLoaded);
@@ -892,23 +894,27 @@ public class Launcher extends StatefulActivity<LauncherState>
                         () -> getStateManager().goToState(NORMAL));
             } else {
                 CellPos presenterPos = getCellPosMapper().mapModelToPresenter(requestArgs);
+                int targetScreenId = presenterPos.screenId;
                 if (requestArgs.container == CONTAINER_DESKTOP) {
                     // When the screen id represents an actual screen (as opposed to a rank)
                     // we make sure that the drop page actually exists.
-                    int newScreenId = ensurePendingDropLayoutExists(presenterPos.screenId);
+                    targetScreenId = ensurePendingDropLayoutExists(presenterPos.screenId);
                     requestArgs.screenId = getCellPosMapper().mapPresenterToModel(
-                            presenterPos.cellX, presenterPos.cellY, newScreenId, CONTAINER_DESKTOP)
-                                    .screenId;
+                            presenterPos.cellX, presenterPos.cellY, targetScreenId,
+                            CONTAINER_DESKTOP).screenId;
                 }
-                final CellLayout dropLayout =
-                        mWorkspace.getScreenWithId(presenterPos.screenId);
+                final CellLayout dropLayout = getCellLayout(requestArgs.container, targetScreenId);
 
-                dropLayout.setDropPending(true);
+                if (dropLayout != null) {
+                    dropLayout.setDropPending(true);
+                }
                 final Runnable onComplete = new Runnable() {
                     @Override
                     public void run() {
                         completeTwoStageWidgetDrop(resultCode, appWidgetId, requestArgs);
-                        dropLayout.setDropPending(false);
+                        if (dropLayout != null) {
+                            dropLayout.setDropPending(false);
+                        }
                     }
                 };
                 mWorkspace.removeExtraEmptyScreenDelayed(
@@ -971,7 +977,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Thunk
     void completeTwoStageWidgetDrop(
             final int resultCode, final int appWidgetId, final PendingRequestArgs requestArgs) {
-        CellLayout cellLayout = mWorkspace.getScreenWithId(
+        CellLayout cellLayout = getCellLayout(requestArgs.container,
                 getCellPosMapper().mapModelToPresenter(requestArgs).screenId);
         Runnable onCompleteRunnable = null;
         int animationType = 0;
@@ -984,10 +990,19 @@ public class Launcher extends StatefulActivity<LauncherState>
             // If FLAG_ENABLE_ADD_APP_WIDGET_VIA_CONFIG_ACTIVITY_V2 is enabled, we can retrieve the
             // PendingAppWidgetHostView from LauncherWidgetHolder (it was added to
             // LauncherWidgetHolder when starting the config activity).
-            final AppWidgetHostView layout = enableAddAppWidgetViaConfigActivityV2()
-                    ? getWorkspace().getWidgetForAppWidgetId(appWidgetId)
-                    : mAppWidgetHolder.createView(appWidgetId,
-                            requestArgs.getWidgetHandler().getProviderInfo(this));
+            AppWidgetHostView layout;
+            if (enableAddAppWidgetViaConfigActivityV2()) {
+                layout = getWorkspace().getWidgetForAppWidgetId(appWidgetId);
+            } else {
+                WidgetAddFlowHandler handler = requestArgs.getWidgetHandler();
+                LauncherAppWidgetProviderInfo providerInfo = handler != null
+                        ? handler.getProviderInfo(this)
+                        : mAppWidgetManager.getLauncherAppWidgetInfo(
+                                appWidgetId, requestArgs.getTargetComponent());
+                layout = providerInfo != null
+                        ? mAppWidgetHolder.createView(appWidgetId, providerInfo)
+                        : null;
+            }
             boundWidget = layout;
             onCompleteRunnable = () -> {
                 completeAddAppWidget(appWidgetId, requestArgs, layout, null, false, true, null);
@@ -996,16 +1011,33 @@ public class Launcher extends StatefulActivity<LauncherState>
                 }
             };
         } else if (resultCode == RESULT_CANCELED) {
-            mAppWidgetHolder.deleteAppWidgetId(appWidgetId);
+            LauncherWidgetHolder.removePendingAppWidgetId(appWidgetId);
+            if (enableAddAppWidgetViaConfigActivityV2() && appWidgetId >= 0) {
+                LauncherAppWidgetHostView pendingView =
+                        getWorkspace().getWidgetForAppWidgetId(appWidgetId);
+                if (pendingView instanceof PendingAppWidgetHostView
+                        && pendingView.getTag() instanceof ItemInfo pendingItem) {
+                    removeItem(pendingView, pendingItem, true,
+                            "widget removed because configuration was cancelled");
+                }
+            }
+            if (appWidgetId >= 0) {
+                mAppWidgetHolder.deleteAppWidgetId(appWidgetId);
+            }
             animationType = Workspace.CANCEL_TWO_STAGE_WIDGET_DROP_ANIMATION;
         }
-        if (mDragLayer.getAnimatedView() != null) {
+        if (mDragLayer.getAnimatedView() != null && cellLayout != null) {
             mWorkspace.animateWidgetDrop(requestArgs, cellLayout,
                     (DragView) mDragLayer.getAnimatedView(), onCompleteRunnable,
                     animationType, boundWidget, true);
-        } else if (onCompleteRunnable != null) {
-            // The animated view may be null in the case of a rotation during widget configuration
-            onCompleteRunnable.run();
+        } else {
+            if (mDragLayer.getAnimatedView() != null) {
+                mDragLayer.clearAnimatedView();
+            }
+            if (onCompleteRunnable != null) {
+                // The animated view may be null in the case of a rotation during widget config
+                onCompleteRunnable.run();
+            }
         }
     }
 
@@ -1469,6 +1501,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             @Nullable AppWidgetHostView hostView, LauncherAppWidgetProviderInfo appWidgetInfo,
             boolean showPendingWidget, boolean updateWidgetSize,
             @Nullable Bitmap widgetPreviewBitmap) {
+        LauncherWidgetHolder.removePendingAppWidgetId(appWidgetId);
         if (app.lawnchair.widget.helper.WidgetStackLauncherHelper.completeAddAppWidgetToStack(
                 this, appWidgetId, itemInfo, hostView)) {
             return;
@@ -1482,6 +1515,12 @@ public class Launcher extends StatefulActivity<LauncherState>
                 return;
             }
         }
+
+        // Only treat hostView as an existing V2 workspace PendingAppWidgetHostView if it was
+        // already passed in from the workspace — NOT when createView() below returns a freshly
+        // created deferred PendingAppWidgetHostView because FLAG_LISTENING is currently 0.
+        final boolean isExistingPendingWidget =
+                hostView instanceof PendingAppWidgetHostView && hostView.getParent() != null;
 
         if (hostView == null && !showPendingWidget) {
             // Perform actual inflation because we're live
@@ -1508,7 +1547,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             PendingAppWidgetHostView pendingAppWidgetHostView = new PendingAppWidgetHostView(
                     this, mAppWidgetHolder, launcherInfo, appWidgetInfo, widgetPreviewBitmap);
             hostView = pendingAppWidgetHostView;
-        } else if (hostView instanceof PendingAppWidgetHostView) {
+        } else if (isExistingPendingWidget) {
             ((PendingAppWidgetHostView) hostView).setPreviewBitmapAndUpdateBackground(null);
             // User has selected a widget config and exited the config activity, we can trigger
             // re-inflation of PendingAppWidgetHostView to replace it with
@@ -1518,13 +1557,14 @@ public class Launcher extends StatefulActivity<LauncherState>
             // Show resize frame on the newly inflated LauncherAppWidgetHostView.
             LauncherAppWidgetHostView reInflatedHostView =
                     getWorkspace().getWidgetForAppWidgetId(appWidgetId);
-            showWidgetResizeFrame(
-                    reInflatedHostView,
-                    (LauncherAppWidgetInfo) reInflatedHostView.getTag(),
-                    presenterPos);
-            // We always update widget size after re-inflating PendingAppWidgetHostView
-            WidgetSizes.updateWidgetSizeRanges(
-                    reInflatedHostView, this, itemInfo.spanX, itemInfo.spanY);
+            if (reInflatedHostView != null) {
+                if (reInflatedHostView.getTag() instanceof LauncherAppWidgetInfo reInflatedInfo) {
+                    showWidgetResizeFrame(reInflatedHostView, reInflatedInfo, presenterPos);
+                }
+                // We always update widget size after re-inflating PendingAppWidgetHostView
+                WidgetSizes.updateWidgetSizeRanges(
+                        reInflatedHostView, this, itemInfo.spanX, itemInfo.spanY);
+            }
             return;
         }
         if (updateWidgetSize) {
@@ -1557,7 +1597,13 @@ public class Launcher extends StatefulActivity<LauncherState>
             LauncherAppWidgetHostView launcherHostView,
             LauncherAppWidgetInfo launcherInfo,
             CellPos presenterPos) {
+        if (launcherHostView == null || launcherInfo == null) {
+            return;
+        }
         CellLayout cellLayout = getCellLayout(launcherInfo.container, presenterPos.screenId);
+        if (cellLayout == null) {
+            return;
+        }
         // We should wait until launcher is not animating to show resize frame so that
         // {@link View#hasIdentityMatrix()} returns true (no scale effect) from CellLayout and
         // Workspace (they are widget's parent view). Otherwise widget's
@@ -1880,7 +1926,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         Bitmap widgetPreviewBitmap = null;
         if (isActivityStarted) {
             DragView dropView = getDragLayer().clearAnimatedView();
-            if (dropView != null && dropView.containsAppWidgetHostView()) {
+            if (dropView != null && dropView.containsAppWidgetHostView()
+                    && dropView.getWidth() > 0 && dropView.getHeight() > 0) {
                 // Extracting Bitmap from dropView instead of its content view produces the correct
                 // bitmap.
                 widgetPreviewBitmap = createHardwareBitmap(
@@ -1894,7 +1941,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 NORMAL, SPRING_LOADED_EXIT_DELAY);
         completeAddAppWidget(appWidgetId, info, boundWidget,
                 addFlowHandler.getProviderInfo(this), addFlowHandler.needsConfigure(),
-                false, widgetPreviewBitmap);
+                !isActivityStarted, widgetPreviewBitmap);
         // Remove extra screen if widget drop concluded. If a config activity was started, extra
         // screen will be removed when we get back its result.
         if (!isActivityStarted) {
@@ -2262,7 +2309,12 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
 
             if (enableWorkspaceInflation() && view instanceof LauncherAppWidgetHostView lv) {
-                view = getAppWidgetHolder().attachViewToHostAndGetAttachedView(lv);
+                View attached = getAppWidgetHolder().attachViewToHostAndGetAttachedView(lv);
+                if (attached != lv && attached instanceof AppWidgetHostView ahv
+                        && item instanceof LauncherAppWidgetInfo lawi) {
+                    mItemInflater.prepareAppWidget(ahv, lawi);
+                }
+                view = attached;
             }
             workspace.addInScreenFromBind(view, item);
             if (boundAnim != null) {
@@ -2840,6 +2892,9 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     public void setWaitingForResult(PendingRequestArgs args) {
         mPendingRequestArgs = args;
+        if (args != null && args.getWidgetId() > 0) {
+            LauncherWidgetHolder.addPendingAppWidgetId(args.getWidgetId());
+        }
     }
 
     /**

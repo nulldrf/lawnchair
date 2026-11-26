@@ -51,8 +51,12 @@ open class ListenableAppWidgetHost(private val ctx: Context, hostId: Int) :
         }
     }
 
-    override fun onProviderChanged(appWidgetId: Int, appWidget: AppWidgetProviderInfo) {
-        val info = LauncherAppWidgetProviderInfo.fromProviderInfo(ctx, appWidget)
+    override fun onProviderChanged(appWidgetId: Int, appWidget: AppWidgetProviderInfo?) {
+        if (appWidget == null) {
+            super.onProviderChanged(appWidgetId, null)
+            return
+        }
+        val info = LauncherAppWidgetProviderInfo.fromProviderInfo(ctx, appWidget) ?: return
         super.onProviderChanged(appWidgetId, info)
         // The super method updates the dimensions of the providerInfo. Update the
         // launcher spans accordingly.

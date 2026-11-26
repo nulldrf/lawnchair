@@ -220,6 +220,13 @@ public class PendingAppWidgetHostView extends LauncherAppWidgetHostView
         super.onAttachedToWindow();
 
         mOnDetachCleanup.executeAllAndClear();
+        if (mIsDeferredWidget && mWidgetHolder.isListening()) {
+            // updateDeferredView() may have run before this view was attached to the window
+            // (e.g. during Activity recreate or background bind), in which case reInflate()
+            // returned early. Trigger re-inflation now that we are attached and listening.
+            MAIN_EXECUTOR.getHandler().post(this::reInflate);
+            return;
+        }
         if ((mAppwidget != null)
                 && !mInfo.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_ID_NOT_VALID)
                 && mInfo.restoreStatus != LauncherAppWidgetInfo.RESTORE_COMPLETED) {

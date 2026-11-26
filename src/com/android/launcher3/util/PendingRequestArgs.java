@@ -15,10 +15,13 @@
  */
 package com.android.launcher3.util;
 
+import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.os.Parcel;
 import android.os.Parcelable;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.model.data.ItemInfo;
@@ -39,6 +42,8 @@ public class PendingRequestArgs extends ItemInfo implements Parcelable {
     private final int mArg2;
     private final int mObjectType;
     private final Parcelable mObject;
+    @Nullable
+    private ComponentName mTargetComponent;
 
     public PendingRequestArgs(ItemInfo info) {
         mArg1 = 0;
@@ -47,6 +52,7 @@ public class PendingRequestArgs extends ItemInfo implements Parcelable {
         mObject = null;
 
         copyFrom(info);
+        mTargetComponent = info.getTargetComponent();
     }
 
     private PendingRequestArgs(int arg1, int objectType, Parcelable object) {
@@ -68,6 +74,21 @@ public class PendingRequestArgs extends ItemInfo implements Parcelable {
         mArg2 = parcel.readInt();
         mObjectType = parcel.readInt();
         mObject = parcel.readParcelable(getClass().getClassLoader());
+        mTargetComponent = parcel.readParcelable(ComponentName.class.getClassLoader());
+        minSpanX = parcel.readInt();
+        minSpanY = parcel.readInt();
+    }
+
+    @Override
+    public void copyFrom(ItemInfo info) {
+        super.copyFrom(info);
+        mTargetComponent = info.getTargetComponent();
+    }
+
+    @Nullable
+    @Override
+    public ComponentName getTargetComponent() {
+        return mTargetComponent != null ? mTargetComponent : super.getTargetComponent();
     }
 
     @Override
@@ -86,6 +107,9 @@ public class PendingRequestArgs extends ItemInfo implements Parcelable {
         dest.writeInt(mArg2);
         dest.writeInt(mObjectType);
         dest.writeParcelable(mObject, flags);
+        dest.writeParcelable(getTargetComponent(), flags);
+        dest.writeInt(minSpanX);
+        dest.writeInt(minSpanY);
     }
 
     public WidgetAddFlowHandler getWidgetHandler() {

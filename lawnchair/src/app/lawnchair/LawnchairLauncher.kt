@@ -288,6 +288,7 @@ class LawnchairLauncher : QuickstepLauncher() {
                 LawnchairShortcut.CUSTOMIZE,
                 LawnchairShortcut.OPEN_IN_STORE,
                 app.lawnchair.widget.shortcut.WidgetStackShortcut.FACTORY,
+                app.lawnchair.widget.shortcut.WidgetStackResizeShortcut.FACTORY,
             ),
             Stream.of(LawnchairShortcut.PAUSE_APPS),
         ),

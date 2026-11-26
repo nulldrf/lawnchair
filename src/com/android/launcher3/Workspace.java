@@ -2607,6 +2607,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         if (dropOverView == null || dropOverView == draggedView) {
             return false;
         }
+        if (!app.lawnchair.widget.helper.WidgetStackCompatibility
+                .isDraggedWidgetCompatibleWithDropTarget(
+                        getContext(), draggedWidgetInfo, dropOverView)) {
+            return false;
+        }
         if (dropOverView instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
             if (draggedView instanceof LauncherAppWidgetHostView) {
                 d.dragView.detachContentView(/* reattachToPreviousParent= */ false);
@@ -3088,12 +3093,13 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         mDragOverView = mDragTargetLayout.getChildAt(mTargetCell[0], mTargetCell[1]);
         ItemInfo info = dragObject.dragInfo;
-        boolean widgetStackPending = info instanceof LauncherAppWidgetInfo
+        boolean widgetStackPending = info instanceof LauncherAppWidgetInfo draggedWidgetInfo
                 && !(mDragInfo != null && mDragInfo.cell instanceof app.lawnchair.widget.view.WidgetStackView)
                 && mDragOverView != null
                 && (mDragInfo == null || mDragOverView != mDragInfo.cell)
-                && (mDragOverView instanceof LauncherAppWidgetHostView
-                        || mDragOverView instanceof app.lawnchair.widget.view.WidgetStackView);
+                && app.lawnchair.widget.helper.WidgetStackCompatibility
+                        .isDraggedWidgetCompatibleWithDropTarget(
+                                getContext(), draggedWidgetInfo, mDragOverView);
         boolean userFolderPending = willCreateUserFolder(info, mDragOverView, false)
                 || widgetStackPending;
         if (mDragMode == DRAG_MODE_NONE && userFolderPending) {

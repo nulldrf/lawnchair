@@ -263,6 +263,10 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
 
     public static void showForWidgetStack(
             app.lawnchair.widget.view.WidgetStackView stackView, CellLayout cellLayout) {
+        PreferenceManager2 pref2 = PreferenceManager2.getInstance(stackView.getContext());
+        boolean force = PreferenceCacheExtensionsKt.firstCached(pref2.getForceWidgetResize());
+        boolean unlimited = PreferenceCacheExtensionsKt.firstCached(pref2.getWidgetUnlimitedSize());
+
         if (stackView.getParent() == null) {
             return;
         }
@@ -272,7 +276,7 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         DragLayer dl = launcher.getDragLayer();
         AppWidgetResizeFrame frame = (AppWidgetResizeFrame) launcher.getLayoutInflater()
                 .inflate(R.layout.app_widget_resize_frame, dl, false);
-        frame.setupForWidgetStack(stackView, cellLayout, dl);
+        frame.setupForWidgetStack(stackView, cellLayout, dl, force, unlimited);
         frame.setTag(stackView.getTag());
         frame.setAccessibilityDelegate(launcher.getAccessibilityDelegate());
         frame.setContentDescription(launcher.asContext().getString(R.string.widget_frame_name,
@@ -287,20 +291,66 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
     private void setupForWidgetStack(
             app.lawnchair.widget.view.WidgetStackView stackView,
             CellLayout cellLayout,
-            DragLayer dragLayer) {
+            DragLayer dragLayer,
+            boolean force,
+            boolean unlimited) {
         mCellLayout = cellLayout;
         mWidgetView = null;
         mWidgetStackView = stackView;
         mDragLayer = dragLayer;
         InvariantDeviceProfile idp = LauncherAppState.getIDP(cellLayout.getContext());
 
-        mMinHSpan = 1;
-        mMinVSpan = 1;
-        mMaxHSpan = idp.numColumns;
-        mMaxVSpan = idp.numRows;
+        LauncherAppWidgetHostView currentWidgetView = stackView.getCurrentWidgetView();
+        LauncherAppWidgetProviderInfo info = currentWidgetView != null
+                && currentWidgetView.getAppWidgetInfo() instanceof LauncherAppWidgetProviderInfo lapi
+                ? lapi
+                : null;
 
-        mHorizontalResizeActive = true;
-        mVerticalResizeActive = true;
+        int resizeMode;
+        if (force || info == null) {
+            resizeMode = AppWidgetProviderInfo.RESIZE_BOTH;
+        } else {
+            resizeMode = info.resizeMode;
+        }
+
+        if (unlimited || info == null) {
+            mMinHSpan = 1;
+            mMinVSpan = 1;
+            mMaxHSpan = idp.numColumns;
+            mMaxVSpan = idp.numRows;
+            if (resizeMode != AppWidgetProviderInfo.RESIZE_NONE) {
+                resizeMode = AppWidgetProviderInfo.RESIZE_BOTH;
+            }
+        } else {
+            mMinHSpan = Math.max(1, info.minSpanX);
+            mMinVSpan = Math.max(1, info.minSpanY);
+            mMaxHSpan = info.maxSpanX > 0 ? info.maxSpanX : idp.numColumns;
+            mMaxVSpan = info.maxSpanY > 0 ? info.maxSpanY : idp.numRows;
+        }
+
+        app.lawnchair.widget.model.WidgetStackInfo stackInfo = stackView.getStackInfo();
+        int currentSpanX = stackInfo != null ? stackInfo.getSpanX() : 1;
+        int currentSpanY = stackInfo != null ? stackInfo.getSpanY() : 1;
+
+        boolean isWidgetVSpanInvalid = currentSpanY < mMinVSpan;
+        mVerticalResizeActive = (resizeMode & AppWidgetProviderInfo.RESIZE_VERTICAL) != 0 && (
+                (mMinVSpan < idp.numRows && mMaxVSpan > 1 && mMinVSpan < mMaxVSpan)
+                        || isWidgetVSpanInvalid);
+        if (!mVerticalResizeActive) {
+            mDragHandles[INDEX_TOP].setVisibility(GONE);
+            mDragHandles[INDEX_BOTTOM].setVisibility(GONE);
+        }
+
+        boolean isWidgetHSpanInvalid = currentSpanX < mMinHSpan;
+        mHorizontalResizeActive = (resizeMode & AppWidgetProviderInfo.RESIZE_HORIZONTAL) != 0 && (
+                (mMinHSpan < idp.numColumns && mMaxHSpan > 1 && mMinHSpan < mMaxHSpan)
+                        || isWidgetHSpanInvalid);
+        if (!mHorizontalResizeActive) {
+            mDragHandles[INDEX_LEFT].setVisibility(GONE);
+            mDragHandles[INDEX_RIGHT].setVisibility(GONE);
+        }
+
+        mReconfigureButton = (ImageButton) findViewById(R.id.widget_reconfigure_button);
         mReconfigureButton.setVisibility(GONE);
 
         mWidgetViewOldRect.set(stackView.getLeft(), stackView.getTop(),
@@ -310,16 +360,29 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         CellLayoutLayoutParams lp = (CellLayoutLayoutParams) stackView.getLayoutParams();
         ItemInfo widgetInfo = (ItemInfo) stackView.getTag();
         if (widgetInfo != null) {
+            CellPos presenterPos = mLauncher.getCellPosMapper().mapModelToPresenter(widgetInfo);
+            lp.setCellX(presenterPos.cellX);
+            lp.setTmpCellX(presenterPos.cellX);
+            lp.setCellY(presenterPos.cellY);
+            lp.setTmpCellY(presenterPos.cellY);
+            lp.cellHSpan = currentSpanX;
+            lp.cellVSpan = currentSpanY;
+            lp.isLockedToGrid = true;
             setId(widgetInfo.id);
         }
 
         mCellLayout.markCellsAsUnoccupiedForView(stackView);
+        setOnKeyListener(this);
+        setCornerRadiusFromWidget();
         stackView.addOnLayoutChangeListener(mWidgetViewLayoutListener);
     }
 
     private void setCornerRadiusFromWidget() {
-        if (mWidgetView != null && mWidgetView.hasEnforcedCornerRadius()) {
-            float enforcedCornerRadius = mWidgetView.getEnforcedCornerRadius();
+        LauncherAppWidgetHostView hostView = mWidgetView != null
+                ? mWidgetView
+                : (mWidgetStackView != null ? mWidgetStackView.getCurrentWidgetView() : null);
+        if (hostView != null && hostView.hasEnforcedCornerRadius()) {
+            float enforcedCornerRadius = hostView.getEnforcedCornerRadius();
             ImageView imageView = findViewById(R.id.widget_resize_frame);
             Drawable d = imageView.getDrawable();
             if (d instanceof GradientDrawable) {

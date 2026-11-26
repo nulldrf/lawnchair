@@ -22,7 +22,7 @@ class WidgetStackShortcut(
     originalView: View,
     isEditing: Boolean,
 ) : SystemShortcut<Launcher>(
-    R.drawable.ic_widget,
+    SystemShortcut.Widgets.getDrawableId(),
     if (isEditing) R.string.edit_stack else R.string.create_stack,
     target,
     itemInfo,

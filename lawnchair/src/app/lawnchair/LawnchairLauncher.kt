@@ -51,6 +51,7 @@ import app.lawnchair.root.RootNotAvailableException
 import app.lawnchair.theme.ThemeProvider
 import app.lawnchair.ui.popup.LauncherOptionsPopup
 import app.lawnchair.ui.popup.LawnchairShortcut
+import app.lawnchair.ui.popup.WallpaperCarouselView
 import app.lawnchair.util.getThemedIconPacksInstalled
 import app.lawnchair.util.unsafeLazy
 import app.lawnchair.views.LawnchairFloatingSurfaceView
@@ -403,13 +404,18 @@ class LawnchairLauncher : QuickstepLauncher() {
         width: Int = 0,
     ): OptionsPopupView<T>? where T : Context?, T : ActivityContext? {
         if (activityContext == null) return null
-        val isEmpty = WallpaperService.INSTANCE.get(this).getTopWallpapers().isEmpty()
+        val topWallpapers = WallpaperService.INSTANCE.get(this).getTopWallpapers()
+        val isEmpty = topWallpapers.isEmpty()
         val layout = if (isEmpty) R.layout.longpress_options_menu else R.layout.wallpaper_options_popup
         val popup = activityContext.layoutInflater.inflate(
             layout,
             activityContext.dragLayer,
             false,
         ) as OptionsPopupView<T>
+        if (!isEmpty) {
+            popup.findViewById<WallpaperCarouselView>(R.id.wallpaper_carousel)
+                ?.setInitialWallpapers(topWallpapers)
+        }
         popup.setTargetRect(targetRect)
         popup.setShouldAddArrow(shouldAddArrow)
         for (item in items) {

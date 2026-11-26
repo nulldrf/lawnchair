@@ -18,6 +18,9 @@ class WallpaperViewModel(application: Application) : AndroidViewModel(applicatio
     val wallpapers: StateFlow<List<Wallpaper>>
         field = MutableStateFlow<List<Wallpaper>>(emptyList())
 
+    val isLoaded: StateFlow<Boolean>
+        field = MutableStateFlow(false)
+
     private val mutex = Mutex()
 
     private val listener = object : WallpaperManagerCompat.OnColorsChangedListener {
@@ -35,6 +38,11 @@ class WallpaperViewModel(application: Application) : AndroidViewModel(applicatio
         wallpaperManagerCompat.addOnChangeListener(listener)
     }
 
+    fun seedWallpapers(initialWallpapers: List<Wallpaper>) {
+        wallpapers.value = initialWallpapers
+        isLoaded.value = true
+    }
+
     private suspend fun saveWallpaper(wallpaperManager: WallpaperManager) {
         wallpaperManagerCompat.service.saveWallpaper(wallpaperManager)
         refreshWallpapers()
@@ -43,6 +51,7 @@ class WallpaperViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun refreshWallpapers() {
         val topWallpapers = wallpaperManagerCompat.service.dao.getTopWallpapers()
         wallpapers.value = topWallpapers
+        isLoaded.value = true
     }
 
     private fun loadTopWallpapers() {

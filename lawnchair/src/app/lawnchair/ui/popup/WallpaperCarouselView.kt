@@ -22,6 +22,7 @@ import app.lawnchair.util.decodeSampledBitmapFromFile
 import app.lawnchair.views.component.IconFrame
 import app.lawnchair.views.createContainedLoadingIndicator
 import com.android.launcher3.R
+import com.android.launcher3.popup.ArrowPopup
 import com.android.launcher3.util.Themes
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -58,16 +60,52 @@ class WallpaperCarouselView @JvmOverloads constructor(
         observeWallpapers()
     }
 
+    /**
+     * Seeds the carousel synchronously before the enclosing popup measures and positions itself,
+     * avoiding an initial GONE -> VISIBLE height jump that clips lower menu items.
+     */
+    fun setInitialWallpapers(wallpapers: List<Wallpaper>) {
+        viewModel.seedWallpapers(wallpapers)
+        applyWallpapers(wallpapers, isLoaded = true)
+    }
+
     private fun observeWallpapers() {
         viewScope.launch {
-            viewModel.wallpapers.collect { wallpapers ->
-                visibility = if (wallpapers.isEmpty()) GONE else VISIBLE
-                loadingView.visibility = if (wallpapers.isEmpty()) GONE else VISIBLE
-                if (wallpapers.isNotEmpty()) {
-                    displayWallpapers(wallpapers)
-                }
+            combine(viewModel.wallpapers, viewModel.isLoaded) { wallpapers, isLoaded ->
+                wallpapers to isLoaded
+            }.collect { (wallpapers, isLoaded) ->
+                applyWallpapers(wallpapers, isLoaded)
             }
         }
+    }
+
+    private fun applyWallpapers(wallpapers: List<Wallpaper>, isLoaded: Boolean) {
+        if (!isLoaded && wallpapers.isEmpty()) {
+            // Keep carousel at its XML height while initial DB query is in flight so
+            // ArrowPopup.orientAboutObject() reserves space for it instead of measuring 0px.
+            visibility = VISIBLE
+            loadingView.visibility = VISIBLE
+            return
+        }
+        val newVisibility = if (wallpapers.isEmpty()) GONE else VISIBLE
+        val visibilityChanged = visibility != newVisibility
+        visibility = newVisibility
+        loadingView.visibility = if (wallpapers.isEmpty()) GONE else VISIBLE
+        if (wallpapers.isNotEmpty()) {
+            displayWallpapers(wallpapers)
+        }
+        if (visibilityChanged) {
+            findEnclosingArrowPopup()?.reorientIfOpen()
+        }
+    }
+
+    private fun findEnclosingArrowPopup(): ArrowPopup<*>? {
+        var current = parent
+        while (current != null) {
+            if (current is ArrowPopup<*>) return current
+            current = current.parent
+        }
+        return null
     }
 
     private fun displayWallpapers(wallpapers: List<Wallpaper>) {

@@ -783,7 +783,9 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         if (targetView == null) {
             return;
         }
-        float scale = mWidgetView != null ? mWidgetView.getScaleToFit() : 1f;
+        float scale = mWidgetView != null
+                ? mWidgetView.getScaleToFit()
+                : (mWidgetStackView != null ? mWidgetStackView.getScaleToFit() : 1f);
         if (mWidgetView != null && FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()) {
             getViewRectRelativeToDragLayer(out);
         } else {

@@ -265,7 +265,6 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
                 .map(s -> s.getShortcut(launcher, item, widgetView))
                 .filter(Objects::nonNull)
                 .filter(s -> s instanceof app.lawnchair.widget.shortcut.WidgetStackShortcut
-                        || s instanceof app.lawnchair.widget.shortcut.WidgetStackResizeShortcut
                         || s instanceof SystemShortcut.AppInfo)
                 .collect(Collectors.toList());
         if (systemShortcuts.isEmpty()) {

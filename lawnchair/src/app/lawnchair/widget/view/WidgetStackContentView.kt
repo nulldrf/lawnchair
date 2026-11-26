@@ -312,17 +312,11 @@ class WidgetStackContentView @JvmOverloads constructor(
 
     fun updateMemberWidgetSizeRanges(spanX: Int, spanY: Int) {
         val launcher = Launcher.getLauncher(context)
-        val helper = WidgetManagerHelper(context)
         for (view in widgetViews) {
             val widgetInfo = view.tag as? LauncherAppWidgetInfo ?: continue
             widgetInfo.spanX = spanX
             widgetInfo.spanY = spanY
-            val provider = view.appWidgetInfo as? LauncherAppWidgetProviderInfo
-                ?: helper.getLauncherAppWidgetInfo(widgetInfo.appWidgetId, widgetInfo.providerName)
             WidgetSizes.updateWidgetSizeRanges(view, launcher, spanX, spanY)
-            if (provider != null) {
-                view.setAppWidget(widgetInfo.appWidgetId, provider)
-            }
         }
     }
 

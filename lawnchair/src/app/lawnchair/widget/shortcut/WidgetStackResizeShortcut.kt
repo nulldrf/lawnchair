@@ -14,17 +14,16 @@ import com.android.launcher3.R
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.popup.SystemShortcut
-import com.android.launcher3.widget.LauncherAppWidgetHostView
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo
 
 /**
  * Long-press menu shortcut that opens [AppWidgetResizeFrame] for a [WidgetStackView]
- * (using the currently displayed widget's resize constraints) or a single widget.
+ * (using the currently displayed widget's resize constraints). Only shown for widget stacks.
  */
 class WidgetStackResizeShortcut(
     target: Launcher,
     itemInfo: LauncherAppWidgetInfo,
-    originalView: View,
+    originalView: WidgetStackView,
 ) : SystemShortcut<Launcher>(
     R.drawable.ic_aspect_ratio,
     R.string.widget_stack_resize,
@@ -35,18 +34,16 @@ class WidgetStackResizeShortcut(
 
     override fun onClick(view: View) {
         AbstractFloatingView.closeAllOpenViews(mTarget)
-        val anchor = mOriginalView ?: return
-        val cellLayout = (anchor.parent?.parent as? CellLayout) ?: return
-        when (anchor) {
-            is WidgetStackView -> AppWidgetResizeFrame.showForWidgetStack(anchor, cellLayout)
-            is LauncherAppWidgetHostView -> AppWidgetResizeFrame.showForWidget(anchor, cellLayout)
-        }
+        val stackView = mOriginalView as? WidgetStackView ?: return
+        val cellLayout = (stackView.parent?.parent as? CellLayout) ?: return
+        AppWidgetResizeFrame.showForWidgetStack(stackView, cellLayout)
     }
 
     companion object {
         @JvmField
         val FACTORY: SystemShortcut.Factory<Launcher> =
             SystemShortcut.Factory { activity: Launcher, itemInfo: ItemInfo, originalView: View ->
+                val stackView = originalView as? WidgetStackView ?: return@Factory null
                 val prefs2 = PreferenceManager2.getInstance(activity)
                 if (prefs2.lockHomeScreen.firstCached()) {
                     return@Factory null
@@ -56,19 +53,14 @@ class WidgetStackResizeShortcut(
                     return@Factory null
                 }
                 val forceResize = prefs2.forceWidgetResize.firstCached()
-                val targetHostView = when (originalView) {
-                    is WidgetStackView -> originalView.getCurrentWidgetView()
-                    is LauncherAppWidgetHostView -> originalView
-                    else -> null
-                } ?: return@Factory null
-
-                val providerInfo = targetHostView.appWidgetInfo as? LauncherAppWidgetProviderInfo
+                val currentHostView = stackView.getCurrentWidgetView() ?: return@Factory null
+                val providerInfo = currentHostView.appWidgetInfo as? LauncherAppWidgetProviderInfo
                 val canResize = forceResize ||
                     (providerInfo != null && providerInfo.resizeMode != AppWidgetProviderInfo.RESIZE_NONE)
                 if (!canResize) {
                     return@Factory null
                 }
-                WidgetStackResizeShortcut(activity, widgetInfo, originalView)
+                WidgetStackResizeShortcut(activity, widgetInfo, stackView)
             }
     }
 }

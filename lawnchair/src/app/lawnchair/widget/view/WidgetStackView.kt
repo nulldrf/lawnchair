@@ -44,6 +44,7 @@ class WidgetStackView @JvmOverloads constructor(
     private val translateDelegate = MultiTranslateDelegate(this)
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
+    private var scaleToFit = 1f
     private var reorderBounceScale = 1f
     private var downX = 0f
     private var downY = 0f
@@ -164,17 +165,30 @@ class WidgetStackView @JvmOverloads constructor(
     override fun getViewType(): Int = DraggableView.DRAGGABLE_WIDGET
 
     override fun getWorkspaceVisualDragBounds(bounds: Rect) {
-        bounds.set(0, 0, width, height)
+        val w = (measuredWidth * scaleToFit).toInt()
+        val h = (measuredHeight * scaleToFit).toInt()
+        bounds.set(0, 0, w, h)
     }
 
-    // --- Reorderable ---
+    // --- Reorderable / Scaling ---
+
+    private fun updateScale() {
+        super.setScaleX(scaleToFit * reorderBounceScale)
+        super.setScaleY(scaleToFit * reorderBounceScale)
+    }
+
+    fun setScaleToFit(scale: Float) {
+        scaleToFit = scale
+        updateScale()
+    }
+
+    fun getScaleToFit(): Float = scaleToFit
 
     override fun getTranslateDelegate(): MultiTranslateDelegate = translateDelegate
 
     override fun setReorderBounceScale(scale: Float) {
         reorderBounceScale = scale
-        scaleX = scale
-        scaleY = scale
+        updateScale()
     }
 
     override fun getReorderBounceScale(): Float = reorderBounceScale

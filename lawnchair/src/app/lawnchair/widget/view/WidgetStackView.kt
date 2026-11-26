@@ -97,8 +97,7 @@ class WidgetStackView @JvmOverloads constructor(
         syncPrimaryTag()
     }
 
-    fun addWidget(widgetInfo: LauncherAppWidgetInfo, hostView: LauncherAppWidgetHostView? = null): Boolean =
-        contentView.addWidget(widgetInfo, hostView)
+    fun addWidget(widgetInfo: LauncherAppWidgetInfo, hostView: LauncherAppWidgetHostView? = null): Boolean = contentView.addWidget(widgetInfo, hostView)
 
     fun removeWidget(appWidgetId: Int): Boolean = contentView.removeWidget(appWidgetId)
 

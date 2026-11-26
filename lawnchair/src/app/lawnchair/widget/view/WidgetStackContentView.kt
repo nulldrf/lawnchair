@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -12,12 +11,10 @@ import androidx.viewpager.widget.PagerAdapter
 import androidx.viewpager.widget.ViewPager
 import app.lawnchair.smartspace.PageIndicator
 import app.lawnchair.widget.model.WidgetStackInfo
-import app.lawnchair.widget.model.WidgetStackManager
 import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
-import com.android.launcher3.util.Executors
 import com.android.launcher3.widget.LauncherAppWidgetHostView
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo
 import com.android.launcher3.widget.LauncherWidgetHolder
@@ -138,13 +135,11 @@ class WidgetStackContentView @JvmOverloads constructor(
 
     fun getWidgetCount(): Int = widgetViews.size
 
-    fun getCurrentWidgetView(): LauncherAppWidgetHostView? =
-        widgetViews.getOrNull(pager.currentItem)
+    fun getCurrentWidgetView(): LauncherAppWidgetHostView? = widgetViews.getOrNull(pager.currentItem)
 
     fun getWidgetViews(): List<LauncherAppWidgetHostView> = widgetViews.toList()
 
-    fun getCurrentWidgetInfo(): LauncherAppWidgetInfo? =
-        getCurrentWidgetView()?.tag as? LauncherAppWidgetInfo
+    fun getCurrentWidgetInfo(): LauncherAppWidgetInfo? = getCurrentWidgetView()?.tag as? LauncherAppWidgetInfo
 
     fun setStackInfo(
         info: WidgetStackInfo,
@@ -372,7 +367,7 @@ class WidgetStackContentView @JvmOverloads constructor(
         provider: LauncherAppWidgetProviderInfo,
         stack: WidgetStackInfo,
     ): LauncherAppWidgetHostView {
-        val hostView = holder.createView(widgetInfo.appWidgetId, provider)
+        val hostView = holder.createView(widgetInfo.appWidgetId, provider) as LauncherAppWidgetHostView
         launcher.itemInflater?.prepareAppWidget(hostView, widgetInfo)
         WidgetSizes.updateWidgetSizeRanges(hostView, launcher, stack.spanX, stack.spanY)
         return hostView

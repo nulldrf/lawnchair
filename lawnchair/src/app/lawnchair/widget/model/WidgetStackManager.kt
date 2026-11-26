@@ -297,8 +297,7 @@ object WidgetStackManager {
     }
 
     @JvmStatic
-    fun consumePendingStackInfo(appWidgetId: Int): WidgetStackInfo? =
-        pendingStackByWidgetId.remove(appWidgetId)
+    fun consumePendingStackInfo(appWidgetId: Int): WidgetStackInfo? = pendingStackByWidgetId.remove(appWidgetId)
 
     @JvmStatic
     fun clearPendingStackInfo(appWidgetId: Int) {

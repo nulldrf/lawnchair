@@ -121,7 +121,7 @@ protobuf-javalite = { module = "com.google.protobuf:protobuf-javalite", version.
 android-desugarJdkLibs = "com.android.tools:desugar_jdk_libs:2.1.5"
 airbnb-lottie = "com.airbnb.android:lottie:6.7.1"
 
-hiddenapi-bypass = "org.lsposed.hiddenapibypass:hiddenapibypass:6.1"
+hiddenapi-bypass = "org.lsposed.hiddenapibypass:hiddenapibypass:6.2"
 coil-compose = "io.coil-kt:coil-compose:2.7.0"
 google-material = "com.google.android.material:material:1.14.0"
 hoko-blur = "io.github.hokofly:hoko-blur:1.5.5"

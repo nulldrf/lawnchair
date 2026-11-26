@@ -56,6 +56,7 @@ object WidgetStackResizeHelper {
             )
         }
 
+        stackView.updateBounds(cellX, cellY, spanX, spanY)
         stackView.updateMemberWidgetSizeRanges(spanX, spanY)
         writer.saveWidgetStack(updated)
     }

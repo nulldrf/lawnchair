@@ -204,6 +204,13 @@ private fun openWidgetPickerForStack(
             launcher.getString(R.string.widget_stack_picker_title),
             null,
         )
+        setWidgetFilter { widgetItem ->
+            app.lawnchair.widget.helper.WidgetStackCompatibility.isWidgetItemCompatibleWithStack(
+                widgetItem,
+                draftStack.spanX,
+                draftStack.spanY,
+            )
+        }
         setWidgetPickListener { widgetItem ->
             val providerInfo = widgetItem.widgetInfo ?: return@setWidgetPickListener
             picked = true

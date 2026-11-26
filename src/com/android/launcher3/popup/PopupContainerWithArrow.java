@@ -265,6 +265,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
                 .map(s -> s.getShortcut(launcher, item, widgetView))
                 .filter(Objects::nonNull)
                 .filter(s -> s instanceof app.lawnchair.widget.shortcut.WidgetStackShortcut
+                        || s instanceof app.lawnchair.widget.shortcut.WidgetStackResizeShortcut
                         || s instanceof SystemShortcut.AppInfo)
                 .collect(Collectors.toList());
         if (systemShortcuts.isEmpty()) {
@@ -279,8 +280,9 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     }
 
     /**
-     * Shows a popup with stack-specific shortcuts (e.g. "Edit stack") for a {@code WidgetStackView},
-     * omitting irrelevant app-level shortcuts like "Widgets" or "App info".
+     * Shows a popup with stack-specific shortcuts (e.g. "Edit stack", "Resize") for a
+     * {@code WidgetStackView}, omitting irrelevant app-level shortcuts like "Widgets" or
+     * "App info".
      */
     @Nullable
     public static PopupContainerWithArrow<Launcher> showForWidgetStack(
@@ -301,7 +303,8 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         List<SystemShortcut> systemShortcuts = launcher.getSupportedShortcuts(targetItem.container)
                 .map(s -> s.getShortcut(launcher, targetItem, stackView))
                 .filter(Objects::nonNull)
-                .filter(s -> s instanceof app.lawnchair.widget.shortcut.WidgetStackShortcut)
+                .filter(s -> s instanceof app.lawnchair.widget.shortcut.WidgetStackShortcut
+                        || s instanceof app.lawnchair.widget.shortcut.WidgetStackResizeShortcut)
                 .collect(Collectors.toList());
         if (systemShortcuts.isEmpty()) {
             return null;

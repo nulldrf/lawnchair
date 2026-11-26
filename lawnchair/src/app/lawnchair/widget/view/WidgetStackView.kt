@@ -50,8 +50,8 @@ class WidgetStackView @JvmOverloads constructor(
     private var stackChangeListener: WidgetStackChangeListener? = null
 
     init {
-        clipChildren = false
-        clipToPadding = false
+        clipChildren = true
+        clipToPadding = true
         isFocusable = true
         isLongClickable = true
         setOnLongClickListener(this)
@@ -103,6 +103,10 @@ class WidgetStackView @JvmOverloads constructor(
 
     fun onAppWidgetConfigureCompleted(appWidgetId: Int) {
         contentView.onAppWidgetConfigureCompleted(appWidgetId)
+    }
+
+    fun updateBounds(cellX: Int, cellY: Int, spanX: Int, spanY: Int) {
+        contentView.updateBounds(cellX, cellY, spanX, spanY)
     }
 
     fun updateMemberWidgetSizeRanges(spanX: Int, spanY: Int) {

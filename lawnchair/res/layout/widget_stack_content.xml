@@ -4,15 +4,15 @@
     android:id="@id/widget_stack_content"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:clipChildren="false"
-    android:clipToPadding="false">
+    android:clipChildren="true"
+    android:clipToPadding="true">
 
     <app.lawnchair.widget.view.InterceptingWidgetPager
         android:id="@id/widget_stack_pager"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clipChildren="false"
-        android:clipToPadding="false" />
+        android:clipChildren="true"
+        android:clipToPadding="true" />
 
     <app.lawnchair.smartspace.PageIndicator
         android:id="@id/widget_stack_indicator"

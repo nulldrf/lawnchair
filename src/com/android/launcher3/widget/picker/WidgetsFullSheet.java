@@ -126,6 +126,15 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     private List<WidgetItem> mRecommendedWidgets = new ArrayList<>();
     private Map<WidgetRecommendationCategory, List<WidgetItem>> mRecommendedWidgetsMap =
             new HashMap<>();
+    @Nullable
+    private Predicate<WidgetItem> mWidgetFilter;
+
+    public void setWidgetFilter(@Nullable Predicate<WidgetItem> filter) {
+        mWidgetFilter = filter;
+        mRecommendedWidgetsMap = new HashMap<>();
+        onWidgetsBound();
+        onRecommendedWidgetsBound();
+    }
     protected int mRecommendationsCurrentPage = 0;
     protected final SparseArray<AdapterHolder> mAdapters = new SparseArray();
 
@@ -551,6 +560,13 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             widgets = getWidgetsToDisplay();
         }
 
+        if (mWidgetFilter != null) {
+            widgets = app.lawnchair.widget.helper.WidgetStackCompatibility
+                    .filterWidgetListEntries(widgets, mWidgetFilter);
+            defaultWidgets = app.lawnchair.widget.helper.WidgetStackCompatibility
+                    .filterWidgetListEntries(defaultWidgets, mWidgetFilter);
+        }
+
         AdapterHolder primaryUserAdapterHolder = mAdapters.get(AdapterHolder.PRIMARY);
         primaryUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets, defaultWidgets);
 
@@ -613,7 +629,11 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
     @Override
     public void onSearchResults(List<WidgetsListBaseEntry> entries) {
-        mAdapters.get(AdapterHolder.SEARCH).mWidgetsListAdapter.setWidgetsOnSearch(entries);
+        List<WidgetsListBaseEntry> results = mWidgetFilter != null
+                ? app.lawnchair.widget.helper.WidgetStackCompatibility
+                        .filterWidgetListEntries(entries, mWidgetFilter)
+                : entries;
+        mAdapters.get(AdapterHolder.SEARCH).mWidgetsListAdapter.setWidgetsOnSearch(results);
         updateRecyclerViewVisibility(mAdapters.get(AdapterHolder.SEARCH));
     }
 
@@ -656,9 +676,18 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         boolean forceUpdate = false;
         // We avoid applying new recommendations when some are already displayed.
         if (mRecommendedWidgetsMap.isEmpty()) {
-            mRecommendedWidgetsMap =
+            Map<WidgetRecommendationCategory, List<WidgetItem>> raw =
                     mActivityContext.getWidgetPickerDataProvider().get().getRecommendations();
+            mRecommendedWidgetsMap = mWidgetFilter != null
+                    ? app.lawnchair.widget.helper.WidgetStackCompatibility
+                            .filterRecommendations(raw, mWidgetFilter)
+                    : raw;
             forceUpdate = true;
+        }
+        if (mRecommendedWidgetsMap.isEmpty()) {
+            mRecommendedWidgetsCount = 0;
+            mWidgetRecommendationsContainer.setVisibility(GONE);
+            return;
         }
         mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
                 mRecommendedWidgetsMap,

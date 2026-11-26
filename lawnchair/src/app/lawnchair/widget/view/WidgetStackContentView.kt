@@ -24,9 +24,9 @@ import com.android.launcher3.widget.WidgetManagerHelper
 import com.android.launcher3.widget.util.WidgetSizes
 
 /**
- * Inner content view of a [WidgetStackView], hosting an [InterceptingWidgetPager],
- * a One UI-style auto-fading [PageIndicator], auto-rotation scheduling, and
- * pending-to-real widget inflation upgrades.
+ * Inner content view of a [WidgetStackView], hosting a circularly-scrolling
+ * [InterceptingWidgetPager], a One UI-style auto-fading [PageIndicator], auto-rotation
+ * scheduling, and pending-to-real widget inflation upgrades.
  */
 class WidgetStackContentView @JvmOverloads constructor(
     context: Context,
@@ -45,6 +45,7 @@ class WidgetStackContentView @JvmOverloads constructor(
 
     private val widgetViews = mutableListOf<LauncherAppWidgetHostView>()
     private val knownWidgetInfos = mutableMapOf<Int, LauncherAppWidgetInfo>()
+    private val slotHolders = mutableMapOf<Int, FrameLayout>()
 
     private var stackInfo: WidgetStackInfo? = null
     private var changeListener: WidgetStackChangeListener? = null
@@ -58,8 +59,9 @@ class WidgetStackContentView @JvmOverloads constructor(
             isAutoRotateScheduled = false
             val info = stackInfo ?: return
             if (!info.autoRotate || widgetViews.size <= 1 || !isAttachedToWindow) return
-            val next = (pager.currentItem + 1) % widgetViews.size
-            pager.setCurrentItem(next, true)
+            val nextVirtual = pager.currentItem + 1
+            ensureWidgetAttachedToSlot(nextVirtual)
+            pager.setCurrentItem(nextVirtual, true)
             scheduleAutoRotate()
         }
     }
@@ -84,16 +86,30 @@ class WidgetStackContentView @JvmOverloads constructor(
 
         pager.adapter = adapter
         pager.offscreenPageLimit = OFFSCREEN_PAGE_LIMIT
+        pager.pageMargin = (PAGE_MARGIN_DP * resources.displayMetrics.density).toInt()
         pager.onUserInteraction = { showIndicatorTemporarily() }
         pager.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
-                if (widgetViews.size > 1) {
-                    indicator.setPageOffset(position, positionOffset)
+                val count = widgetViews.size
+                if (count <= 1) return
+
+                ensureWidgetAttachedToSlot(position)
+                if (positionOffset > 0f) {
+                    ensureWidgetAttachedToSlot(position + 1)
+                }
+
+                val realPos = toRealIndex(position)
+                if (realPos < count - 1) {
+                    indicator.setPageOffset(realPos, positionOffset)
+                } else {
+                    indicator.setPageOffset(if (positionOffset >= 0.5f) 0 else realPos, 0f)
                 }
             }
 
             override fun onPageSelected(position: Int) {
-                stackInfo?.currentIndex = position
+                val realPos = toRealIndex(position)
+                stackInfo?.currentIndex = realPos
+                ensureWidgetAttachedToSlot(position)
                 showIndicatorTemporarily()
                 restartAutoRotate()
             }
@@ -102,6 +118,8 @@ class WidgetStackContentView @JvmOverloads constructor(
                 if (state == ViewPager.SCROLL_STATE_DRAGGING) {
                     showIndicatorTemporarily(autoHide = false)
                 } else if (state == ViewPager.SCROLL_STATE_IDLE) {
+                    recenterIfNearBoundary()
+                    ensureWidgetAttachedToSlot(pager.currentItem)
                     scheduleIndicatorFadeOut()
                 }
             }
@@ -135,7 +153,7 @@ class WidgetStackContentView @JvmOverloads constructor(
 
     fun getWidgetCount(): Int = widgetViews.size
 
-    fun getCurrentWidgetView(): LauncherAppWidgetHostView? = widgetViews.getOrNull(pager.currentItem)
+    fun getCurrentWidgetView(): LauncherAppWidgetHostView? = widgetViews.getOrNull(toRealIndex(pager.currentItem))
 
     fun getWidgetViews(): List<LauncherAppWidgetHostView> = widgetViews.toList()
 
@@ -150,6 +168,7 @@ class WidgetStackContentView @JvmOverloads constructor(
         pendingRefreshAttempts = 0
         mainHandler.removeCallbacks(pendingRefreshRunnable)
 
+        detachAllSlotHolders()
         widgetViews.clear()
         val missingIds = mutableListOf<Int>()
         for (widgetId in info.widgetIds) {
@@ -165,10 +184,14 @@ class WidgetStackContentView @JvmOverloads constructor(
         updateIndicatorCount()
 
         if (widgetViews.isNotEmpty()) {
-            val targetIndex = info.currentIndex.coerceIn(0, widgetViews.lastIndex)
-            info.currentIndex = targetIndex
-            pager.setCurrentItem(targetIndex, false)
-            indicator.setPageOffset(targetIndex, 0f)
+            val targetRealIndex = info.currentIndex.coerceIn(0, widgetViews.lastIndex)
+            info.currentIndex = targetRealIndex
+            val targetVirtual = centerVirtualPosition(targetRealIndex)
+            pager.setCurrentItem(targetVirtual, false)
+            ensureWidgetAttachedToSlot(targetVirtual)
+            if (widgetViews.size > 1) {
+                indicator.setPageOffset(targetRealIndex, 0f)
+            }
         }
 
         if (widgetViews.size > 1) {
@@ -186,7 +209,9 @@ class WidgetStackContentView @JvmOverloads constructor(
         if (current.widgetIds.contains(widgetInfo.appWidgetId)) {
             val existingIdx = current.widgetIds.indexOf(widgetInfo.appWidgetId)
             if (existingIdx in widgetViews.indices) {
-                pager.setCurrentItem(existingIdx, true)
+                val targetVirtual = centerVirtualPosition(existingIdx)
+                pager.setCurrentItem(targetVirtual, false)
+                ensureWidgetAttachedToSlot(targetVirtual)
             }
             return false
         }
@@ -203,13 +228,19 @@ class WidgetStackContentView @JvmOverloads constructor(
         widgetInfo.widgetStackId = updated.stackId
         syncPositionToStack(widgetInfo, updated)
 
+        detachAllSlotHolders()
         widgetViews.add(view)
         adapter.notifyDataSetChanged()
         updateIndicatorCount()
 
-        val newIndex = widgetViews.lastIndex
-        updated.currentIndex = newIndex
-        pager.setCurrentItem(newIndex, true)
+        val newRealIndex = widgetViews.lastIndex
+        updated.currentIndex = newRealIndex
+        val targetVirtual = centerVirtualPosition(newRealIndex)
+        pager.setCurrentItem(targetVirtual, false)
+        ensureWidgetAttachedToSlot(targetVirtual)
+        if (widgetViews.size > 1) {
+            indicator.setPageOffset(newRealIndex, 0f)
+        }
         showIndicatorTemporarily()
         restartAutoRotate()
 
@@ -227,6 +258,7 @@ class WidgetStackContentView @JvmOverloads constructor(
         stackInfo = updated
         knownWidgetInfos.remove(appWidgetId)
 
+        detachAllSlotHolders()
         if (index in widgetViews.indices) {
             widgetViews.removeAt(index)
         }
@@ -241,9 +273,14 @@ class WidgetStackContentView @JvmOverloads constructor(
         }
 
         if (widgetViews.isNotEmpty()) {
-            val nextIndex = updated.currentIndex.coerceIn(0, widgetViews.lastIndex)
-            updated.currentIndex = nextIndex
-            pager.setCurrentItem(nextIndex, false)
+            val nextRealIndex = updated.currentIndex.coerceIn(0, widgetViews.lastIndex)
+            updated.currentIndex = nextRealIndex
+            val targetVirtual = centerVirtualPosition(nextRealIndex)
+            pager.setCurrentItem(targetVirtual, false)
+            ensureWidgetAttachedToSlot(targetVirtual)
+            if (widgetViews.size > 1) {
+                indicator.setPageOffset(nextRealIndex, 0f)
+            }
         }
         restartAutoRotate()
         persistStackAsync(updated)
@@ -261,6 +298,16 @@ class WidgetStackContentView @JvmOverloads constructor(
         pendingRefreshAttempts = 0
         refreshPendingWidgets()
         mainHandler.postDelayed(pendingRefreshRunnable, CONFIGURE_REFRESH_DELAY_MS)
+    }
+
+    fun updateBounds(cellX: Int, cellY: Int, spanX: Int, spanY: Int) {
+        val current = stackInfo ?: return
+        stackInfo = current.withBounds(
+            cellX = cellX,
+            cellY = cellY,
+            spanX = spanX,
+            spanY = spanY,
+        )
     }
 
     fun updateMemberWidgetSizeRanges(spanX: Int, spanY: Int) {
@@ -297,6 +344,7 @@ class WidgetStackContentView @JvmOverloads constructor(
             if (result.type == WidgetInflater.TYPE_REAL && provider != null && holder.isListening) {
                 val realView = setupRealWidgetView(launcher, holder, widgetInfo, provider, info)
                 widgetInfo.restoreStatus = LauncherAppWidgetInfo.RESTORE_COMPLETED
+                (existing.parent as? ViewGroup)?.removeView(existing)
                 widgetViews[i] = realView
                 changed = true
             }
@@ -316,17 +364,67 @@ class WidgetStackContentView @JvmOverloads constructor(
         }
 
         if (changed) {
+            detachAllSlotHolders()
             adapter.notifyDataSetChanged()
             updateIndicatorCount()
             if (widgetViews.isNotEmpty()) {
-                val targetIndex = info.currentIndex.coerceIn(0, widgetViews.lastIndex)
-                pager.setCurrentItem(targetIndex, false)
+                val targetRealIndex = info.currentIndex.coerceIn(0, widgetViews.lastIndex)
+                val targetVirtual = centerVirtualPosition(targetRealIndex)
+                pager.setCurrentItem(targetVirtual, false)
+                ensureWidgetAttachedToSlot(targetVirtual)
             }
         }
 
         if (hasPendingOrMissingWidgets() && pendingRefreshAttempts < MAX_PENDING_RETRIES) {
             schedulePendingRefresh()
         }
+    }
+
+    private fun toRealIndex(virtualPos: Int): Int {
+        val count = widgetViews.size
+        if (count == 0) return 0
+        return Math.floorMod(virtualPos, count)
+    }
+
+    private fun centerVirtualPosition(realIndex: Int): Int {
+        val count = widgetViews.size
+        if (count <= 1) return 0
+        return (LOOP_MULTIPLIER / 2) * count + realIndex.coerceIn(0, count - 1)
+    }
+
+    private fun recenterIfNearBoundary() {
+        val count = widgetViews.size
+        if (count <= 1) return
+        val total = count * LOOP_MULTIPLIER
+        val current = pager.currentItem
+        val margin = count * 10
+        if (current < margin || current > total - margin) {
+            val realPos = toRealIndex(current)
+            val centered = centerVirtualPosition(realPos)
+            pager.setCurrentItem(centered, false)
+            ensureWidgetAttachedToSlot(centered)
+        }
+    }
+
+    private fun ensureWidgetAttachedToSlot(virtualPos: Int) {
+        if (widgetViews.isEmpty()) return
+        val holder = slotHolders[virtualPos] ?: return
+        val realIndex = toRealIndex(virtualPos)
+        val view = widgetViews[realIndex]
+        if (view.parent === holder) return
+        (view.parent as? ViewGroup)?.removeView(view)
+        holder.removeAllViews()
+        holder.addView(
+            view,
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+        )
+    }
+
+    private fun detachAllSlotHolders() {
+        for (holder in slotHolders.values) {
+            holder.removeAllViews()
+        }
+        slotHolders.clear()
     }
 
     private fun createWidgetView(appWidgetId: Int, info: WidgetStackInfo): LauncherAppWidgetHostView? {
@@ -501,36 +599,52 @@ class WidgetStackContentView @JvmOverloads constructor(
     }
 
     private inner class WidgetStackAdapter : PagerAdapter() {
-        override fun getCount(): Int = widgetViews.size
+        override fun getCount(): Int {
+            val count = widgetViews.size
+            return if (count > 1) count * LOOP_MULTIPLIER else count
+        }
 
         override fun isViewFromObject(view: View, obj: Any): Boolean = view === obj
 
-        override fun getItemPosition(obj: Any): Int {
-            val idx = widgetViews.indexOf(obj)
-            return if (idx >= 0) idx else POSITION_NONE
-        }
+        override fun getItemPosition(obj: Any): Int = POSITION_NONE
 
         override fun instantiateItem(container: ViewGroup, position: Int): Any {
-            val view = widgetViews[position]
-            (view.parent as? ViewGroup)?.removeView(view)
+            val holder = FrameLayout(container.context).apply {
+                clipChildren = true
+                clipToPadding = true
+            }
+            slotHolders[position] = holder
             container.addView(
-                view,
+                holder,
                 ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 ),
             )
-            return view
+            if (widgetViews.isNotEmpty()) {
+                val realIndex = toRealIndex(position)
+                val view = widgetViews[realIndex]
+                if (position == pager.currentItem || view.parent == null) {
+                    ensureWidgetAttachedToSlot(position)
+                }
+            }
+            return holder
         }
 
         override fun destroyItem(container: ViewGroup, position: Int, obj: Any) {
-            (obj as? View)?.let { container.removeView(it) }
+            val holder = obj as? FrameLayout
+            holder?.removeAllViews()
+            slotHolders.remove(position)
+            if (holder != null) {
+                container.removeView(holder)
+            }
         }
     }
 
     companion object {
-        private const val TAG = "WidgetStackContentView"
-        private const val OFFSCREEN_PAGE_LIMIT = 2
+        private const val OFFSCREEN_PAGE_LIMIT = 1
+        private const val LOOP_MULTIPLIER = 1_000
+        private const val PAGE_MARGIN_DP = 12
         private const val AUTO_ROTATE_INTERVAL_MS = 20_000L
         private const val INDICATOR_HIDE_DELAY_MS = 1_500L
         private const val INDICATOR_FADE_IN_MS = 150L

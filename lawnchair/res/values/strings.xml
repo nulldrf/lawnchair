@@ -1272,4 +1272,5 @@
     <string name="widget_stack_cell_size">%1$d × %2$d</string>
     <string name="widget_stack_picker_title">Add to widget stack</string>
     <string name="widget_stack_save">Save</string>
+    <string name="widget_stack_resize">Resize</string>
 </resources>

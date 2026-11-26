@@ -40,6 +40,7 @@ class InterceptingWidgetPager @JvmOverloads constructor(
                 isHorizontalDrag = false
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
+
             MotionEvent.ACTION_MOVE -> {
                 val dx = abs(ev.x - initialX)
                 val dy = abs(ev.y - initialY)
@@ -49,6 +50,7 @@ class InterceptingWidgetPager @JvmOverloads constructor(
                     onUserInteraction?.invoke()
                 }
             }
+
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL,
             -> {
@@ -78,6 +80,7 @@ class InterceptingWidgetPager @JvmOverloads constructor(
                     onUserInteraction?.invoke()
                 }
             }
+
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL,
             -> {

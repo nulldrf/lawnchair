@@ -343,6 +343,7 @@ class WidgetStackContentView @JvmOverloads constructor(
             result.type == WidgetInflater.TYPE_DELETE -> {
                 tryRestoreWidget(launcher, holder, widgetInfo, info)
             }
+
             result.type == WidgetInflater.TYPE_REAL && result.widgetInfo != null -> {
                 if (holder.isListening && Looper.myLooper() == Looper.getMainLooper()) {
                     setupRealWidgetView(launcher, holder, widgetInfo, result.widgetInfo, info)
@@ -352,6 +353,7 @@ class WidgetStackContentView @JvmOverloads constructor(
                     }
                 }
             }
+
             else -> {
                 PendingAppWidgetHostView(context, holder, widgetInfo, result.widgetInfo).apply {
                     launcher.itemInflater?.prepareAppWidget(this, widgetInfo)

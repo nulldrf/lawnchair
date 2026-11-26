@@ -513,8 +513,8 @@ public class ModelWriter {
                     }
                     if (db != null) {
                         db.delete(
-                                LauncherSettings.Favorites.TABLE_NAME,
-                                LauncherSettings.Favorites.APPWIDGET_ID + " = ?",
+                                Favorites.TABLE_NAME,
+                                Favorites.APPWIDGET_ID + " = ?",
                                 new String[] { String.valueOf(widgetId) });
                     }
                 }

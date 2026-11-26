@@ -321,21 +321,47 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         }
     }
 
+    private boolean mMarginsAssigned;
+    private boolean mHasReorientedForOverflow;
+
     /**
      * Shows the popup at the desired location.
      */
     public void show() {
         setupForDisplay();
         assignMarginsAndBackgrounds(this);
+        mMarginsAssigned = true;
         if (shouldAddArrow()) {
             addArrow();
         }
         animateOpen();
     }
 
+    /**
+     * Re-computes popup orientation and margins when child visibility or size changes while open.
+     */
+    public void reorientIfOpen() {
+        if (!mIsOpen || getParent() == null) {
+            return;
+        }
+        orientAboutObject();
+        if (shouldAddArrow() && mArrow.getParent() != null) {
+            mArrow.setX(getX() + getArrowLeft());
+            if (Gravity.isVertical(mGravity)) {
+                mArrow.setVisibility(INVISIBLE);
+            } else {
+                mArrow.setVisibility(VISIBLE);
+                updateArrowColor();
+            }
+        }
+        requestLayout();
+    }
+
     protected void setupForDisplay() {
         setVisibility(View.INVISIBLE);
         mIsOpen = true;
+        mMarginsAssigned = false;
+        mHasReorientedForOverflow = false;
         getPopupContainer().addView(this);
         orientAboutObject();
     }
@@ -422,15 +448,19 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED);
 
         int extraVerticalSpace = mArrowHeight + mArrowOffsetVertical + getExtraVerticalOffset();
-        // The margins are added after we call this method, so we need to account for them here.
+        // The margins are added after we call this method on initial show, so account for them
+        // only if assignMarginsAndBackgrounds() has not already applied them.
         int numVisibleChildren = 0;
         for (int i = getChildCount() - 1; i >= 0; --i) {
             if (getChildAt(i).getVisibility() == VISIBLE) {
                 numVisibleChildren++;
             }
         }
-        int childMargins = (numVisibleChildren - 1) * mChildContainerMargin;
-        int height = getMeasuredHeight() + extraVerticalSpace + childMargins;
+        int pendingChildMargins = mMarginsAssigned
+                ? 0
+                : Math.max(0, numVisibleChildren - 1) * mChildContainerMargin;
+        int popupHeight = getMeasuredHeight() + pendingChildMargins;
+        int height = popupHeight + extraVerticalSpace;
         int width = getMeasuredWidth() + getPaddingLeft() + getPaddingRight();
 
         getTargetObjectLocation(mTempRect);
@@ -479,6 +509,15 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         x -= insets.left;
         y -= insets.top;
 
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
+        FrameLayout.LayoutParams arrowLp = (FrameLayout.LayoutParams) mArrow.getLayoutParams();
+        lp.gravity = Gravity.NO_GRAVITY;
+        lp.topMargin = 0;
+        lp.bottomMargin = 0;
+        arrowLp.gravity = Gravity.NO_GRAVITY;
+        arrowLp.topMargin = 0;
+        arrowLp.bottomMargin = 0;
+
         mGravity = 0;
         if ((insets.top + y + height) > (dragLayer.getBottom() - insets.bottom)) {
             // The container is opening off the screen, so just center it in the drag layer instead.
@@ -507,16 +546,15 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         }
 
         setX(x);
+        setTranslationY(0f);
         if (Gravity.isVertical(mGravity)) {
             return;
         }
 
-        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
-        FrameLayout.LayoutParams arrowLp = (FrameLayout.LayoutParams) mArrow.getLayoutParams();
         if (mIsAboveIcon) {
             arrowLp.gravity = lp.gravity = Gravity.BOTTOM;
             lp.bottomMargin =
-                    getPopupContainer().getHeight() - y - getMeasuredHeight() - insets.top;
+                    getPopupContainer().getHeight() - y - popupHeight - insets.top;
             arrowLp.bottomMargin =
                     lp.bottomMargin - arrowLp.height - mArrowOffsetVertical - insets.bottom;
         } else {
@@ -545,6 +583,24 @@ public abstract class ArrowPopup<T extends Context & ActivityContext>
         }
         if (Gravity.isVertical(mGravity)) {
             setY(dragLayer.getHeight() / 2 - getMeasuredHeight() / 2);
+        } else if (mIsOpen && !mHasReorientedForOverflow) {
+            // Safeguard: if dynamic content grew after orientAboutObject() and caused any visible
+            // menu item to be clipped against the popup's constrained height or screen bounds,
+            // re-orient once so all menu items remain visible.
+            int popupHeight = b - t;
+            boolean clippedChild = false;
+            for (int i = getChildCount() - 1; i >= 0; --i) {
+                View child = getChildAt(i);
+                if (child.getVisibility() == VISIBLE && child.getBottom() > popupHeight) {
+                    clippedChild = true;
+                    break;
+                }
+            }
+            boolean overflowsScreen = t < insets.top || b > dragLayer.getHeight() - insets.bottom;
+            if (clippedChild || overflowsScreen) {
+                mHasReorientedForOverflow = true;
+                post(this::reorientIfOpen);
+            }
         }
     }
 

@@ -76,7 +76,11 @@ public class DragPreviewProvider {
                 dv.getSourceVisualDragBounds(mTempRect);
                 destCanvas.translate(blurSizeOutline / 2 - mTempRect.left,
                         blurSizeOutline / 2 - mTempRect.top);
-                mView.draw(destCanvas);
+                if (mView instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+                    stackView.drawDragPreview(destCanvas);
+                } else {
+                    mView.draw(destCanvas);
+                }
             }
         }
         destCanvas.restoreToCount(saveCount);
@@ -158,6 +162,8 @@ public class DragPreviewProvider {
             // App widgets are technically scaled, but are drawn at their expected size -- so the
             // app widget scale should not affect the scale of the preview.
             scale /= ((LauncherAppWidgetHostView) mView).getScaleToFit();
+        } else if (mView instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+            scale /= stackView.getScaleToFit();
         }
 
         outPos[0] = Math.round(outPos[0] -

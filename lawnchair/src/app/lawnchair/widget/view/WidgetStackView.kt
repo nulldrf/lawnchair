@@ -1,12 +1,17 @@
 package app.lawnchair.widget.view
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Outline
+import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import app.lawnchair.widget.model.WidgetStackInfo
 import com.android.launcher3.CheckLongPressHelper
@@ -17,6 +22,7 @@ import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.touch.ItemLongClickListener
 import com.android.launcher3.util.MultiTranslateDelegate
 import com.android.launcher3.widget.LauncherAppWidgetHostView
+import com.android.launcher3.widget.RoundedCornerEnforcement
 import kotlin.math.hypot
 
 /**
@@ -161,6 +167,65 @@ class WidgetStackView @JvmOverloads constructor(
     }
 
     // --- DraggableView ---
+
+    /**
+     * Renders the currently displayed widget into [canvas] while explicitly re-applying
+     * [View.getClipToOutline] rounded-rect clips from the widget host view and its background
+     * container, since [View.draw] bypasses [android.view.ViewOutlineProvider] clipping.
+     */
+    fun drawDragPreview(canvas: Canvas) {
+        val currentWidget = getCurrentWidgetView()
+        if (currentWidget == null) {
+            draw(canvas)
+            return
+        }
+        val saveCount = canvas.save()
+        applyOutlineClips(canvas, currentWidget)
+        currentWidget.draw(canvas)
+        canvas.restoreToCount(saveCount)
+    }
+
+    private fun applyOutlineClips(canvas: Canvas, hostView: LauncherAppWidgetHostView) {
+        clipViewOutline(canvas, hostView, hostView)
+        val background = RoundedCornerEnforcement.findBackground(hostView)
+        var cursor: View? = background
+        while (cursor != null && cursor !== hostView) {
+            clipViewOutline(canvas, hostView, cursor)
+            cursor = cursor.parent as? View
+        }
+        if (hostView.childCount > 0) {
+            val rootChild = hostView.getChildAt(0)
+            if (rootChild != null && rootChild !== background) {
+                clipViewOutline(canvas, hostView, rootChild)
+            }
+        }
+    }
+
+    private fun clipViewOutline(canvas: Canvas, root: ViewGroup, target: View) {
+        if (!target.clipToOutline) return
+        val provider = target.outlineProvider ?: return
+        val outline = Outline()
+        provider.getOutline(target, outline)
+        if (outline.isEmpty) return
+        val rect = Rect()
+        if (!outline.getRect(rect) || rect.isEmpty) return
+        if (target !== root) {
+            try {
+                root.offsetDescendantRectToMyCoords(target, rect)
+            } catch (_: IllegalArgumentException) {
+                return
+            }
+        }
+        val radius = outline.radius
+        if (radius > 0f) {
+            val path = Path().apply {
+                addRoundRect(RectF(rect), radius, radius, Path.Direction.CW)
+            }
+            canvas.clipPath(path)
+        } else {
+            canvas.clipRect(rect)
+        }
+    }
 
     override fun getViewType(): Int = DraggableView.DRAGGABLE_WIDGET
 

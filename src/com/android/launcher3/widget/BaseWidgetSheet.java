@@ -146,6 +146,13 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
         }
     }
 
+    @Nullable
+    private java.util.function.Consumer<WidgetItem> mWidgetPickListener;
+
+    public void setWidgetPickListener(@Nullable java.util.function.Consumer<WidgetItem> listener) {
+        mWidgetPickListener = listener;
+    }
+
     @Override
     public final void onClick(View v) {
         WidgetCell wc;
@@ -154,6 +161,17 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
         }  else if (v.getParent() instanceof WidgetCell parent) {
             wc = parent;
         } else {
+            return;
+        }
+
+        if (mWidgetPickListener != null) {
+            WidgetItem item = wc.getWidgetItem();
+            if (item != null) {
+                java.util.function.Consumer<WidgetItem> listener = mWidgetPickListener;
+                mWidgetPickListener = null;
+                close(/* animate= */ true);
+                listener.accept(item);
+            }
             return;
         }
 
@@ -282,6 +300,9 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
 
     @Override
     public boolean onLongClick(View v) {
+        if (mWidgetPickListener != null) {
+            return true;
+        }
         TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "Widgets.onLongClick");
         v.cancelLongPress();
         if (!ItemLongClickListener.canStartDrag(Launcher.getLauncher(mActivityContext)))

@@ -76,7 +76,21 @@ public class ItemLongClickListener {
         if (!(v.getTag() instanceof ItemInfo)) return false;
 
         launcher.setWaitingForResult(null);
-        beginDrag(v, launcher, (ItemInfo) v.getTag(), new DragOptions());
+        DragOptions dragOptions = new DragOptions();
+        if (v instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+            com.android.launcher3.popup.PopupContainerWithArrow<Launcher> popup =
+                    com.android.launcher3.popup.PopupContainerWithArrow.showForWidgetStack(stackView);
+            if (popup != null) {
+                dragOptions.preDragCondition = popup.createPreDragCondition(false);
+            }
+        } else if (v instanceof LauncherAppWidgetHostView) {
+            com.android.launcher3.popup.PopupContainerWithArrow<Launcher> popup =
+                    com.android.launcher3.popup.PopupContainerWithArrow.showForWidget(v);
+            if (popup != null) {
+                dragOptions.preDragCondition = popup.createPreDragCondition(false);
+            }
+        }
+        beginDrag(v, launcher, (ItemInfo) v.getTag(), dragOptions);
         return true;
     }
 

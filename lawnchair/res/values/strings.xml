@@ -1259,4 +1259,17 @@
     <string name="lawnchair_action_failed">Failed to trigger action</string>
 
     <string name="please_wait">Please wait…</string>
+
+    <!-- Widget stacks -->
+    <string name="create_stack">Create stack</string>
+    <string name="edit_stack">Edit stack</string>
+    <string name="widget_stack_title">Widget stack</string>
+    <string name="add_widget_to_stack">Add widget</string>
+    <string name="remove_widget_from_stack">Remove widget</string>
+    <string name="auto_rotate_widgets">Auto-rotate widgets</string>
+    <string name="auto_rotate_widgets_description">Automatically cycle through widgets in this stack</string>
+    <string name="widget_stack_reorder_hint">Long-press and drag a widget card to reorder</string>
+    <string name="widget_stack_cell_size">%1$d × %2$d</string>
+    <string name="widget_stack_picker_title">Add to widget stack</string>
+    <string name="widget_stack_save">Save</string>
 </resources>

@@ -129,6 +129,7 @@ public class LoaderCursor extends CursorWrapper {
     private final int mRankIndex;
     private final int mOptionsIndex;
     private final int mAppWidgetSourceIndex;
+    private final int mWidgetStackIdIndex;
 
     private final PackageManager mPM;
 
@@ -155,6 +156,7 @@ public class LoaderCursor extends CursorWrapper {
             LauncherModel model,
             PackageManagerHelper pmHelper) {
         super(cursor);
+
         mContext = context;
         mIconCache = iconCache;
         mIDP = idp;
@@ -188,6 +190,15 @@ public class LoaderCursor extends CursorWrapper {
         mRankIndex = getColumnIndexOrThrow(Favorites.RANK);
         mOptionsIndex = getColumnIndexOrThrow(Favorites.OPTIONS);
         mAppWidgetSourceIndex = getColumnIndexOrThrow(Favorites.APPWIDGET_SOURCE);
+        mWidgetStackIdIndex = getColumnIndex(Favorites.WIDGET_STACK_ID);
+    }
+
+    @Nullable
+    public Long getWidgetStackId() {
+        if (mWidgetStackIdIndex < 0 || isNull(mWidgetStackIdIndex)) {
+            return null;
+        }
+        return getLong(mWidgetStackIdIndex);
     }
 
     @Override
@@ -617,6 +628,10 @@ public class LoaderCursor extends CursorWrapper {
      * check & update map of what's occupied; used to discard overlapping/invalid items
      */
     protected boolean checkItemPlacement(ItemInfo item) {
+        if (item instanceof com.android.launcher3.model.data.LauncherAppWidgetInfo widgetInfo
+                && widgetInfo.widgetStackId != null) {
+            return true;
+        }
         int containerIndex = item.screenId;
         if (item.container == Favorites.CONTAINER_HOTSEAT) {
             final GridOccupancy hotseatOccupancy =

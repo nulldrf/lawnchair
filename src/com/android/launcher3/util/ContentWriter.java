@@ -69,6 +69,11 @@ public class ContentWriter {
         return this;
     }
 
+    public ContentWriter putNull(String key) {
+        mValues.putNull(key);
+        return this;
+    }
+
     public ContentWriter put(String key, CharSequence value) {
         mValues.put(key, value == null ? null : value.toString());
         return this;

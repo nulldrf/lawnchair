@@ -97,6 +97,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
     private final float mShortcutHeight;
 
     private BubbleTextView mOriginalIcon;
+    private View mOriginalView;
     private int mContainerWidth;
 
     private ViewGroup mWidgetContainer;
@@ -172,9 +173,10 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
                 // TODO: add WW log if want to log if tap closed deep shortcut container.
                 close(true);
 
-                // We let touches on the original icon go through so that users can launch
-                // the app with one tap if they don't find a shortcut they want.
-                return mOriginalIcon == null || !dl.isEventOverView(mOriginalIcon, ev);
+                // We let touches on the original icon/view go through so that users can interact
+                // with it if they don't find a shortcut they want.
+                View anchor = mOriginalIcon != null ? mOriginalIcon : mOriginalView;
+                return anchor == null || !dl.isEventOverView(anchor, ev);
             }
         }
         return false;
@@ -243,6 +245,88 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         launcher.refreshAndBindWidgetsForPackageUser(PackageUserKey.fromItemInfo(item));
         container.requestFocus();
         return container;
+    }
+
+    /**
+     * Shows a popup with shortcuts for a single home-screen widget (e.g. "Create stack").
+     */
+    @Nullable
+    public static PopupContainerWithArrow<Launcher> showForWidget(View widgetView) {
+        Launcher launcher = Launcher.getLauncher(widgetView.getContext());
+        if (getOpen(launcher) != null) {
+            widgetView.clearFocus();
+            return null;
+        }
+        if (!(widgetView.getTag() instanceof ItemInfo item)) {
+            return null;
+        }
+        List<SystemShortcut> systemShortcuts = launcher.getSupportedShortcuts(item.container)
+                .map(s -> s.getShortcut(launcher, item, widgetView))
+                .filter(Objects::nonNull)
+                .filter(s -> s instanceof app.lawnchair.widget.shortcut.WidgetStackShortcut
+                        || s instanceof SystemShortcut.AppInfo)
+                .collect(Collectors.toList());
+        if (systemShortcuts.isEmpty()) {
+            return null;
+        }
+        PopupContainerWithArrow<Launcher> container = (PopupContainerWithArrow) launcher
+                .getLayoutInflater().inflate(R.layout.popup_container, launcher.getDragLayer(), false);
+        container.configureForLauncher(launcher, item);
+        container.populateAndShowRowsForWidget(widgetView, systemShortcuts);
+        container.requestFocus();
+        return container;
+    }
+
+    /**
+     * Shows a popup with stack-specific shortcuts (e.g. "Edit stack") for a {@code WidgetStackView},
+     * omitting irrelevant app-level shortcuts like "Widgets" or "App info".
+     */
+    @Nullable
+    public static PopupContainerWithArrow<Launcher> showForWidgetStack(
+            app.lawnchair.widget.view.WidgetStackView stackView) {
+        Launcher launcher = Launcher.getLauncher(stackView.getContext());
+        if (getOpen(launcher) != null) {
+            stackView.clearFocus();
+            return null;
+        }
+        ItemInfo item = stackView.getCurrentWidgetInfo();
+        if (item == null && stackView.getTag() instanceof ItemInfo tagInfo) {
+            item = tagInfo;
+        }
+        if (item == null) {
+            return null;
+        }
+        final ItemInfo targetItem = item;
+        List<SystemShortcut> systemShortcuts = launcher.getSupportedShortcuts(targetItem.container)
+                .map(s -> s.getShortcut(launcher, targetItem, stackView))
+                .filter(Objects::nonNull)
+                .filter(s -> s instanceof app.lawnchair.widget.shortcut.WidgetStackShortcut)
+                .collect(Collectors.toList());
+        if (systemShortcuts.isEmpty()) {
+            return null;
+        }
+        PopupContainerWithArrow<Launcher> container = (PopupContainerWithArrow) launcher
+                .getLayoutInflater().inflate(R.layout.popup_container, launcher.getDragLayer(), false);
+        container.configureForLauncher(launcher, targetItem);
+        container.populateAndShowRowsForWidget(stackView, systemShortcuts);
+        container.requestFocus();
+        return container;
+    }
+
+    private void populateAndShowRowsForWidget(View originalView, List<SystemShortcut> systemShortcuts) {
+        mOriginalIcon = null;
+        mOriginalView = originalView;
+        mContainerWidth = getResources().getDimensionPixelSize(R.dimen.bg_popup_item_width);
+        if (!systemShortcuts.isEmpty()) {
+            addSystemShortcuts(systemShortcuts,
+                    R.layout.system_shortcut_rows_container,
+                    R.layout.system_shortcut);
+        }
+        show();
+        if (Utilities.ATLEAST_P) {
+            setAccessibilityPaneTitle(getTitleForAccessibility());
+        }
+        setLayoutTransition(new LayoutTransition());
     }
 
     private void configureForLauncher(Launcher launcher, ItemInfo itemInfo) {
@@ -525,13 +609,17 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
     @Override
     protected void getTargetObjectLocation(Rect outPos) {
-        getPopupContainer().getDescendantRectRelativeToSelf(mOriginalIcon, outPos);
-        outPos.top += mOriginalIcon.getPaddingTop();
-        outPos.left += mOriginalIcon.getPaddingLeft();
-        outPos.right -= mOriginalIcon.getPaddingRight();
-        outPos.bottom = outPos.top + (mOriginalIcon.getIcon() != null
-                ? mOriginalIcon.getIcon().getBounds().height()
-                : mOriginalIcon.getHeight());
+        if (mOriginalIcon != null) {
+            getPopupContainer().getDescendantRectRelativeToSelf(mOriginalIcon, outPos);
+            outPos.top += mOriginalIcon.getPaddingTop();
+            outPos.left += mOriginalIcon.getPaddingLeft();
+            outPos.right -= mOriginalIcon.getPaddingRight();
+            outPos.bottom = outPos.top + (mOriginalIcon.getIcon() != null
+                    ? mOriginalIcon.getIcon().getBounds().height()
+                    : mOriginalIcon.getHeight());
+        } else if (mOriginalView != null) {
+            getPopupContainer().getDescendantRectRelativeToSelf(mOriginalView, outPos);
+        }
     }
 
     protected void updateHiddenShortcuts() {
@@ -595,7 +683,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
             @Override
             public void onPreDragStart(DropTarget.DragObject dragObject) {
-                if (!updateIconUi) {
+                if (!updateIconUi || mOriginalIcon == null) {
                     return;
                 }
                 if (mIsAboveIcon) {
@@ -610,7 +698,7 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
             @Override
             public void onPreDragEnd(DropTarget.DragObject dragObject, boolean dragStarted) {
-                if (!updateIconUi) {
+                if (!updateIconUi || mOriginalIcon == null) {
                     return;
                 }
                 mOriginalIcon.setIconVisible(true);
@@ -659,9 +747,11 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
 
     @Override
     protected void onCreateCloseAnimation(AnimatorSet anim) {
-        // Animate original icon's text back in.
-        anim.play(mOriginalIcon.createTextAlphaAnimator(true /* fadeIn */));
-        mOriginalIcon.setForceHideDot(false);
+        if (mOriginalIcon != null) {
+            // Animate original icon's text back in.
+            anim.play(mOriginalIcon.createTextAlphaAnimator(true /* fadeIn */));
+            mOriginalIcon.setForceHideDot(false);
+        }
     }
 
     @Override
@@ -670,10 +760,12 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         if (mActivityContext.getDragController() != null) {
             mActivityContext.getDragController().removeDragListener(this);
         }
-        PopupContainerWithArrow openPopup = getOpen(mActivityContext);
-        if (openPopup == null || openPopup.mOriginalIcon != mOriginalIcon) {
-            mOriginalIcon.setTextVisibility(mOriginalIcon.shouldTextBeVisible());
-            mOriginalIcon.setForceHideDot(false);
+        if (mOriginalIcon != null) {
+            PopupContainerWithArrow openPopup = getOpen(mActivityContext);
+            if (openPopup == null || openPopup.mOriginalIcon != mOriginalIcon) {
+                mOriginalIcon.setTextVisibility(mOriginalIcon.shouldTextBeVisible());
+                mOriginalIcon.setForceHideDot(false);
+            }
         }
     }
 
@@ -689,8 +781,15 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
      */
     public static <T extends Context & ActivityContext> void dismissInvalidPopup(T activity) {
         PopupContainerWithArrow popup = getOpen(activity);
-        if (popup != null && (!popup.mOriginalIcon.isAttachedToWindow()
-                || !ShortcutUtil.supportsShortcuts((ItemInfo) popup.mOriginalIcon.getTag()))) {
+        if (popup == null) {
+            return;
+        }
+        if (popup.mOriginalIcon != null) {
+            if (!popup.mOriginalIcon.isAttachedToWindow()
+                    || !ShortcutUtil.supportsShortcuts((ItemInfo) popup.mOriginalIcon.getTag())) {
+                popup.animateClose();
+            }
+        } else if (popup.mOriginalView != null && !popup.mOriginalView.isAttachedToWindow()) {
             popup.animateClose();
         }
     }

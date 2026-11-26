@@ -147,6 +147,12 @@ public class LauncherAppWidgetInfo extends ItemInfo {
      */
     public int sourceContainer = LauncherSettings.Favorites.CONTAINER_UNKNOWN;
 
+    /**
+     * Identifier of the widget stack this widget belongs to, or {@code null} if unstacked.
+     */
+    @Nullable
+    public Long widgetStackId = null;
+
     public LauncherAppWidgetInfo(int appWidgetId, ComponentName providerName) {
         this.appWidgetId = appWidgetId;
         this.providerName = providerName;
@@ -197,6 +203,12 @@ public class LauncherAppWidgetInfo extends ItemInfo {
                 .put(LauncherSettings.Favorites.OPTIONS, options)
                 .put(LauncherSettings.Favorites.INTENT, bindOptions)
                 .put(LauncherSettings.Favorites.APPWIDGET_SOURCE, sourceContainer);
+        if (widgetStackId != null) {
+            writer.put(LauncherSettings.Favorites.WIDGET_STACK_ID, widgetStackId);
+        } else {
+            writer.putNull(LauncherSettings.Favorites.WIDGET_STACK_ID);
+            writer.putNull(LauncherSettings.Favorites.WIDGET_STACK_DATA);
+        }
     }
 
     @Override

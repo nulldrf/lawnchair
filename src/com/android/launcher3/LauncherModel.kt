@@ -127,6 +127,8 @@ constructor(
 
     fun newModelCallbacks() = ModelLauncherCallbacks(this::enqueueModelUpdateTask)
 
+    fun getBgDataModel(): BgDataModel = mBgDataModel
+
     fun getWriter(
         verifyChanges: Boolean,
         cellPosMapper: CellPosMapper?,

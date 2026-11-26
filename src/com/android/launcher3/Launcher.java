@@ -852,6 +852,8 @@ public class Launcher extends StatefulActivity<LauncherState>
             // This is called only if the user did not previously have permissions to bind widgets
             final int appWidgetId = data != null ?
                     data.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) : -1;
+            app.lawnchair.widget.helper.WidgetStackLauncherHelper.handleBindWidgetResult(
+                    resultCode, requestArgs.getTargetComponent(), appWidgetId);
             if (resultCode == RESULT_CANCELED) {
                 completeTwoStageWidgetDrop(RESULT_CANCELED, appWidgetId, requestArgs);
                 mWorkspace.removeExtraEmptyScreenDelayed(
@@ -1467,6 +1469,10 @@ public class Launcher extends StatefulActivity<LauncherState>
             @Nullable AppWidgetHostView hostView, LauncherAppWidgetProviderInfo appWidgetInfo,
             boolean showPendingWidget, boolean updateWidgetSize,
             @Nullable Bitmap widgetPreviewBitmap) {
+        if (app.lawnchair.widget.helper.WidgetStackLauncherHelper.completeAddAppWidgetToStack(
+                this, appWidgetId, itemInfo, hostView)) {
+            return;
+        }
 
         if (appWidgetInfo == null) {
             appWidgetInfo = mAppWidgetManager.getLauncherAppWidgetInfo(appWidgetId,
@@ -2072,7 +2078,10 @@ public class Launcher extends StatefulActivity<LauncherState>
             final LauncherAppWidgetInfo widgetInfo = (LauncherAppWidgetInfo) itemInfo;
             mWorkspace.removeWorkspaceItem(v);
             if (deleteFromDb) {
-                getModelWriter().deleteWidgetInfo(widgetInfo, getAppWidgetHolder(), reason);
+                if (!app.lawnchair.widget.helper.WidgetStackLauncherHelper.deleteStackForItem(
+                        this, v, widgetInfo, reason)) {
+                    getModelWriter().deleteWidgetInfo(widgetInfo, getAppWidgetHolder(), reason);
+                }
             }
         } else {
             return false;
@@ -2228,6 +2237,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         int index = 0;
         for (Pair<ItemInfo, View> e : shortcuts) {
             final ItemInfo item = e.first;
+            View view = e.second;
+            if (view == null) {
+                continue;
+            }
 
             // Remove colliding items.
             CellPos presenterPos = getCellPosMapper().mapModelToPresenter(item);
@@ -2248,10 +2261,6 @@ public class Launcher extends StatefulActivity<LauncherState>
                 }
             }
 
-            View view = e.second;
-            if (view == null) {
-                continue;
-            }
             if (enableWorkspaceInflation() && view instanceof LauncherAppWidgetHostView lv) {
                 view = getAppWidgetHolder().attachViewToHostAndGetAttachedView(lv);
             }

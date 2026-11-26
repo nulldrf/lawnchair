@@ -433,10 +433,16 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
     /** Bind the items start-end from the list. */
     @VisibleForTesting
     fun bindItems(items: List<ItemInfo>, forceAnimateIcons: Boolean) {
-        launcher.bindInflatedItems(
-            items.map { Pair.create(it, launcher.itemInflater.inflateItem(it)) },
-            if (forceAnimateIcons) AnimatorSet() else null,
-        )
+        val inflater = launcher.itemInflater
+        inflater.clearWidgetStackLoadCache()
+        try {
+            launcher.bindInflatedItems(
+                items.map { Pair.create(it, inflater.inflateItem(it)) },
+                if (forceAnimateIcons) AnimatorSet() else null,
+            )
+        } finally {
+            inflater.clearWidgetStackLoadCache()
+        }
     }
 
     @AnyThread
@@ -445,6 +451,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         activeBindTask.getAndSet(taskTracker).cancel()
 
         val inflater = launcher.itemInflater
+        inflater.clearWidgetStackLoadCache()
 
         fun executeCallbacksTask(executor: Executor = MAIN_EXECUTOR, task: () -> Unit) {
             executor.execute {

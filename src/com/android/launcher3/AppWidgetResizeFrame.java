@@ -89,6 +89,13 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
     private final List<Rect> mSystemGestureExclusionRects = new ArrayList<>(HANDLE_COUNT);
 
     private LauncherAppWidgetHostView mWidgetView;
+    @Nullable
+    private app.lawnchair.widget.view.WidgetStackView mWidgetStackView;
+
+    @Nullable
+    private View getTargetView() {
+        return mWidgetStackView != null ? mWidgetStackView : mWidgetView;
+    }
     private CellLayout mCellLayout;
     private DragLayer mDragLayer;
     private ImageButton mReconfigureButton;
@@ -254,6 +261,63 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         frame.post(() -> frame.snapToWidget(false));
     }
 
+    public static void showForWidgetStack(
+            app.lawnchair.widget.view.WidgetStackView stackView, CellLayout cellLayout) {
+        if (stackView.getParent() == null) {
+            return;
+        }
+        Launcher launcher = Launcher.getLauncher(cellLayout.getContext());
+        AbstractFloatingView.closeAllOpenViews(launcher);
+
+        DragLayer dl = launcher.getDragLayer();
+        AppWidgetResizeFrame frame = (AppWidgetResizeFrame) launcher.getLayoutInflater()
+                .inflate(R.layout.app_widget_resize_frame, dl, false);
+        frame.setupForWidgetStack(stackView, cellLayout, dl);
+        frame.setTag(stackView.getTag());
+        frame.setAccessibilityDelegate(launcher.getAccessibilityDelegate());
+        frame.setContentDescription(launcher.asContext().getString(R.string.widget_frame_name,
+                launcher.asContext().getString(R.string.widget_stack_title)));
+        ((DragLayer.LayoutParams) frame.getLayoutParams()).customPosition = true;
+
+        dl.addView(frame);
+        frame.mIsOpen = true;
+        frame.post(() -> frame.snapToWidget(false));
+    }
+
+    private void setupForWidgetStack(
+            app.lawnchair.widget.view.WidgetStackView stackView,
+            CellLayout cellLayout,
+            DragLayer dragLayer) {
+        mCellLayout = cellLayout;
+        mWidgetView = null;
+        mWidgetStackView = stackView;
+        mDragLayer = dragLayer;
+        InvariantDeviceProfile idp = LauncherAppState.getIDP(cellLayout.getContext());
+
+        mMinHSpan = 1;
+        mMinVSpan = 1;
+        mMaxHSpan = idp.numColumns;
+        mMaxVSpan = idp.numRows;
+
+        mHorizontalResizeActive = true;
+        mVerticalResizeActive = true;
+        mReconfigureButton.setVisibility(GONE);
+
+        mWidgetViewOldRect.set(stackView.getLeft(), stackView.getTop(),
+                stackView.getRight(), stackView.getBottom());
+        mWidgetViewNewRect.set(mWidgetViewOldRect);
+
+        CellLayoutLayoutParams lp = (CellLayoutLayoutParams) stackView.getLayoutParams();
+        ItemInfo widgetInfo = (ItemInfo) stackView.getTag();
+        if (widgetInfo != null) {
+            setId(widgetInfo.id);
+        }
+
+        mCellLayout.markCellsAsUnoccupiedForView(stackView);
+        mWidgetPadding.set(0, 0, 0, 0);
+        stackView.addOnLayoutChangeListener(mWidgetViewLayoutListener);
+    }
+
     private void setCornerRadiusFromWidget() {
         if (mWidgetView != null && mWidgetView.hasEnforcedCornerRadius()) {
             float enforcedCornerRadius = mWidgetView.getEnforcedCornerRadius();
@@ -270,7 +334,7 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
      *  Retrieves the view where accessibility actions happen.
      */
     public View getViewForAccessibility() {
-        return mWidgetView;
+        return getTargetView();
     }
 
     private void setupForWidget(LauncherAppWidgetHostView widgetView, CellLayout cellLayout,
@@ -526,7 +590,11 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
      *  Based on the current deltas, we determine if and how to resize the widget.
      */
     private void resizeWidgetIfNeeded(boolean onDismiss) {
-        ViewGroup.LayoutParams wlp = mWidgetView.getLayoutParams();
+        View targetView = getTargetView();
+        if (targetView == null) {
+            return;
+        }
+        ViewGroup.LayoutParams wlp = targetView.getLayoutParams();
         if (!(wlp instanceof CellLayoutLayoutParams)) {
             return;
         }
@@ -585,8 +653,8 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         // We don't want to evaluate resize if a widget was pending config activity and was already
         // occupying a space on the screen. This otherwise will cause reorder algorithm evaluate a
         // different location for the widget and cause a jump.
-        if (!(mWidgetView instanceof PendingAppWidgetHostView) && mCellLayout.createAreaForResize(
-                cellX, cellY, spanX, spanY, mWidgetView, mDirectionVector, onDismiss)) {
+        if (!(targetView instanceof PendingAppWidgetHostView) && mCellLayout.createAreaForResize(
+                cellX, cellY, spanX, spanY, targetView, mDirectionVector, onDismiss)) {
             if (mStateAnnouncer != null && (lp.cellHSpan != spanX || lp.cellVSpan != spanY) ) {
                 mStateAnnouncer.announce(
                         mLauncher.getString(R.string.widget_resized, spanX, spanY));
@@ -600,10 +668,18 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             mRunningHInc += hSpanDelta;
 
             if (!onDismiss) {
-                WidgetSizes.updateWidgetSizeRanges(mWidgetView, mLauncher, spanX, spanY);
+                if (mWidgetStackView != null) {
+                    app.lawnchair.widget.helper.WidgetStackResizeHelper.updateMemberSizeRanges(
+                            mWidgetStackView, spanX, spanY);
+                } else if (mWidgetView != null) {
+                    WidgetSizes.updateWidgetSizeRanges(mWidgetView, mLauncher, spanX, spanY);
+                }
+            } else if (mWidgetStackView != null) {
+                app.lawnchair.widget.helper.WidgetStackResizeHelper.commitStackResize(
+                        mLauncher, mWidgetStackView, cellX, cellY, spanX, spanY);
             }
         }
-        mWidgetView.requestLayout();
+        targetView.requestLayout();
     }
 
     @Override
@@ -612,11 +688,14 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
 
         // We are done with resizing the widget. Save the widget size & position to LauncherModel
         resizeWidgetIfNeeded(true);
-        mLauncher.getStatsLogManager()
-                .logger()
-                .withInstanceId(logInstanceId)
-                .withItemInfo((ItemInfo) mWidgetView.getTag())
-                .log(LAUNCHER_WIDGET_RESIZE_COMPLETED);
+        View targetView = getTargetView();
+        if (targetView != null && targetView.getTag() instanceof ItemInfo info) {
+            mLauncher.getStatsLogManager()
+                    .logger()
+                    .withInstanceId(logInstanceId)
+                    .withItemInfo(info)
+                    .log(LAUNCHER_WIDGET_RESIZE_COMPLETED);
+        }
     }
 
     private void onTouchUp() {
@@ -638,11 +717,15 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
      * relative to the {@link DragLayer}.
      */
     private void getSnappedRectRelativeToDragLayer(@NonNull Rect out) {
-        float scale = mWidgetView.getScaleToFit();
-        if (FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()) {
+        View targetView = getTargetView();
+        if (targetView == null) {
+            return;
+        }
+        float scale = mWidgetView != null ? mWidgetView.getScaleToFit() : 1f;
+        if (mWidgetView != null && FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()) {
             getViewRectRelativeToDragLayer(out);
         } else {
-            mDragLayer.getViewRectRelativeToSelf(mWidgetView, out);
+            mDragLayer.getViewRectRelativeToSelf(targetView, out);
         }
 
         int width = 2 * mBackgroundPadding + Math.round(scale * out.width());
@@ -668,22 +751,25 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         int x = sDragLayerLoc[0];
         int y = sDragLayerLoc[1];
 
-        if (mWidgetViewWindowPos == null) {
+        View targetView = getTargetView();
+        if (mWidgetViewWindowPos == null && targetView != null) {
             mWidgetViewWindowPos = new int[2];
-            mWidgetView.getLocationInWindow(mWidgetViewWindowPos);
+            targetView.getLocationInWindow(mWidgetViewWindowPos);
         }
 
         int leftOffset = mWidgetViewNewRect.left - mWidgetViewOldRect.left;
         int topOffset = mWidgetViewNewRect.top - mWidgetViewOldRect.top;
 
-        return new int[] {mWidgetViewWindowPos[0] - x + leftOffset,
-                mWidgetViewWindowPos[1] - y + topOffset};
+        int winX = mWidgetViewWindowPos != null ? mWidgetViewWindowPos[0] : 0;
+        int winY = mWidgetViewWindowPos != null ? mWidgetViewWindowPos[1] : 0;
+        return new int[] {winX - x + leftOffset, winY - y + topOffset};
     }
 
     private void snapToWidget(boolean animate) {
         // The widget is guaranteed to be attached to the cell layout at this point, thus setting
         // the transition here
-        if (FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()
+        if (mWidgetView != null
+                && FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()
                 && mWidgetView.getLayoutTransition() == null) {
             final LayoutTransition transition = new LayoutTransition();
             transition.setDuration(RESIZE_TRANSITION_DURATION_MS);
@@ -765,7 +851,10 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         // Clear the frame and give focus to the widget host view when a directional key is pressed.
         if (shouldConsume(keyCode)) {
             close(false);
-            mWidgetView.requestFocus();
+            View targetView = getTargetView();
+            if (targetView != null) {
+                targetView.requestFocus();
+            }
             return true;
         }
         return false;
@@ -832,12 +921,15 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
 
     @Override
     protected void handleClose(boolean animate) {
-        if (FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()) {
+        if (mWidgetView != null && FeatureFlags.ENABLE_WIDGET_TRANSITION_FOR_RESIZING.get()) {
             mWidgetView.clearCellChildViewPreLayoutListener();
             mWidgetView.setLayoutTransition(null);
         }
         mDragLayer.removeView(this);
-        mWidgetView.removeOnLayoutChangeListener(mWidgetViewLayoutListener);
+        View targetView = getTargetView();
+        if (targetView != null) {
+            targetView.removeOnLayoutChangeListener(mWidgetViewLayoutListener);
+        }
     }
 
     private void updateInvalidResizeEffect(CellLayout cellLayout, CellLayout pairedCellLayout,

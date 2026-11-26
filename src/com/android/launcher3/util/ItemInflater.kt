@@ -53,6 +53,13 @@ class ItemInflater<T>(
     private val widgetInflater =
         WidgetInflater(context, LauncherAppState.getInstance(context).isSafeModeEnabled)
 
+    private val widgetStackLoadCache =
+        java.util.concurrent.ConcurrentHashMap<Long, java.util.Optional<app.lawnchair.widget.model.WidgetStackInfo>>()
+
+    fun clearWidgetStackLoadCache() {
+        widgetStackLoadCache.clear()
+    }
+
     @JvmOverloads
     fun inflateItem(
         item: ItemInfo,
@@ -124,6 +131,22 @@ class ItemInflater<T>(
     }
 
     private fun inflateAppWidget(item: LauncherAppWidgetInfo, writer: ModelWriter): View? {
+        if (item.widgetStackId != null) {
+            val cache = mutableMapOf<Long, app.lawnchair.widget.model.WidgetStackInfo?>()
+            widgetStackLoadCache.forEach { (k, v) -> cache[k] = v.orElse(null) }
+            val result = app.lawnchair.widget.helper.WidgetStackLauncherHelper.inflateWidgetOrStack(
+                context = context,
+                item = item,
+                cache = cache,
+                fallbackInflate = { inflateSingleAppWidget(item, writer) },
+            )
+            cache.forEach { (k, v) -> widgetStackLoadCache[k] = java.util.Optional.ofNullable(v) }
+            return result
+        }
+        return inflateSingleAppWidget(item, writer)
+    }
+
+    private fun inflateSingleAppWidget(item: LauncherAppWidgetInfo, writer: ModelWriter): View? {
         TraceHelper.INSTANCE.beginSection("BIND_WIDGET_id=" + item.appWidgetId)
         try {
             val (type, reason, _, isUpdate, widgetInfo) = widgetInflater.inflateAppWidget(item)

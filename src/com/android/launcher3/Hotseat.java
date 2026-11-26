@@ -452,7 +452,9 @@ public class Hotseat extends FrameLayout implements Insettable {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         int yThreshold = getMeasuredHeight() - getPaddingBottom();
-        if (ev.getY() > yThreshold || isTouchOnQsb(ev)) {
+        if (ev.getY() > yThreshold
+                || isTouchOnQsb(ev)
+                || app.lawnchair.widget.helper.WidgetStackWorkspaceHelper.isTouchOverWidgetStack(this, ev)) {
             return false;
         }
 

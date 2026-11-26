@@ -28,8 +28,10 @@ import android.text.TextUtils
 import android.util.Log
 import android.util.LongSparseArray
 import android.util.SparseArray
+import app.lawnchair.widget.model.WidgetStackManager
 import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
+import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError
 import com.android.launcher3.folder.Folder
@@ -558,6 +560,7 @@ class WorkspaceItemProcessor(
         appWidgetInfo.user = c.user
         appWidgetInfo.sourceContainer = c.appWidgetSource
         appWidgetInfo.restoreStatus = c.restoreFlag
+        appWidgetInfo.widgetStackId = c.widgetStackId
         if (appWidgetInfo.spanX <= 0 || appWidgetInfo.spanY <= 0) {
             c.markDeleted(
                 "processWidget: Widget has invalid size: ${appWidgetInfo.spanX}x${appWidgetInfo.spanY}" +
@@ -568,7 +571,7 @@ class WorkspaceItemProcessor(
             )
             return
         }
-        if (!c.isOnWorkspaceOrHotseat) {
+        if (!c.isOnWorkspaceOrHotseat && appWidgetInfo.widgetStackId == null) {
             c.markDeleted(
                 "processWidget: invalid Widget container != CONTAINER_DESKTOP nor CONTAINER_HOTSEAT." +
                     " id=${c.id}," +
@@ -593,6 +596,11 @@ class WorkspaceItemProcessor(
         )
         when (inflationResult.type) {
             WidgetInflater.TYPE_DELETE -> {
+                appWidgetInfo.widgetStackId?.let { stackId ->
+                    LauncherAppState.getInstance(context).model.modelDbController.db?.let { db ->
+                        WidgetStackManager.pruneInvalidWidgetFromStack(db, stackId, appWidgetInfo.appWidgetId)
+                    }
+                }
                 c.markDeleted(inflationResult.reason, inflationResult.restoreErrorType)
                 return
             }
@@ -608,6 +616,11 @@ class WorkspaceItemProcessor(
                         (lapi == null) &&
                         !isArchived
                 ) {
+                    appWidgetInfo.widgetStackId?.let { stackId ->
+                        LauncherAppState.getInstance(context).model.modelDbController.db?.let { db ->
+                            WidgetStackManager.pruneInvalidWidgetFromStack(db, stackId, appWidgetInfo.appWidgetId)
+                        }
+                    }
                     // Restore never started
                     c.markDeleted(
                         "processWidget: Unrestored Pending widget removed:" +

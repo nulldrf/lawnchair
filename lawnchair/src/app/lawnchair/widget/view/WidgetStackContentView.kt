@@ -79,6 +79,10 @@ class WidgetStackContentView @JvmOverloads constructor(
         refreshPendingWidgets()
     }
 
+    private val realignPagerRunnable = Runnable {
+        realignPagerAfterResize()
+    }
+
     override fun onFinishInflate() {
         super.onFinishInflate()
         pager = findViewById(R.id.widget_stack_pager)
@@ -88,6 +92,7 @@ class WidgetStackContentView @JvmOverloads constructor(
         pager.offscreenPageLimit = OFFSCREEN_PAGE_LIMIT
         pager.pageMargin = (PAGE_MARGIN_DP * resources.displayMetrics.density).toInt()
         pager.onUserInteraction = { showIndicatorTemporarily() }
+        pager.onPagerSizeChanged = { schedulePagerRealignment() }
         pager.addOnPageChangeListener(object : ViewPager.SimpleOnPageChangeListener() {
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
                 val count = widgetViews.size
@@ -143,6 +148,7 @@ class WidgetStackContentView @JvmOverloads constructor(
         stopAutoRotate()
         mainHandler.removeCallbacks(hideIndicatorRunnable)
         mainHandler.removeCallbacks(pendingRefreshRunnable)
+        mainHandler.removeCallbacks(realignPagerRunnable)
     }
 
     fun setChangeListener(listener: WidgetStackChangeListener?) {
@@ -308,6 +314,30 @@ class WidgetStackContentView @JvmOverloads constructor(
             spanX = spanX,
             spanY = spanY,
         )
+        schedulePagerRealignment()
+    }
+
+    private fun schedulePagerRealignment() {
+        mainHandler.removeCallbacks(realignPagerRunnable)
+        mainHandler.post(realignPagerRunnable)
+    }
+
+    private fun realignPagerAfterResize() {
+        if (!::pager.isInitialized || widgetViews.isEmpty()) return
+        val realIndex = (stackInfo?.currentIndex ?: toRealIndex(pager.currentItem))
+            .coerceIn(0, widgetViews.lastIndex)
+        detachAllSlotHolders()
+        adapter.notifyDataSetChanged()
+        val targetVirtual = centerVirtualPosition(realIndex)
+        pager.setCurrentItem(targetVirtual, false)
+        ensureWidgetAttachedToSlot(targetVirtual)
+        if (widgetViews.size > 1) {
+            indicator.setPageOffset(realIndex, 0f)
+        }
+        for (view in widgetViews) {
+            view.requestLayout()
+        }
+        pager.requestLayout()
     }
 
     fun updateMemberWidgetSizeRanges(spanX: Int, spanY: Int) {
@@ -637,7 +667,7 @@ class WidgetStackContentView @JvmOverloads constructor(
 
     companion object {
         private const val OFFSCREEN_PAGE_LIMIT = 1
-        private const val LOOP_MULTIPLIER = 1_000
+        private const val LOOP_MULTIPLIER = 100
         private const val PAGE_MARGIN_DP = 12
         private const val AUTO_ROTATE_INTERVAL_MS = 20_000L
         private const val INDICATOR_HIDE_DELAY_MS = 1_500L

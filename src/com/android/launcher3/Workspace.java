@@ -1389,6 +1389,14 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         Utilities.mapCoordInSelfToDescendant(container, this, mTempFXY);
         for (int i = 0; i < container.getChildCount(); i++) {
             View child = container.getChildAt(i);
+            if (child instanceof app.lawnchair.widget.view.WidgetStackView) {
+                boolean isOverStack = child.getLeft() <= mTempFXY[0] && child.getRight() >= mTempFXY[0]
+                        && child.getTop() <= mTempFXY[1] && child.getBottom() >= mTempFXY[1];
+                if (isOverStack) {
+                    return true;
+                }
+                continue;
+            }
             Object tag = child.getTag();
             if (!(tag instanceof LauncherAppWidgetInfo))
                 continue;
@@ -2320,6 +2328,15 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     return;
                 }
 
+                // Drag-to-stack: dropping a single widget onto another widget or existing stack.
+                if (tryDropIntoWidgetStack(cell, container, screenId, dropTargetLayout, mTargetCell,
+                        distance, d)) {
+                    if (!mLauncher.isInState(EDIT_MODE)) {
+                        mLauncher.getStateManager().goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
+                    }
+                    return;
+                }
+
                 // Aside from the special case where we're dropping a shortcut onto a shortcut,
                 // we need to find the nearest cell location that is vacant
                 ItemInfo item = d.dragInfo;
@@ -2405,9 +2422,19 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                         // in its final location
                         onCompleteRunnable = getWidgetResizeFrameRunnable(options,
                                 (LauncherAppWidgetHostView) cell, dropTargetLayout, forceWidgetResize);
+                    } else if (container != CONTAINER_HOTSEAT
+                            && cell instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+                        onCompleteRunnable = getWidgetStackResizeFrameRunnable(
+                                options, stackView, dropTargetLayout);
                     }
-                    mLauncher.getModelWriter().modifyItemInDatabase(info, container, screenId,
-                            lp.getCellX(), lp.getCellY(), item.spanX, item.spanY);
+                    if (cell instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+                        app.lawnchair.widget.helper.WidgetStackWorkspaceHelper.persistMovedStack(
+                                mLauncher, stackView, container, screenId,
+                                lp.getCellX(), lp.getCellY());
+                    } else {
+                        mLauncher.getModelWriter().modifyItemInDatabase(info, container, screenId,
+                                lp.getCellX(), lp.getCellY(), item.spanX, item.spanY);
+                    }
                 } else {
                     if (!returnToOriginalCellToPreventShuffling) {
                         onNoCellFound(dropTargetLayout, d.dragInfo, d.logInstanceId);
@@ -2439,6 +2466,12 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     if (pageIsVisible) {
                         onCompleteRunnable = getWidgetResizeFrameRunnable(options,
                                 (LauncherAppWidgetHostView) cell, cellLayout, forceWidgetResize);
+                    }
+                } else if (cell instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+                    final CellLayout cellLayout = getParentCellLayoutForView(cell);
+                    if (cellLayout != null && isVisible(cellLayout)) {
+                        onCompleteRunnable = getWidgetStackResizeFrameRunnable(
+                                options, stackView, cellLayout);
                     }
                 }
             }
@@ -2536,6 +2569,68 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             };
         }
         return null;
+    }
+
+    @Nullable
+    private Runnable getWidgetStackResizeFrameRunnable(
+            DragOptions options,
+            app.lawnchair.widget.view.WidgetStackView stackView,
+            CellLayout cellLayout) {
+        if (!options.isAccessibleDrag) {
+            return () -> {
+                if (!isPageInTransition()) {
+                    AppWidgetResizeFrame.showForWidgetStack(stackView, cellLayout);
+                }
+            };
+        }
+        return null;
+    }
+
+    private boolean tryDropIntoWidgetStack(
+            View draggedView,
+            int container,
+            int screenId,
+            CellLayout target,
+            int[] targetCell,
+            float distance,
+            DragObject d) {
+        if (draggedView instanceof app.lawnchair.widget.view.WidgetStackView) {
+            return false;
+        }
+        if (!(d.dragInfo instanceof LauncherAppWidgetInfo draggedWidgetInfo)) {
+            return false;
+        }
+        if (distance > target.getFolderCreationRadius(targetCell)) {
+            return false;
+        }
+        View dropOverView = target.getChildAt(targetCell[0], targetCell[1]);
+        if (dropOverView == null || dropOverView == draggedView) {
+            return false;
+        }
+        if (dropOverView instanceof app.lawnchair.widget.view.WidgetStackView stackView) {
+            if (draggedView instanceof LauncherAppWidgetHostView) {
+                d.dragView.detachContentView(/* reattachToPreviousParent= */ false);
+            }
+            return app.lawnchair.widget.helper.WidgetStackWorkspaceHelper
+                    .addToExistingStackFromDrop(mLauncher, stackView, draggedView, draggedWidgetInfo);
+        }
+        if (dropOverView instanceof LauncherAppWidgetHostView
+                && dropOverView.getTag() instanceof LauncherAppWidgetInfo targetWidgetInfo) {
+            if (draggedView instanceof LauncherAppWidgetHostView) {
+                d.dragView.detachContentView(/* reattachToPreviousParent= */ false);
+            }
+            return app.lawnchair.widget.helper.WidgetStackWorkspaceHelper.createStackFromDrop(
+                    mLauncher,
+                    dropOverView,
+                    draggedView,
+                    draggedWidgetInfo,
+                    targetWidgetInfo,
+                    container,
+                    screenId,
+                    targetCell[0],
+                    targetCell[1]) != null;
+        }
+        return false;
     }
 
     public void onNoCellFound(
@@ -2993,7 +3088,14 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         mDragOverView = mDragTargetLayout.getChildAt(mTargetCell[0], mTargetCell[1]);
         ItemInfo info = dragObject.dragInfo;
-        boolean userFolderPending = willCreateUserFolder(info, mDragOverView, false);
+        boolean widgetStackPending = info instanceof LauncherAppWidgetInfo
+                && !(mDragInfo != null && mDragInfo.cell instanceof app.lawnchair.widget.view.WidgetStackView)
+                && mDragOverView != null
+                && (mDragInfo == null || mDragOverView != mDragInfo.cell)
+                && (mDragOverView instanceof LauncherAppWidgetHostView
+                        || mDragOverView instanceof app.lawnchair.widget.view.WidgetStackView);
+        boolean userFolderPending = willCreateUserFolder(info, mDragOverView, false)
+                || widgetStackPending;
         if (mDragMode == DRAG_MODE_NONE && userFolderPending) {
             if (Flags.msdlFeedback()) {
                 mMSDLPlayerWrapper.playToken(MSDLToken.DRAG_INDICATOR_DISCRETE);

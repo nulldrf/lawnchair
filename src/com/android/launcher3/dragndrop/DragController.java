@@ -107,6 +107,10 @@ public abstract class DragController<T extends ActivityContext>
      */
     protected boolean mIsInPreDrag;
 
+    public boolean isInPreDrag() {
+        return mIsInPreDrag;
+    }
+
     private final int DRAG_VIEW_SCALE_DURATION_MS = 500;
 
     /**

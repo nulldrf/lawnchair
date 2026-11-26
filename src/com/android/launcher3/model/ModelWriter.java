@@ -457,6 +457,74 @@ public class ModelWriter {
         }));
     }
 
+    public ModelDbController getModelDbController() {
+        return mModel.getModelDbController();
+    }
+
+    /**
+     * Persists the widget stack metadata to the database on the model thread and syncs
+     * {@code widgetStackId} on matching in-memory {@link LauncherAppWidgetInfo} items.
+     */
+    public void saveWidgetStack(
+            @NonNull app.lawnchair.widget.model.WidgetStackInfo stackInfo) {
+        MODEL_EXECUTOR.execute(() -> {
+            android.database.sqlite.SQLiteDatabase db = mModel.getModelDbController().getDb();
+            if (db == null) return;
+            app.lawnchair.widget.model.WidgetStackManager.saveStack(db, stackInfo);
+            synchronized (mBgDataModel) {
+                for (ItemInfo item : mBgDataModel.itemsIdMap) {
+                    if (item instanceof LauncherAppWidgetInfo widgetInfo
+                            && stackInfo.getWidgetIds().contains(widgetInfo.appWidgetId)) {
+                        widgetInfo.widgetStackId = stackInfo.getStackId();
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Deletes an entire widget stack: removes all member items from model and DB, and releases
+     * each allocated {@code appWidgetId} from the host exactly once.
+     */
+    public void deleteWidgetStack(
+            @NonNull app.lawnchair.widget.model.WidgetStackInfo stackInfo,
+            @Nullable LauncherWidgetHolder holder,
+            @Nullable String reason) {
+        final java.util.List<LauncherAppWidgetInfo> inMemoryMembers = new ArrayList<>();
+        final java.util.Set<Integer> handledWidgetIds = new java.util.HashSet<>();
+        synchronized (mBgDataModel) {
+            for (ItemInfo item : mBgDataModel.itemsIdMap) {
+                if (item instanceof LauncherAppWidgetInfo widgetInfo
+                        && stackInfo.getWidgetIds().contains(widgetInfo.appWidgetId)) {
+                    inMemoryMembers.add(widgetInfo);
+                    handledWidgetIds.add(widgetInfo.appWidgetId);
+                }
+            }
+        }
+        for (LauncherAppWidgetInfo member : inMemoryMembers) {
+            deleteWidgetInfo(member, holder, reason);
+        }
+        enqueueDeleteRunnable(newModelTask(() -> {
+            android.database.sqlite.SQLiteDatabase db = mModel.getModelDbController().getDb();
+            for (int widgetId : stackInfo.getWidgetIds()) {
+                if (!handledWidgetIds.contains(widgetId)) {
+                    if (holder != null && widgetId > 0) {
+                        holder.deleteAppWidgetId(widgetId);
+                    }
+                    if (db != null) {
+                        db.delete(
+                                LauncherSettings.Favorites.TABLE_NAME,
+                                LauncherSettings.Favorites.APPWIDGET_ID + " = ?",
+                                new String[] { String.valueOf(widgetId) });
+                    }
+                }
+            }
+            if (db != null) {
+                app.lawnchair.widget.model.WidgetStackManager.deleteStack(db, stackInfo.getStackId());
+            }
+        }));
+    }
+
     /**
      * Deletes the widget info and the widget id.
      */

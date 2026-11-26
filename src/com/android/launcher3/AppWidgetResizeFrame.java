@@ -314,7 +314,6 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         }
 
         mCellLayout.markCellsAsUnoccupiedForView(stackView);
-        mWidgetPadding.set(0, 0, 0, 0);
         stackView.addOnLayoutChangeListener(mWidgetViewLayoutListener);
     }
 

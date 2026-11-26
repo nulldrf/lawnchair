@@ -354,7 +354,7 @@ private fun resolveMemberUis(
 ): Map<Int, WidgetStackMemberUi> {
     val appWidgetManager = AppWidgetManager.getInstance(launcher)
     val pm = launcher.packageManager
-    val allWidgetItems = launcher.popupDataProvider.allWidgets
+    val allWidgetItems = launcher.widgetPickerDataProvider.get().allWidgets
         .flatMap { it.mWidgets }
         .associateBy { it.componentName }
 

@@ -13,7 +13,6 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.Utilities
 import com.android.launcher3.Workspace
-import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.util.Executors
 import com.android.launcher3.widget.LauncherAppWidgetHostView
@@ -28,17 +27,16 @@ object WidgetStackWorkspaceHelper {
     private const val TAG = "WidgetStackWorkspaceHelper"
 
     @JvmStatic
-    fun createStackChangeListener(launcher: Launcher): WidgetStackView.WidgetStackChangeListener =
-        object : WidgetStackView.WidgetStackChangeListener {
-            override fun onStackChanged(stackView: WidgetStackView) {
-                val info = stackView.getStackInfo() ?: return
-                launcher.modelWriter.saveWidgetStack(info)
-            }
-
-            override fun onStackCollapsed(stackView: WidgetStackView, remainingWidgetId: Int) {
-                collapseStackToSingleWidget(launcher, stackView, remainingWidgetId)
-            }
+    fun createStackChangeListener(launcher: Launcher): WidgetStackView.WidgetStackChangeListener = object : WidgetStackView.WidgetStackChangeListener {
+        override fun onStackChanged(stackView: WidgetStackView) {
+            val info = stackView.getStackInfo() ?: return
+            launcher.modelWriter.saveWidgetStack(info)
         }
+
+        override fun onStackCollapsed(stackView: WidgetStackView, remainingWidgetId: Int) {
+            collapseStackToSingleWidget(launcher, stackView, remainingWidgetId)
+        }
+    }
 
     @JvmStatic
     fun findStackViewByStackId(workspace: Workspace<*>, stackId: Long): WidgetStackView? {
@@ -75,8 +73,7 @@ object WidgetStackWorkspaceHelper {
     }
 
     @JvmStatic
-    fun isAppWidgetIdInDisplayedWidgetStack(workspace: Workspace<*>, appWidgetId: Int): Boolean =
-        findStackViewContainingWidget(workspace, appWidgetId) != null
+    fun isAppWidgetIdInDisplayedWidgetStack(workspace: Workspace<*>, appWidgetId: Int): Boolean = findStackViewContainingWidget(workspace, appWidgetId) != null
 
     @JvmStatic
     fun onAppWidgetConfigureCompletedInStack(workspace: Workspace<*>, appWidgetId: Int): Boolean {
@@ -304,9 +301,11 @@ object WidgetStackWorkspaceHelper {
         val stackInfo = stackView.getStackInfo() ?: return
 
         val inMemory = findWidgetInfoInMemory(launcher, remainingWidgetId)
-            ?: (stackView.getWidgetViews().firstOrNull {
-                (it.tag as? LauncherAppWidgetInfo)?.appWidgetId == remainingWidgetId
-            }?.tag as? LauncherAppWidgetInfo)
+            ?: (
+                stackView.getWidgetViews().firstOrNull {
+                    (it.tag as? LauncherAppWidgetInfo)?.appWidgetId == remainingWidgetId
+                }?.tag as? LauncherAppWidgetInfo
+                )
 
         if (inMemory != null) {
             finishCollapseOnMainThread(launcher, stackView, stackInfo, inMemory)

@@ -49,7 +49,9 @@ class InterceptingWidgetPager @JvmOverloads constructor(
                     onUserInteraction?.invoke()
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL,
+            -> {
                 isHorizontalDrag = false
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
@@ -76,7 +78,9 @@ class InterceptingWidgetPager @JvmOverloads constructor(
                     onUserInteraction?.invoke()
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL,
+            -> {
                 isHorizontalDrag = false
                 parent?.requestDisallowInterceptTouchEvent(false)
             }

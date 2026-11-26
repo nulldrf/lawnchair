@@ -290,7 +290,7 @@ public class LauncherWidgetHolder {
             TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "start: startConfigActivity");
             mWidgetHost.startAppWidgetConfigureActivityForResult(activity, widgetId, 0, requestCode,
                     getConfigurationActivityOptions(activity, widgetId));
-        } catch (ActivityNotFoundException | SecurityException | RuntimeException e) {
+        } catch (RuntimeException e) {
             Log.e(TAG, "Failed to start configuration activity for widgetId=" + widgetId, e);
             Toast.makeText(activity, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
             sendActionCancelled(activity, requestCode);
@@ -353,7 +353,7 @@ public class LauncherWidgetHolder {
         // intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_OPTIONS, options);
         try {
             activity.startActivityForResult(intent, requestCode);
-        } catch (ActivityNotFoundException | SecurityException | RuntimeException e) {
+        } catch (RuntimeException e) {
             Log.e(TAG, "Failed to start bind flow for widgetId=" + appWidgetId, e);
             sendActionCancelled(activity, requestCode);
         }

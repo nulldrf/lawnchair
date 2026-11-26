@@ -1,5 +1,8 @@
 package app.lawnchair.widget.ui
 
+import android.content.Context
+import android.util.TypedValue
+import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -196,8 +199,9 @@ private fun WidgetCellPreview(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            FrameLayout(context).apply {
-                val cell = LayoutInflater.from(context)
+            val themedContext = resolveWidgetsThemeContext(context)
+            FrameLayout(themedContext).apply {
+                val cell = LayoutInflater.from(themedContext)
                     .inflate(R.layout.widget_cell, this, false) as WidgetCell
                 cell.isClickable = false
                 cell.isLongClickable = false
@@ -216,9 +220,20 @@ private fun WidgetCellPreview(
         update = { container ->
             if (container.tag != widgetItem) {
                 val cell = container.getChildAt(0) as? WidgetCell
+                cell?.clear()
                 cell?.applyFromCellItem(widgetItem)
                 container.tag = widgetItem
             }
         },
     )
+}
+
+private fun resolveWidgetsThemeContext(context: Context): Context {
+    val tv = TypedValue()
+    val themeResId = if (context.theme.resolveAttribute(R.attr.widgetsTheme, tv, true) && tv.resourceId != 0) {
+        tv.resourceId
+    } else {
+        R.style.WidgetContainerTheme
+    }
+    return ContextThemeWrapper(context, themeResId)
 }

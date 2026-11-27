@@ -138,11 +138,32 @@ public class ItemClickHandler {
      * @param v The view that was clicked. Must be an instance of {@link FolderIcon}.
      */
     private static void onClickFolderIcon(View v) {
-        Folder folder = ((FolderIcon) v).getFolder();
+        if (!(v instanceof FolderIcon folderIcon)) {
+            return;
+        }
+        if (folderIcon.isCoverModeActive()) {
+            ItemInfoWithIcon coverInfo = folderIcon.getCoverInfo();
+            Launcher launcher = Launcher.getLauncher(v.getContext());
+            if (coverInfo instanceof WorkspaceItemInfo workspaceItem) {
+                onClickAppShortcut(folderIcon.getFolderName(), workspaceItem, launcher);
+                return;
+            } else if (coverInfo instanceof AppInfo appInfo) {
+                startAppShortcutOrInfoActivity(folderIcon.getFolderName(), appInfo, launcher);
+                return;
+            }
+        }
+        openFolder(folderIcon);
+    }
+
+    /**
+     * Opens the folder associated with {@code folderIcon}.
+     */
+    public static void openFolder(FolderIcon folderIcon) {
+        Folder folder = folderIcon.getFolder();
         if (!folder.isOpen() && !folder.isDestroyed()) {
             // Open the requested folder
             folder.animateOpen();
-            StatsLogManager.newInstance(v.getContext()).logger().withItemInfo(folder.mInfo)
+            StatsLogManager.newInstance(folderIcon.getContext()).logger().withItemInfo(folder.mInfo)
                     .log(LAUNCHER_FOLDER_OPEN);
         }
     }

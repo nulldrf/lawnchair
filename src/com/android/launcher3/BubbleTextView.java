@@ -462,6 +462,42 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         setContentDescription(description);
     }
 
+    /**
+     * Lawnchair: Applies only the icon, tag, progress state, and notification dot of
+     * {@code info} without modifying the text label or icon swipe gesture listener.
+     * Used by {@link FolderIcon} in Cover Mode so the folder's own name remains unaffected.
+     */
+    @UiThread
+    public void applyCoverIcon(@NonNull ItemInfoWithIcon info) {
+        setTag(info);
+        FastBitmapDrawable oldIcon = mIcon;
+        if (!canReuseIcon(info)) {
+            setNonPendingIcon(info);
+        }
+        maybeApplyProgressLevel(info, oldIcon);
+        verifyHighRes();
+        applyDotState(info, false /* animate */);
+    }
+
+    /**
+     * Lawnchair: Clears the cover icon and notification dot applied by {@link #applyCoverIcon}.
+     */
+    @UiThread
+    public void clearCoverIcon() {
+        if (mIconLoadRequest != null) {
+            mIconLoadRequest.cancel();
+            mIconLoadRequest = null;
+        }
+        setTag(null);
+        mIcon = null;
+        mIsIconVisible = true;
+        updateIcon(null);
+        mDotInfo = null;
+        cancelDotScaleAnim();
+        mDotParams.scale = 0f;
+        invalidate();
+    }
+
     public void setRunningAppState(RunningAppState runningAppState) {
         mRunningAppState = runningAppState;
     }
@@ -1625,7 +1661,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             // Optimization: Starting in N, pre-uploads the bitmap to RenderThread.
             info.bitmap.icon.prepareToDraw();
 
-            if (info instanceof AppInfo) {
+            if (getParent() instanceof FolderIcon folderIcon && folderIcon.isCoverModeActive()) {
+                applyCoverIcon(info);
+            } else if (info instanceof AppInfo) {
                 applyFromApplicationInfo((AppInfo) info);
             } else if (info instanceof WorkspaceItemInfo) {
                 applyFromWorkspaceItem((WorkspaceItemInfo) info);

@@ -59,6 +59,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.OnAlarmListener;
 import com.android.launcher3.R;
 import com.android.launcher3.Reorderable;
@@ -80,14 +81,17 @@ import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.FolderInfo.LabelState;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemFactory;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.MultiTranslateDelegate;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.FloatingIconViewCompanion;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 
+import app.lawnchair.gestures.FolderCoverGestureListener;
 import app.lawnchair.theme.ThemeProvider;
 
 import java.util.ArrayList;
@@ -116,6 +120,10 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     private static final int ON_OPEN_DELAY = 800;
 
     @Thunk BubbleTextView mFolderName;
+    private boolean mIsTextVisible = true;
+    @Nullable
+    private FolderCoverGestureListener mCoverGestureListener;
+    private boolean mShouldHandleCoverSwipeTouch;
 
     PreviewBackground mBackground = new PreviewBackground(getContext());
     private boolean mBackgroundIsVisible = true;
@@ -132,6 +140,9 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     private final ThemeProvider.ColorSchemeChangeListener mColorSchemeChangeListener =
             () -> {
                 mPreviewItemManager.invalidateColors();
+                if (isCoverModeActive()) {
+                    updateCoverMode();
+                }
                 invalidate();
             };
     private PreviewItemDrawingParams mTmpParams = new PreviewItemDrawingParams(0, 0, 0);
@@ -232,6 +243,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
 
         icon.setClipToPadding(false);
         icon.mFolderName = icon.findViewById(R.id.folder_icon_name);
+        icon.mFolderName.setCenterVertically(false);
         icon.mFolderName.setText(folderInfo.title);
         // Lawnchair: apply workspace icon text colour preference to the folder name label.
         app.lawnchair.util.LawnchairUtilsKt.overrideWorkspaceTextColor(icon.mFolderName);
@@ -258,6 +270,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         icon.mPreviewVerifier = createFolderGridOrganizer(activity.getDeviceProfile());
         icon.mPreviewVerifier.setFolderInfo(folderInfo);
         icon.updatePreviewItems(false);
+        icon.updateCoverMode();
 
         return icon;
     }
@@ -415,7 +428,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
                 to.offset(center[0] - animateView.getMeasuredWidth() / 2,
                         center[1] - animateView.getMeasuredHeight() / 2);
 
-                float finalAlpha = index < MAX_NUM_ITEMS_IN_PREVIEW ? 1f : 0f;
+                float finalAlpha = (index < MAX_NUM_ITEMS_IN_PREVIEW && !isCoverModeActive()) ? 1f : 0f;
 
                 float finalScale = scale * scaleRelativeToDragLayer;
 
@@ -538,6 +551,12 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
             mDotScale = newDotScale;
             invalidate();
         }
+        if (isCoverModeActive()) {
+            ItemInfoWithIcon coverInfo = getCoverInfo();
+            if (coverInfo != null) {
+                mFolderName.applyDotState(coverInfo, isShown());
+            }
+        }
     }
 
     public ClippedFolderIconLayoutRule getLayoutRule() {
@@ -550,6 +569,9 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
             return;
         }
         mForceHideDot = forceHideDot;
+        if (mFolderName != null) {
+            mFolderName.setForceHideDot(forceHideDot);
+        }
 
         if (forceHideDot) {
             invalidate();
@@ -565,6 +587,10 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     }
 
     public void animateDotScale(float... dotScales) {
+        if (isCoverModeActive()) {
+            mFolderName.animateDotScale(dotScales);
+            return;
+        }
         cancelDotScaleAnim();
         mDotScaleAnim = ObjectAnimator.ofFloat(this, DOT_SCALE_PROPERTY, dotScales);
         mDotScaleAnim.addListener(new AnimatorListenerAdapter() {
@@ -577,6 +603,9 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     }
 
     public boolean hasDot() {
+        if (isCoverModeActive()) {
+            return mFolderName != null && mFolderName.hasDot();
+        }
         return mDotInfo != null && mDotInfo.hasDot();
     }
 
@@ -604,6 +633,9 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     @Override
     public void setIconVisible(boolean visible) {
         mBackgroundIsVisible = visible;
+        if (isCoverModeActive()) {
+            mFolderName.setIconVisible(visible);
+        }
         invalidate();
     }
 
@@ -619,6 +651,105 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         return mPreviewItemManager;
     }
 
+    /**
+     * Lawnchair: Returns whether Cover Mode is enabled on this folder and a cover item is
+     * available to display.
+     */
+    public boolean isCoverModeActive() {
+        return mInfo != null && mInfo.isCoverMode() && getCoverInfo() != null;
+    }
+
+    /**
+     * Lawnchair: Returns the first icon-bearing item inside this folder used as the cover icon,
+     * or {@code null} if unavailable.
+     */
+    @Nullable
+    public ItemInfoWithIcon getCoverInfo() {
+        if (mInfo == null) {
+            return null;
+        }
+        ItemInfo first = mInfo.getCoverInfo();
+        return first instanceof ItemInfoWithIcon ? (ItemInfoWithIcon) first : null;
+    }
+
+    /**
+     * Lawnchair: Refreshes the cover icon presentation after toggling Cover Mode.
+     */
+    public void onCoverModeChanged() {
+        updateCoverMode();
+        updateDotInfo();
+        invalidate();
+        requestLayout();
+    }
+
+    /**
+     * Lawnchair: Synchronizes {@link #mFolderName}'s layout, compound icon, dot state, and swipe
+     * gesture listener with the current Cover Mode state without modifying the folder's title.
+     */
+    private void updateCoverMode() {
+        if (mFolderName == null || mActivity == null || mInfo == null) {
+            return;
+        }
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) mFolderName.getLayoutParams();
+        DeviceProfile grid = mActivity.getDeviceProfile();
+
+        if (isCoverModeActive()) {
+            ItemInfoWithIcon coverInfo = getCoverInfo();
+            lp.topMargin = 0;
+            if (isInAppDrawer()) {
+                mFolderName.setCompoundDrawablePadding(
+                        grid.getAllAppsProfile().getIconDrawablePaddingPx());
+            } else {
+                mFolderName.setCompoundDrawablePadding(grid.iconDrawablePaddingPx);
+            }
+            if (coverInfo != null) {
+                mFolderName.applyCoverIcon(coverInfo);
+                mFolderName.setIconVisible(mBackgroundIsVisible);
+                mFolderName.setForceHideDot(mForceHideDot);
+            }
+            // Keep mFolderName VISIBLE so the cover icon stays visible in the dock even when
+            // dock labels are hidden (mIsTextVisible == false).
+            mFolderName.setVisibility(VISIBLE);
+            mFolderName.setTextVisibility(mIsTextVisible);
+            if (mCoverGestureListener == null && !isInAppDrawer()) {
+                mCoverGestureListener = new FolderCoverGestureListener(this);
+            }
+        } else {
+            if (isInAppDrawer()) {
+                lp.topMargin = grid.getAllAppsProfile().getIconSizePx()
+                        + grid.getAllAppsProfile().getIconDrawablePaddingPx();
+            } else {
+                lp.topMargin = grid.iconSizePx + grid.iconDrawablePaddingPx;
+            }
+            mFolderName.setCompoundDrawablePadding(0);
+            mFolderName.clearCoverIcon();
+            mFolderName.setVisibility(mIsTextVisible ? VISIBLE : INVISIBLE);
+            mFolderName.setTextVisibility(mIsTextVisible);
+            mCoverGestureListener = null;
+            mShouldHandleCoverSwipeTouch = false;
+        }
+    }
+
+    /**
+     * Lawnchair: Returns whether this FolderIcon currently handles vertical swipe gestures
+     * (Cover Mode active and launcher not in edit mode).
+     */
+    public boolean hasConfiguredVerticalSwipeGesture() {
+        if (!isCoverModeActive() || isInAppDrawer()) {
+            return false;
+        }
+        return !(mActivity instanceof Launcher launcher
+                && launcher.isInState(LauncherState.EDIT_MODE));
+    }
+
+    /**
+     * Lawnchair: Writes the cover icon bounds relative to this FolderIcon into {@code outBounds}.
+     */
+    public void getCoverIconBounds(Rect outBounds) {
+        mFolderName.getIconBounds(outBounds);
+        outBounds.offset(mFolderName.getLeft(), mFolderName.getTop());
+    }
+
     @Override
     protected void dispatchDraw(Canvas canvas) {
         super.dispatchDraw(canvas);
@@ -626,6 +757,14 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         if (!mBackgroundIsVisible) return;
 
         mPreviewItemManager.recomputePreviewDrawingParams();
+
+        if (isCoverModeActive()) {
+            if (mBackground.mIsAccepting && !mBackground.drawingDelegated()) {
+                mBackground.drawBackground(canvas);
+                mBackground.drawBackgroundStroke(canvas);
+            }
+            return;
+        }
 
         if (!mBackground.drawingDelegated()) {
             mBackground.drawBackground(canvas);
@@ -678,15 +817,18 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
 
     /** Sets the visibility of the icon's title text */
     public void setTextVisible(boolean visible) {
-        if (visible) {
+        mIsTextVisible = visible;
+        if (isCoverModeActive()) {
             mFolderName.setVisibility(VISIBLE);
+            mFolderName.setTextVisibility(visible);
         } else {
-            mFolderName.setVisibility(INVISIBLE);
+            mFolderName.setVisibility(visible ? VISIBLE : INVISIBLE);
+            mFolderName.setTextVisibility(visible);
         }
     }
 
     public boolean getTextVisible() {
-        return mFolderName.getVisibility() == VISIBLE;
+        return mIsTextVisible;
     }
 
     /**
@@ -712,10 +854,17 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
      */
     public void updatePreviewItems(Predicate<ItemInfo> itemCheck) {
         mPreviewItemManager.updatePreviewItems(itemCheck);
+        if (isCoverModeActive()) {
+            ItemInfoWithIcon coverInfo = getCoverInfo();
+            if (coverInfo != null && itemCheck.test(coverInfo)) {
+                updateCoverMode();
+            }
+        }
     }
 
     public void onItemsChanged(boolean animate) {
         updatePreviewItems(false);
+        updateCoverMode();
         updateDotInfo();
         setContentDescription(getAccessiblityTitle(mInfo.title));
         updatePreviewItems(animate);
@@ -738,12 +887,53 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
             return false;
         }
 
+        if (handleCoverSwipeTouchEvent(event)) {
+            return true;
+        }
+
         // Call the superclass onTouchEvent first, because sometimes it changes the state to
         // isPressed() on an ACTION_UP
         super.onTouchEvent(event);
         mLongPressHelper.onTouchEvent(event);
         // Keep receiving the rest of the events
         return true;
+    }
+
+    /**
+     * Lawnchair: Delegates vertical swipes on a Cover Mode folder icon to
+     * {@link FolderCoverGestureListener} to open the folder without triggering a click or drag.
+     */
+    private boolean handleCoverSwipeTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mShouldHandleCoverSwipeTouch = hasConfiguredVerticalSwipeGesture();
+        }
+
+        if (!mShouldHandleCoverSwipeTouch || mCoverGestureListener == null) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                mShouldHandleCoverSwipeTouch = false;
+            }
+            return false;
+        }
+
+        boolean handled = mCoverGestureListener.handleTouchEvent(event);
+        if (handled) {
+            cancelLongPress();
+            MotionEvent cancelEvent = MotionEvent.obtain(event);
+            cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
+            super.onTouchEvent(cancelEvent);
+            mLongPressHelper.onTouchEvent(cancelEvent);
+            cancelEvent.recycle();
+            setPressed(false);
+            refreshDrawableState();
+            mShouldHandleCoverSwipeTouch = false;
+            return true;
+        }
+
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            mShouldHandleCoverSwipeTouch = false;
+        }
+        return false;
     }
 
     /**
@@ -805,9 +995,28 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         return DRAGGABLE_ICON;
     }
 
+    @NonNull
+    @Override
+    public SafeCloseable prepareDrawDragView() {
+        if (isCoverModeActive()) {
+            boolean prevTextVisible = getTextVisible();
+            mFolderName.setTextVisibility(false);
+            mFolderName.setForceHideDot(true);
+            return () -> {
+                mFolderName.setTextVisibility(prevTextVisible);
+                mFolderName.setForceHideDot(mForceHideDot);
+            };
+        }
+        return DraggableView.super.prepareDrawDragView();
+    }
+
     @Override
     public void getWorkspaceVisualDragBounds(Rect bounds) {
-        getPreviewBounds(bounds);
+        if (isCoverModeActive()) {
+            getCoverIconBounds(bounds);
+        } else {
+            getPreviewBounds(bounds);
+        }
     }
 
     /**

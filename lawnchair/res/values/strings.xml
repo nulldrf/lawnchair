@@ -160,6 +160,14 @@
     <string name="folder_manage_apps">Manage apps</string>
     <string name="my_folder_label">My folder</string>
     <string name="sort_active_items_action">Sort active items</string>
+    <string name="customize_folder_title">Customize folder</string>
+    <string name="open_folder_action">Open folder</string>
+    <string name="folder_cover_mode_label">Cover mode</string>
+    <string name="folder_cover_mode_description">Show the first app as the folder icon. Tap to launch it or swipe to open the folder.</string>
+    <string name="folder_cover_mode_reorder_hint">Reorder apps inside the folder to change the cover icon. The folder name is unaffected.</string>
+    <string name="folder_cover_mode_preview_hint">Tap to open %1$s \u00B7 Swipe for folder</string>
+    <string name="folder_cover_mode_preview_hint_generic">Tap to open first app \u00B7 Swipe for folder</string>
+    <string name="folder_normal_preview_hint">Tap to open folder</string>
 
     <!-- A11y description -->
     <string name="accessibility_service_description">To perform certain actions when you use a gesture, such as locking your phone, Lawnchair requires accessibility access.\n\nLawnchair doesn\'t watch your actions, though all accessibility services require this privilege. Lawnchair discards any event sent by the system.\n\nTo lock your phone or open the Recents screen, Lawnchair uses the performGlobalAction accessibility service.</string>

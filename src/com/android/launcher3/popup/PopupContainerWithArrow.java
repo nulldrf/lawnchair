@@ -316,6 +316,39 @@ public class PopupContainerWithArrow<T extends Context & ActivityContext>
         return container;
     }
 
+    /**
+     * Lawnchair: Shows a popup with folder-specific shortcuts (e.g. "Customize", and "Open folder"
+     * when Cover Mode is active) for a workspace or dock {@link com.android.launcher3.folder.FolderIcon}.
+     */
+    @Nullable
+    public static PopupContainerWithArrow<Launcher> showForFolder(
+            com.android.launcher3.folder.FolderIcon folderIcon) {
+        if (folderIcon.isInAppDrawer() || folderIcon.mInfo == null) {
+            return null;
+        }
+        Launcher launcher = Launcher.getLauncher(folderIcon.getContext());
+        if (getOpen(launcher) != null) {
+            folderIcon.clearFocus();
+            return null;
+        }
+        ItemInfo item = folderIcon.mInfo;
+        List<SystemShortcut> systemShortcuts = launcher.getSupportedShortcuts(item.container)
+                .map(s -> s.getShortcut(launcher, item, folderIcon))
+                .filter(Objects::nonNull)
+                .filter(s -> s instanceof app.lawnchair.ui.popup.LawnchairShortcut.CustomizeFolder
+                        || s instanceof app.lawnchair.ui.popup.LawnchairShortcut.OpenFolder)
+                .collect(Collectors.toList());
+        if (systemShortcuts.isEmpty()) {
+            return null;
+        }
+        PopupContainerWithArrow<Launcher> container = (PopupContainerWithArrow) launcher
+                .getLayoutInflater().inflate(R.layout.popup_container, launcher.getDragLayer(), false);
+        container.configureForLauncher(launcher, item);
+        container.populateAndShowRowsForWidget(folderIcon, systemShortcuts);
+        container.requestFocus();
+        return container;
+    }
+
     private void populateAndShowRowsForWidget(View originalView, List<SystemShortcut> systemShortcuts) {
         mOriginalIcon = null;
         mOriginalView = originalView;

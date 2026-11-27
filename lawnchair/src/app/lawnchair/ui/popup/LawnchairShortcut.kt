@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.override.CustomizeAppDialog
+import app.lawnchair.override.showCustomizeFolderSheet
 import app.lawnchair.preferences2.PreferenceManager2
 import app.lawnchair.preferences2.firstCached
 import app.lawnchair.ui.preferences.PreferenceActivity
@@ -39,8 +40,10 @@ import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.icons.LauncherIcons
 import com.android.launcher3.logging.StatsLogManager
 import com.android.launcher3.model.data.AppInfo as ModelAppInfo
+import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.popup.SystemShortcut
+import com.android.launcher3.touch.ItemClickHandler
 import com.android.launcher3.util.ApplicationInfoWrapper
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.PackageManagerHelper
@@ -94,8 +97,19 @@ class LawnchairShortcut {
                 val prefs2 = PreferenceManager2.getInstance(activity)
                 if (prefs2.lockHomeScreen.firstCached()) {
                     null
+                } else if (itemInfo is FolderInfo && originalView is FolderIcon && !originalView.isInAppDrawer) {
+                    CustomizeFolder(activity, itemInfo, originalView)
                 } else {
                     getAppInfo(activity, itemInfo)?.let { Customize(activity, it, itemInfo, originalView) }
+                }
+            }
+
+        val OPEN_FOLDER =
+            SystemShortcut.Factory { activity: LawnchairLauncher, itemInfo, originalView ->
+                if (itemInfo is FolderInfo && originalView is FolderIcon && originalView.isCoverModeActive) {
+                    OpenFolder(activity, itemInfo, originalView)
+                } else {
+                    null
                 }
             }
 
@@ -235,6 +249,40 @@ class LawnchairShortcut {
                 Toast.makeText(launcher, R.string.activity_not_found, Toast.LENGTH_SHORT).show()
                 AbstractFloatingView.closeAllOpenViews(launcher)
             }
+        }
+    }
+
+    class CustomizeFolder(
+        private val launcher: LawnchairLauncher,
+        private val folderInfo: FolderInfo,
+        private val folderIcon: FolderIcon,
+    ) : SystemShortcut<LawnchairLauncher>(
+        R.drawable.ic_edit,
+        R.string.action_customize,
+        launcher,
+        folderInfo,
+        folderIcon,
+    ) {
+        override fun onClick(v: View) {
+            AbstractFloatingView.closeAllOpenViews(launcher)
+            showCustomizeFolderSheet(launcher, folderInfo, folderIcon)
+        }
+    }
+
+    class OpenFolder(
+        private val launcher: LawnchairLauncher,
+        folderInfo: FolderInfo,
+        private val folderIcon: FolderIcon,
+    ) : SystemShortcut<LawnchairLauncher>(
+        R.drawable.ic_folder,
+        R.string.open_folder_action,
+        launcher,
+        folderInfo,
+        folderIcon,
+    ) {
+        override fun onClick(v: View) {
+            AbstractFloatingView.closeAllOpenViews(launcher)
+            ItemClickHandler.openFolder(folderIcon)
         }
     }
 

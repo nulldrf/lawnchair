@@ -89,6 +89,12 @@ public class ItemLongClickListener {
             if (popup != null) {
                 dragOptions.preDragCondition = popup.createPreDragCondition(false);
             }
+        } else if (v instanceof com.android.launcher3.folder.FolderIcon folderIcon) {
+            com.android.launcher3.popup.PopupContainerWithArrow<Launcher> popup =
+                    com.android.launcher3.popup.PopupContainerWithArrow.showForFolder(folderIcon);
+            if (popup != null) {
+                dragOptions.preDragCondition = popup.createPreDragCondition(false);
+            }
         }
         beginDrag(v, launcher, (ItemInfo) v.getTag(), dragOptions);
         return true;

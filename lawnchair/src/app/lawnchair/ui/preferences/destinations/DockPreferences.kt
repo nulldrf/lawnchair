@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.PreferenceManager2
-import app.lawnchair.preferences2.firstCached
+import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.DummyLauncherBox
@@ -133,6 +133,7 @@ fun HotseatBackgroundSettings(
                 step = 1f,
                 valueRange = 0f..100f,
                 showUnit = "dp",
+                liveUpdate = true,
             )
         }
         ScrollAnchor(ScrollKeys.DOCK_BG_OPACITY, scrollState) {
@@ -142,6 +143,7 @@ fun HotseatBackgroundSettings(
                 step = 5,
                 valueRange = 5..100,
                 showUnit = "%",
+                liveUpdate = true,
             )
         }
         ScrollAnchor(ScrollKeys.DOCK_BG_LEFT_MARGIN, scrollState) {
@@ -151,6 +153,7 @@ fun HotseatBackgroundSettings(
                 step = 5,
                 valueRange = 0..100,
                 showUnit = "px",
+                liveUpdate = true,
             )
         }
         ScrollAnchor(ScrollKeys.DOCK_BG_RIGHT_MARGIN, scrollState) {
@@ -160,6 +163,7 @@ fun HotseatBackgroundSettings(
                 step = 5,
                 valueRange = 0..100,
                 showUnit = "px",
+                liveUpdate = true,
             )
         }
         ScrollAnchor(ScrollKeys.DOCK_BG_TOP_MARGIN, scrollState) {
@@ -169,6 +173,7 @@ fun HotseatBackgroundSettings(
                 step = 5,
                 valueRange = 0..100,
                 showUnit = "px",
+                liveUpdate = true,
             )
         }
         ScrollAnchor(ScrollKeys.DOCK_BG_BOTTOM_MARGIN, scrollState) {
@@ -178,6 +183,7 @@ fun HotseatBackgroundSettings(
                 step = 5,
                 valueRange = 0..100,
                 showUnit = "px",
+                liveUpdate = true,
             )
         }
     }
@@ -278,32 +284,56 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
     val primary = MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(28.dp)
 
-    val hotseatRows = prefs2.hotseatRows
-    val dockPages = prefs2.dockPages
+    // Structural dock settings that affect DeviceProfile / Hotseat layout and require
+    // rebuilding the preview IDP & renderer (swapped atomically without blanking).
+    val hotseatMode by prefs2.hotseatMode.asState()
+    val hotseatColumns by prefs2.hotseatColumns.asState()
+    val hotseatColumnsUnfolded by prefs2.hotseatColumnsUnfolded.asState()
+    val hotseatRows by prefs2.hotseatRows.asState()
+    val dockPages by prefs2.dockPages.asState()
+    val hotseatBottomFactor by prefs2.hotseatBottomFactor.asState()
+    val pageIndicatorHeightFactor by prefs2.pageIndicatorHeightFactor.asState()
+    val enableLabelInDock by prefs2.enableLabelInDock.asState()
+    val twoLineDock by prefs2.twoLineDock.asState()
 
-    val adapters = listOf(
-        prefs2.hotseatMode.getAdapter(),
-        prefs2.hotseatQsbProvider.getAdapter(),
-        prefs2.hotseatColumns.getAdapter(),
-        prefs2.hotseatColumnsUnfolded.getAdapter(),
-        hotseatRows.getAdapter(),
-        dockPages.getAdapter(),
-        prefs2.themedHotseatQsb.getAdapter(),
-        prefs2.hotseatQsbCornerRadius.getAdapter(),
-        prefs2.hotseatQsbAlpha.getAdapter(),
-        prefs2.hotseatQsbStrokeWidth.getAdapter(),
-        prefs2.hotseatBottomFactor.getAdapter(),
-        prefs2.strokeColorStyle.getAdapter(),
-        prefs2.enableLabelInDock.getAdapter(),
-        prefs2.hotseatBG.getAdapter(),
-        prefs2.hotseatBGHorizontalInsetLeft.getAdapter(),
-        prefs2.hotseatBGVerticalInsetTop.getAdapter(),
-        prefs2.hotseatBGHorizontalInsetRight.getAdapter(),
-        prefs2.hotseatBGVerticalInsetBottom.getAdapter(),
-        prefs2.pageIndicatorHeightFactor.getAdapter(),
-        prefs2.hotseatBackgroundColor.getAdapter(),
-        prefs2.hotseatBackgroundCornerRadius.getAdapter(),
-        prefs2.hotseatBGAlpha.getAdapter(),
+    val previewIdp = createPreviewIdp(
+        updateGridOptions = {
+            copy(numHotseatColumns = hotseatColumns)
+        },
+        keys = listOf(
+            hotseatMode,
+            hotseatColumns,
+            hotseatColumnsUnfolded,
+            hotseatRows,
+            dockPages,
+            hotseatBottomFactor,
+            pageIndicatorHeightFactor,
+            enableLabelInDock,
+            twoLineDock,
+        ),
+    )
+
+    // Background styling is reapplied directly on the live preview Hotseat without
+    // tearing down or rebinding the preview renderer. QSB styling is already observed
+    // reactively inside LawnQsbLayout via Compose state.
+    val hotseatBG by prefs2.hotseatBG.asState()
+    val hotseatBackgroundColor by prefs2.hotseatBackgroundColor.asState()
+    val hotseatBackgroundCornerRadius by prefs2.hotseatBackgroundCornerRadius.asState()
+    val hotseatBGAlpha by prefs2.hotseatBGAlpha.asState()
+    val hotseatBGHorizontalInsetLeft by prefs2.hotseatBGHorizontalInsetLeft.asState()
+    val hotseatBGVerticalInsetTop by prefs2.hotseatBGVerticalInsetTop.asState()
+    val hotseatBGHorizontalInsetRight by prefs2.hotseatBGHorizontalInsetRight.asState()
+    val hotseatBGVerticalInsetBottom by prefs2.hotseatBGVerticalInsetBottom.asState()
+
+    val hotseatBackgroundKey = listOf(
+        hotseatBG,
+        hotseatBackgroundColor,
+        hotseatBackgroundCornerRadius,
+        hotseatBGAlpha,
+        hotseatBGHorizontalInsetLeft,
+        hotseatBGVerticalInsetTop,
+        hotseatBGHorizontalInsetRight,
+        hotseatBGVerticalInsetBottom,
     )
 
     PreferenceGroupHeading(heading = stringResource(id = R.string.preview_label))
@@ -325,22 +355,19 @@ fun ColumnScope.DockPreferencesPreview(modifier: Modifier = Modifier) {
                 DummyLauncherBox(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clipToBottomPercentage(if (hotseatRows.getAdapter().state.value >= 2) 0.4f else 0.3f),
+                        .clipToBottomPercentage(if (hotseatRows >= 2) 0.4f else 0.3f),
                     forcePortrait = forcePortrait,
                 ) {
                     WallpaperPreview(
                         wallpaper = wallpaper,
                         modifier = Modifier.fillMaxSize(),
                     )
-                    key(adapters.map { it.state.value }.toTypedArray()) {
-                        DummyLauncherLayout(
-                            idp = createPreviewIdp {
-                                copy(numHotseatColumns = prefs2.hotseatColumns.firstCached())
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                            forcePortrait = forcePortrait,
-                        )
-                    }
+                    DummyLauncherLayout(
+                        idp = previewIdp,
+                        modifier = Modifier.fillMaxSize(),
+                        forcePortrait = forcePortrait,
+                        hotseatBackgroundKey = hotseatBackgroundKey,
+                    )
                 }
             }
         }

@@ -292,7 +292,7 @@ class PreferenceManager2 @Inject constructor(
         key = stringPreferencesKey(name = "hotseat_bg_color"),
         parse = ColorOption::fromString,
         save = ColorOption::toString,
-        onSet = { reloadHelper.reloadGrid() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
         defaultValue = ColorOption.fromString(context.getString(R.string.config_default_hotseat_bg_color)),
     )
 
@@ -300,7 +300,7 @@ class PreferenceManager2 @Inject constructor(
         key = floatPreferencesKey(name = "hotseat_bg_corner_radius"),
         defaultValue = context.resources.getDimension(R.dimen.bg_round_rect_radius) /
             context.resources.displayMetrics.density, // This should hopefully match corner of all devices
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val appDrawerBackgroundColor = preference(
@@ -1532,37 +1532,37 @@ class PreferenceManager2 @Inject constructor(
     val hotseatBG = preference(
         key = booleanPreferencesKey(name = "hotseat_bg"),
         defaultValue = false,
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val hotseatBGHorizontalInsetLeft = preference(
         key = intPreferencesKey(name = "hotseat_bg_horizontal_inset_left"),
         defaultValue = 0,
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val hotseatBGVerticalInsetTop = preference(
         key = intPreferencesKey(name = "hotseat_bg_vertical_inset_top"),
         defaultValue = 0,
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val hotseatBGHorizontalInsetRight = preference(
         key = intPreferencesKey(name = "hotseat_bg_horizontal_inset_right"),
         defaultValue = 0,
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val hotseatBGVerticalInsetBottom = preference(
         key = intPreferencesKey(name = "hotseat_bg_vertical_inset_bottom"),
         defaultValue = 0,
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val hotseatBGAlpha = preference(
         key = intPreferencesKey(name = "hotseat_bg_alpha"),
         defaultValue = 100,
-        onSet = { reloadHelper.recreate() },
+        onSet = { reloadHelper.reloadHotseatBackground() },
     )
 
     val enableWallpaperBlur = preference(

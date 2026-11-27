@@ -193,13 +193,22 @@ public class Hotseat extends FrameLayout implements Insettable {
         mQsbAlphaChannels = new MultiValueAlpha(mQsb, ALPHA_CHANNEL_CHANNELS_COUNT);
         mQsbAlphaChannels.setUpdateVisibility(true);
 
-        setUpBackground();
+        updateBackground();
         setClipChildren(false);
         setClipToPadding(false);
     }
 
-    private void setUpBackground() {
-        if (!PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBG())) return;
+    public void updateBackground() {
+        int paddingLeft = getPaddingLeft();
+        int paddingTop = getPaddingTop();
+        int paddingRight = getPaddingRight();
+        int paddingBottom = getPaddingBottom();
+
+        if (!PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBG())) {
+            setBackground(null);
+            setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
+            return;
+        }
 
         var bgColor = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBackgroundColor());
         var transparency = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatBGAlpha());
@@ -222,6 +231,7 @@ public class Hotseat extends FrameLayout implements Insettable {
         InsetDrawable bg = new InsetDrawable(background,
                 insetHorizontalLeft, insetVerticalTop, insetHorizontalRight, insetVerticalBottom);
         setBackground(bg);
+        setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
     }
 
     /** Provides translation X for hotseat icons for the channel. */

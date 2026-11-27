@@ -67,6 +67,7 @@ fun SliderPreference(
     showAsPercentage: Boolean = false,
     showUnit: String = "",
     enabled: Boolean = true,
+    liveUpdate: Boolean = false,
 ) {
     val transformedAdapter = rememberTransformAdapter(
         adapter = adapter,
@@ -83,6 +84,7 @@ fun SliderPreference(
         showAsPercentage = showAsPercentage,
         showUnit = showUnit,
         enabled = enabled,
+        liveUpdate = liveUpdate,
     )
 }
 
@@ -96,6 +98,7 @@ fun SliderPreference(
     showAsPercentage: Boolean = false,
     showUnit: String = "",
     enabled: Boolean = true,
+    liveUpdate: Boolean = false,
 ) {
     var adapterValue by adapter
 
@@ -111,6 +114,7 @@ fun SliderPreference(
         showAsPercentage = showAsPercentage,
         showUnit = showUnit,
         enabled = enabled,
+        liveUpdate = liveUpdate,
     )
 }
 
@@ -125,8 +129,10 @@ private fun SliderPreference(
     showAsPercentage: Boolean = false,
     showUnit: String = "",
     enabled: Boolean = true,
+    liveUpdate: Boolean = false,
 ) {
     var sliderValue by remember { mutableFloatStateOf(value) }
+    var lastCommittedValue by remember { mutableFloatStateOf(value) }
     var thresholdReached by remember { mutableStateOf<SliderThreshold?>(null) }
     val mMSDLPlayerWrapper = MSDLPlayerWrapper.INSTANCE.get(LocalContext.current)
     val getAppropriateHaptic = if (step == 0f) {
@@ -136,8 +142,11 @@ private fun SliderPreference(
     }
 
     DisposableEffect(value) {
-        sliderValue = value
-        thresholdReached = null
+        if (value != lastCommittedValue) {
+            sliderValue = value
+            lastCommittedValue = value
+            thresholdReached = null
+        }
         onDispose { }
     }
 
@@ -209,8 +218,21 @@ private fun SliderPreference(
                             mMSDLPlayerWrapper.playToken(getAppropriateHaptic)
                         }
                     }
+                    if (liveUpdate) {
+                        val snapped = snapSliderValue(valueRange.start, newValue, step)
+                        if (snapped != lastCommittedValue) {
+                            lastCommittedValue = snapped
+                            onValueChangeFinished(snapped)
+                        }
+                    }
                 },
-                onValueChangeFinished = { onValueChangeFinished(sliderValue) },
+                onValueChangeFinished = {
+                    val snapped = snapSliderValue(valueRange.start, sliderValue, step)
+                    if (!liveUpdate || snapped != lastCommittedValue) {
+                        lastCommittedValue = snapped
+                        onValueChangeFinished(snapped)
+                    }
+                },
                 valueRange = valueRange,
                 steps = getSteps(valueRange, step),
                 modifier = Modifier

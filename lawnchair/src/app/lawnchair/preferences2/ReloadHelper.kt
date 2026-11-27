@@ -48,6 +48,12 @@ class ReloadHelper(private val context: Context) {
         LawnchairLauncher.instance?.recreateIfNotScheduled()
     }
 
+    fun reloadHotseatBackground() {
+        Executors.MAIN_EXECUTOR.execute {
+            LawnchairLauncher.instance?.hotseat?.updateBackground()
+        }
+    }
+
     fun restart() {
         reloadGrid()
         recreate()

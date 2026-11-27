@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,26 +85,16 @@ fun ColumnScope.GridOverridesPreview(
 }
 
 @Composable
-fun createPreviewIdp(updateGridOptions: DeviceProfileOverrides.DBGridInfo.() -> DeviceProfileOverrides.DBGridInfo): InvariantDeviceProfile {
-    return createPreviewIdp(
-        updateGridOptions = updateGridOptions,
-        previewOverrides = DeviceProfileOverrides.PreviewOverrides(),
-    )
-}
-
-@Composable
 fun createPreviewIdp(
     updateGridOptions: DeviceProfileOverrides.DBGridInfo.() -> DeviceProfileOverrides.DBGridInfo,
     previewOverrides: DeviceProfileOverrides.PreviewOverrides = DeviceProfileOverrides.PreviewOverrides(),
+    keys: List<Any?> = emptyList(),
 ): InvariantDeviceProfile {
     val context = LocalContext.current
     val prefs = preferenceManager2()
+    val gridInfo = updateGridOptions(DeviceProfileOverrides.DBGridInfo(prefs))
 
-    val newIdp by remember(previewOverrides) {
-        derivedStateOf {
-            val options = DeviceProfileOverrides.DBGridInfo(prefs)
-            InvariantDeviceProfile(context, updateGridOptions(options), previewOverrides)
-        }
+    return remember(context, gridInfo, previewOverrides, keys) {
+        InvariantDeviceProfile(context, gridInfo, previewOverrides)
     }
-    return newIdp
 }

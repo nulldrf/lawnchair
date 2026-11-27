@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.lawnchair.DeviceProfileOverrides
 import app.lawnchair.preferences.asPreferenceAdapter
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.preferenceManager2
@@ -96,9 +97,11 @@ fun HomeScreenGridPreferences(
             // ── Phone-frame mockup ───────────────────────────────────────────
             GridMockup(
                 isPortrait = isPortrait,
+                isFoldable = isFoldable,
                 columns = columns.intValue,
                 rows = rows.intValue,
                 hotseatColumns = hotseatColumns.intValue,
+                hotseatColumnsUnfolded = hotseatColumnsUnfolded.intValue,
             )
 
             if (isFoldable) {
@@ -112,18 +115,21 @@ fun HomeScreenGridPreferences(
                             adapter = columns.asPreferenceAdapter(),
                             step = 1,
                             valueRange = 3..maxGridSize,
+                            liveUpdate = true,
                         )
                         SliderPreference(
                             label = stringResource(id = R.string.rows),
                             adapter = rows.asPreferenceAdapter(),
                             step = 1,
                             valueRange = 3..maxGridSize,
+                            liveUpdate = true,
                         )
                         SliderPreference(
                             label = stringResource(id = R.string.dock_icons),
                             adapter = hotseatColumns.asPreferenceAdapter(),
                             step = 1,
                             valueRange = 3..maxGridSize,
+                            liveUpdate = true,
                         )
                     }
 
@@ -135,6 +141,7 @@ fun HomeScreenGridPreferences(
                             adapter = hotseatColumnsUnfolded.asPreferenceAdapter(),
                             step = 1,
                             valueRange = hotseatColumns.intValue..maxGridSize,
+                            liveUpdate = true,
                         )
                         FakeExpandedGridPreference(
                             columns = columns.intValue * 2,
@@ -150,18 +157,21 @@ fun HomeScreenGridPreferences(
                         adapter = columns.asPreferenceAdapter(),
                         step = 1,
                         valueRange = 3..maxGridSize,
+                        liveUpdate = true,
                     )
                     SliderPreference(
                         label = stringResource(id = R.string.rows),
                         adapter = rows.asPreferenceAdapter(),
                         step = 1,
                         valueRange = 3..maxGridSize,
+                        liveUpdate = true,
                     )
                     SliderPreference(
                         label = stringResource(id = R.string.dock_icons),
                         adapter = hotseatColumns.asPreferenceAdapter(),
                         step = 1,
                         valueRange = 3..maxGridSize,
+                        liveUpdate = true,
                     )
                 }
             }
@@ -220,9 +230,11 @@ fun HomeScreenGridPreferences(
 @Composable
 private fun GridMockup(
     isPortrait: Boolean,
+    isFoldable: Boolean,
     columns: Int,
     rows: Int,
     hotseatColumns: Int,
+    hotseatColumnsUnfolded: Int,
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val phoneShape = RoundedCornerShape(28.dp)
@@ -231,6 +243,13 @@ private fun GridMockup(
     // DummyLauncherBox's internal aspectRatio() derives height from width alone,
     // so this stays gap-free inside a scrollable column.
     val widthFraction = if (isPortrait) 0.65f else 0.45f
+    val previewOverrides = if (isFoldable) {
+        DeviceProfileOverrides.PreviewOverrides(
+            foldableDatabaseHotseatIcons = hotseatColumnsUnfolded,
+        )
+    } else {
+        DeviceProfileOverrides.PreviewOverrides()
+    }
 
     Box(
         modifier = Modifier
@@ -255,13 +274,16 @@ private fun GridMockup(
                     // createPreviewIdp reflects current slider values live,
                     // including the dock column count added in this merge.
                     DummyLauncherLayout(
-                        idp = createPreviewIdp {
-                            copy(
-                                numColumns = columns,
-                                numRows = rows,
-                                numHotseatColumns = hotseatColumns,
-                            )
-                        },
+                        idp = createPreviewIdp(
+                            updateGridOptions = {
+                                copy(
+                                    numColumns = columns,
+                                    numRows = rows,
+                                    numHotseatColumns = hotseatColumns,
+                                )
+                            },
+                            previewOverrides = previewOverrides,
+                        ),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

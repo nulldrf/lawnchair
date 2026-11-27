@@ -66,10 +66,11 @@ fun ColorSelection(
     val context = LocalContext.current
     val navController = LocalNavController.current
     val selectedColor = remember { mutableIntStateOf(appliedColor.forCustomPicker(context)) }
-    val selectedColorApplied = remember {
+    val selectedColorApplied = remember(adapter) {
         derivedStateOf {
-            appliedColor is ColorOption.CustomColor &&
-                appliedColor.color == selectedColor.intValue
+            val current = adapter.state.value
+            current is ColorOption.CustomColor &&
+                current.color == selectedColor.intValue
         }
     }
 

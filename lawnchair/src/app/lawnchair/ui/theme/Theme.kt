@@ -31,13 +31,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
 import app.lawnchair.theme.ThemeProvider
@@ -104,24 +104,17 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
     val colorSpec by preferenceManager2.colorSpec.asState()
     val colorSpecFallback by preferenceManager2.colorSpecFallback.asState()
 
-    // Track external palette updates (wallpaper color changes, system overlay changes) so
-    // an open Settings screen refreshes live without having to close and re-enter it.
-    var themeVersion by remember(themeProvider) { mutableIntStateOf(0) }
-    DisposableEffect(themeProvider) {
-        val listener = object : ThemeProvider.ColorSchemeChangeListener {
-            override fun onColorSchemeChanged() {
-                themeVersion++
-            }
-        }
-        themeProvider.addListener(listener)
-        onDispose { themeProvider.removeListener(listener) }
-    }
+    // Track external palette updates (wallpaper color changes, system overlay changes)
+    // without double-recomposing out of sync when preferences change.
+    val externalThemeVersion by themeProvider.externalThemeVersion.collectAsStateWithLifecycle()
 
     val isSystemAccent = accentColor == ColorOption.SystemAccent
-    val effectiveStyle = if (colorSpec != SpecVersion.SPEC_2026 && colorStyle is Cmf) {
-        TonalSpot
-    } else {
-        colorStyle
+    val isWallpaperAccent = accentColor is ColorOption.WallpaperPrimary ||
+        accentColor is ColorOption.WallpaperDerived
+    val effectiveStyle = when {
+        !isWallpaperAccent && colorStyle is LegacyKdrag -> TonalSpot
+        colorSpec != SpecVersion.SPEC_2026 && colorStyle is Cmf -> TonalSpot
+        else -> colorStyle
     }
     val effectiveSpec = resolveEffectiveSpec(colorSpec, colorSpecFallback, effectiveStyle)
 
@@ -156,7 +149,7 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
             colorSpec,
             colorSpecFallback,
             darkTheme,
-            themeVersion,
+            externalThemeVersion,
         ) {
             themeProvider.colorScheme2025(
                 isDark = darkTheme,
@@ -177,7 +170,7 @@ fun getColorScheme(darkTheme: Boolean): ColorScheme {
         accentColor,
         effectiveStyle,
         if (isSystemAccent) null else effectiveSpec,
-        themeVersion,
+        externalThemeVersion,
     ) {
         themeProvider.colorSchemeFor(
             accentColor = accentColor,

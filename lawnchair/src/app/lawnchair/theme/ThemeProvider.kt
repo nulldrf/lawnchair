@@ -19,6 +19,7 @@ import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
 import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.MonetColorSchemeCompat2025
+import app.lawnchair.theme.color.Spec2025CompatColorScheme
 import app.lawnchair.theme.color.SystemColorScheme
 import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.resolveEffectiveSpec
@@ -45,6 +46,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
@@ -101,6 +105,15 @@ class ThemeProvider @Inject constructor(
     // Typed as MonetColorSchemeCompat2025 directly; no kdrag0n type involved.
     private val colorSchemeMap2025 = ConcurrentHashMap<Scheme2025Key, MonetColorSchemeCompat2025>()
 
+    private val _externalThemeVersion = MutableStateFlow(0)
+
+    /**
+     * Incremented only on external palette updates (wallpaper color changes, system overlay
+     * changes) so Compose theme readers that already observe preference flows directly don't
+     * double-recompose out of sync on every preference write.
+     */
+    val externalThemeVersion: StateFlow<Int> = _externalThemeVersion.asStateFlow()
+
     private val listeners = CopyOnWriteArrayList<ColorSchemeChangeListener>()
     private var overlayChangedReceiver: BroadcastReceiver? = null
     private var systemWallpaperColorsListener: android.app.WallpaperManager.OnColorsChangedListener? = null
@@ -110,7 +123,7 @@ class ThemeProvider @Inject constructor(
                 when (val current = accentColor) {
                     is ColorOption.WallpaperPrimary -> {
                         colorSchemeMap2025.clear()
-                        notifyColorSchemeChanged()
+                        notifyExternalThemeChanged()
                     }
 
                     is ColorOption.WallpaperDerived -> {
@@ -122,7 +135,7 @@ class ThemeProvider @Inject constructor(
                         colorSchemeMap2025.clear()
                         freshWallpaperPrimary = newPrimary
                         freshWallpaperSecondary = wallpaperManager.wallpaperColors?.secondaryColor
-                        notifyColorSchemeChanged()
+                        notifyExternalThemeChanged()
                         if (newPrimary != current.wallpaperPrimary) {
                             coroutineScope.launch {
                                 preferenceManager2.accentColor.set(
@@ -221,7 +234,7 @@ class ThemeProvider @Inject constructor(
                         colorSchemeMap2025.clear()
                         freshWallpaperPrimary = newPrimary
                         freshWallpaperSecondary = colors.secondaryColor?.toArgb()
-                        notifyColorSchemeChanged()
+                        notifyExternalThemeChanged()
                         if (newPrimary != current.wallpaperPrimary) {
                             coroutineScope.launch {
                                 preferenceManager2.accentColor.set(
@@ -261,7 +274,7 @@ class ThemeProvider @Inject constructor(
         cachedSystemColorScheme = fresh
         if (oldAccent == null || oldAccent.toAndroidColor() != newAccent?.toAndroidColor()) {
             if (accentColor is ColorOption.SystemAccent) {
-                notifyColorSchemeChanged()
+                notifyExternalThemeChanged()
             }
         }
     }
@@ -274,7 +287,7 @@ class ThemeProvider @Inject constructor(
             override fun onReceive(context: Context, intent: Intent) {
                 seedSystemColorScheme()
                 if (accentColor is ColorOption.SystemAccent) {
-                    notifyColorSchemeChanged()
+                    notifyExternalThemeChanged()
                 }
             }
         }
@@ -298,6 +311,44 @@ class ThemeProvider @Inject constructor(
         colorSpecFallback: SpecVersion = this.colorSpecFallback,
     ): ColorScheme = resolveColorScheme(accentColor, colorStyle, colorSpec, colorSpecFallback)
 
+    /**
+     * Returns a cached kdrag0n [ColorScheme] for settings preview swatches and style cards,
+     * sharing [kdragColorSchemeMap], [colorSchemeMap], and [colorSchemeMap2025] so switching
+     * between Legacy ZCAM and other specs/styles avoids repeated main-thread recomputation.
+     */
+    fun previewColorScheme(
+        seedColor: Int,
+        colorStyle: ColorStyle?,
+        specVersion: SpecVersion = SpecVersion.SPEC_2021,
+        isDark: Boolean = false,
+        secondarySeedColor: Int? = null,
+    ): ColorScheme {
+        if (colorStyle == null) {
+            return getLegacyColorScheme(seedColor, TonalSpot, SpecVersion.SPEC_2021)
+        }
+        if (colorStyle is LegacyKdrag) {
+            return getLegacyColorScheme(seedColor, LegacyKdrag, SpecVersion.SPEC_2021)
+        }
+        val use2025 = (specVersion == SpecVersion.SPEC_2025 || specVersion == SpecVersion.SPEC_2026) &&
+            !hasNo2025Variant(colorStyle)
+        if (use2025) {
+            val mkSpec = if (colorStyle is Cmf && specVersion == SpecVersion.SPEC_2026) {
+                ColorSpec.SpecVersion.SPEC_2026
+            } else {
+                ColorSpec.SpecVersion.SPEC_2025
+            }
+            val scheme2025 = get2025ColorScheme(
+                colorInt = seedColor,
+                colorStyle = colorStyle,
+                isDark = isDark,
+                specVersion = mkSpec,
+                secondaryColorInt = if (colorStyle is Cmf) secondarySeedColor else null,
+            )
+            return Spec2025CompatColorScheme(scheme2025)
+        }
+        return getLegacyColorScheme(seedColor, colorStyle, SpecVersion.SPEC_2021)
+    }
+
     /** Public accessor so Java callers (e.g. AccentColorExtractor) can gate on spec. */
     val activeColorSpec: SpecVersion get() = colorSpec
 
@@ -306,7 +357,7 @@ class ThemeProvider @Inject constructor(
      *
      * Returns null when:
      * - [accentColor] is [ColorOption.SystemAccent] (always uses the system palette),
-     * - [colorStyle] is [LegacyKdrag] (always uses ZCAM),
+     * - [colorStyle] is [LegacyKdrag] on a wallpaper accent (always uses ZCAM),
      * - the effective spec resolves to [SpecVersion.SPEC_2021], or
      * - [colorStyle] has no 2025/2026 implementation.
      *
@@ -325,9 +376,28 @@ class ThemeProvider @Inject constructor(
     ): MonetColorSchemeCompat2025? = resolveColorScheme2025(accentColor, colorStyle, colorSpec, colorSpecFallback, isDark)
 
     private fun effectiveColorStyle(
+        accentColor: ColorOption = this.accentColor,
         style: ColorStyle = colorStyle,
         spec: SpecVersion = colorSpec,
-    ): ColorStyle = if (spec != SpecVersion.SPEC_2026 && style is Cmf) TonalSpot else style
+    ): ColorStyle {
+        val isWallpaper = accentColor is ColorOption.WallpaperPrimary ||
+            accentColor is ColorOption.WallpaperDerived
+        return when {
+            !isWallpaper && style is LegacyKdrag -> TonalSpot
+            spec != SpecVersion.SPEC_2026 && style is Cmf -> TonalSpot
+            else -> style
+        }
+    }
+
+    private fun hasNo2025Variant(style: ColorStyle): Boolean = when (style) {
+        is app.lawnchair.theme.color.Rainbow,
+        is app.lawnchair.theme.color.FruitSalad,
+        is app.lawnchair.theme.color.Content,
+        is app.lawnchair.theme.color.Monochromatic,
+        -> true
+
+        else -> false
+    }
 
     private fun resolveSecondarySeedForCmf(primarySeed: Int, accentColor: ColorOption): Int? = when (accentColor) {
         is ColorOption.WallpaperPrimary -> wallpaperManager.wallpaperColors?.secondaryColor
@@ -353,7 +423,7 @@ class ThemeProvider @Inject constructor(
         colorSpec: SpecVersion,
         colorSpecFallback: SpecVersion,
     ): ColorScheme {
-        val activeStyle = effectiveColorStyle(colorStyle, colorSpec)
+        val activeStyle = effectiveColorStyle(accentColor, colorStyle, colorSpec)
         val effectiveSpec = resolveEffectiveSpec(colorSpec, colorSpecFallback, activeStyle)
         return when (accentColor) {
             is ColorOption.SystemAccent -> resolveSystemColorScheme(activeStyle)
@@ -378,8 +448,7 @@ class ThemeProvider @Inject constructor(
             }
 
             is ColorOption.CustomColor -> {
-                val effectiveStyle = if (activeStyle is LegacyKdrag) TonalSpot else activeStyle
-                getLegacyColorScheme(accentColor.color, effectiveStyle, effectiveSpec)
+                getLegacyColorScheme(accentColor.color, activeStyle, effectiveSpec)
             }
 
             else -> getLegacyColorScheme(ColorOption.LawnchairBlue.color, activeStyle, effectiveSpec)
@@ -393,7 +462,7 @@ class ThemeProvider @Inject constructor(
         colorSpecFallback: SpecVersion,
         isDark: Boolean,
     ): MonetColorSchemeCompat2025? {
-        val activeStyle = effectiveColorStyle(colorStyle, colorSpec)
+        val activeStyle = effectiveColorStyle(accentColor, colorStyle, colorSpec)
 
         // LegacyKdrag always routes to the ZCAM engine regardless of active spec version.
         // Returning null here lets the caller fall back to resolveColorScheme(), which
@@ -416,16 +485,7 @@ class ThemeProvider @Inject constructor(
         // SystemAccent and LegacyKdrag already do.
         // NOTE: intentionally checked against the sealed subtype (not activeStyle.style) so
         // that any future ColorStyle that shares a Style enum value can't silently bypass this.
-        val styleHasNo2025Variant = when (activeStyle) {
-            is app.lawnchair.theme.color.Rainbow,
-            is app.lawnchair.theme.color.FruitSalad,
-            is app.lawnchair.theme.color.Content,
-            is app.lawnchair.theme.color.Monochromatic,
-            -> true
-
-            else -> false
-        }
-        if (styleHasNo2025Variant) return null
+        if (hasNo2025Variant(activeStyle)) return null
 
         val mkSpec = if (effectiveSpec == SpecVersion.SPEC_2026) {
             ColorSpec.SpecVersion.SPEC_2026
@@ -456,7 +516,7 @@ class ThemeProvider @Inject constructor(
             }
 
             is ColorOption.CustomColor -> {
-                // LegacyKdrag is already returned null above; activeStyle is safe to use directly.
+                // LegacyKdrag is already mapped to TonalSpot by effectiveColorStyle().
                 get2025ColorScheme(accentColor.color, activeStyle, isDark, mkSpec, null)
             }
 
@@ -514,6 +574,12 @@ class ThemeProvider @Inject constructor(
         return colorSchemeMap2025.computeIfAbsent(key) {
             MonetColorSchemeCompat2025(colorInt, effectiveStyle.style, isDark, specVersion, secondaryColorInt)
         }
+    }
+
+    private fun notifyExternalThemeChanged() {
+        if (isClosed) return
+        _externalThemeVersion.value += 1
+        notifyColorSchemeChanged()
     }
 
     fun addListener(listener: ColorSchemeChangeListener) {

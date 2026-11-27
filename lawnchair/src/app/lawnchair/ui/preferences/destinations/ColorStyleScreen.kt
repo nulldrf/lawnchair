@@ -42,14 +42,12 @@ import androidx.compose.ui.unit.dp
 import app.lawnchair.preferences.getAdapter
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
+import app.lawnchair.theme.ThemeProvider
 import app.lawnchair.theme.color.Cmf
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
-import app.lawnchair.theme.color.KdragMonetColorScheme
 import app.lawnchair.theme.color.LegacyKdrag
-import app.lawnchair.theme.color.MonetColorSchemeCompat
-import app.lawnchair.theme.color.MonetColorSchemeCompat2025
-import app.lawnchair.theme.color.Spec2025CompatColorScheme
+import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.theme.color.resolveEffectiveSpec
 import app.lawnchair.ui.preferences.LocalIsExpandedScreen
 import app.lawnchair.ui.preferences.components.layout.PreferenceLayoutLazyColumn
@@ -57,9 +55,7 @@ import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.R
 import com.android.systemui.monet.SpecVersion
 import com.android.systemui.monet.Style
-import com.materialkolor.dynamiccolor.ColorSpec
 import dev.kdrag0n.colorkt.Color as KdragColor
-import dev.kdrag0n.monet.theme.ColorScheme as KdragColorScheme
 import dev.kdrag0n.monet.theme.toComposeColor
 
 @Composable
@@ -68,12 +64,18 @@ fun ColorStyleScreen(
     showLegacyKdrag: Boolean = false,
 ) {
     val context = LocalContext.current
+    val themeProvider = remember(context) { ThemeProvider.INSTANCE.get(context) }
     val prefs2 = preferenceManager2()
     val styleAdapter = prefs2.colorStyle.getAdapter()
 
     val currentStyle = styleAdapter.state.value
     val currentSpec = prefs2.colorSpec.asState().value
     val fallbackSpec = prefs2.colorSpecFallback.asState().value
+    val effectiveCurrentStyle = when {
+        !showLegacyKdrag && currentStyle is LegacyKdrag -> TonalSpot
+        currentSpec != SpecVersion.SPEC_2026 && currentStyle is Cmf -> TonalSpot
+        else -> currentStyle
+    }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
@@ -123,6 +125,7 @@ fun ColorStyleScreen(
     }
 
     val allPreviewColors = remember(
+        themeProvider,
         rawWallpaperSeed,
         rawWallpaperSecondarySeed,
         isDark,
@@ -133,6 +136,7 @@ fun ColorStyleScreen(
         styles.associateWith { style ->
             val cardSpec = resolveEffectiveSpec(currentSpec, fallbackSpec, style)
             buildStylePreviewColors(
+                themeProvider = themeProvider,
                 style = style,
                 rawWallpaperSeed = rawWallpaperSeed,
                 rawWallpaperSecondarySeed = rawWallpaperSecondarySeed,
@@ -165,7 +169,7 @@ fun ColorStyleScreen(
 
             ColorStyleCard(
                 style = style,
-                isSelected = style == currentStyle,
+                isSelected = style == effectiveCurrentStyle,
                 previewColors = allPreviewColors.getValue(style),
                 onClick = { styleAdapter.onChange(style) },
                 specBadge = badgeSpec,
@@ -347,27 +351,20 @@ private data class StylePreviewColors(
 )
 
 private fun buildStylePreviewColors(
+    themeProvider: ThemeProvider,
     style: ColorStyle,
     rawWallpaperSeed: Int,
     rawWallpaperSecondarySeed: Int? = null,
     isDark: Boolean,
     specVersion: SpecVersion = SpecVersion.SPEC_2021,
 ): StylePreviewColors {
-    val scheme: KdragColorScheme = when (style) {
-        is LegacyKdrag -> KdragMonetColorScheme(rawWallpaperSeed)
-
-        is Cmf -> Spec2025CompatColorScheme(
-            MonetColorSchemeCompat2025(
-                seedColor = rawWallpaperSeed,
-                style = Style.CMF,
-                isDark = isDark,
-                specVersion = ColorSpec.SpecVersion.SPEC_2026,
-                secondarySeedColor = rawWallpaperSecondarySeed,
-            ),
-        )
-
-        else -> MonetColorSchemeCompat(rawWallpaperSeed, style.style, specVersion)
-    }
+    val scheme = themeProvider.previewColorScheme(
+        seedColor = rawWallpaperSeed,
+        colorStyle = style,
+        specVersion = specVersion,
+        isDark = isDark,
+        secondarySeedColor = rawWallpaperSecondarySeed,
+    )
 
     val containerKey = if (isDark) 700 else 100
     val cardBgKey = if (isDark) 900 else 50

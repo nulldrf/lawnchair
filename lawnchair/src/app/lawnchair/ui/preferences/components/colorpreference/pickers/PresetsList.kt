@@ -24,11 +24,14 @@ import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
 import app.lawnchair.preferences2.asState
 import app.lawnchair.preferences2.preferenceManager2
+import app.lawnchair.theme.color.Cmf
 import app.lawnchair.theme.color.ColorOption
+import app.lawnchair.theme.color.TonalSpot
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.wallpaper.WallpaperManagerCompat
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
+import com.android.systemui.monet.SpecVersion
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
@@ -42,9 +45,9 @@ private const val DEDUPE_DISTANCE = 48.0
 /**
  * Wallpaper colour grid for the Presets page.
  *
- * Reads [preferenceManager2.colorStyle] reactively so every swatch re-renders
- * with the correct Monet style whenever the user changes it — without touching
- * the Custom page's grid at all.
+ * Reads [preferenceManager2.colorStyle] and [preferenceManager2.colorSpec] reactively so
+ * every swatch re-renders with the correct Monet style and spec whenever the user changes
+ * them — without touching the Custom page's grid at all.
  *
  * Slot layout (up to [MAX_SWATCHES] total):
  *  [0]    SystemAccent
@@ -60,10 +63,18 @@ fun WallpaperColorGrid(
     simple: Boolean = false,
 ) {
     val context = LocalContext.current
+    val prefs2 = preferenceManager2()
 
-    // Read the active colour style reactively — recomposition happens
-    // automatically when the user picks a different style.
-    val currentColorStyle = preferenceManager2().colorStyle.asState().value
+    // Read the active colour style and spec reactively — recomposition happens
+    // automatically when the user picks a different style or spec.
+    val currentColorStyle by prefs2.colorStyle.asState()
+    val currentColorSpec by prefs2.colorSpec.asState()
+    val currentColorSpecFallback by prefs2.colorSpecFallback.asState()
+    val effectiveColorStyle = if (currentColorSpec != SpecVersion.SPEC_2026 && currentColorStyle is Cmf) {
+        TonalSpot
+    } else {
+        currentColorStyle
+    }
 
     var extractedEntries by remember {
         mutableStateOf<List<ColorPreferenceEntry<ColorOption>>>(emptyList())
@@ -122,9 +133,11 @@ fun WallpaperColorGrid(
         },
         modifier = modifier,
         contentModifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-        // Pass the active style so presets swatches reflect e.g. Monochromatic.
-        // The banner still shows the raw dot colour, not the processed palette.
-        colorStyle = currentColorStyle,
+        // Pass the active style and spec so presets swatches reflect e.g. Monochromatic,
+        // ZCAM, or Spec 2025/2026. The banner still shows the raw dot colour.
+        colorStyle = effectiveColorStyle,
+        colorSpec = currentColorSpec,
+        colorSpecFallback = currentColorSpecFallback,
         simple = simple,
     )
 }

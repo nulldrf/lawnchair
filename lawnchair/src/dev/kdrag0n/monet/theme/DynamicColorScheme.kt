@@ -60,7 +60,9 @@ class DynamicColorScheme(
             val newLch = transformColor(target, seed, reference)
             val newSrgb = newLch.convert<Srgb>()
 
-            Log.d(TAG, "Transform: [$shade] $target => $newLch => ${newSrgb.toHex()}")
+            if (Log.isLoggable(TAG, Log.VERBOSE)) {
+                Log.v(TAG, "Transform: [$shade] $target => $newLch => ${newSrgb.toHex()}")
+            }
             shade to newSrgb
         }.toMap()
     }

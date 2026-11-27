@@ -1,13 +1,10 @@
 package app.lawnchair.ui.preferences.components.colorpreference.pickers
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,12 +12,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,19 +35,20 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.lawnchair.theme.ThemeProvider
 import app.lawnchair.theme.color.ColorOption
 import app.lawnchair.theme.color.ColorStyle
-import app.lawnchair.theme.color.KdragMonetColorScheme
-import app.lawnchair.theme.color.LegacyKdrag
-import app.lawnchair.theme.color.MonetColorSchemeCompat
 import app.lawnchair.theme.color.TonalSpot
+import app.lawnchair.theme.color.resolveEffectiveSpec
 import app.lawnchair.theme.toAndroidColor
 import app.lawnchair.ui.preferences.components.colorpreference.ColorPreferenceEntry
 import app.lawnchair.ui.theme.isSelectedThemeDark
+import com.android.systemui.monet.SpecVersion
 import dev.kdrag0n.monet.theme.ColorScheme
 
 object SwatchGridDefaults {
@@ -75,11 +71,14 @@ fun <T> SwatchGrid(
     modifier: Modifier = Modifier,
     contentModifier: Modifier = Modifier,
     colorStyle: ColorStyle? = null,
+    colorSpec: SpecVersion = SpecVersion.SPEC_2021,
+    colorSpecFallback: SpecVersion = SpecVersion.SPEC_2025,
     simple: Boolean = false,
 ) {
     val columnCount = SwatchGridDefaults.COLUMN_COUNT
     val rowCount = if (entries.isEmpty()) 0 else (entries.size - 1) / columnCount + 1
     val gutter = SwatchGridDefaults.GutterSize
+    val isDark = isSelectedThemeDark
 
     Column(
         modifier = modifier.then(contentModifier),
@@ -98,26 +97,32 @@ fun <T> SwatchGrid(
                         contentAlignment = Alignment.Center,
                     ) {
                         if (entry != null) {
-                            if (simple) {
-                                SimpleColorSwatch(
-                                    entry = entry,
-                                    onClick = { onSwatchClick(entry.value) },
-                                    selected = isSwatchSelected(entry.value),
-                                    modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
-                                )
-                            } else {
-                                ColorSwatch(
-                                    entry = entry,
-                                    onClick = { onSwatchClick(entry.value) },
-                                    selected = isSwatchSelected(entry.value),
-                                    colorStyle = colorStyle,
-                                    forceStyle = if (entry.value is ColorOption.SystemAccent) {
-                                        TonalSpot
-                                    } else {
-                                        null
-                                    },
-                                    modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
-                                )
+                            key(entry.value) {
+                                if (simple) {
+                                    SimpleColorSwatch(
+                                        entry = entry,
+                                        onClick = { onSwatchClick(entry.value) },
+                                        selected = isSwatchSelected(entry.value),
+                                        modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
+                                        isDark = isDark,
+                                    )
+                                } else {
+                                    ColorSwatch(
+                                        entry = entry,
+                                        onClick = { onSwatchClick(entry.value) },
+                                        selected = isSwatchSelected(entry.value),
+                                        colorStyle = colorStyle,
+                                        forceStyle = if (entry.value is ColorOption.SystemAccent) {
+                                            TonalSpot
+                                        } else {
+                                            null
+                                        },
+                                        colorSpec = colorSpec,
+                                        colorSpecFallback = colorSpecFallback,
+                                        isDark = isDark,
+                                        modifier = Modifier.widthIn(0.dp, SwatchGridDefaults.SwatchMaxWidth),
+                                    )
+                                }
                             }
                         }
                     }
@@ -142,9 +147,9 @@ fun <T> SimpleColorSwatch(
     onClick: () -> Unit,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    isDark: Boolean = isSelectedThemeDark,
 ) {
     val context = LocalContext.current
-    val isDark = isSelectedThemeDark
     // Check lightColor == 0 to detect Default — darkColor calls lightenColor(0)
     // which returns a non-zero value, so checking colorInt == 0 in dark mode fails.
     val lightColorInt = entry.lightColor(context)
@@ -156,24 +161,34 @@ fun <T> SimpleColorSwatch(
     val defaultBadgeBg = Color(0xFFEEEEEE) // Near-white — high contrast on gray
     val defaultBadgeFg = Color(0xFF212121) // Near-black on near-white
 
+    val selectionTransition = updateTransition(
+        targetState = selected,
+        label = "simpleSwatchSelection",
+    )
     // Ring stroke width — animate with no-bounce spring to avoid negative values
-    val ringStroke by animateDpAsState(
-        targetValue = if (selected) 2.5.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "ringStroke_$selected",
-    )
+    val ringStroke by selectionTransition.animateDp(
+        transitionSpec = {
+            spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium,
+            )
+        },
+        label = "ringStroke",
+    ) { isSelected ->
+        if (isSelected) 2.5.dp else 0.dp
+    }
     // Gap between circle edge and ring
-    val ringGap by animateDpAsState(
-        targetValue = if (selected) 3.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "ringGap_$selected",
-    )
+    val ringGap by selectionTransition.animateDp(
+        transitionSpec = {
+            spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium,
+            )
+        },
+        label = "ringGap",
+    ) { isSelected ->
+        if (isSelected) 3.dp else 0.dp
+    }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -246,14 +261,26 @@ fun <T> ColorSwatch(
     modifier: Modifier = Modifier,
     colorStyle: ColorStyle? = null,
     forceStyle: ColorStyle? = null,
+    colorSpec: SpecVersion = SpecVersion.SPEC_2021,
+    colorSpecFallback: SpecVersion = SpecVersion.SPEC_2025,
+    isDark: Boolean = isSelectedThemeDark,
 ) {
     val context = LocalContext.current
-    val isDark = isSelectedThemeDark
+    val themeProvider = remember(context) { ThemeProvider.INSTANCE.get(context) }
     val baseColorInt = if (isDark) entry.darkColor(context) else entry.lightColor(context)
 
     val effectiveStyle = forceStyle ?: colorStyle
-    val scheme: ColorScheme = remember(baseColorInt, effectiveStyle) {
-        buildScheme(baseColorInt, effectiveStyle)
+    val effectiveSpec = if (effectiveStyle != null) {
+        resolveEffectiveSpec(colorSpec, colorSpecFallback, effectiveStyle)
+    } else {
+        SpecVersion.SPEC_2021
+    }
+    val scheme: ColorScheme = remember(themeProvider, baseColorInt, effectiveStyle, effectiveSpec) {
+        themeProvider.previewColorScheme(
+            seedColor = baseColorInt,
+            colorStyle = effectiveStyle,
+            specVersion = effectiveSpec,
+        )
     }
 
     val topHalf = remember(scheme) {
@@ -274,14 +301,32 @@ fun <T> ColorSwatch(
     }
     val checkTint = topHalf
 
-    val centerCircleSize by animateDpAsState(
-        targetValue = if (selected) 32.dp else 24.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "centerCircle_$selected",
+    val selectionTransition = updateTransition(
+        targetState = selected,
+        label = "swatchSelection",
     )
+    val centerCircleSize by selectionTransition.animateDp(
+        transitionSpec = {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            )
+        },
+        label = "centerCircle",
+    ) { isSelected ->
+        if (isSelected) 32.dp else 24.dp
+    }
+    val checkScale by selectionTransition.animateFloat(
+        transitionSpec = {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium,
+            )
+        },
+        label = "checkScale",
+    ) { isSelected ->
+        if (isSelected) 1f else 0f
+    }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -316,35 +361,20 @@ fun <T> ColorSwatch(
                 .clip(CircleShape)
                 .background(innerCircle),
         ) {
-            AnimatedVisibility(
-                visible = selected,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut(),
-            ) {
+            if (checkScale > 0.01f) {
                 Icon(
                     imageVector = Icons.Rounded.Done,
                     contentDescription = null,
                     tint = checkTint,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier
+                        .size(16.dp)
+                        .graphicsLayer {
+                            scaleX = checkScale
+                            scaleY = checkScale
+                            alpha = checkScale.coerceIn(0f, 1f)
+                        },
                 )
             }
         }
     }
-}
-
-private fun buildScheme(seedColor: Int, colorStyle: ColorStyle?): ColorScheme = when (colorStyle) {
-    is LegacyKdrag -> KdragMonetColorScheme(seedColor)
-
-    is app.lawnchair.theme.color.Cmf -> app.lawnchair.theme.color.Spec2025CompatColorScheme(
-        app.lawnchair.theme.color.MonetColorSchemeCompat2025(
-            seedColor = seedColor,
-            style = com.android.systemui.monet.Style.CMF,
-            isDark = false,
-            specVersion = com.materialkolor.dynamiccolor.ColorSpec.SpecVersion.SPEC_2026,
-        ),
-    )
-
-    null -> MonetColorSchemeCompat(seedColor, com.android.systemui.monet.Style.TONAL_SPOT)
-
-    else -> MonetColorSchemeCompat(seedColor, colorStyle.style)
 }

@@ -32,6 +32,7 @@ import com.android.launcher3.InvariantDeviceProfile
 import com.patrykmichalik.opto.core.PreferenceImpl
 import com.patrykmichalik.opto.domain.Preference
 import kotlin.reflect.KProperty
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 interface PreferenceAdapter<T> {
@@ -79,7 +80,8 @@ fun IdpPreference.getAdapter(): PreferenceAdapter<Int> {
     val context = LocalContext.current
     val idp = remember { InvariantDeviceProfile.INSTANCE.get(context) }
     val defaultGrid = idp.closestProfile
-    val state = get(defaultGrid).collectAsStateWithLifecycle(initialValue = firstCached(defaultGrid))
+    val flow = remember(this, defaultGrid) { get(defaultGrid).distinctUntilChanged() }
+    val state = flow.collectAsStateWithLifecycle(initialValue = firstCached(defaultGrid))
     return createStateAdapter(state = state, set = { set(it, defaultGrid) })
 }
 
@@ -89,7 +91,7 @@ private fun <T> createStateAdapter(
     set: suspend (T) -> Unit,
 ): PreferenceAdapter<T> {
     val scope = rememberCoroutineScope()
-    return remember {
+    return remember(state, scope) {
         StatePreferenceAdapter(state) {
             scope.launch { set(it) }
         }

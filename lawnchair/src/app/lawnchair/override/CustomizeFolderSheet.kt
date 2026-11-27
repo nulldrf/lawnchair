@@ -129,7 +129,7 @@ private fun resolveFolderPreviewData(
     val shouldTheme = prefs.themedIcons.firstCached()
     val flags = if (shouldTheme) BitmapInfo.FLAG_THEMED else 0
 
-    val contents = folderInfo.contents
+    val contents = folderInfo.getContents()
     val previewDrawables = contents.take(4).mapNotNull { item ->
         createItemPreviewDrawable(context, item, flags)
     }

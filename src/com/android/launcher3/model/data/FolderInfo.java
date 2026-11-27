@@ -59,6 +59,12 @@ public class FolderInfo extends CollectionInfo {
     public static final int FLAG_MANUAL_FOLDER_NAME = 0x00000008;
 
     /**
+     * Lawnchair: Displays the first item in the folder as the folder's cover icon.
+     * Tapping launches the cover item; swiping opens the folder.
+     */
+    public static final int FLAG_COVER_MODE = 0x00000010;
+
+    /**
      * Different states of folder label.
      */
     public enum LabelState {
@@ -158,6 +164,29 @@ public class FolderInfo extends CollectionInfo {
         }
     }
 
+    /**
+     * Lawnchair: Returns whether Cover Mode is enabled for this folder.
+     */
+    public boolean isCoverMode() {
+        return hasOption(FLAG_COVER_MODE);
+    }
+
+    /**
+     * Lawnchair: Enables or disables Cover Mode for this folder and persists it to the database.
+     */
+    public void setCoverMode(boolean enable, @Nullable ModelWriter modelWriter) {
+        setOption(FLAG_COVER_MODE, enable, modelWriter);
+    }
+
+    /**
+     * Lawnchair: Returns the first item inside this folder, which serves as the cover icon
+     * when Cover Mode is active, or {@code null} if the folder is empty.
+     */
+    @Nullable
+    public ItemInfo getCoverInfo() {
+        return contents.isEmpty() ? null : contents.get(0);
+    }
+
     @Override
     protected String dumpProperties() {
         return String.format("%s; labelState=%s", super.dumpProperties(), getLabelState());
@@ -231,6 +260,7 @@ public class FolderInfo extends CollectionInfo {
         super.copyFrom(info);
         if (info instanceof FolderInfo fi) {
             contents.addAll(fi.getContents());
+            options = fi.options;
         }
     }
 

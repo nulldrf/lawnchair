@@ -243,6 +243,13 @@ public final class Utilities {
                 return bi.newIcon(context);
             }
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER) {
+            if (info instanceof com.android.launcher3.model.data.FolderInfo folderInfo
+                    && folderInfo.isCoverMode()) {
+                ItemInfo coverInfo = folderInfo.getCoverInfo();
+                if (coverInfo != null) {
+                    return loadFullDrawableWithoutTheme(context, coverInfo, width, height, outObj);
+                }
+            }
             FolderAdaptiveIcon icon = FolderAdaptiveIcon.createFolderAdaptiveIcon(
                     activity, info.id, new Point(width, height));
             if (icon == null) {
@@ -815,6 +822,13 @@ public final class Utilities {
                 }
             }
         } else if (info.itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER) {
+            if (info instanceof com.android.launcher3.model.data.FolderInfo folderInfo
+                    && folderInfo.isCoverMode()) {
+                ItemInfo coverInfo = folderInfo.getCoverInfo();
+                if (coverInfo != null) {
+                    return getFullDrawable(context, coverInfo, width, height, useTheme);
+                }
+            }
             FolderAdaptiveIcon icon = FolderAdaptiveIcon.createFolderAdaptiveIcon(
                     context, info.id, new Point(width, height));
             if (icon == null) {

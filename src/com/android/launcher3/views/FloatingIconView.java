@@ -268,8 +268,12 @@ public class FloatingIconView extends FrameLayout implements
 
         if (v instanceof BubbleTextView) {
             ((BubbleTextView) v).getIconBounds(outViewBounds);
-        } else if (v instanceof FolderIcon) {
-            ((FolderIcon) v).getPreviewBounds(outViewBounds);
+        } else if (v instanceof FolderIcon folderIcon) {
+            if (folderIcon.isCoverModeActive()) {
+                folderIcon.getCoverIconBounds(outViewBounds);
+            } else {
+                folderIcon.getPreviewBounds(outViewBounds);
+            }
         } else {
             outViewBounds.set(0, 0, v.getWidth(), v.getHeight());
         }
@@ -561,17 +565,29 @@ public class FloatingIconView extends FrameLayout implements
 
         final FastBitmapDrawable btvIcon;
         final Supplier<Drawable> btvDrawableSupplier;
+        final BubbleTextView btv;
         if (v instanceof BubbleTextView) {
-            BubbleTextView btv = (BubbleTextView) v;
-            if (info instanceof ItemInfoWithIcon
-                    && (((ItemInfoWithIcon) info).runtimeStatusFlags
+            btv = (BubbleTextView) v;
+        } else if (v instanceof FolderIcon folderIcon && folderIcon.isCoverModeActive()) {
+            btv = folderIcon.getFolderName();
+        } else {
+            btv = null;
+        }
+        if (btv != null) {
+            ItemInfo effectiveInfo = (v instanceof FolderIcon folderIcon && folderIcon.isCoverModeActive())
+                    ? folderIcon.getCoverInfo()
+                    : info;
+            if (effectiveInfo instanceof ItemInfoWithIcon
+                    && (((ItemInfoWithIcon) effectiveInfo).runtimeStatusFlags
                     & ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK) != 0) {
                 btvIcon = btv.makePreloadIcon();
                 btvDrawableSupplier = () -> btvIcon;
             } else {
                 btvIcon = btv.getIcon();
                 // Clone when needed
-                btvDrawableSupplier = () -> btvIcon.getConstantState().newDrawable();
+                btvDrawableSupplier = btvIcon != null
+                        ? () -> btvIcon.getConstantState().newDrawable()
+                        : null;
             }
         } else {
             btvIcon = null;

@@ -1252,21 +1252,54 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     // Lawnchair: Icon swipe gesture feature
-    public boolean isTouchOnIconWithSwipeGesture(float x, float y, boolean vertical) {
-        boolean hasConfiguredIconSwipeGesture = false;
-        BubbleTextView touchedIcon = findIconAtPosition(x, y);
-        if (touchedIcon != null) {
-            if (vertical) {
-                hasConfiguredIconSwipeGesture = touchedIcon.hasConfiguredVerticalIconSwipeGesture();
-            } else {
-                hasConfiguredIconSwipeGesture = touchedIcon.hasConfiguredHorizontalIconSwipeGesture();
+    public boolean isDragLayerTouchOnIconWithSwipeGesture(MotionEvent ev, boolean vertical) {
+        DragLayer dragLayer = mLauncher.getDragLayer();
+        if (dragLayer == null) {
+            return false;
+        }
+        float[] coord = new float[]{ev.getX(), ev.getY()};
+        dragLayer.mapCoordInSelfToDescendant(this, coord);
+        if (isTouchOnIconWithSwipeGesture(coord[0], coord[1], vertical)) {
+            return true;
+        }
+        Hotseat hotseat = mLauncher.getHotseat();
+        if (hotseat != null && hotseat.getVisibility() == VISIBLE) {
+            CellLayout hotseatPage = hotseat.getCurrentPageLayout();
+            if (hotseatPage != null) {
+                coord[0] = ev.getX();
+                coord[1] = ev.getY();
+                dragLayer.mapCoordInSelfToDescendant(hotseatPage, coord);
+                if (Utilities.pointInView(hotseatPage, coord[0], coord[1], 0)) {
+                    View touchedHotseatView = findSwipeTargetInCellLayout(
+                            hotseatPage, coord[0], coord[1]);
+                    return hasSwipeGestureOnView(touchedHotseatView, vertical);
+                }
             }
         }
-        return hasConfiguredIconSwipeGesture;
+        return false;
     }
 
     // Lawnchair: Icon swipe gesture feature
-    private BubbleTextView findIconAtPosition(float x, float y) {
+    public boolean isTouchOnIconWithSwipeGesture(float x, float y, boolean vertical) {
+        View touchedView = findSwipeTargetAtPosition(x, y);
+        return hasSwipeGestureOnView(touchedView, vertical);
+    }
+
+    private static boolean hasSwipeGestureOnView(@Nullable View view, boolean vertical) {
+        if (view instanceof BubbleTextView touchedIcon) {
+            return vertical
+                    ? touchedIcon.hasConfiguredVerticalIconSwipeGesture()
+                    : touchedIcon.hasConfiguredHorizontalIconSwipeGesture();
+        }
+        if (view instanceof FolderIcon folderIcon) {
+            return vertical && folderIcon.hasConfiguredVerticalSwipeGesture();
+        }
+        return false;
+    }
+
+    // Lawnchair: Icon swipe gesture feature
+    @Nullable
+    private View findSwipeTargetAtPosition(float x, float y) {
         for (int i = getChildCount() - 1; i >= 0; i--) {
             View child = getChildAt(i);
             if (!(child instanceof CellLayout cellLayout)) {
@@ -1277,7 +1310,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             if (!Utilities.pointInView(cellLayout, localX, localY, 0)) {
                 continue;
             }
-            BubbleTextView foundView = findIconInCellLayout(cellLayout, localX, localY);
+            View foundView = findSwipeTargetInCellLayout(cellLayout, localX, localY);
             if (foundView != null) {
                 return foundView;
             }
@@ -1286,13 +1319,14 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     }
 
     // Lawnchair: Icon swipe gesture feature
-    private BubbleTextView findIconInCellLayout(CellLayout cellLayout, float x, float y) {
+    @Nullable
+    private View findSwipeTargetInCellLayout(CellLayout cellLayout, float x, float y) {
         ShortcutAndWidgetContainer container = cellLayout.getShortcutsAndWidgets();
         float containerX = x - container.getLeft();
         float containerY = y - container.getTop();
         for (int i = container.getChildCount() - 1; i >= 0; i--) {
             View child = container.getChildAt(i);
-            if (!(child instanceof BubbleTextView bubbleTextView)
+            if ((!(child instanceof BubbleTextView) && !(child instanceof FolderIcon))
                     || child.getVisibility() != VISIBLE) {
                 continue;
             }
@@ -1300,7 +1334,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                     containerX - child.getLeft(),
                     containerY - child.getTop(),
                     0)) {
-                return bubbleTextView;
+                return child;
             }
         }
         return null;

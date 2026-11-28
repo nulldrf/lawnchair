@@ -325,6 +325,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mHorizontalPageIndicator = findViewById(R.id.all_apps_horizontal_page_indicator);
         if (mHorizontalPageIndicator != null) {
             mHorizontalPageIndicator.setShouldAutoHide(false);
+            mHorizontalPageIndicator.setPaintColor(Themes.getColorAccent(getContext()));
         }
         mFastScroller = findViewById(R.id.fast_scroller);
         mFastScroller.setPopupView(findViewById(R.id.fast_scroller_popup));
@@ -1173,6 +1174,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         updateBackgroundVisibility(dp);
         updateContainerPadding(dp);
         applyAdapterSideAndBottomPaddings(dp);
+        if (mHorizontalPageIndicator != null) {
+            mHorizontalPageIndicator.setPaintColor(Themes.getColorAccent(getContext()));
+            mHorizontalPageIndicator.invalidate();
+        }
         updateHorizontalPageIndicatorForActiveTab();
 
         boolean needsInvalidate = false;

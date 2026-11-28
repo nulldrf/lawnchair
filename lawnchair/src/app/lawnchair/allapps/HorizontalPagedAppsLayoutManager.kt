@@ -638,8 +638,7 @@ class HorizontalPagedAppsLayoutManager(
 
     override fun computeHorizontalScrollExtent(state: RecyclerView.State): Int = pageStride.coerceAtLeast(0)
 
-    override fun computeHorizontalScrollRange(state: RecyclerView.State): Int =
-        (pageCount * pageStride).coerceAtLeast(0)
+    override fun computeHorizontalScrollRange(state: RecyclerView.State): Int = (pageCount * pageStride).coerceAtLeast(0)
 
     override fun computeVerticalScrollOffset(state: RecyclerView.State): Int = 0
 

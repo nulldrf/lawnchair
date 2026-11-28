@@ -56,6 +56,7 @@ import app.lawnchair.util.getAllAppsBackgroundColor
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.R
+import com.android.launcher3.util.Themes
 
 private const val MIN_DRAWER_GRID_SIZE = 3
 private const val MAX_DRAWER_GRID_SIZE = 10
@@ -240,6 +241,9 @@ private fun AppDrawerGridMockup(
         val defaultColor = ColorTokens.AllAppsScrimColor.resolveColor(context)
         Color(getAllAppsBackgroundColor(context, defaultColor))
     }
+    val scrollHandleAccentColor = remember(context) {
+        Color(Themes.getColorAccent(context))
+    }
 
     Box(
         modifier = Modifier
@@ -346,7 +350,7 @@ private fun AppDrawerGridMockup(
                             }
 
                             Spacer(modifier = Modifier.height(6.dp))
-                            PreviewPageIndicatorDots(primary = primary)
+                            PreviewPageIndicatorDots(primary = scrollHandleAccentColor)
 
                             if (!hideSearchBar && searchBarAtBottom) {
                                 Spacer(modifier = Modifier.height(8.dp))

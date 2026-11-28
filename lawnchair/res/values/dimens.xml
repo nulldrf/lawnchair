@@ -78,6 +78,8 @@
     <!-- Match the search→tabs gap so the app grid sits equally close under the tabs. -->
     <dimen name="all_apps_paged_view_top_padding">8dp</dimen>
     <dimen name="all_apps_header_bottom_padding">4dp</dimen>
+    <dimen name="all_apps_horizontal_page_indicator_height">24dp</dimen>
+    <dimen name="all_apps_horizontal_page_indicator_bottom_margin">6dp</dimen>
 
     <!-- smartspace -->
     <dimen name="smartspaceAmbientShadowBlur">1.5dp</dimen>

@@ -896,6 +896,12 @@ class PreferenceManager2 @Inject constructor(
         defaultValue = context.resources.getBoolean(R.bool.config_default_show_component_names),
     )
 
+    val drawerHorizontalScroll = preference(
+        key = booleanPreferencesKey(name = "drawer_horizontal_scroll"),
+        defaultValue = false,
+        onSet = { reloadHelper.recreate() },
+    )
+
     val drawerColumns = idpPreference(
         key = intPreferencesKey(name = "drawer_columns"),
         defaultSelector = { numAllAppsColumns },
@@ -905,6 +911,12 @@ class PreferenceManager2 @Inject constructor(
     val drawerColumnsUnfolded = idpPreference(
         key = intPreferencesKey(name = "drawer_columns_unfolded"),
         defaultSelector = { numAllAppsColumns + 2 },
+        onSet = { reloadHelper.reloadGrid() },
+    )
+
+    val drawerRows = idpPreference(
+        key = intPreferencesKey(name = "drawer_rows"),
+        defaultSelector = { numRows.coerceIn(3, 10) },
         onSet = { reloadHelper.reloadGrid() },
     )
 

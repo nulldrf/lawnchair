@@ -576,6 +576,8 @@ fun PreferencesDashboard(
     val showDrawerLabels = showIconLabelsInDrawerAdapterObj.state.value
     val drawerHapticSupported = remember { isDrawerHapticFeedbackSupported(context) }
     val appDrawerSearchBarAtBottomAdapter = prefs2.appDrawerSearchBarAtBottom.getAdapter()
+    val drawerHorizontalScrollAdapter = prefs2.drawerHorizontalScroll.getAdapter()
+    val drawerHorizontalEnabled = drawerHorizontalScrollAdapter.state.value
     val appDrawerHapticFeedbackAdapter = prefs2.appDrawerHapticFeedback.getAdapter()
     val workProfileTabContainerBackgroundAdapter = prefs2.workProfileTabContainerBackground.getAdapter()
     val appDrawerSearchBarBackgroundAdapter = prefs2.appDrawerSearchBarBackground.getAdapter()
@@ -880,7 +882,9 @@ fun PreferencesDashboard(
             a(stringResource(R.string.drawer_icon_text_color), "text color app drawer icon label", ScrollKeys.DRAWER_TEXT_COLOR)
             a(stringResource(R.string.drawer_hoko_blur_label), "blur app drawer background wallpaper", ScrollKeys.DRAWER_BLUR, toggle = drawerBlurToggle)
             a(stringResource(R.string.drawer_hoko_blur_intensity_label), "blur intensity strength app drawer", ScrollKeys.DRAWER_BLUR_INTENSITY, visible = drawerBlurBackgroundAdapter.state.value)
-            a(stringResource(R.string.app_drawer_columns), "columns grid app drawer layout count", ScrollKeys.DRAWER_COLUMNS)
+            a(stringResource(R.string.pref_app_drawer_horizontal_title), "horizontal app drawer paged scroll sideways pages", ScrollKeys.DRAWER_HORIZONTAL, toggle = drawerHorizontalScrollAdapter.toToggle())
+            a(stringResource(R.string.app_drawer_grid), "app drawer grid columns rows horizontal layout", ScrollKeys.DRAWER_GRID, visible = drawerHorizontalEnabled)
+            a(stringResource(R.string.app_drawer_columns), "columns grid app drawer layout count", ScrollKeys.DRAWER_COLUMNS, visible = !drawerHorizontalEnabled)
             a(stringResource(R.string.row_height_label), "row height size spacing compact", ScrollKeys.DRAWER_ROW_HEIGHT)
             a(stringResource(R.string.app_drawer_indent_label), "horizontal padding indent margin spacing", ScrollKeys.DRAWER_INDENT)
             a(stringResource(R.string.top_padding_label), "top padding app drawer", ScrollKeys.DRAWER_TOP_PADDING)
@@ -889,7 +893,7 @@ fun PreferencesDashboard(
             a(stringResource(R.string.label_size), "label size app drawer", ScrollKeys.DRAWER_LABEL_SIZE, visible = showDrawerLabels)
             a(stringResource(R.string.twoline_label), "use multiple lines app drawer labels", ScrollKeys.DRAWER_TWO_LINE, visible = showDrawerLabels, toggle = twoLineAllAppsAdapter.toToggle())
             a(stringResource(R.string.pref_all_apps_remember_position_title), "remember position scroll app drawer keep", ScrollKeys.DRAWER_REMEMBER, toggle = rememberPositionAdapter.toToggle())
-            a(stringResource(R.string.pref_all_apps_show_scrollbar_title), "scrollbar show hide fast scroll", ScrollKeys.DRAWER_SCROLLBAR, toggle = showScrollbarAdapter.toToggle())
+            a(stringResource(R.string.pref_all_apps_show_scrollbar_title), "scrollbar show hide fast scroll", ScrollKeys.DRAWER_SCROLLBAR, visible = !drawerHorizontalEnabled, toggle = showScrollbarAdapter.toToggle())
 
             val breadcrumbPredictions = "$labelAppDrawer › $labelSuggestions"
             a(stringResource(R.string.global_predictions_label), "predictions suggestions enable toggle", route = Predictions, breadcrumb = breadcrumbPredictions, toggle = enableGlobalPredictionAdapter.toToggle())

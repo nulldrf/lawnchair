@@ -20,16 +20,23 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.View;
 
 import com.android.launcher3.PagedView;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.workprofile.PersonalWorkPagedView;
+
+import app.lawnchair.allapps.HorizontalPagedAppsLayoutManager;
 
 /**
  * A {@link PagedView} for showing different views for the personal and work profile respectively
  * in the {@link BaseAllAppsContainerView}.
  */
 public class AllAppsPagedView extends PersonalWorkPagedView {
+
+    private float mNestedDownX;
+    private float mNestedDownY;
 
     public AllAppsPagedView(Context context) {
         this(context, null);
@@ -41,6 +48,30 @@ public class AllAppsPagedView extends PersonalWorkPagedView {
 
     public AllAppsPagedView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mNestedDownX = ev.getX();
+            mNestedDownY = ev.getY();
+        } else if (action == MotionEvent.ACTION_MOVE) {
+            View currentChild = getChildAt(getCurrentPage());
+            if (currentChild instanceof AllAppsRecyclerView rv
+                    && rv.getLayoutManager() instanceof HorizontalPagedAppsLayoutManager) {
+                float dx = ev.getX() - mNestedDownX;
+                float dy = ev.getY() - mNestedDownY;
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 0f) {
+                    // Positive direction = finger dragging left (scroll content toward right).
+                    int direction = dx < 0f ? 1 : -1;
+                    if (rv.canScrollHorizontally(direction)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return super.onInterceptTouchEvent(ev);
     }
 
     @Override

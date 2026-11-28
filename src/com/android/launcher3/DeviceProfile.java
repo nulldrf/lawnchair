@@ -247,6 +247,7 @@ public class DeviceProfile {
     public int allAppsCloseDuration;
     public int allAppsLeftRightMargin;
     public final int numShownAllAppsColumns;
+    public final int numShownAllAppsRows;
 
     private final OverviewProfile overviewProfile;
 
@@ -340,6 +341,7 @@ public class DeviceProfile {
         numHotseatPages = 1;
         mBubbleBarSpaceThresholdPx = 0;
         numShownAllAppsColumns = 0;
+        numShownAllAppsRows = 0;
         mViewScaleProvider = null;
         mDotRendererWorkSpace = null;
         mDotRendererAllApps = null;
@@ -350,6 +352,10 @@ public class DeviceProfile {
 
     private final TextFactors mTextFactors;
     private float allAppsCellHeightMultiplier;
+
+    public float getAllAppsCellHeightMultiplier() {
+        return allAppsCellHeightMultiplier > 0f ? allAppsCellHeightMultiplier : 1f;
+    }
     private float workspacePaddingHorizontalFactor;
     private float workspacePaddingVerticalFactor;
     private float widgetPaddingFactor;
@@ -528,6 +534,7 @@ public class DeviceProfile {
         mHotseatColumnSpan = inv.numColumns;
 
         numShownAllAppsColumns = displayOptionSpec.numAllAppsColumns;
+        numShownAllAppsRows = Math.max(1, inv.numAllAppsRows > 0 ? inv.numAllAppsRows : inv.numRows);
 
         int hotseatBarBottomSpace = pxFromDp(inv.hotseatBarBottomSpace[mTypeIndex], mMetrics);
         int minQsbMargin = res.getDimensionPixelSize(R.dimen.min_qsb_margin);

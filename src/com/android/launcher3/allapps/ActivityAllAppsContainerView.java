@@ -97,6 +97,7 @@ import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.UserIconInfo;
+import com.android.launcher3.pageindicators.PageIndicatorDots;
 import com.android.launcher3.recyclerview.AllAppsRecyclerViewPool;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.Preconditions;
@@ -119,6 +120,9 @@ import java.util.stream.Stream;
 import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
 import static com.topjohnwu.superuser.internal.Utils.context;
 import app.lawnchair.allapps.DrawerWallpaperBlurHelper;
+import app.lawnchair.allapps.HorizontalAppsPageCalculator;
+import app.lawnchair.allapps.HorizontalPageSnapper;
+import app.lawnchair.allapps.HorizontalPagedAppsLayoutManager;
 import app.lawnchair.allapps.LawnchairAlphabeticalAppsList;
 import app.lawnchair.font.FontManager;
 import app.lawnchair.preferences2.PreferenceManager2;
@@ -191,6 +195,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private boolean mIsSearching;
     private boolean mSearchExitInProgress;
     boolean showFastScroller;
+    private boolean mIsHorizontalDrawer;
+    @Nullable private PageIndicatorDots mHorizontalPageIndicator;
+    private int mHorizontalPageIndicatorHeight;
+    private int mHorizontalPageIndicatorBottomMargin;
     private boolean mRebindAdaptersAfterSearchAnimation;
     private int mNavBarScrimHeight = 0;
     private boolean mSearchContainerAnimating = false;
@@ -287,7 +295,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     protected void initContent() {
-        showFastScroller = PreferenceCacheExtensionsKt.firstCached(pref2.getShowScrollbar());
+        mIsHorizontalDrawer = PreferenceCacheExtensionsKt.firstCached(
+                pref2.getDrawerHorizontalScroll());
+        showFastScroller = PreferenceCacheExtensionsKt.firstCached(pref2.getShowScrollbar())
+                && !mIsHorizontalDrawer;
+        mHorizontalPageIndicatorHeight = getResources().getDimensionPixelSize(
+                R.dimen.all_apps_horizontal_page_indicator_height);
+        mHorizontalPageIndicatorBottomMargin = getResources().getDimensionPixelSize(
+                R.dimen.all_apps_horizontal_page_indicator_bottom_margin);
 
         mMainAdapterProvider = mSearchUiDelegate.createMainAdapterProvider();
 
@@ -307,6 +322,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mBottomSheetHandleArea = findViewById(R.id.bottom_sheet_handle_area);
         mBottomSheetHandle = findViewById(R.id.bottom_sheet_handle);
         mSearchRecyclerView = findViewById(R.id.search_results_list_view);
+        mHorizontalPageIndicator = findViewById(R.id.all_apps_horizontal_page_indicator);
+        if (mHorizontalPageIndicator != null) {
+            mHorizontalPageIndicator.setShouldAutoHide(false);
+        }
         mFastScroller = findViewById(R.id.fast_scroller);
         mFastScroller.setPopupView(findViewById(R.id.fast_scroller_popup));
         mFastScroller.setVisibility(showFastScroller ? VISIBLE : INVISIBLE);
@@ -432,7 +451,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
         mSearchExitInProgress = !goingToSearch;
-        mFastScroller.setVisibility(goingToSearch ? INVISIBLE : VISIBLE);
+        mFastScroller.setVisibility(goingToSearch || !showFastScroller ? INVISIBLE : VISIBLE);
+        if (goingToSearch && mHorizontalPageIndicator != null) {
+            mHorizontalPageIndicator.setVisibility(GONE);
+        }
         if (goingToSearch) {
             mWorkManager.onActivePageChanged(SEARCH);
         } else if (mAllAppsTransitionController != null) {
@@ -638,6 +660,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mHeader.setActiveRV(currentActivePage);
         reset(true /* animate */, !isSearching() && !keepSearchFocus /* exitSearch */);
         mWorkManager.onActivePageChanged(currentActivePage);
+        updateHorizontalPageIndicatorBottomMargin();
+        updateHorizontalPageIndicatorForActiveTab();
     }
 
     protected void rebindAdapters() { rebindAdapters(false); }
@@ -730,6 +754,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         Log.d(TAG, "replaceAppsRVContainer: showTabs: " + showTabs);
         for (int i = AdapterHolder.MAIN; i <= AdapterHolder.WORK; i++) {
             AdapterHolder h = mAH.get(i);
+            if (h.mHorizontalPageSnapper != null) {
+                h.mHorizontalPageSnapper.detach();
+            }
             if (h.mRecyclerView != null) {
                 h.mRecyclerView.setLayoutManager(null);
                 h.mRecyclerView.setAdapter(null);
@@ -1131,14 +1158,22 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         for (AdapterHolder holder : mAH) {
             holder.mAdapter.setAppsPerRow(dp.numShownAllAppsColumns);
             holder.mAppsList.setNumAppsPerRowAllApps(dp.numShownAllAppsColumns);
+            if (holder.mLayoutManager instanceof HorizontalPagedAppsLayoutManager horizontalLm) {
+                horizontalLm.updateGrid(
+                        dp.numShownAllAppsColumns,
+                        dp.numShownAllAppsRows,
+                        dp.getAllAppsCellHeightMultiplier());
+            }
             if (holder.mRecyclerView != null) {
                 holder.mRecyclerView.swapAdapter(holder.mRecyclerView.getAdapter(), true);
                 holder.mRecyclerView.getRecycledViewPool().clear();
+                holder.mRecyclerView.updatePoolSize(mUsingTabs);
             }
         }
         updateBackgroundVisibility(dp);
         updateContainerPadding(dp);
         applyAdapterSideAndBottomPaddings(dp);
+        updateHorizontalPageIndicatorForActiveTab();
 
         boolean needsInvalidate = false;
         int navBarScrimColor = Themes.getNavBarScrimColor(mActivityContext);
@@ -1225,7 +1260,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!isInAllApps()) { mTouchHandler = null; return false; }
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             AllAppsRecyclerView rv = getActiveRecyclerView();
-            if (rv != null && rv.getScrollbar() != null
+            if (rv != null && rv.supportsFastScrolling() && rv.getScrollbar() != null
                     && rv.getScrollbar().isHitInParent(ev.getX(), ev.getY(), mFastScrollerOffset)) {
                 mTouchHandler = rv.getScrollbar();
             } else {
@@ -1241,7 +1276,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (!isInAllApps()) return false;
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             AllAppsRecyclerView rv = getActiveRecyclerView();
-            if (rv != null && rv.getScrollbar() != null
+            if (rv != null && rv.supportsFastScrolling() && rv.getScrollbar() != null
                     && rv.getScrollbar().isHitInParent(ev.getX(), ev.getY(), mFastScrollerOffset)) {
                 mTouchHandler = rv.getScrollbar();
             } else {
@@ -1376,24 +1411,108 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mHeader.setVisibility(hasHeaderContent ? View.VISIBLE : View.GONE);
         }
         if (mHeader.isSetUp()) mHeader.setActiveRV(getCurrentPage());
+        updateHorizontalPageIndicatorForActiveTab();
     }
 
     private void applyAdapterSideAndBottomPaddings(DeviceProfile grid) {
-        int bottomPadding = Math.max(mInsets.bottom, mNavBarScrimHeight);
+        int bottomInset = Math.max(mInsets.bottom, mNavBarScrimHeight);
 
         boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
                 pref2.getAppDrawerSearchBarAtBottom());
-        if (searchBarAtBottom && !isSearchBarFloating()) {
-            bottomPadding += mSearchContainer.getHeight();
-        }
+        boolean reserveBottomSearch = searchBarAtBottom && !isSearchBarFloating()
+                && !isAppDrawerSearchBarHidden() && mSearchContainer != null;
+        int bottomSearchHeight = reserveBottomSearch ? mSearchContainer.getHeight() : 0;
+        int pageIndicatorReserved = mIsHorizontalDrawer
+                ? (mHorizontalPageIndicatorHeight + mHorizontalPageIndicatorBottomMargin) : 0;
 
-        final int finalBottomPadding = bottomPadding;
+        final int appsBottomPadding = HorizontalAppsPageCalculator.INSTANCE
+                .computeReservedBottomPadding(
+                        bottomInset,
+                        reserveBottomSearch,
+                        bottomSearchHeight,
+                        pageIndicatorReserved,
+                        0);
+        final int searchBottomPadding = bottomInset + bottomSearchHeight;
+
         mAH.forEach(adapterHolder -> {
-            adapterHolder.mPadding.bottom = finalBottomPadding;
+            adapterHolder.mPadding.bottom = adapterHolder.isSearch()
+                    ? searchBottomPadding : appsBottomPadding;
             adapterHolder.mPadding.left = grid.allAppsPadding.left;
             adapterHolder.mPadding.right = grid.allAppsPadding.right;
             adapterHolder.applyPadding();
         });
+        updateHorizontalPageIndicatorBottomMargin();
+    }
+
+    private boolean isActiveAppsTab(int holderType) {
+        if (isSearching()) return false;
+        if (!mUsingTabs) return holderType == AdapterHolder.MAIN;
+        return isPersonalTab()
+                ? holderType == AdapterHolder.MAIN
+                : holderType == AdapterHolder.WORK;
+    }
+
+    private void updateHorizontalPageIndicatorBottomMargin() {
+        if (mHorizontalPageIndicator == null) return;
+        ViewGroup.LayoutParams rawLp = mHorizontalPageIndicator.getLayoutParams();
+        if (!(rawLp instanceof RelativeLayout.LayoutParams lp)) return;
+
+        int bottomInset = Math.max(mInsets.bottom, mNavBarScrimHeight);
+        boolean searchBarAtBottom = PreferenceCacheExtensionsKt.firstCached(
+                pref2.getAppDrawerSearchBarAtBottom());
+        int bottomSearchHeight = (searchBarAtBottom && !isSearchBarFloating()
+                && !isAppDrawerSearchBarHidden() && mSearchContainer != null)
+                ? mSearchContainer.getHeight() : 0;
+        int workFabOffset = 0;
+        if (mUsingTabs && !isPersonalTab() && mWorkManager.getWorkUtilityView() != null) {
+            workFabOffset = mWorkManager.getWorkUtilityView().getHeight();
+        }
+        int desiredMargin = bottomInset + bottomSearchHeight + workFabOffset
+                + mHorizontalPageIndicatorBottomMargin;
+        if (lp.bottomMargin != desiredMargin) {
+            lp.bottomMargin = desiredMargin;
+            mHorizontalPageIndicator.setLayoutParams(lp);
+        }
+    }
+
+    private void updateHorizontalPageIndicatorForActiveTab() {
+        if (mHorizontalPageIndicator == null) return;
+        if (!mIsHorizontalDrawer || isSearching()) {
+            mHorizontalPageIndicator.setVisibility(GONE);
+            return;
+        }
+        int activeTab = (!mUsingTabs || isPersonalTab())
+                ? AdapterHolder.MAIN : AdapterHolder.WORK;
+        AdapterHolder holder = mAH.get(activeTab);
+        if (holder != null
+                && holder.mLayoutManager instanceof HorizontalPagedAppsLayoutManager horizontalLm) {
+            syncHorizontalPageIndicator(
+                    horizontalLm.getScrollOffsetX(),
+                    horizontalLm.getMaxScrollX(),
+                    horizontalLm.getPageCount(),
+                    horizontalLm.getCurrentPage(),
+                    horizontalLm.isRtlLayout());
+        } else {
+            mHorizontalPageIndicator.setVisibility(GONE);
+        }
+    }
+
+    private void syncHorizontalPageIndicator(
+            int scrollOffsetX,
+            int maxScrollX,
+            int pageCount,
+            int currentPage,
+            boolean isRtl) {
+        if (mHorizontalPageIndicator == null) return;
+        if (!mIsHorizontalDrawer || isSearching() || pageCount <= 1) {
+            mHorizontalPageIndicator.setVisibility(GONE);
+            return;
+        }
+        mHorizontalPageIndicator.setVisibility(VISIBLE);
+        mHorizontalPageIndicator.setMarkersCount(pageCount);
+        mHorizontalPageIndicator.setActiveMarker(currentPage);
+        int scrollForIndicator = isRtl ? Math.max(0, maxScrollX - scrollOffsetX) : scrollOffsetX;
+        mHorizontalPageIndicator.setScroll(scrollForIndicator, maxScrollX);
     }
 
     private void setDeviceManagementResources() {
@@ -1811,6 +1930,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         private final int mType;
         public final BaseAllAppsAdapter<T> mAdapter;
         final RecyclerView.LayoutManager mLayoutManager;
+        @Nullable final HorizontalPageSnapper mHorizontalPageSnapper;
         final AlphabeticalAppsList<T> mAppsList;
         final Rect mPadding = new Rect();
         AllAppsRecyclerView mRecyclerView;
@@ -1821,7 +1941,26 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mAppsList = appsList;
             mAdapter = createAdapter(mAppsList);
             mAppsList.setAdapter(mAdapter);
-            mLayoutManager = mAdapter.getLayoutManager();
+            if (mIsHorizontalDrawer && type != SEARCH) {
+                DeviceProfile dp = mActivityContext.getDeviceProfile();
+                HorizontalPagedAppsLayoutManager horizontalLm =
+                        new HorizontalPagedAppsLayoutManager(
+                                dp.numShownAllAppsColumns,
+                                dp.numShownAllAppsRows,
+                                dp.getAllAppsCellHeightMultiplier());
+                horizontalLm.setOnPageScrollListener(
+                        (scrollX, maxScrollX, pageCount, currentPage, isRtl) -> {
+                            if (isActiveAppsTab(type)) {
+                                syncHorizontalPageIndicator(
+                                        scrollX, maxScrollX, pageCount, currentPage, isRtl);
+                            }
+                        });
+                mLayoutManager = horizontalLm;
+                mHorizontalPageSnapper = new HorizontalPageSnapper();
+            } else {
+                mLayoutManager = mAdapter.getLayoutManager();
+                mHorizontalPageSnapper = null;
+            }
         }
 
         void setup(@NonNull View rv, @Nullable Predicate<ItemInfo> matcher) {
@@ -1832,6 +1971,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mRecyclerView.setApps(mAppsList);
             mRecyclerView.setLayoutManager(mLayoutManager);
             mRecyclerView.setAdapter(mAdapter);
+            if (mHorizontalPageSnapper != null) {
+                mHorizontalPageSnapper.attachToRecyclerView(mRecyclerView);
+            }
             mRecyclerView.setHasFixedSize(true);
             mRecyclerView.setItemAnimator(null);
             onInitializeRecyclerView(mRecyclerView);
@@ -1863,6 +2005,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 if (isSearchBarFloating()) bottomOffset += mSearchContainer.getHeight();
                 mRecyclerView.setPadding(mPadding.left, mPadding.top, mPadding.right,
                         mPadding.bottom + bottomOffset);
+                if (mIsHorizontalDrawer && isActiveAppsTab(mType)) {
+                    updateHorizontalPageIndicatorBottomMargin();
+                }
             }
         }
 

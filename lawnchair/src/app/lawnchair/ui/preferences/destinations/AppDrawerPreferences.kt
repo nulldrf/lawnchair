@@ -61,6 +61,7 @@ import app.lawnchair.ui.preferences.components.layout.PreferenceLayout
 import app.lawnchair.ui.preferences.components.layout.ScrollAnchor
 import app.lawnchair.ui.preferences.components.layout.ScrollKeys
 import app.lawnchair.ui.preferences.components.layout.rememberPreferenceScrollState
+import app.lawnchair.ui.preferences.navigation.AppDrawerGrid
 import app.lawnchair.ui.preferences.navigation.AppDrawerHiddenApps
 import app.lawnchair.ui.preferences.navigation.Predictions
 import com.android.launcher3.InvariantDeviceProfile
@@ -230,10 +231,32 @@ fun AppDrawerPreferences(
             )
         }
 
+        val drawerHorizontalAdapter = prefs2.drawerHorizontalScroll.getAdapter()
+        val isHorizontalDrawer = drawerHorizontalAdapter.state.value
         PreferenceGroup(heading = stringResource(id = R.string.grid)) {
+            ScrollAnchor(ScrollKeys.DRAWER_HORIZONTAL, scrollState) {
+                SwitchPreference(
+                    label = stringResource(id = R.string.pref_app_drawer_horizontal_title),
+                    description = stringResource(id = R.string.pref_app_drawer_horizontal_description),
+                    adapter = drawerHorizontalAdapter,
+                )
+            }
             val drawerColumnsAdapter = prefs2.drawerColumns.getAdapter()
             val drawerColumnsUnfoldedAdapter = prefs2.drawerColumnsUnfolded.getAdapter()
-            if (isFoldable) {
+            val drawerRowsAdapter = prefs2.drawerRows.getAdapter()
+            if (isHorizontalDrawer) {
+                ScrollAnchor(ScrollKeys.DRAWER_GRID, scrollState) {
+                    NavigationActionPreference(
+                        label = stringResource(id = R.string.app_drawer_grid),
+                        destination = AppDrawerGrid,
+                        subtitle = stringResource(
+                            id = R.string.x_by_y,
+                            drawerColumnsAdapter.state.value,
+                            drawerRowsAdapter.state.value,
+                        ),
+                    )
+                }
+            } else if (isFoldable) {
                 ScrollAnchor(ScrollKeys.DRAWER_COLUMNS, scrollState) {
                     SliderPreference(
                         label = stringResource(id = R.string.state_folded, stringResource(id = R.string.app_drawer_columns)),
@@ -344,11 +367,13 @@ fun AppDrawerPreferences(
                     adapter = prefs2.rememberPosition.getAdapter(),
                 )
             }
-            ScrollAnchor(ScrollKeys.DRAWER_SCROLLBAR, scrollState) {
-                SwitchPreference(
-                    label = stringResource(id = R.string.pref_all_apps_show_scrollbar_title),
-                    adapter = prefs2.showScrollbar.getAdapter(),
-                )
+            ExpandAndShrink(visible = !isHorizontalDrawer) {
+                ScrollAnchor(ScrollKeys.DRAWER_SCROLLBAR, scrollState) {
+                    SwitchPreference(
+                        label = stringResource(id = R.string.pref_all_apps_show_scrollbar_title),
+                        adapter = prefs2.showScrollbar.getAdapter(),
+                    )
+                }
             }
         }
     }

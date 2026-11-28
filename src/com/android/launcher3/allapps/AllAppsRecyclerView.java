@@ -38,6 +38,7 @@ import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 
@@ -62,6 +63,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import app.lawnchair.allapps.HorizontalPagedAppsLayoutManager;
+import app.lawnchair.preferences2.PreferenceCacheExtensionsKt;
+import app.lawnchair.preferences2.PreferenceManager2;
+
 /**
  * A RecyclerView with custom fast scroll support for the all apps view.
  */
@@ -74,6 +79,7 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
     protected final int mNumAppsPerRow;
     private final AllAppsFastScrollHelper mFastScrollHelper;
     private int mCumulativeVerticalScroll;
+    private int mSavedHorizontalPage = 0;
     private ConstraintLayout mLetterList;
 
     public AlphabeticalAppsList<?> mApps;
@@ -108,6 +114,39 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         return mApps;
     }
 
+    @Override
+    public boolean supportsFastScrolling() {
+        return !(getLayoutManager() instanceof HorizontalPagedAppsLayoutManager);
+    }
+
+    @Override
+    public boolean shouldContainerScroll(MotionEvent ev, View eventSource) {
+        if (getLayoutManager() instanceof HorizontalPagedAppsLayoutManager) {
+            return true;
+        }
+        return super.shouldContainerScroll(ev, eventSource);
+    }
+
+    @Override
+    public void saveScrollPosition() {
+        if (getLayoutManager() instanceof HorizontalPagedAppsLayoutManager horizontalLm) {
+            boolean remember = PreferenceCacheExtensionsKt.firstCached(
+                    PreferenceManager2.getInstance(getContext()).getRememberPosition());
+            mSavedHorizontalPage = remember ? horizontalLm.getCurrentPage() : 0;
+            return;
+        }
+        super.saveScrollPosition();
+    }
+
+    @Override
+    public void restoreScrollPosition() {
+        if (getLayoutManager() instanceof HorizontalPagedAppsLayoutManager horizontalLm) {
+            horizontalLm.scrollToPage(mSavedHorizontalPage);
+            return;
+        }
+        super.restoreScrollPosition();
+    }
+
     protected void updatePoolSize() {
         updatePoolSize(false);
     }
@@ -118,15 +157,22 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_EMPTY_SEARCH, 1);
         pool.setMaxRecycledViews(AllAppsGridAdapter.VIEW_TYPE_ALL_APPS_DIVIDER, 1);
 
-        // By default the max num of pool size for app icons is num of app icons in one page of
-        // all apps.
-        int maxPoolSizeForAppIcons = grid.getMaxAllAppsRowCount()
-                * grid.numShownAllAppsColumns;
-        // If we set all apps' hidden visibility to GONE and enable pre-inflation, we want to
-        // preinflate one page of all apps icons plus [PREINFLATE_ICONS_ROW_COUNT] rows +
-        // [EXTRA_ICONS_COUNT]. Thus we need to bump the max pool size of app icons accordingly.
-        maxPoolSizeForAppIcons +=
-                PREINFLATE_ICONS_ROW_COUNT * grid.numShownAllAppsColumns + EXTRA_ICONS_COUNT;
+        int maxPoolSizeForAppIcons;
+        if (getLayoutManager() instanceof HorizontalPagedAppsLayoutManager horizontalLm) {
+            // Keep at least two full pages pooled for smooth horizontal page swiping.
+            maxPoolSizeForAppIcons = 2 * horizontalLm.getColumns() * horizontalLm.getRows()
+                    + EXTRA_ICONS_COUNT;
+        } else {
+            // By default the max num of pool size for app icons is num of app icons in one page of
+            // all apps.
+            maxPoolSizeForAppIcons = grid.getMaxAllAppsRowCount()
+                    * grid.numShownAllAppsColumns;
+            // If we set all apps' hidden visibility to GONE and enable pre-inflation, we want to
+            // preinflate one page of all apps icons plus [PREINFLATE_ICONS_ROW_COUNT] rows +
+            // [EXTRA_ICONS_COUNT]. Thus we need to bump the max pool size of app icons accordingly.
+            maxPoolSizeForAppIcons +=
+                    PREINFLATE_ICONS_ROW_COUNT * grid.numShownAllAppsColumns + EXTRA_ICONS_COUNT;
+        }
         if (hasWorkProfile) {
             maxPoolSizeForAppIcons *= 2;
         }
@@ -227,6 +273,12 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
      */
     @Override
     public void onUpdateScrollbar(int dy) {
+        if (!supportsFastScrolling()) {
+            if (mScrollbar != null) {
+                mScrollbar.setThumbOffsetY(-1);
+            }
+            return;
+        }
         if (mApps == null) {
             return;
         }

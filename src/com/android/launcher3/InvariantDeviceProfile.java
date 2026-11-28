@@ -224,6 +224,10 @@ public class InvariantDeviceProfile {
      * Number of columns in the all apps list.
      */
     public int numAllAppsColumns;
+    /**
+     * Number of rows per page in the horizontal app drawer.
+     */
+    public int numAllAppsRows;
     public int numAllAppsRowsForCellHeightCalculation;
     public int numDatabaseAllAppsColumns;
     public @StyleRes int allAppsStyle;
@@ -513,6 +517,7 @@ public class InvariantDeviceProfile {
         allAppsStyle = closestProfile.allAppsStyle;
 
         numAllAppsColumns = closestProfile.numAllAppsColumns;
+        numAllAppsRows = Math.max(3, Math.min(10, closestProfile.numRows));
 
         numDatabaseAllAppsColumns = deviceType == TYPE_MULTI_DISPLAY
                 ? closestProfile.numDatabaseAllAppsColumns : numAllAppsColumns;

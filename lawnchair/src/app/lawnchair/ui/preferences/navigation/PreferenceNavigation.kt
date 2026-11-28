@@ -25,6 +25,7 @@ import app.lawnchair.ui.preferences.components.colorpreference.ColorSelection
 import app.lawnchair.ui.preferences.components.search.SearchProviderId
 import app.lawnchair.ui.preferences.components.search.SearchProviderPreferenceScreen
 import app.lawnchair.ui.preferences.destinations.AppDrawerFoldersPreference
+import app.lawnchair.ui.preferences.destinations.AppDrawerGridPreferences
 import app.lawnchair.ui.preferences.destinations.AppDrawerPreferences
 import app.lawnchair.ui.preferences.destinations.BackupAndRestorePreference
 import app.lawnchair.ui.preferences.destinations.ColorStyleScreen
@@ -169,6 +170,9 @@ fun PreferenceNavigation(
         composable<AppDrawer>(
             deepLinks = getDeepLink(AppDrawer),
         ) { AppDrawerPreferences() }
+        composable<AppDrawerGrid>(
+            deepLinks = getDeepLink(AppDrawerGrid),
+        ) { AppDrawerGridPreferences() }
         composable<AppDrawerHiddenApps>(
             deepLinks = getDeepLink(AppDrawerHiddenApps),
         ) { HiddenAppsPreferences() }

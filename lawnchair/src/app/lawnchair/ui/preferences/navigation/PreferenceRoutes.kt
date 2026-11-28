@@ -169,6 +169,11 @@ data object DockSearchProvider : PreferenceRoute, PreferenceDeepLink {
 
 // App Drawer section routes
 @Serializable
+data object AppDrawerGrid : PreferenceRoute, PreferenceDeepLink {
+    override val deepLink = "$URI/app-drawer-grid"
+}
+
+@Serializable
 data object AppDrawerHiddenApps : PreferenceRoute, PreferenceDeepLink {
     override val deepLink = "$URI/app-drawer-hidden-apps"
 }

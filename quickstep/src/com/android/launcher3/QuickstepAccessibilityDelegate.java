@@ -65,8 +65,8 @@ public class QuickstepAccessibilityDelegate extends LauncherAccessibilityDelegat
         if (contentView instanceof SearchRecyclerView) {
             return;
         }
-        LinearLayoutManager layoutManager = (LinearLayoutManager) contentView.getLayoutManager();
-        if (layoutManager == null) {
+        RecyclerView.LayoutManager lm = contentView.getLayoutManager();
+        if (!(lm instanceof LinearLayoutManager layoutManager)) {
             return;
         }
         RecyclerView.ViewHolder vh = contentView.findContainingViewHolder(view);

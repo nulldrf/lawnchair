@@ -156,6 +156,8 @@ object ScrollKeys {
     const val DRAWER_TEXT_COLOR = "drawer.text_color"
     const val DRAWER_BLUR = "drawer.blur"
     const val DRAWER_BLUR_INTENSITY = "drawer.blur_intensity"
+    const val DRAWER_HORIZONTAL = "drawer.horizontal"
+    const val DRAWER_GRID = "drawer.grid"
     const val DRAWER_COLUMNS = "drawer.columns"
     const val DRAWER_ROW_HEIGHT = "drawer.row_height"
     const val DRAWER_INDENT = "drawer.indent"

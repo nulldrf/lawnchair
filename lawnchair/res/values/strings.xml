@@ -1071,6 +1071,10 @@
 	
 	<string name="pref_app_drawer_search_bar_at_bottom">Search bar at bottom</string>
 
+    <string name="app_drawer_grid">App drawer grid</string>
+    <string name="pref_app_drawer_horizontal_title">Horizontal app drawer</string>
+    <string name="pref_app_drawer_horizontal_description">Scroll through apps horizontally page by page</string>
+
     <string name="app_drawer_columns">App drawer columns</string>
     <string name="row_height_label">Row height</string>
     <string name="app_drawer_haptic_feedback_label">Haptic feedback</string>

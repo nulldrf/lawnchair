@@ -94,6 +94,7 @@ class DeviceProfileOverrides @Inject constructor(
 
     data class Options(
         val numAllAppsColumns: Int,
+        val numAllAppsRows: Int,
         val numFolderRows: Int,
         val numFolderColumns: Int,
 
@@ -118,6 +119,7 @@ class DeviceProfileOverrides @Inject constructor(
             previewOverrides: PreviewOverrides,
         ) : this(
             numAllAppsColumns = prefs2.drawerColumns.firstCached(gridOption = defaultGrid),
+            numAllAppsRows = prefs2.drawerRows.firstCached(gridOption = defaultGrid).coerceIn(3, 10),
             numFolderRows = prefs2.folderRows.firstCached(gridOption = defaultGrid),
             numFolderColumns = prefs2.folderColumns.firstCached(gridOption = defaultGrid),
 
@@ -160,6 +162,7 @@ class DeviceProfileOverrides @Inject constructor(
             // apply grid size
             idp.numAllAppsColumns = numAllAppsColumns
             idp.numDatabaseAllAppsColumns = numAllAppsColumns
+            idp.numAllAppsRows = numAllAppsRows
             idp.numFolderRows[INDEX_DEFAULT] = numFolderRows
             idp.numFolderColumns[INDEX_DEFAULT] = numFolderColumns
 

@@ -48,7 +48,7 @@ class HeadlessWidgetsManager @Inject constructor(
             return existing
         }
 
-        return Widget(info, prefKey).also {
+        return Widget(this, info, prefKey).also {
             widgetsMap[prefKey] = it
         }
     }
@@ -109,29 +109,33 @@ class HeadlessWidgetsManager @Inject constructor(
         }
     }
 
-    inner class Widget internal constructor(val info: AppWidgetProviderInfo, private val prefKey: String) {
+    class Widget internal constructor(
+        private val manager: HeadlessWidgetsManager,
+        val info: AppWidgetProviderInfo,
+        private val prefKey: String,
+    ) {
 
-        private var widgetId = prefs.getInt(prefKey, -1)
+        private var widgetId = manager.prefs.getInt(prefKey, -1)
         val isBound: Boolean
-            get() = widgetId > -1 && widgetManager.getAppWidgetInfo(widgetId)?.provider == info.provider
+            get() = widgetId > -1 && manager.widgetManager.getAppWidgetInfo(widgetId)?.provider == info.provider
         val updates = callbackFlow {
-            onSubscriberStarted()
+            manager.onSubscriberStarted()
             val view = try {
-                host.createView(context, widgetId, info) as HeadlessAppWidgetHostView
+                manager.host.createView(manager.context, widgetId, info) as HeadlessAppWidgetHostView
             } catch (t: Throwable) {
-                onSubscriberStopped()
+                manager.onSubscriberStopped()
                 throw t
             }
             trySend(view)
             view.updateCallback = { trySend(it) }
             awaitClose {
                 view.updateCallback = null
-                onSubscriberStopped()
+                manager.onSubscriberStopped()
             }
         }
             .onStart { if (!isBound) throw WidgetNotBoundException() }
             .shareIn(
-                scope,
+                manager.scope,
                 SharingStarted.WhileSubscribed(),
                 replay = 1,
             )
@@ -143,11 +147,11 @@ class HeadlessWidgetsManager @Inject constructor(
         fun bind() {
             if (!isBound) {
                 if (widgetId > -1) {
-                    host.deleteAppWidgetId(widgetId)
+                    manager.host.deleteAppWidgetId(widgetId)
                 }
 
-                widgetId = host.allocateAppWidgetId()
-                widgetManager.bindAppWidgetIdIfAllowed(
+                widgetId = manager.host.allocateAppWidgetId()
+                manager.widgetManager.bindAppWidgetIdIfAllowed(
                     widgetId,
                     info.profile,
                     info.provider,
@@ -155,7 +159,7 @@ class HeadlessWidgetsManager @Inject constructor(
                 )
             }
 
-            prefs.edit { putInt(prefKey, widgetId) }
+            manager.prefs.edit { putInt(prefKey, widgetId) }
         }
 
         fun getBindIntent() = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)

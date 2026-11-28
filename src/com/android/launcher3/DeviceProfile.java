@@ -918,7 +918,7 @@ public class DeviceProfile {
         int iconTextHeight = getHomeIconTextHeightPx(maxHotseatTextLineCount);
         HotseatMode hotseatMode = PreferenceCacheExtensionsKt.firstCached(preferenceManager2.getHotseatMode());
         boolean isQsbEnable = hotseatMode.getLayoutResourceId() != R.layout.empty_view;
-        // LC-Note: Hidden dock labels need no text space; keep the minimum touch target.
+        // Ensure there is enough space for folder icons and vertical centering in dock cells.
         hotseatCellHeightPx = app.lawnchair.util.DockCellSize.calculate(
                 hotseatIconSizePx, iconTextHeight, isLabelInDock, pxFromDp(48, mMetrics));
         hotseatQsbSpace = mHotseatQsbSpaceBase;

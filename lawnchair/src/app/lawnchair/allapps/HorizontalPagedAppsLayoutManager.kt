@@ -286,11 +286,13 @@ class HorizontalPagedAppsLayoutManager(
         }
 
     val isRtlLayout: Boolean
-        get() = layoutDirection == View.LAYOUT_DIRECTION_RTL
+        get() = recyclerView?.layoutDirection == View.LAYOUT_DIRECTION_RTL
 
     fun setOnPageScrollListener(listener: OnPageScrollListener?) {
         onPageScrollListener = listener
-        notifyPageScroll()
+        if (recyclerView != null) {
+            notifyPageScroll()
+        }
     }
 
     fun updateGrid(columns: Int, rows: Int, cellHeightFactor: Float) {
@@ -338,6 +340,7 @@ class HorizontalPagedAppsLayoutManager(
     override fun onAttachedToWindow(view: RecyclerView) {
         super.onAttachedToWindow(view)
         recyclerView = view
+        notifyPageScroll()
     }
 
     override fun onDetachedFromWindow(view: RecyclerView, recycler: RecyclerView.Recycler) {
